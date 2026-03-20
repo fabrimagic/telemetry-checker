@@ -1,92 +1,116 @@
 import { useMemo } from "react";
 import type { LocationData } from "@/lib/openf1";
 
-interface Props {
+interface DriverLocation {
+  driverNumber: number;
+  acronym: string;
+  color: string; // hex without #
   locations: LocationData[];
-  activeDate: string | null;
-  teamColor: string;
 }
 
-export function TrackMap({ locations, activeDate, teamColor }: Props) {
-  const { points, viewBox, activePoint } = useMemo(() => {
-    if (!locations.length) return { points: "", viewBox: "0 0 100 100", activePoint: null };
+interface Props {
+  drivers: DriverLocation[];
+  activeDate: string | null;
+}
 
-    const xs = locations.map((l) => l.x);
-    const ys = locations.map((l) => l.y);
+export function TrackMap({ drivers, activeDate }: Props) {
+  const { viewBox, driverPaths, scale } = useMemo(() => {
+    const allLocs = drivers.flatMap((d) => d.locations);
+    if (!allLocs.length) return { viewBox: "0 0 100 100", driverPaths: [], scale: 100 };
+
+    const xs = allLocs.map((l) => l.x);
+    const ys = allLocs.map((l) => l.y);
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const pad = Math.max((maxX - minX), (maxY - minY)) * 0.08;
+    const range = Math.max(maxX - minX, maxY - minY);
+    const pad = range * 0.08;
     const vb = `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`;
 
-    const pts = locations.map((l) => `${l.x},${l.y}`).join(" ");
+    const paths = drivers.map((d) => {
+      const pts = d.locations.map((l) => `${l.x},${l.y}`).join(" ");
 
-    let active: { x: number; y: number } | null = null;
-    if (activeDate) {
-      const target = new Date(activeDate).getTime();
-      let closest = locations[0];
-      let minDiff = Infinity;
-      for (const loc of locations) {
-        const diff = Math.abs(new Date(loc.date).getTime() - target);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closest = loc;
+      let active: { x: number; y: number } | null = null;
+      if (activeDate) {
+        const target = new Date(activeDate).getTime();
+        let closest = d.locations[0];
+        let minDiff = Infinity;
+        for (const loc of d.locations) {
+          const diff = Math.abs(new Date(loc.date).getTime() - target);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = loc;
+          }
         }
+        if (closest) active = { x: closest.x, y: closest.y };
       }
-      active = { x: closest.x, y: closest.y };
-    }
 
-    return { points: pts, viewBox: vb, activePoint: active };
-  }, [locations, activeDate]);
+      return { ...d, points: pts, activePoint: active };
+    });
 
-  if (!locations.length) return null;
+    return { viewBox: vb, driverPaths: paths, scale: range || 100 };
+  }, [drivers, activeDate]);
 
-  const color = `#${teamColor}`;
+  if (!drivers.some((d) => d.locations.length > 0)) return null;
 
   return (
     <div className="bg-card rounded-lg border border-border p-4">
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Track Position</h3>
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mb-3">
+        {drivers.map((d) => (
+          <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${d.color}` }} />
+            <span className="font-mono font-bold">{d.acronym}</span>
+          </span>
+        ))}
+      </div>
       <svg viewBox={viewBox} className="w-full max-h-[400px]" style={{ aspectRatio: "1", transform: "scale(-1,1)" }}>
-        {/* Track outline */}
-        <polyline
-          points={points}
-          fill="none"
-          stroke="hsl(220 14% 22%)"
-          strokeWidth={Math.max((parseFloat(viewBox.split(" ")[2]) || 100) * 0.006, 1)}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Colored path */}
-        <polyline
-          points={points}
-          fill="none"
-          stroke={color}
-          strokeWidth={Math.max((parseFloat(viewBox.split(" ")[2]) || 100) * 0.004, 0.5)}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.6}
-        />
-        {/* Active marker */}
-        {activePoint && (
-          <>
-            <circle
-              cx={activePoint.x}
-              cy={activePoint.y}
-              r={Math.max((parseFloat(viewBox.split(" ")[2]) || 100) * 0.015, 2)}
-              fill={color}
-              opacity={0.3}
-            />
-            <circle
-              cx={activePoint.x}
-              cy={activePoint.y}
-              r={Math.max((parseFloat(viewBox.split(" ")[2]) || 100) * 0.008, 1)}
-              fill={color}
-              stroke="white"
-              strokeWidth={Math.max((parseFloat(viewBox.split(" ")[2]) || 100) * 0.002, 0.3)}
-            />
-          </>
+        {/* Track outline from first driver */}
+        {driverPaths[0] && (
+          <polyline
+            points={driverPaths[0].points}
+            fill="none"
+            stroke="hsl(220 14% 22%)"
+            strokeWidth={Math.max(scale * 0.006, 1)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         )}
+        {/* Each driver's path and marker */}
+        {driverPaths.map((d) => (
+          <g key={d.driverNumber}>
+            <polyline
+              points={d.points}
+              fill="none"
+              stroke={`#${d.color}`}
+              strokeWidth={Math.max(scale * 0.003, 0.5)}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.5}
+            />
+            {d.activePoint && (
+              <>
+                <circle
+                  cx={d.activePoint.x}
+                  cy={d.activePoint.y}
+                  r={Math.max(scale * 0.015, 2)}
+                  fill={`#${d.color}`}
+                  opacity={0.3}
+                />
+                <circle
+                  cx={d.activePoint.x}
+                  cy={d.activePoint.y}
+                  r={Math.max(scale * 0.008, 1)}
+                  fill={`#${d.color}`}
+                  stroke="white"
+                  strokeWidth={Math.max(scale * 0.002, 0.3)}
+                />
+              </>
+            )}
+          </g>
+        ))}
       </svg>
     </div>
   );
