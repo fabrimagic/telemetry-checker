@@ -210,7 +210,7 @@ export default function Index() {
     } finally {
       setLoadingTelemetry(false);
     }
-  }, [sessionKey, driverStates]);
+  }, [sessionKey, driverStates, selectedDriverNumbers, sessionType]);
 
   const handleReset = useCallback(() => {
     setSessionKey(null);
