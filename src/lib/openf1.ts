@@ -44,6 +44,19 @@ export interface LocationData {
   session_key: number;
 }
 
+export interface WeatherData {
+  air_temperature: number;
+  date: string;
+  humidity: number;
+  meeting_key: number;
+  pressure: number;
+  rainfall: number;
+  session_key: number;
+  track_temperature: number;
+  wind_direction: number;
+  wind_speed: number;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
