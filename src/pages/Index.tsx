@@ -5,6 +5,7 @@ import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
 import { TrackMap } from "@/components/f1/TrackMap";
 import { WeatherCard } from "@/components/f1/WeatherCard";
+import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
