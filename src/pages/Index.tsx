@@ -165,6 +165,16 @@ export default function Index() {
     }
   }, [sessionKey, driverStates]);
 
+  const handleReset = useCallback(() => {
+    setSessionKey(null);
+    setAllDrivers([]);
+    setSelectedDriverNumbers([]);
+    setDriverStates(new Map());
+    setError(null);
+    setCursorTime(null);
+    setClickedTime(null);
+  }, []);
+
   // Check if we have laps selected ready to load
   const hasLapsSelected = useMemo(
     () => [...driverStates.values()].some((s) => s.selectedLap != null),
