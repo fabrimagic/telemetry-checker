@@ -390,6 +390,9 @@ export default function Index() {
               {weatherData && selectedDriverNumbers.length === 1 && (
                 <WeatherCard weather={weatherData} />
               )}
+              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+              )}
             </div>
           </div>
         )}
