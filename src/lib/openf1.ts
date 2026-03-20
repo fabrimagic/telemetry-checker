@@ -110,3 +110,9 @@ export function getWeather(sessionKey: number, dateStart: string, dateEnd: strin
     `/weather?session_key=${sessionKey}&date>=${dateStart}&date<=${dateEnd}`
   );
 }
+
+export function getOvertakes(sessionKey: number, driverNumber: number) {
+  return fetchApi<OvertakeData[]>(
+    `/overtakes?session_key=${sessionKey}&overtaking_driver_number=${driverNumber}`
+  );
+}
