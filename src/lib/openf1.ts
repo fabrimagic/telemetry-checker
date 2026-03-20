@@ -57,6 +57,15 @@ export interface WeatherData {
   wind_speed: number;
 }
 
+export interface OvertakeData {
+  date: string;
+  meeting_key: number;
+  overtaken_driver_number: number;
+  overtaking_driver_number: number;
+  position: number;
+  session_key: number;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
@@ -99,5 +108,11 @@ export function getLocation(sessionKey: number, driverNumber: number, dateStart:
 export function getWeather(sessionKey: number, dateStart: string, dateEnd: string) {
   return fetchApi<WeatherData[]>(
     `/weather?session_key=${sessionKey}&date>=${dateStart}&date<=${dateEnd}`
+  );
+}
+
+export function getOvertakes(sessionKey: number, driverNumber: number) {
+  return fetchApi<OvertakeData[]>(
+    `/overtakes?session_key=${sessionKey}&overtaking_driver_number=${driverNumber}`
   );
 }

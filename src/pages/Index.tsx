@@ -5,6 +5,7 @@ import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
 import { TrackMap } from "@/components/f1/TrackMap";
 import { WeatherCard } from "@/components/f1/WeatherCard";
+import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
@@ -14,11 +15,13 @@ import {
   getCarData,
   getLocation,
   getWeather,
+  getOvertakes,
   type Driver,
   type Lap,
   type CarData,
   type LocationData,
   type WeatherData,
+  type OvertakeData,
 } from "@/lib/openf1";
 
 interface DriverState {
@@ -31,6 +34,7 @@ interface DriverState {
 
 export default function Index() {
   const [sessionKey, setSessionKey] = useState<number | null>(null);
+  const [sessionType, setSessionType] = useState<string>("");
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [selectedDriverNumbers, setSelectedDriverNumbers] = useState<number[]>([]);
   const [driverStates, setDriverStates] = useState<Map<number, DriverState>>(new Map());
@@ -39,15 +43,17 @@ export default function Index() {
   const [loadingLaps, setLoadingLaps] = useState<Set<number>>(new Set());
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
   const [clickedTime, setClickedTime] = useState<number | null>(null);
 
   // Load drivers for session
-  const handleSessionSubmit = useCallback(async (key: number) => {
+  const handleSessionSubmit = useCallback(async (key: number, type: string) => {
     setError(null);
     setSessionKey(key);
+    setSessionType(type);
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setLoadingDrivers(true);
@@ -137,6 +143,7 @@ export default function Index() {
     setClickedTime(null);
     setCursorTime(null);
     setWeatherData(null);
+    setOvertakesData([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
@@ -177,6 +184,19 @@ export default function Index() {
         }
       }
 
+      // Fetch overtakes for single driver in Race/Sprint sessions
+      if (
+        selectedDriverNumbers.length === 1 &&
+        (sessionType === "Race" || sessionType === "Sprint")
+      ) {
+        try {
+          const ot = await getOvertakes(sessionKey, selectedDriverNumbers[0]);
+          setOvertakesData(ot);
+        } catch {
+          // Overtakes are optional
+        }
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
@@ -190,14 +210,16 @@ export default function Index() {
     } finally {
       setLoadingTelemetry(false);
     }
-  }, [sessionKey, driverStates]);
+  }, [sessionKey, driverStates, selectedDriverNumbers, sessionType]);
 
   const handleReset = useCallback(() => {
     setSessionKey(null);
+    setSessionType("");
     setAllDrivers([]);
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setWeatherData(null);
+    setOvertakesData([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
@@ -367,6 +389,9 @@ export default function Index() {
               <TrackMap drivers={mapDrivers} activeDate={activeDate} />
               {weatherData && selectedDriverNumbers.length === 1 && (
                 <WeatherCard weather={weatherData} />
+              )}
+              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
               )}
             </div>
           </div>

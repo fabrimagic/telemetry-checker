@@ -20,7 +20,7 @@ interface Session {
 }
 
 interface Props {
-  onSelect: (sessionKey: number) => void;
+  onSelect: (sessionKey: number, sessionType: string) => void;
   isLoading: boolean;
 }
 
@@ -61,7 +61,8 @@ export function SessionPicker({ onSelect, isLoading }: Props) {
 
   const handleChange = (val: string) => {
     setSelected(val);
-    onSelect(Number(val));
+    const session = sessions.find((s) => s.session_key === Number(val));
+    onSelect(Number(val), session?.session_type ?? "");
   };
 
   if (loading) {
