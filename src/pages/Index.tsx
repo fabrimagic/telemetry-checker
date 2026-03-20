@@ -200,6 +200,12 @@ export default function Index() {
         } catch {
           // Overtakes are optional
         }
+        try {
+          const st = await getStints(sessionKey, selectedDriverNumbers[0]);
+          setStintsData(st);
+        } catch {
+          // Stints are optional
+        }
       }
 
       setDriverStates((prev) => {
