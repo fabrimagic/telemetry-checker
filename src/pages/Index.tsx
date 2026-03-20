@@ -251,10 +251,18 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center gap-3">
-          <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
-          <h1 className="text-lg font-bold tracking-tight">F1 Telemetry</h1>
-          <span className="text-xs text-muted-foreground ml-1">OpenF1 Data</span>
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
+            <h1 className="text-lg font-bold tracking-tight">F1 Telemetry</h1>
+            <span className="text-xs text-muted-foreground ml-1">OpenF1 Data</span>
+          </div>
+          {sessionKey && (
+            <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-xs text-muted-foreground">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </Button>
+          )}
         </div>
       </header>
 
