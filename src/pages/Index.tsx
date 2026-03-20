@@ -6,6 +6,7 @@ import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/co
 import { TrackMap } from "@/components/f1/TrackMap";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
+import { StintsCard } from "@/components/f1/StintsCard";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
