@@ -4,7 +4,7 @@ import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
 import { TrackMap } from "@/components/f1/TrackMap";
-import { Loader2 } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
 import {
@@ -165,6 +165,16 @@ export default function Index() {
     }
   }, [sessionKey, driverStates]);
 
+  const handleReset = useCallback(() => {
+    setSessionKey(null);
+    setAllDrivers([]);
+    setSelectedDriverNumbers([]);
+    setDriverStates(new Map());
+    setError(null);
+    setCursorTime(null);
+    setClickedTime(null);
+  }, []);
+
   // Check if we have laps selected ready to load
   const hasLapsSelected = useMemo(
     () => [...driverStates.values()].some((s) => s.selectedLap != null),
@@ -241,10 +251,18 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center gap-3">
-          <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
-          <h1 className="text-lg font-bold tracking-tight">F1 Telemetry</h1>
-          <span className="text-xs text-muted-foreground ml-1">OpenF1 Data</span>
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
+            <h1 className="text-lg font-bold tracking-tight">F1 Telemetry</h1>
+            <span className="text-xs text-muted-foreground ml-1">OpenF1 Data</span>
+          </div>
+          {sessionKey && (
+            <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-xs text-muted-foreground">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </Button>
+          )}
         </div>
       </header>
 
