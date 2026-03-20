@@ -405,6 +405,9 @@ export default function Index() {
               {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
                 <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
               )}
+              {stintsData.length > 0 && selectedDriverNumbers.length === 1 && (
+                <StintsCard stints={stintsData} />
+              )}
             </div>
           </div>
         )}
