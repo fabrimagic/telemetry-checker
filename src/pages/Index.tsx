@@ -363,7 +363,12 @@ export default function Index() {
                 onCursorClick={setClickedTime}
               />
             </section>
-            <TrackMap drivers={mapDrivers} activeDate={activeDate} />
+            <div className="space-y-6">
+              <TrackMap drivers={mapDrivers} activeDate={activeDate} />
+              {weatherData && selectedDriverNumbers.length === 1 && (
+                <WeatherCard weather={weatherData} />
+              )}
+            </div>
           </div>
         )}
       </main>
