@@ -214,10 +214,12 @@ export default function Index() {
 
   const handleReset = useCallback(() => {
     setSessionKey(null);
+    setSessionType("");
     setAllDrivers([]);
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setWeatherData(null);
+    setOvertakesData([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
