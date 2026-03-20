@@ -148,6 +148,7 @@ export default function Index() {
     setCursorTime(null);
     setWeatherData(null);
     setOvertakesData([]);
+    setStintsData([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
