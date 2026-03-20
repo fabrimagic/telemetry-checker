@@ -6,6 +6,7 @@ import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/co
 import { TrackMap } from "@/components/f1/TrackMap";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
+import { StintsCard } from "@/components/f1/StintsCard";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
@@ -16,12 +17,14 @@ import {
   getLocation,
   getWeather,
   getOvertakes,
+  getStints,
   type Driver,
   type Lap,
   type CarData,
   type LocationData,
   type WeatherData,
   type OvertakeData,
+  type StintData,
 } from "@/lib/openf1";
 
 interface DriverState {
@@ -44,6 +47,7 @@ export default function Index() {
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
+  const [stintsData, setStintsData] = useState<StintData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -144,6 +148,7 @@ export default function Index() {
     setCursorTime(null);
     setWeatherData(null);
     setOvertakesData([]);
+    setStintsData([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
@@ -195,6 +200,12 @@ export default function Index() {
         } catch {
           // Overtakes are optional
         }
+        try {
+          const st = await getStints(sessionKey, selectedDriverNumbers[0]);
+          setStintsData(st);
+        } catch {
+          // Stints are optional
+        }
       }
 
       setDriverStates((prev) => {
@@ -220,6 +231,7 @@ export default function Index() {
     setDriverStates(new Map());
     setWeatherData(null);
     setOvertakesData([]);
+    setStintsData([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
@@ -392,6 +404,9 @@ export default function Index() {
               )}
               {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
                 <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+              )}
+              {stintsData.length > 0 && selectedDriverNumbers.length === 1 && (
+                <StintsCard stints={stintsData} />
               )}
             </div>
           </div>

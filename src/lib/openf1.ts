@@ -66,6 +66,17 @@ export interface OvertakeData {
   session_key: number;
 }
 
+export interface StintData {
+  compound: string;
+  driver_number: number;
+  lap_end: number;
+  lap_start: number;
+  meeting_key: number;
+  session_key: number;
+  stint_number: number;
+  tyre_age_at_start: number;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
@@ -114,5 +125,11 @@ export function getWeather(sessionKey: number, dateStart: string, dateEnd: strin
 export function getOvertakes(sessionKey: number, driverNumber: number) {
   return fetchApi<OvertakeData[]>(
     `/overtakes?session_key=${sessionKey}&overtaking_driver_number=${driverNumber}`
+  );
+}
+
+export function getStints(sessionKey: number, driverNumber: number) {
+  return fetchApi<StintData[]>(
+    `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
   );
 }
