@@ -43,6 +43,7 @@ export default function Index() {
   const [loadingLaps, setLoadingLaps] = useState<Set<number>>(new Set());
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
