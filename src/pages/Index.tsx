@@ -197,6 +197,7 @@ export default function Index() {
     setAllDrivers([]);
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
+    setWeatherData(null);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
