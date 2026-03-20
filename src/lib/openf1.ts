@@ -57,6 +57,15 @@ export interface WeatherData {
   wind_speed: number;
 }
 
+export interface OvertakeData {
+  date: string;
+  meeting_key: number;
+  overtaken_driver_number: number;
+  overtaking_driver_number: number;
+  position: number;
+  session_key: number;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
