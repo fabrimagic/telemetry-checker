@@ -231,6 +231,7 @@ export default function Index() {
     setDriverStates(new Map());
     setWeatherData(null);
     setOvertakesData([]);
+    setStintsData([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
