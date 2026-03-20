@@ -47,7 +47,7 @@ export function TrackMap({ locations, activeDate, teamColor }: Props) {
   return (
     <div className="bg-card rounded-lg border border-border p-4">
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Track Position</h3>
-      <svg viewBox={viewBox} className="w-full max-h-[400px]" style={{ aspectRatio: "1", transform: "scaleY(-1)" }}>
+      <svg viewBox={viewBox} className="w-full max-h-[400px]" style={{ aspectRatio: "1", transform: "scale(-1,-1)" }}>
         {/* Track outline */}
         <polyline
           points={points}
