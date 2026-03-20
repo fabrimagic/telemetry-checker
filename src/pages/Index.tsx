@@ -50,9 +50,10 @@ export default function Index() {
   const [clickedTime, setClickedTime] = useState<number | null>(null);
 
   // Load drivers for session
-  const handleSessionSubmit = useCallback(async (key: number) => {
+  const handleSessionSubmit = useCallback(async (key: number, type: string) => {
     setError(null);
     setSessionKey(key);
+    setSessionType(type);
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setLoadingDrivers(true);
