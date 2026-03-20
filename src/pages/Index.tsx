@@ -15,11 +15,13 @@ import {
   getCarData,
   getLocation,
   getWeather,
+  getOvertakes,
   type Driver,
   type Lap,
   type CarData,
   type LocationData,
   type WeatherData,
+  type OvertakeData,
 } from "@/lib/openf1";
 
 interface DriverState {
