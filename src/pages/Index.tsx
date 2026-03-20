@@ -34,6 +34,7 @@ interface DriverState {
 
 export default function Index() {
   const [sessionKey, setSessionKey] = useState<number | null>(null);
+  const [sessionType, setSessionType] = useState<string>("");
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [selectedDriverNumbers, setSelectedDriverNumbers] = useState<number[]>([]);
   const [driverStates, setDriverStates] = useState<Map<number, DriverState>>(new Map());
