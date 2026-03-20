@@ -95,3 +95,9 @@ export function getLocation(sessionKey: number, driverNumber: number, dateStart:
     `/location?session_key=${sessionKey}&driver_number=${driverNumber}&date>=${dateStart}&date<=${dateEnd}`
   );
 }
+
+export function getWeather(sessionKey: number, dateStart: string, dateEnd: string) {
+  return fetchApi<WeatherData[]>(
+    `/weather?session_key=${sessionKey}&date>=${dateStart}&date<=${dateEnd}`
+  );
+}
