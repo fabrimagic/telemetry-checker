@@ -12,7 +12,14 @@ import {
   CartesianGrid,
 } from "recharts";
 
-interface TelemetryPoint {
+export interface DriverTelemetry {
+  driverNumber: number;
+  acronym: string;
+  color: string; // hex without #
+  data: TelemetryPoint[];
+}
+
+export interface TelemetryPoint {
   time: number;
   speed: number;
   throttle: number;
@@ -23,8 +30,7 @@ interface TelemetryPoint {
 }
 
 interface Props {
-  data: TelemetryPoint[];
-  teamColor: string;
+  drivers: DriverTelemetry[];
   cursorTime: number | null;
   onCursorChange: (time: number | null) => void;
   onCursorClick: (time: number) => void;
@@ -48,13 +54,7 @@ function formatTimeAxis(t: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function ChartWrapper({
-  children,
-  label,
-}: {
-  children: React.ReactNode;
-  label: string;
-}) {
+function ChartWrapper({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="relative">
       <span className="absolute top-1 left-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider z-10">
@@ -65,12 +65,36 @@ function ChartWrapper({
   );
 }
 
-export function TelemetryCharts({ data, teamColor, cursorTime, onCursorChange, onCursorClick }: Props) {
-  const color = `#${teamColor}`;
+// Merge multiple drivers' data into a single array keyed by time
+function mergeData(drivers: DriverTelemetry[], field: string) {
+  const map = new Map<number, Record<string, any>>();
+  for (const d of drivers) {
+    for (const pt of d.data) {
+      const key = Math.round(pt.time * 10); // 0.1s precision
+      if (!map.has(key)) map.set(key, { time: pt.time });
+      map.get(key)![`${field}_${d.driverNumber}`] = (pt as any)[field];
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.time - b.time);
+}
+
+export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick }: Props) {
   const domain = useMemo(() => {
-    if (!data.length) return [0, 0];
-    return [data[0].time, data[data.length - 1].time];
-  }, [data]);
+    let min = Infinity, max = -Infinity;
+    for (const d of drivers) {
+      if (d.data.length) {
+        min = Math.min(min, d.data[0].time);
+        max = Math.max(max, d.data[d.data.length - 1].time);
+      }
+    }
+    return min === Infinity ? [0, 0] : [min, max];
+  }, [drivers]);
+
+  const speedData = useMemo(() => mergeData(drivers, "speed"), [drivers]);
+  const throttleData = useMemo(() => mergeData(drivers, "throttle"), [drivers]);
+  const brakeData = useMemo(() => mergeData(drivers, "brake"), [drivers]);
+  const rpmData = useMemo(() => mergeData(drivers, "rpm"), [drivers]);
+  const gearData = useMemo(() => mergeData(drivers, "gear"), [drivers]);
 
   const handleMouseMove = useCallback(
     (state: any) => {
@@ -102,8 +126,7 @@ export function TelemetryCharts({ data, teamColor, cursorTime, onCursorChange, o
     tickLine: false,
   };
 
-  const commonProps = {
-    data,
+  const chartHandlers = {
     onMouseMove: handleMouseMove,
     onMouseLeave: handleMouseLeave,
     onClick: handleClick,
@@ -113,77 +136,101 @@ export function TelemetryCharts({ data, teamColor, cursorTime, onCursorChange, o
     <ReferenceLine x={cursorTime} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
   ) : null;
 
-  if (!data.length) return null;
+  if (!drivers.length || !drivers.some((d) => d.data.length > 0)) return null;
+
+  const renderLineChart = (
+    label: string,
+    data: Record<string, any>[],
+    field: string,
+    height: number,
+    yProps?: Record<string, any>,
+    showXAxis?: boolean,
+    lineType?: string
+  ) => (
+    <ChartWrapper label={label}>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} {...chartHandlers} margin={{ top: 20, right: 12, left: 0, bottom: showXAxis ? 4 : 0 }}>
+          <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
+          <XAxis {...commonXAxis} hide={!showXAxis} />
+          <YAxis width={42} tick={AXIS_TICK} axisLine={false} tickLine={false} {...yProps} />
+          <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTimeAxis} />
+          {refLine}
+          {drivers.map((d) => (
+            <Line
+              key={d.driverNumber}
+              type={(lineType as any) || "monotone"}
+              dataKey={`${field}_${d.driverNumber}`}
+              name={d.acronym}
+              stroke={`#${d.color}`}
+              dot={false}
+              strokeWidth={1.5}
+              isAnimationActive={false}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartWrapper>
+  );
 
   return (
     <div className="space-y-0">
-      {/* Speed */}
-      <ChartWrapper label="Speed (km/h)">
-        <ResponsiveContainer width="100%" height={140}>
-          <LineChart {...commonProps} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
-            <XAxis {...commonXAxis} hide />
-            <YAxis width={42} tick={AXIS_TICK} axisLine={false} tickLine={false} />
-            <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTimeAxis} />
-            {refLine}
-            <Line type="monotone" dataKey="speed" stroke={color} dot={false} strokeWidth={1.5} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartWrapper>
+      {renderLineChart("Speed (km/h)", speedData, "speed", 140)}
 
-      {/* Throttle */}
+      {/* Throttle as area */}
       <ChartWrapper label="Throttle (%)">
         <ResponsiveContainer width="100%" height={100}>
-          <AreaChart {...commonProps} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
+          <AreaChart data={throttleData} {...chartHandlers} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
             <XAxis {...commonXAxis} hide />
             <YAxis width={42} domain={[0, 100]} tick={AXIS_TICK} axisLine={false} tickLine={false} />
             <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTimeAxis} />
             {refLine}
-            <Area type="stepAfter" dataKey="throttle" stroke="hsl(142 70% 45%)" fill="hsl(142 70% 45% / 0.15)" strokeWidth={1} isAnimationActive={false} />
+            {drivers.map((d) => (
+              <Area
+                key={d.driverNumber}
+                type="stepAfter"
+                dataKey={`throttle_${d.driverNumber}`}
+                name={d.acronym}
+                stroke={`#${d.color}`}
+                fill={`#${d.color}`}
+                fillOpacity={0.08}
+                strokeWidth={1}
+                isAnimationActive={false}
+                connectNulls
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </ChartWrapper>
 
-      {/* Brake */}
+      {/* Brake as area */}
       <ChartWrapper label="Brake">
         <ResponsiveContainer width="100%" height={60}>
-          <AreaChart {...commonProps} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
+          <AreaChart data={brakeData} {...chartHandlers} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
             <XAxis {...commonXAxis} hide />
             <YAxis width={42} domain={[0, 100]} tick={AXIS_TICK} axisLine={false} tickLine={false} ticks={[0, 100]} />
             {refLine}
-            <Area type="stepAfter" dataKey="brake" stroke="hsl(0 76% 50%)" fill="hsl(0 76% 50% / 0.3)" strokeWidth={1} isAnimationActive={false} />
+            {drivers.map((d) => (
+              <Area
+                key={d.driverNumber}
+                type="stepAfter"
+                dataKey={`brake_${d.driverNumber}`}
+                name={d.acronym}
+                stroke={`#${d.color}`}
+                fill={`#${d.color}`}
+                fillOpacity={0.15}
+                strokeWidth={1}
+                isAnimationActive={false}
+                connectNulls
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </ChartWrapper>
 
-      {/* RPM */}
-      <ChartWrapper label="RPM">
-        <ResponsiveContainer width="100%" height={100}>
-          <LineChart {...commonProps} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
-            <XAxis {...commonXAxis} hide />
-            <YAxis width={42} tick={AXIS_TICK} axisLine={false} tickLine={false} />
-            <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTimeAxis} />
-            {refLine}
-            <Line type="monotone" dataKey="rpm" stroke="hsl(217 91% 60%)" dot={false} strokeWidth={1.5} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartWrapper>
-
-      {/* Gear */}
-      <ChartWrapper label="Gear">
-        <ResponsiveContainer width="100%" height={80}>
-          <LineChart {...commonProps} margin={{ top: 20, right: 12, left: 0, bottom: 4 }}>
-            <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
-            <XAxis {...commonXAxis} />
-            <YAxis width={42} domain={[0, 8]} ticks={[1, 2, 3, 4, 5, 6, 7, 8]} tick={AXIS_TICK} axisLine={false} tickLine={false} />
-            <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTimeAxis} />
-            {refLine}
-            <Line type="stepAfter" dataKey="gear" stroke="hsl(45 93% 58%)" dot={false} strokeWidth={1.5} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartWrapper>
+      {renderLineChart("RPM", rpmData, "rpm", 100)}
+      {renderLineChart("Gear", gearData, "gear", 80, { domain: [0, 8], ticks: [1, 2, 3, 4, 5, 6, 7, 8] }, true, "stepAfter")}
     </div>
   );
 }
