@@ -184,6 +184,19 @@ export default function Index() {
         }
       }
 
+      // Fetch overtakes for single driver in Race/Sprint sessions
+      if (
+        selectedDriverNumbers.length === 1 &&
+        (sessionType === "Race" || sessionType === "Sprint")
+      ) {
+        try {
+          const ot = await getOvertakes(sessionKey, selectedDriverNumbers[0]);
+          setOvertakesData(ot);
+        } catch {
+          // Overtakes are optional
+        }
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
