@@ -136,10 +136,14 @@ export default function Index() {
     setError(null);
     setClickedTime(null);
     setCursorTime(null);
+    setWeatherData(null);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
     try {
+      let weatherStart: string | null = null;
+      let weatherEnd: string | null = null;
+
       // Sequential to respect rate limits
       for (const [num, state] of driverStates) {
         if (!state.selectedLap) continue;
@@ -149,9 +153,28 @@ export default function Index() {
         const start = lap.date_start;
         const endDate = new Date(new Date(start).getTime() + lap.lap_duration * 1000).toISOString();
 
+        // Use first driver's lap time range for weather
+        if (!weatherStart) {
+          weatherStart = start;
+          weatherEnd = endDate;
+        }
+
         const car = await getCarData(sessionKey, num, start, endDate);
         const loc = await getLocation(sessionKey, num, start, endDate);
         updates.push([num, car, loc]);
+      }
+
+      // Fetch weather only when single driver selected
+      if (selectedDriverNumbers.length === 1 && weatherStart && weatherEnd) {
+        try {
+          const weather = await getWeather(sessionKey, weatherStart, weatherEnd);
+          if (weather.length > 0) {
+            // Pick the weather reading closest to the lap start
+            setWeatherData(weather[weather.length - 1]);
+          }
+        } catch {
+          // Weather is optional, don't fail the whole load
+        }
       }
 
       setDriverStates((prev) => {
