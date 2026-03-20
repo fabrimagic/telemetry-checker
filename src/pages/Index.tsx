@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { SessionInput } from "@/components/f1/SessionInput";
+import { SessionPicker } from "@/components/f1/SessionPicker";
 import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts } from "@/components/f1/TelemetryCharts";
@@ -167,7 +167,7 @@ export default function Index() {
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Controls */}
         <section className="flex flex-wrap gap-6 items-end">
-          <SessionInput onSubmit={handleSessionSubmit} isLoading={loadingDrivers} />
+          <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
           {drivers.length > 0 && (
             <DriverPicker drivers={drivers} selected={selectedDriver} onSelect={handleDriverSelect} />
           )}
