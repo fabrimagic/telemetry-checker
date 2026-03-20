@@ -127,3 +127,9 @@ export function getOvertakes(sessionKey: number, driverNumber: number) {
     `/overtakes?session_key=${sessionKey}&overtaking_driver_number=${driverNumber}`
   );
 }
+
+export function getStints(sessionKey: number, driverNumber: number) {
+  return fetchApi<StintData[]>(
+    `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
+  );
+}
