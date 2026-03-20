@@ -4,6 +4,7 @@ import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
 import { TrackMap } from "@/components/f1/TrackMap";
+import { WeatherCard } from "@/components/f1/WeatherCard";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
@@ -12,10 +13,12 @@ import {
   getLaps,
   getCarData,
   getLocation,
+  getWeather,
   type Driver,
   type Lap,
   type CarData,
   type LocationData,
+  type WeatherData,
 } from "@/lib/openf1";
 
 interface DriverState {
@@ -35,6 +38,7 @@ export default function Index() {
   const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [loadingLaps, setLoadingLaps] = useState<Set<number>>(new Set());
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -132,10 +136,14 @@ export default function Index() {
     setError(null);
     setClickedTime(null);
     setCursorTime(null);
+    setWeatherData(null);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
     try {
+      let weatherStart: string | null = null;
+      let weatherEnd: string | null = null;
+
       // Sequential to respect rate limits
       for (const [num, state] of driverStates) {
         if (!state.selectedLap) continue;
@@ -145,9 +153,28 @@ export default function Index() {
         const start = lap.date_start;
         const endDate = new Date(new Date(start).getTime() + lap.lap_duration * 1000).toISOString();
 
+        // Use first driver's lap time range for weather
+        if (!weatherStart) {
+          weatherStart = start;
+          weatherEnd = endDate;
+        }
+
         const car = await getCarData(sessionKey, num, start, endDate);
         const loc = await getLocation(sessionKey, num, start, endDate);
         updates.push([num, car, loc]);
+      }
+
+      // Fetch weather only when single driver selected
+      if (selectedDriverNumbers.length === 1 && weatherStart && weatherEnd) {
+        try {
+          const weather = await getWeather(sessionKey, weatherStart, weatherEnd);
+          if (weather.length > 0) {
+            // Pick the weather reading closest to the lap start
+            setWeatherData(weather[weather.length - 1]);
+          }
+        } catch {
+          // Weather is optional, don't fail the whole load
+        }
       }
 
       setDriverStates((prev) => {
@@ -170,6 +197,7 @@ export default function Index() {
     setAllDrivers([]);
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
+    setWeatherData(null);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
@@ -335,7 +363,12 @@ export default function Index() {
                 onCursorClick={setClickedTime}
               />
             </section>
-            <TrackMap drivers={mapDrivers} activeDate={activeDate} />
+            <div className="space-y-6">
+              <TrackMap drivers={mapDrivers} activeDate={activeDate} />
+              {weatherData && selectedDriverNumbers.length === 1 && (
+                <WeatherCard weather={weatherData} />
+              )}
+            </div>
           </div>
         )}
       </main>

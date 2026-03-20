@@ -44,6 +44,19 @@ export interface LocationData {
   session_key: number;
 }
 
+export interface WeatherData {
+  air_temperature: number;
+  date: string;
+  humidity: number;
+  meeting_key: number;
+  pressure: number;
+  rainfall: number;
+  session_key: number;
+  track_temperature: number;
+  wind_direction: number;
+  wind_speed: number;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
@@ -80,5 +93,11 @@ export function getCarData(sessionKey: number, driverNumber: number, dateStart: 
 export function getLocation(sessionKey: number, driverNumber: number, dateStart: string, dateEnd: string) {
   return fetchApi<LocationData[]>(
     `/location?session_key=${sessionKey}&driver_number=${driverNumber}&date>=${dateStart}&date<=${dateEnd}`
+  );
+}
+
+export function getWeather(sessionKey: number, dateStart: string, dateEnd: string) {
+  return fetchApi<WeatherData[]>(
+    `/weather?session_key=${sessionKey}&date>=${dateStart}&date<=${dateEnd}`
   );
 }
