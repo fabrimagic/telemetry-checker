@@ -44,8 +44,21 @@ export interface LocationData {
   session_key: number;
 }
 
-async function fetchApi<T>(path: string): Promise<T> {
+// Simple queue to enforce max 2 requests/second
+let lastRequestTime = 0;
+const MIN_INTERVAL = 500; // ms between requests
+
+async function fetchApi<T>(path: string, retries = 2): Promise<T> {
+  const now = Date.now();
+  const wait = Math.max(0, MIN_INTERVAL - (now - lastRequestTime));
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastRequestTime = Date.now();
+
   const res = await fetch(`${BASE}${path}`);
+  if (res.status === 429 && retries > 0) {
+    await new Promise((r) => setTimeout(r, 1500));
+    return fetchApi<T>(path, retries - 1);
+  }
   if (!res.ok) throw new Error(`OpenF1 API error: ${res.status}`);
   return res.json();
 }
