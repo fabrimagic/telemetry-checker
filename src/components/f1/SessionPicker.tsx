@@ -20,7 +20,7 @@ interface Session {
 }
 
 interface Props {
-  onSelect: (sessionKey: number) => void;
+  onSelect: (sessionKey: number, sessionType: string) => void;
   isLoading: boolean;
 }
 
