@@ -134,28 +134,22 @@ export default function Index() {
     setCursorTime(null);
 
     const updates: [number, CarData[], LocationData[]][] = [];
-    const promises: Promise<void>[] = [];
-
-    for (const [num, state] of driverStates) {
-      if (!state.selectedLap) continue;
-      const lap = state.laps.find((l) => l.lap_number === state.selectedLap);
-      if (!lap?.date_start || !lap.lap_duration) continue;
-
-      const start = lap.date_start;
-      const endDate = new Date(new Date(start).getTime() + lap.lap_duration * 1000).toISOString();
-
-      promises.push(
-        Promise.all([
-          getCarData(sessionKey, num, start, endDate),
-          getLocation(sessionKey, num, start, endDate),
-        ]).then(([car, loc]) => {
-          updates.push([num, car, loc]);
-        })
-      );
-    }
 
     try {
-      await Promise.all(promises);
+      // Sequential to respect rate limits
+      for (const [num, state] of driverStates) {
+        if (!state.selectedLap) continue;
+        const lap = state.laps.find((l) => l.lap_number === state.selectedLap);
+        if (!lap?.date_start || !lap.lap_duration) continue;
+
+        const start = lap.date_start;
+        const endDate = new Date(new Date(start).getTime() + lap.lap_duration * 1000).toISOString();
+
+        const car = await getCarData(sessionKey, num, start, endDate);
+        const loc = await getLocation(sessionKey, num, start, endDate);
+        updates.push([num, car, loc]);
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
