@@ -153,6 +153,7 @@ export default function Index() {
     setWeatherData(null);
     setOvertakesData([]);
     setStintsData([]);
+    setPitStopsData([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
