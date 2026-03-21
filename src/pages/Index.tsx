@@ -429,6 +429,13 @@ export default function Index() {
               {stintsData.length > 0 && selectedDriverNumbers.length === 1 && (
                 <StintsCard stints={stintsData} />
               )}
+              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
+                <PitStopsCard
+                  pitStops={pitStopsData}
+                  allDrivers={allDrivers}
+                  multiDriver={selectedDriverNumbers.length > 1}
+                />
+              )}
             </div>
           </div>
         )}
