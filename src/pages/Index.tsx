@@ -51,6 +51,7 @@ export default function Index() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
+  const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
