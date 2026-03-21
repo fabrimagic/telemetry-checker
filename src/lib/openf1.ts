@@ -77,6 +77,17 @@ export interface StintData {
   tyre_age_at_start: number;
 }
 
+export interface PitData {
+  date: string;
+  driver_number: number;
+  lane_duration: number;
+  lap_number: number;
+  meeting_key: number;
+  pit_duration: number;
+  session_key: number;
+  stop_duration: number | null;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
@@ -131,5 +142,11 @@ export function getOvertakes(sessionKey: number, driverNumber: number) {
 export function getStints(sessionKey: number, driverNumber: number) {
   return fetchApi<StintData[]>(
     `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
+  );
+}
+
+export function getPitStops(sessionKey: number, driverNumber: number) {
+  return fetchApi<PitData[]>(
+    `/pit?session_key=${sessionKey}&driver_number=${driverNumber}`
   );
 }

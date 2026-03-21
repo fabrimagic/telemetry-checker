@@ -7,6 +7,7 @@ import { TrackMap } from "@/components/f1/TrackMap";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
+import { PitStopsCard } from "@/components/f1/PitStopsCard";
 import { Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   getWeather,
   getOvertakes,
   getStints,
+  getPitStops,
   type Driver,
   type Lap,
   type CarData,
@@ -25,6 +27,7 @@ import {
   type WeatherData,
   type OvertakeData,
   type StintData,
+  type PitData,
 } from "@/lib/openf1";
 
 interface DriverState {
@@ -48,6 +51,7 @@ export default function Index() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
+  const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -149,6 +153,7 @@ export default function Index() {
     setWeatherData(null);
     setOvertakesData([]);
     setStintsData([]);
+    setPitStopsData([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
@@ -208,6 +213,21 @@ export default function Index() {
         }
       }
 
+      // Fetch pit stops in Race/Sprint sessions for all selected drivers
+      if (sessionType === "Race" || sessionType === "Sprint") {
+        const allPits: PitData[] = [];
+        for (const num of selectedDriverNumbers) {
+          try {
+            const pits = await getPitStops(sessionKey, num);
+            allPits.push(...pits);
+          } catch {
+            // Pit data is optional
+          }
+        }
+        allPits.sort((a, b) => a.lap_number - b.lap_number);
+        setPitStopsData(allPits);
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
@@ -232,6 +252,7 @@ export default function Index() {
     setWeatherData(null);
     setOvertakesData([]);
     setStintsData([]);
+    setPitStopsData([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
@@ -407,6 +428,13 @@ export default function Index() {
               )}
               {stintsData.length > 0 && selectedDriverNumbers.length === 1 && (
                 <StintsCard stints={stintsData} />
+              )}
+              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
+                <PitStopsCard
+                  pitStops={pitStopsData}
+                  allDrivers={allDrivers}
+                  multiDriver={selectedDriverNumbers.length > 1}
+                />
               )}
             </div>
           </div>
