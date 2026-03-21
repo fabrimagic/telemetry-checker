@@ -213,6 +213,21 @@ export default function Index() {
         }
       }
 
+      // Fetch pit stops in Race/Sprint sessions for all selected drivers
+      if (sessionType === "Race" || sessionType === "Sprint") {
+        const allPits: PitData[] = [];
+        for (const num of selectedDriverNumbers) {
+          try {
+            const pits = await getPitStops(sessionKey, num);
+            allPits.push(...pits);
+          } catch {
+            // Pit data is optional
+          }
+        }
+        allPits.sort((a, b) => a.lap_number - b.lap_number);
+        setPitStopsData(allPits);
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
