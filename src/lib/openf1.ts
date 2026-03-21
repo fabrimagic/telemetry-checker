@@ -144,3 +144,9 @@ export function getStints(sessionKey: number, driverNumber: number) {
     `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
   );
 }
+
+export function getPitStops(sessionKey: number, driverNumber: number) {
+  return fetchApi<PitData[]>(
+    `/pit?session_key=${sessionKey}&driver_number=${driverNumber}`
+  );
+}
