@@ -252,6 +252,7 @@ export default function Index() {
     setWeatherData(null);
     setOvertakesData([]);
     setStintsData([]);
+    setPitStopsData([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
