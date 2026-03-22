@@ -20,6 +20,7 @@ interface DriverLapTimes {
 
 interface Props {
   drivers: DriverLapTimes[];
+  onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
 
 const GRID_STROKE = "hsl(220 14% 16%)";
