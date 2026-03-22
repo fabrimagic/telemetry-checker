@@ -7,6 +7,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
