@@ -99,7 +99,22 @@ export function LapTimesChart({ drivers, onSelectLap }: Props) {
         ))}
       </div>
       <ResponsiveContainer width="100%" height={240}>
-        <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 8, right: 12, left: 4, bottom: 4 }}
+          onClick={(e) => {
+            if (e?.activePayload?.length && onSelectLap) {
+              const lapNumber = e.activeLabel as number;
+              for (const d of drivers) {
+                const key = `t_${d.driverNumber}`;
+                const payload = e.activePayload.find((p: any) => p.dataKey === key && p.value != null);
+                if (payload) {
+                  onSelectLap(d.driverNumber, lapNumber);
+                }
+              }
+            }
+          }}
+        >
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="lap"
