@@ -20,6 +20,7 @@ interface DriverLapTimes {
 
 interface Props {
   drivers: DriverLapTimes[];
+  onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
 
 const GRID_STROKE = "hsl(220 14% 16%)";
@@ -34,7 +35,7 @@ function formatLapTime(seconds: number): string {
   return `${m}:${sWhole.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-export function LapTimesChart({ drivers }: Props) {
+export function LapTimesChart({ drivers, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
 
   const outlierLaps = useMemo(() => {
@@ -98,7 +99,22 @@ export function LapTimesChart({ drivers }: Props) {
         ))}
       </div>
       <ResponsiveContainer width="100%" height={240}>
-        <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 8, right: 12, left: 4, bottom: 4 }}
+          onClick={(e) => {
+            if (e?.activePayload?.length && onSelectLap) {
+              const lapNumber = Number(e.activeLabel);
+              for (const d of drivers) {
+                const key = `t_${d.driverNumber}`;
+                const payload = e.activePayload.find((p: any) => p.dataKey === key && p.value != null);
+                if (payload) {
+                  onSelectLap(d.driverNumber, lapNumber);
+                }
+              }
+            }
+          }}
+        >
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="lap"
@@ -133,7 +149,8 @@ export function LapTimesChart({ drivers }: Props) {
               dataKey={`t_${d.driverNumber}`}
               name={d.acronym}
               stroke={`#${d.color}`}
-              dot={{ r: 2, fill: `#${d.color}` }}
+              dot={{ r: 2, fill: `#${d.color}`, cursor: "pointer" }}
+              activeDot={{ r: 4, cursor: "pointer" }}
               strokeWidth={1.5}
               isAnimationActive={false}
               connectNulls
