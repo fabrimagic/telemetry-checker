@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { SessionPicker } from "@/components/f1/SessionPicker";
+import { LapTimesChart } from "@/components/f1/LapTimesChart";
 import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
