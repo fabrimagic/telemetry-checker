@@ -20,6 +20,7 @@ interface DriverLapTimes {
 
 interface Props {
   drivers: DriverLapTimes[];
+  selectedLaps?: { driverNumber: number; lapNumber: number | null }[];
   onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
 
