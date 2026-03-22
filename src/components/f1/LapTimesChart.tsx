@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -7,8 +7,9 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
 } from "recharts";
+import { Button } from "@/components/ui/button";
+import { Eye, EyeOff } from "lucide-react";
 
 interface DriverLapTimes {
   driverNumber: number;
@@ -23,6 +24,7 @@ interface Props {
 
 const GRID_STROKE = "hsl(220 14% 16%)";
 const AXIS_TICK = { fill: "hsl(215 12% 45%)", fontSize: 10 };
+const OUTLIER_THRESHOLD = 0.07;
 
 function formatLapTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -33,21 +35,38 @@ function formatLapTime(seconds: number): string {
 }
 
 export function LapTimesChart({ drivers }: Props) {
+  const [showOutliers, setShowOutliers] = useState(false);
+
+  const outlierLaps = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of drivers) {
+      const valid = d.laps.filter((l) => l.lap_duration != null && l.lap_duration > 0);
+      if (!valid.length) continue;
+      const avg = valid.reduce((s, l) => s + l.lap_duration!, 0) / valid.length;
+      for (const l of valid) {
+        if (l.lap_duration! > avg * (1 + OUTLIER_THRESHOLD)) {
+          set.add(`${d.driverNumber}_${l.lap_number}`);
+        }
+      }
+    }
+    return set;
+  }, [drivers]);
+
   const data = useMemo(() => {
     const map = new Map<number, Record<string, any>>();
     for (const d of drivers) {
       for (const lap of d.laps) {
         if (lap.lap_duration == null || lap.lap_duration <= 0) continue;
+        if (!showOutliers && outlierLaps.has(`${d.driverNumber}_${lap.lap_number}`)) continue;
         if (!map.has(lap.lap_number)) map.set(lap.lap_number, { lap: lap.lap_number });
         map.get(lap.lap_number)![`t_${d.driverNumber}`] = lap.lap_duration;
       }
     }
     return Array.from(map.values()).sort((a, b) => a.lap - b.lap);
-  }, [drivers]);
+  }, [drivers, outlierLaps, showOutliers]);
 
   if (!data.length) return null;
 
-  // Compute Y domain with some padding
   const allTimes = data.flatMap((d) =>
     drivers.map((dr) => d[`t_${dr.driverNumber}`]).filter((v): v is number => v != null)
   );
@@ -56,9 +75,20 @@ export function LapTimesChart({ drivers }: Props) {
 
   return (
     <div className="bg-card rounded-lg border border-border p-4">
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-        Lap Times
-      </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Lap Times
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowOutliers((v) => !v)}
+          className="gap-1.5 text-xs text-muted-foreground h-7 px-2"
+        >
+          {showOutliers ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {showOutliers ? "Nascondi outlier" : `Mostra outlier (>${OUTLIER_THRESHOLD * 100}%)`}
+        </Button>
+      </div>
       <div className="flex gap-3 mb-2">
         {drivers.map((d) => (
           <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
