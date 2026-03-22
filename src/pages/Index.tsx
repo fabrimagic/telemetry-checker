@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { SessionPicker } from "@/components/f1/SessionPicker";
+import { LapTimesChart } from "@/components/f1/LapTimesChart";
 import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
@@ -376,6 +377,14 @@ export default function Index() {
         {/* Lap Tables */}
         {driversLaps.length > 0 && loadingLaps.size === 0 && (
           <>
+            <LapTimesChart
+              drivers={driversLaps.map((dl) => ({
+                driverNumber: dl.driver.driver_number,
+                acronym: dl.driver.name_acronym,
+                color: dl.driver.team_colour || "ffffff",
+                laps: dl.laps,
+              }))}
+            />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
             {hasLapsSelected && (
               <Button
