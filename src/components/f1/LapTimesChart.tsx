@@ -36,7 +36,7 @@ function formatLapTime(seconds: number): string {
   return `${m}:${sWhole.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-export function LapTimesChart({ drivers, onSelectLap }: Props) {
+export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
 
   const outlierLaps = useMemo(() => {
