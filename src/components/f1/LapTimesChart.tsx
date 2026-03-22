@@ -104,7 +104,7 @@ export function LapTimesChart({ drivers, onSelectLap }: Props) {
           margin={{ top: 8, right: 12, left: 4, bottom: 4 }}
           onClick={(e) => {
             if (e?.activePayload?.length && onSelectLap) {
-              const lapNumber = e.activeLabel as number;
+              const lapNumber = Number(e.activeLabel);
               for (const d of drivers) {
                 const key = `t_${d.driverNumber}`;
                 const payload = e.activePayload.find((p: any) => p.dataKey === key && p.value != null);
