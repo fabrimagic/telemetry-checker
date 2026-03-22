@@ -384,6 +384,10 @@ export default function Index() {
                 color: dl.driver.team_colour || "ffffff",
                 laps: dl.laps,
               }))}
+              selectedLaps={driversLaps.map((dl) => ({
+                driverNumber: dl.driver.driver_number,
+                lapNumber: dl.selectedLap,
+              }))}
               onSelectLap={handleSelectLap}
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />

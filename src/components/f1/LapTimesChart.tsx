@@ -7,6 +7,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
@@ -20,6 +21,7 @@ interface DriverLapTimes {
 
 interface Props {
   drivers: DriverLapTimes[];
+  selectedLaps?: { driverNumber: number; lapNumber: number | null }[];
   onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
 
@@ -35,7 +37,7 @@ function formatLapTime(seconds: number): string {
   return `${m}:${sWhole.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-export function LapTimesChart({ drivers, onSelectLap }: Props) {
+export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
 
   const outlierLaps = useMemo(() => {
@@ -142,6 +144,15 @@ export function LapTimesChart({ drivers, onSelectLap }: Props) {
             labelFormatter={(v) => `Lap ${v}`}
             formatter={(value: number) => [formatLapTime(value), ""]}
           />
+          {selectedLaps?.filter((s) => s.lapNumber != null).map((s) => (
+            <ReferenceLine
+              key={`ref_${s.driverNumber}_${s.lapNumber}`}
+              x={s.lapNumber!}
+              stroke={`#${drivers.find((d) => d.driverNumber === s.driverNumber)?.color || "ffffff"}`}
+              strokeDasharray="4 3"
+              strokeOpacity={0.6}
+            />
+          ))}
           {drivers.map((d) => (
             <Line
               key={d.driverNumber}
