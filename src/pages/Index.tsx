@@ -377,6 +377,14 @@ export default function Index() {
         {/* Lap Tables */}
         {driversLaps.length > 0 && loadingLaps.size === 0 && (
           <>
+            <LapTimesChart
+              drivers={driversLaps.map((dl) => ({
+                driverNumber: dl.driver.driver_number,
+                acronym: dl.driver.name_acronym,
+                color: dl.driver.team_colour || "ffffff",
+                laps: dl.laps,
+              }))}
+            />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
             {hasLapsSelected && (
               <Button
