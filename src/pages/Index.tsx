@@ -384,6 +384,7 @@ export default function Index() {
                 color: dl.driver.team_colour || "ffffff",
                 laps: dl.laps,
               }))}
+              onSelectLap={handleSelectLap}
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
             {hasLapsSelected && (

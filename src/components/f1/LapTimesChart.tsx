@@ -134,7 +134,8 @@ export function LapTimesChart({ drivers, onSelectLap }: Props) {
               dataKey={`t_${d.driverNumber}`}
               name={d.acronym}
               stroke={`#${d.color}`}
-              dot={{ r: 2, fill: `#${d.color}` }}
+              dot={{ r: 2, fill: `#${d.color}`, cursor: "pointer" }}
+              activeDot={{ r: 4, cursor: "pointer" }}
               strokeWidth={1.5}
               isAnimationActive={false}
               connectNulls
