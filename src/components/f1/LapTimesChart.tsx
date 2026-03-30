@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -11,12 +11,14 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
+import type { StintData } from "@/lib/openf1";
 
 interface DriverLapTimes {
   driverNumber: number;
   acronym: string;
   color: string;
   laps: { lap_number: number; lap_duration: number | null }[];
+  stints?: StintData[];
 }
 
 interface Props {
@@ -29,6 +31,14 @@ const GRID_STROKE = "hsl(220 14% 16%)";
 const AXIS_TICK = { fill: "hsl(215 12% 45%)", fontSize: 10 };
 const OUTLIER_THRESHOLD = 0.07;
 
+const compoundColors: Record<string, string> = {
+  SOFT: "#e53935",
+  MEDIUM: "#f9a825",
+  HARD: "#bdbdbd",
+  INTERMEDIATE: "#43a047",
+  WET: "#1e88e5",
+};
+
 function formatLapTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -39,6 +49,22 @@ function formatLapTime(seconds: number): string {
 
 export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
+
+  // Build compound lookup: driverNumber -> lapNumber -> compound
+  const compoundMap = useMemo(() => {
+    const map = new Map<number, Map<number, string>>();
+    for (const d of drivers) {
+      if (!d.stints?.length) continue;
+      const lapMap = new Map<number, string>();
+      for (const stint of d.stints) {
+        for (let lap = stint.lap_start; lap <= stint.lap_end; lap++) {
+          lapMap.set(lap, stint.compound);
+        }
+      }
+      map.set(d.driverNumber, lapMap);
+    }
+    return map;
+  }, [drivers]);
 
   const outlierLaps = useMemo(() => {
     const set = new Set<string>();
@@ -68,6 +94,32 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
     return Array.from(map.values()).sort((a, b) => a.lap - b.lap);
   }, [drivers, outlierLaps, showOutliers]);
 
+  // Custom dot renderer that colors by compound
+  const renderDot = useCallback(
+    (driverNumber: number, defaultColor: string) =>
+      (props: any) => {
+        const { cx, cy, payload } = props;
+        if (cx == null || cy == null) return null;
+        const lapNum = payload?.lap;
+        const driverCompounds = compoundMap.get(driverNumber);
+        const compound = driverCompounds?.get(lapNum);
+        const fill = compound ? compoundColors[compound] || defaultColor : defaultColor;
+        return (
+          <circle
+            key={`dot-${driverNumber}-${lapNum}`}
+            cx={cx}
+            cy={cy}
+            r={3}
+            fill={fill}
+            stroke={fill}
+            strokeWidth={0.5}
+            cursor="pointer"
+          />
+        );
+      },
+    [compoundMap]
+  );
+
   if (!data.length) return null;
 
   const allTimes = data.flatMap((d) =>
@@ -75,6 +127,9 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
   );
   const yMin = Math.floor(Math.min(...allTimes));
   const yMax = Math.ceil(Math.max(...allTimes));
+
+  // Check if any driver has stint data
+  const hasStintData = drivers.some((d) => d.stints && d.stints.length > 0);
 
   return (
     <div className="bg-card rounded-lg border border-border p-4">
@@ -100,6 +155,16 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
           </span>
         ))}
       </div>
+      {hasStintData && (
+        <div className="flex gap-3 mb-2">
+          {Object.entries(compoundColors).map(([compound, color]) => (
+            <span key={compound} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+              {compound}
+            </span>
+          ))}
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={240}>
         <LineChart
           data={data}
@@ -142,7 +207,13 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
             }}
             labelStyle={{ color: "hsl(215 12% 55%)" }}
             labelFormatter={(v) => `Lap ${v}`}
-            formatter={(value: number) => [formatLapTime(value), ""]}
+            formatter={(value: number, name: string) => {
+              const driverNum = parseInt(name.replace("t_", ""));
+              const driverCompounds = compoundMap.get(driverNum);
+              const lapNum = undefined; // tooltip doesn't give us lap directly, but value is sufficient
+              const driver = drivers.find((d) => d.driverNumber === driverNum);
+              return [formatLapTime(value), driver?.acronym || ""];
+            }}
           />
           {selectedLaps?.filter((s) => s.lapNumber != null).map((s) => (
             <ReferenceLine
@@ -158,10 +229,10 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
               key={d.driverNumber}
               type="monotone"
               dataKey={`t_${d.driverNumber}`}
-              name={d.acronym}
+              name={`t_${d.driverNumber}`}
               stroke={`#${d.color}`}
-              dot={{ r: 2, fill: `#${d.color}`, cursor: "pointer" }}
-              activeDot={{ r: 4, cursor: "pointer" }}
+              dot={renderDot(d.driverNumber, `#${d.color}`)}
+              activeDot={{ r: 5, cursor: "pointer" }}
               strokeWidth={1.5}
               isAnimationActive={false}
               connectNulls
