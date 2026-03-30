@@ -150,3 +150,56 @@ export function getPitStops(sessionKey: number, driverNumber: number) {
     `/pit?session_key=${sessionKey}&driver_number=${driverNumber}`
   );
 }
+
+export interface SessionResult {
+  dnf: boolean;
+  dns: boolean;
+  dsq: boolean;
+  driver_number: number;
+  duration: number | number[] | null;
+  gap_to_leader: number | string | null;
+  number_of_laps: number;
+  meeting_key: number;
+  position: number;
+  session_key: number;
+}
+
+export interface StartingGridEntry {
+  driver_number: number;
+  lap_duration: number;
+  meeting_key: number;
+  position: number;
+  session_key: number;
+}
+
+export interface PositionData {
+  date: string;
+  driver_number: number;
+  meeting_key: number;
+  position: number;
+  session_key: number;
+}
+
+export function getSessionResult(sessionKey: number) {
+  return fetchApi<SessionResult[]>(`/session_result?session_key=${sessionKey}`);
+}
+
+export function getStartingGrid(sessionKey: number) {
+  return fetchApi<StartingGridEntry[]>(`/starting_grid?session_key=${sessionKey}`);
+}
+
+export function getPositions(sessionKey: number) {
+  return fetchApi<PositionData[]>(`/position?session_key=${sessionKey}`);
+}
+
+export function getAllStints(sessionKey: number) {
+  return fetchApi<StintData[]>(`/stints?session_key=${sessionKey}`);
+}
+
+export function getAllPitStops(sessionKey: number) {
+  return fetchApi<PitData[]>(`/pit?session_key=${sessionKey}`);
+}
+
+export function getWeatherForSession(sessionKey: number) {
+  return fetchApi<WeatherData[]>(`/weather?session_key=${sessionKey}`);
+}
