@@ -132,7 +132,8 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
   const hasStintData = drivers.some((d) => d.stints && d.stints.length > 0);
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4">
+    <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+      <Watermark />
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Lap Times
