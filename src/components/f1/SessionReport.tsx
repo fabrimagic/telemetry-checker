@@ -76,6 +76,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const [pitStops, setPitStops] = useState<PitData[]>([]);
   const [weather, setWeather] = useState<WeatherData[]>([]);
   const [intervals, setIntervals] = useState<IntervalData[]>([]);
+  const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null); // null = all
 
   const isRace = sessionType === "Race" || sessionType === "Sprint";
 
