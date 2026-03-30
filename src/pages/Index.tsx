@@ -499,9 +499,25 @@ export default function Index() {
                     };
                   })}
               />
+              <DrivingAnalysis
+                drivers={[...driverStates.values()]
+                  .filter((s) => s.carData.length > 0)
+                  .map((s) => ({
+                    driverNumber: s.driver.driver_number,
+                    acronym: s.driver.name_acronym,
+                    color: getColor(s.driver.driver_number),
+                    carData: s.carData,
+                  }))}
+              />
             </section>
             <div className="space-y-6">
-              <TrackMap drivers={mapDrivers} activeDate={activeDate} />
+              <TrackMap
+                drivers={mapDrivers}
+                activeDate={activeDate}
+                driverZones={[...driverStates.values()]
+                  .filter((s) => s.carData.length > 0)
+                  .map((s) => computeDriverZones(s.carData, s.driver.driver_number, getColor(s.driver.driver_number)))}
+              />
               {weatherData && selectedDriverNumbers.length === 1 && (
                 <WeatherCard weather={weatherData} />
               )}
