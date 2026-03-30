@@ -5,6 +5,7 @@ import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
 import { TrackMap } from "@/components/f1/TrackMap";
+import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
@@ -484,6 +485,18 @@ export default function Index() {
                 cursorTime={clickedTime ?? cursorTime}
                 onCursorChange={setCursorTime}
                 onCursorClick={setClickedTime}
+              />
+              <SectorMiniSectors
+                drivers={[...driverStates.values()]
+                  .filter((s) => s.selectedLap != null && s.carData.length > 0)
+                  .map((s) => {
+                    const lap = s.laps.find((l) => l.lap_number === s.selectedLap)!;
+                    return {
+                      driver: s.driver,
+                      lap,
+                      color: getColor(s.driver.driver_number),
+                    };
+                  })}
               />
             </section>
             <div className="space-y-6">
