@@ -228,6 +228,28 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return results.slice(0, 20).map((r) => r.driver_number);
   }, [results]);
 
+  const filteredDrivers = useMemo(() => {
+    if (!visibleDrivers) return positionDrivers;
+    return positionDrivers.filter((num) => visibleDrivers.has(num));
+  }, [positionDrivers, visibleDrivers]);
+
+  const toggleDriver = useCallback((num: number) => {
+    setVisibleDrivers((prev) => {
+      const current = prev ?? new Set(positionDrivers);
+      const next = new Set(current);
+      if (next.has(num)) {
+        next.delete(num);
+        if (next.size === 0) return null; // re-show all if none left
+      } else {
+        next.add(num);
+      }
+      return next;
+    });
+  }, [positionDrivers]);
+
+  const selectAllDrivers = useCallback(() => setVisibleDrivers(null), []);
+  const selectNoneDrivers = useCallback(() => setVisibleDrivers(new Set()), []);
+
   // Build gap-to-leader chart data from intervals, sampled
   const gapChartData = useMemo(() => {
     if (!intervals.length || !results.length) return [];
