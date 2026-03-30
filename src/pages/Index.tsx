@@ -327,7 +327,7 @@ export default function Index() {
       .map((s) => ({
         driverNumber: s.driver.driver_number,
         acronym: s.driver.name_acronym,
-        color: s.driver.team_colour || "ffffff",
+        color: getColor(s.driver.driver_number),
         locations: s.locationData,
       }));
   }, [driverStates]);
