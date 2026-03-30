@@ -314,7 +314,7 @@ export default function Index() {
         return {
           driverNumber: s.driver.driver_number,
           acronym: s.driver.name_acronym,
-          color: s.driver.team_colour || "ffffff",
+          color: getColor(s.driver.driver_number),
           data,
         };
       });
