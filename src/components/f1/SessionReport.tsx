@@ -90,13 +90,17 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         if (cancelled) return;
         setDrivers(drv);
 
-        const res = await getSessionResult(sessionKey);
-        if (cancelled) return;
-        setResults(res.sort((a, b) => a.position - b.position));
+        try {
+          const res = await getSessionResult(sessionKey);
+          if (cancelled) return;
+          setResults(res.sort((a, b) => a.position - b.position));
+        } catch { /* optional */ }
 
-        const w = await getWeatherForSession(sessionKey);
-        if (cancelled) return;
-        setWeather(w);
+        try {
+          const w = await getWeatherForSession(sessionKey);
+          if (cancelled) return;
+          setWeather(w);
+        } catch { /* optional */ }
 
         if (isRace) {
           try {
