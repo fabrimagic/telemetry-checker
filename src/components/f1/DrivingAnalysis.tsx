@@ -48,19 +48,19 @@ function computeZones(carData: CarData[]) {
       }
     }
 
-    // Lift & Coast: transition from (throttle>90, brake=0) to (throttle=0, brake=0)
-    const prevHighThrottle = prev.throttle > 90 && !prev.brake;
-    const currCoasting = curr.throttle === 0 && !curr.brake;
-
-    if (prevHighThrottle && currCoasting) {
-      if (!inLiftCoast) {
+    // Lift & Coast: starts when going from (throttle>90, brake=0) to (throttle=0, brake=0)
+    // ends when throttle OR brake are pressed
+    if (!inLiftCoast) {
+      const prevHighThrottle = prev.throttle > 90 && prev.brake === 0;
+      const currCoasting = curr.throttle === 0 && curr.brake === 0;
+      if (prevHighThrottle && currCoasting) {
         liftcoastCount++;
         inLiftCoast = true;
+        liftcoastMs += dt;
+        liftcoastDates.push(curr.date);
       }
-    }
-
-    if (inLiftCoast) {
-      if (curr.throttle === 0 && !curr.brake) {
+    } else {
+      if (curr.throttle === 0 && curr.brake === 0) {
         liftcoastMs += dt;
         liftcoastDates.push(curr.date);
       } else {
