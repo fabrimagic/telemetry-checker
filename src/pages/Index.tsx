@@ -436,6 +436,7 @@ export default function Index() {
                 acronym: dl.driver.name_acronym,
                 color: getColor(dl.driver.driver_number),
                 laps: dl.laps,
+                stints: dl.stints,
               }))}
               selectedLaps={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
