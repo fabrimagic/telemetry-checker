@@ -475,7 +475,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             Pit Stops ({pitStops.length})
           </h3>
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {pitStops.map((p, i) => (
+            {pitStops.filter((p) => !visibleDrivers || visibleDrivers.has(p.driver_number)).map((p, i) => (
               <div key={i} className="flex items-center gap-3 text-xs py-1.5 px-2 rounded bg-muted/50">
                 <span
                   className="w-2 h-2 rounded-full shrink-0"
