@@ -36,6 +36,7 @@ import {
 interface DriverState {
   driver: Driver;
   laps: Lap[];
+  stints: StintData[];
   selectedLap: number | null;
   carData: CarData[];
   locationData: LocationData[];
