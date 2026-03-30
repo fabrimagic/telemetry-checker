@@ -5,6 +5,7 @@ import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
 import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/components/f1/TelemetryCharts";
 import { TrackMap } from "@/components/f1/TrackMap";
+import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";

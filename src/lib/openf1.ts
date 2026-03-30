@@ -21,6 +21,9 @@ export interface Lap {
   is_pit_out_lap: boolean;
   driver_number: number;
   session_key: number;
+  segments_sector_1: (number | null)[] | null;
+  segments_sector_2: (number | null)[] | null;
+  segments_sector_3: (number | null)[] | null;
 }
 
 export interface CarData {
