@@ -367,6 +367,7 @@ export default function Index() {
         .map((s) => ({
           driver: s.driver,
           laps: s.laps,
+          stints: s.stints,
           selectedLap: s.selectedLap,
         })),
     [selectedDriverNumbers, driverStates]
