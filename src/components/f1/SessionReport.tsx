@@ -114,6 +114,14 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
           const pos = await getPositions(sessionKey);
           if (cancelled) return;
           setPositions(pos);
+
+          try {
+            const ivl = await getIntervals(sessionKey);
+            if (cancelled) return;
+            setIntervals(ivl);
+          } catch {
+            // Intervals are optional
+          }
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message);
