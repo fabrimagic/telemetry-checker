@@ -389,15 +389,27 @@ export default function Index() {
         {/* Controls */}
         <section className="flex flex-wrap gap-6 items-start">
           <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
-          {allDrivers.length > 0 && (
-            <DriverPicker
-              drivers={allDrivers}
-              selected={selectedDriverNumbers}
-              onAdd={handleAddDriver}
-              onRemove={handleRemoveDriver}
-            />
-          )}
         </section>
+
+        {/* Mode Toggle */}
+        {allDrivers.length > 0 && (
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "drivers" | "report")}>
+            <TabsList>
+              <TabsTrigger value="drivers">Driver Analysis</TabsTrigger>
+              <TabsTrigger value="report">Session Report</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="report" className="mt-4">
+              {sessionKey && <SessionReport sessionKey={sessionKey} sessionType={sessionType} />}
+            </TabsContent>
+
+            <TabsContent value="drivers" className="mt-4 space-y-6">
+              <DriverPicker
+                drivers={allDrivers}
+                selected={selectedDriverNumbers}
+                onAdd={handleAddDriver}
+                onRemove={handleRemoveDriver}
+              />
 
         {error && (
           <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
