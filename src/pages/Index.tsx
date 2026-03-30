@@ -66,6 +66,7 @@ export default function Index() {
     setError(null);
     setSessionKey(key);
     setSessionType(type);
+    setViewMode("drivers");
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setLoadingDrivers(true);
