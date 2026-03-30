@@ -565,7 +565,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   return [value, driverName(num)];
                 }}
               />
-              {positionDrivers.map((num) => (
+              {filteredDrivers.map((num) => (
                 <Line
                   key={num}
                   type="stepAfter"
@@ -580,7 +580,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             </LineChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-2 mt-2">
-            {positionDrivers.map((num) => (
+            {filteredDrivers.map((num) => (
               <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
                 {driverName(num)}
@@ -620,7 +620,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   return [`${Number(value).toFixed(3)}s`, driverName(num)];
                 }}
               />
-              {positionDrivers.map((num) => (
+              {filteredDrivers.map((num) => (
                 <Line
                   key={num}
                   type="monotone"
@@ -635,7 +635,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             </LineChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-2 mt-2">
-            {positionDrivers.map((num) => (
+            {filteredDrivers.map((num) => (
               <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
                 {driverName(num)}
@@ -676,7 +676,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   return [`${Number(value).toFixed(3)}s`, driverName(num)];
                 }}
               />
-              {positionDrivers.map((num) => (
+              {filteredDrivers.map((num) => (
                 <Line
                   key={num}
                   type="monotone"
@@ -691,7 +691,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             </LineChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-2 mt-2">
-            {positionDrivers.map((num) => (
+            {filteredDrivers.map((num) => (
               <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
                 {driverName(num)}
