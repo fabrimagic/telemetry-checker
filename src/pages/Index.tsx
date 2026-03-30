@@ -95,9 +95,13 @@ export default function Index() {
       setError(null);
       try {
         const laps = await getLaps(sessionKey, driverNumber);
+        let driverStints: StintData[] = [];
+        try {
+          driverStints = await getStints(sessionKey, driverNumber);
+        } catch { /* optional */ }
         setDriverStates((prev) => {
           const next = new Map(prev);
-          next.set(driverNumber, { driver, laps, selectedLap: null, carData: [], locationData: [] });
+          next.set(driverNumber, { driver, laps, stints: driverStints, selectedLap: null, carData: [], locationData: [] });
           return next;
         });
       } catch (e: any) {
