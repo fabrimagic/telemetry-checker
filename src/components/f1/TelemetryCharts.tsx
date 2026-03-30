@@ -54,12 +54,15 @@ function formatTimeAxis(t: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+import { Watermark } from "./Watermark";
+
 function ChartWrapper({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="relative">
+    <div className="relative overflow-hidden">
       <span className="absolute top-1 left-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider z-10">
         {label}
       </span>
+      <Watermark />
       {children}
     </div>
   );

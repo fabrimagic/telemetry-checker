@@ -18,6 +18,7 @@ import {
   type Driver,
   type IntervalData,
 } from "@/lib/openf1";
+import { Watermark } from "./Watermark";
 import {
   Table,
   TableBody,
@@ -535,7 +536,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
       )}
 
       {isRace && positionChartData.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
+        <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+          <Watermark />
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <ArrowUpDown className="h-3.5 w-3.5" />
             Position Evolution
@@ -592,7 +594,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
 
       {/* Gap to Leader */}
       {isRace && gapChartData.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
+        <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+          <Watermark />
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Timer className="h-3.5 w-3.5" />
             Gap to Leader (seconds)
@@ -647,7 +650,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
 
       {/* Interval to Car Ahead */}
       {isRace && gapChartData.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
+        <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+          <Watermark />
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Timer className="h-3.5 w-3.5" />
             Interval to Car Ahead (seconds)
