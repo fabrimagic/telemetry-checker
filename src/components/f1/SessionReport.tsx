@@ -18,6 +18,7 @@ import {
   type Driver,
   type IntervalData,
 } from "@/lib/openf1";
+import { Watermark } from "./Watermark";
 import {
   Table,
   TableBody,
