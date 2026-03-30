@@ -90,38 +90,48 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         if (cancelled) return;
         setDrivers(drv);
 
-        const res = await getSessionResult(sessionKey);
-        if (cancelled) return;
-        setResults(res.sort((a, b) => a.position - b.position));
+        try {
+          const res = await getSessionResult(sessionKey);
+          if (cancelled) return;
+          setResults(res.sort((a, b) => a.position - b.position));
+        } catch { /* optional */ }
 
-        const w = await getWeatherForSession(sessionKey);
-        if (cancelled) return;
-        setWeather(w);
+        try {
+          const w = await getWeatherForSession(sessionKey);
+          if (cancelled) return;
+          setWeather(w);
+        } catch { /* optional */ }
 
         if (isRace) {
-          const grid = await getStartingGrid(sessionKey);
-          if (cancelled) return;
-          setStartingGrid(grid.sort((a, b) => a.position - b.position));
+          try {
+            const grid = await getStartingGrid(sessionKey);
+            if (cancelled) return;
+            setStartingGrid(grid.sort((a, b) => a.position - b.position));
+          } catch { /* optional */ }
 
-          const st = await getAllStints(sessionKey);
-          if (cancelled) return;
-          setStints(st);
+          try {
+            const st = await getAllStints(sessionKey);
+            if (cancelled) return;
+            setStints(st);
+          } catch { /* optional */ }
 
-          const pits = await getAllPitStops(sessionKey);
-          if (cancelled) return;
-          setPitStops(pits.sort((a, b) => a.lap_number - b.lap_number));
+          try {
+            const pits = await getAllPitStops(sessionKey);
+            if (cancelled) return;
+            setPitStops(pits.sort((a, b) => a.lap_number - b.lap_number));
+          } catch { /* optional */ }
 
-          const pos = await getPositions(sessionKey);
-          if (cancelled) return;
-          setPositions(pos);
+          try {
+            const pos = await getPositions(sessionKey);
+            if (cancelled) return;
+            setPositions(pos);
+          } catch { /* optional */ }
 
           try {
             const ivl = await getIntervals(sessionKey);
             if (cancelled) return;
             setIntervals(ivl);
-          } catch {
-            // Intervals are optional
-          }
+          } catch { /* optional */ }
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message);
