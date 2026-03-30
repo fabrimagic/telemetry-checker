@@ -212,3 +212,7 @@ export function getAllPitStops(sessionKey: number) {
 export function getWeatherForSession(sessionKey: number) {
   return fetchApi<WeatherData[]>(`/weather?session_key=${sessionKey}`);
 }
+
+export function getIntervals(sessionKey: number) {
+  return fetchApi<IntervalData[]>(`/intervals?session_key=${sessionKey}`);
+}
