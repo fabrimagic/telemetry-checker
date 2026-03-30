@@ -1,19 +1,21 @@
 import { useMemo } from "react";
 import type { LocationData } from "@/lib/openf1";
+import type { DriverZones } from "./DrivingAnalysis";
 
 interface DriverLocation {
   driverNumber: number;
   acronym: string;
-  color: string; // hex without #
+  color: string;
   locations: LocationData[];
 }
 
 interface Props {
   drivers: DriverLocation[];
   activeDate: string | null;
+  driverZones?: DriverZones[];
 }
 
-export function TrackMap({ drivers, activeDate }: Props) {
+export function TrackMap({ drivers, activeDate, driverZones }: Props) {
   const { viewBox, driverPaths, scale } = useMemo(() => {
     const allLocs = drivers.flatMap((d) => d.locations);
     if (!allLocs.length) return { viewBox: "0 0 100 100", driverPaths: [], scale: 100 };
@@ -52,12 +54,36 @@ export function TrackMap({ drivers, activeDate }: Props) {
     return { viewBox: vb, driverPaths: paths, scale: range || 100 };
   }, [drivers, activeDate]);
 
+  // Compute zone highlight points
+  const zonePoints = useMemo(() => {
+    if (!driverZones?.length) return [];
+    return driverZones.flatMap((dz) => {
+      const driverLoc = drivers.find((d) => d.driverNumber === dz.driverNumber);
+      if (!driverLoc || !driverLoc.locations.length) return [];
+
+      const dateTimes = driverLoc.locations.map((l) => new Date(l.date).getTime());
+
+      return dz.zones.map((z) => {
+        const target = new Date(z.date).getTime();
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        for (let i = 0; i < dateTimes.length; i++) {
+          const diff = Math.abs(dateTimes[i] - target);
+          if (diff < minDiff) { minDiff = diff; closestIdx = i; }
+        }
+        const loc = driverLoc.locations[closestIdx];
+        return { x: loc.x, y: loc.y, type: z.type, color: dz.color };
+      });
+    });
+  }, [driverZones, drivers]);
+
   if (!drivers.some((d) => d.locations.length > 0)) return null;
+
+  const dotR = Math.max(scale * 0.004, 0.5);
 
   return (
     <div className="bg-card rounded-lg border border-border p-4">
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Track Position</h3>
-      {/* Legend */}
       <div className="flex flex-wrap gap-3 mb-3">
         {drivers.map((d) => (
           <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
@@ -65,9 +91,21 @@ export function TrackMap({ drivers, activeDate }: Props) {
             <span className="font-mono font-bold">{d.acronym}</span>
           </span>
         ))}
+        {driverZones && driverZones.some((dz) => dz.zones.length > 0) && (
+          <>
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "hsl(0 85% 55%)" }} />
+              Superclipping
+            </span>
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "hsl(200 85% 55%)" }} />
+              Lift & Coast
+            </span>
+          </>
+        )}
       </div>
       <svg viewBox={viewBox} className="w-full max-h-[400px]" style={{ aspectRatio: "1", transform: "scale(-1,1)" }}>
-        {/* Track outline from first driver */}
+        {/* Track outline */}
         {driverPaths[0] && (
           <polyline
             points={driverPaths[0].points}
@@ -78,7 +116,18 @@ export function TrackMap({ drivers, activeDate }: Props) {
             strokeLinejoin="round"
           />
         )}
-        {/* Each driver's path and marker */}
+        {/* Zone highlights */}
+        {zonePoints.map((zp, i) => (
+          <circle
+            key={i}
+            cx={zp.x}
+            cy={zp.y}
+            r={dotR}
+            fill={zp.type === "superclipping" ? "hsl(0 85% 55%)" : "hsl(200 85% 55%)"}
+            opacity={0.7}
+          />
+        ))}
+        {/* Driver paths and markers */}
         {driverPaths.map((d) => (
           <g key={d.driverNumber}>
             <polyline
@@ -92,21 +141,8 @@ export function TrackMap({ drivers, activeDate }: Props) {
             />
             {d.activePoint && (
               <>
-                <circle
-                  cx={d.activePoint.x}
-                  cy={d.activePoint.y}
-                  r={Math.max(scale * 0.015, 2)}
-                  fill={`#${d.color}`}
-                  opacity={0.3}
-                />
-                <circle
-                  cx={d.activePoint.x}
-                  cy={d.activePoint.y}
-                  r={Math.max(scale * 0.008, 1)}
-                  fill={`#${d.color}`}
-                  stroke="white"
-                  strokeWidth={Math.max(scale * 0.002, 0.3)}
-                />
+                <circle cx={d.activePoint.x} cy={d.activePoint.y} r={Math.max(scale * 0.015, 2)} fill={`#${d.color}`} opacity={0.3} />
+                <circle cx={d.activePoint.x} cy={d.activePoint.y} r={Math.max(scale * 0.008, 1)} fill={`#${d.color}`} stroke="white" strokeWidth={Math.max(scale * 0.002, 0.3)} />
               </>
             )}
           </g>
