@@ -259,6 +259,37 @@ export default function Index() {
     setClickedTime(null);
   }, []);
 
+  // Differentiate colors for teammates (same team_colour)
+  const driverColorMap = useMemo(() => {
+    const states = [...driverStates.values()];
+    const map = new Map<number, string>();
+    const seen = new Map<string, number>(); // color -> count
+    for (const s of states) {
+      const base = (s.driver.team_colour || "ffffff").toLowerCase();
+      const count = seen.get(base) || 0;
+      seen.set(base, count + 1);
+      if (count > 0) {
+        // Lighten the color for the second teammate
+        const r = parseInt(base.slice(0, 2), 16);
+        const g = parseInt(base.slice(2, 4), 16);
+        const b = parseInt(base.slice(4, 6), 16);
+        const lighten = (v: number) => Math.min(255, v + 70);
+        const alt = [lighten(r), lighten(g), lighten(b)]
+          .map((v) => v.toString(16).padStart(2, "0"))
+          .join("");
+        map.set(s.driver.driver_number, alt);
+      } else {
+        map.set(s.driver.driver_number, base);
+      }
+    }
+    return map;
+  }, [driverStates]);
+
+  const getColor = useCallback(
+    (driverNumber: number) => driverColorMap.get(driverNumber) || "ffffff",
+    [driverColorMap]
+  );
+
   // Check if we have laps selected ready to load
   const hasLapsSelected = useMemo(
     () => [...driverStates.values()].some((s) => s.selectedLap != null),
@@ -283,7 +314,7 @@ export default function Index() {
         return {
           driverNumber: s.driver.driver_number,
           acronym: s.driver.name_acronym,
-          color: s.driver.team_colour || "ffffff",
+          color: getColor(s.driver.driver_number),
           data,
         };
       });
@@ -296,7 +327,7 @@ export default function Index() {
       .map((s) => ({
         driverNumber: s.driver.driver_number,
         acronym: s.driver.name_acronym,
-        color: s.driver.team_colour || "ffffff",
+        color: getColor(s.driver.driver_number),
         locations: s.locationData,
       }));
   }, [driverStates]);
@@ -381,7 +412,7 @@ export default function Index() {
               drivers={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
                 acronym: dl.driver.name_acronym,
-                color: dl.driver.team_colour || "ffffff",
+                color: getColor(dl.driver.driver_number),
                 laps: dl.laps,
               }))}
               selectedLaps={driversLaps.map((dl) => ({
