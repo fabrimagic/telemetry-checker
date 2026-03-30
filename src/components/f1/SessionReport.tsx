@@ -422,6 +422,41 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         </div>
       )}
 
+      {/* Driver Filter */}
+      {isRace && positionDrivers.length > 0 && (
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter Drivers</h3>
+            <div className="flex gap-2">
+              <button onClick={selectAllDrivers} className="text-[10px] text-primary hover:underline">All</button>
+              <button onClick={selectNoneDrivers} className="text-[10px] text-primary hover:underline">None</button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {positionDrivers.map((num) => {
+              const active = !visibleDrivers || visibleDrivers.has(num);
+              return (
+                <button
+                  key={num}
+                  onClick={() => toggleDriver(num)}
+                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
+                    active
+                      ? "border-border bg-muted/80 text-foreground"
+                      : "border-transparent bg-muted/20 text-muted-foreground opacity-40"
+                  }`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: `#${driverColor(num)}` }}
+                  />
+                  {driverName(num)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {isRace && tyreStrategy.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-4">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -429,7 +464,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             Tyre Strategy
           </h3>
           <div className="space-y-1">
-            {tyreStrategy.map(({ driverNumber, stints: dStints }) => (
+            {tyreStrategy.filter(({ driverNumber }) => !visibleDrivers || visibleDrivers.has(driverNumber)).map(({ driverNumber, stints: dStints }) => (
               <div key={driverNumber} className="flex items-center gap-2 text-xs">
                 <span className="font-mono font-bold w-10 shrink-0 text-right">
                   {driverName(driverNumber)}
@@ -475,7 +510,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             Pit Stops ({pitStops.length})
           </h3>
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {pitStops.map((p, i) => (
+            {pitStops.filter((p) => !visibleDrivers || visibleDrivers.has(p.driver_number)).map((p, i) => (
               <div key={i} className="flex items-center gap-3 text-xs py-1.5 px-2 rounded bg-muted/50">
                 <span
                   className="w-2 h-2 rounded-full shrink-0"
@@ -495,41 +530,6 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Driver Filter */}
-      {isRace && positionDrivers.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter Drivers in Charts</h3>
-            <div className="flex gap-2">
-              <button onClick={selectAllDrivers} className="text-[10px] text-primary hover:underline">All</button>
-              <button onClick={selectNoneDrivers} className="text-[10px] text-primary hover:underline">None</button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {positionDrivers.map((num) => {
-              const active = !visibleDrivers || visibleDrivers.has(num);
-              return (
-                <button
-                  key={num}
-                  onClick={() => toggleDriver(num)}
-                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
-                    active
-                      ? "border-border bg-muted/80 text-foreground"
-                      : "border-transparent bg-muted/20 text-muted-foreground opacity-40"
-                  }`}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: `#${driverColor(num)}` }}
-                  />
-                  {driverName(num)}
-                </button>
-              );
-            })}
           </div>
         </div>
       )}
