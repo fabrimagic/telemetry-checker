@@ -412,7 +412,7 @@ export default function Index() {
               drivers={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
                 acronym: dl.driver.name_acronym,
-                color: dl.driver.team_colour || "ffffff",
+                color: getColor(dl.driver.driver_number),
                 laps: dl.laps,
               }))}
               selectedLaps={driversLaps.map((dl) => ({
