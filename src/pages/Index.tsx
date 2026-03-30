@@ -500,6 +500,9 @@ export default function Index() {
             </div>
           </div>
         )}
+            </TabsContent>
+          </Tabs>
+        )}
       </main>
       <footer className="border-t border-border px-6 py-4 mt-8">
         <p className="text-center text-xs text-muted-foreground">
