@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Loader2, Trophy, Flag, Cloud, CircleDot, ArrowUpDown, BarChart3 } from "lucide-react";
+import { Loader2, Trophy, Flag, Cloud, CircleDot, ArrowUpDown, BarChart3, Timer } from "lucide-react";
 import {
   getSessionResult,
   getStartingGrid,
@@ -8,6 +8,7 @@ import {
   getAllPitStops,
   getWeatherForSession,
   getDrivers,
+  getIntervals,
   type SessionResult,
   type StartingGridEntry,
   type PositionData,
@@ -15,6 +16,7 @@ import {
   type PitData,
   type WeatherData,
   type Driver,
+  type IntervalData,
 } from "@/lib/openf1";
 import {
   Table,
