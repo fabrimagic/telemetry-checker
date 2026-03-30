@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import type { StintData } from "@/lib/openf1";
+import { Watermark } from "./Watermark";
 
 interface DriverLapTimes {
   driverNumber: number;
