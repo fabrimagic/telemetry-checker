@@ -521,6 +521,117 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
           </div>
         </div>
       )}
+
+      {/* Gap to Leader */}
+      {isRace && gapChartData.length > 0 && (
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Timer className="h-3.5 w-3.5" />
+            Gap to Leader (seconds)
+          </h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={gapChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="idx"
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                label={{ value: "Time →", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                label={{ value: "Gap (s)", angle: -90, position: "insideLeft", fontSize: 10 }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  fontSize: 11,
+                }}
+                formatter={(value: any, name: string) => {
+                  const num = parseInt(name.replace("gap_", ""));
+                  return [`${Number(value).toFixed(3)}s`, driverName(num)];
+                }}
+              />
+              {positionDrivers.map((num) => (
+                <Line
+                  key={num}
+                  type="monotone"
+                  dataKey={`gap_${num}`}
+                  stroke={`#${driverColor(num)}`}
+                  dot={false}
+                  strokeWidth={1.5}
+                  connectNulls
+                  name={`gap_${num}`}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {positionDrivers.map((num) => (
+              <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
+                {driverName(num)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Interval to Car Ahead */}
+      {isRace && gapChartData.length > 0 && (
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Timer className="h-3.5 w-3.5" />
+            Interval to Car Ahead (seconds)
+          </h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={gapChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="idx"
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                label={{ value: "Time →", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                label={{ value: "Interval (s)", angle: -90, position: "insideLeft", fontSize: 10 }}
+                domain={[0, 10]}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  fontSize: 11,
+                }}
+                formatter={(value: any, name: string) => {
+                  const num = parseInt(name.replace("ivl_", ""));
+                  return [`${Number(value).toFixed(3)}s`, driverName(num)];
+                }}
+              />
+              {positionDrivers.map((num) => (
+                <Line
+                  key={num}
+                  type="monotone"
+                  dataKey={`ivl_${num}`}
+                  stroke={`#${driverColor(num)}`}
+                  dot={false}
+                  strokeWidth={1.5}
+                  connectNulls
+                  name={`ivl_${num}`}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {positionDrivers.map((num) => (
+              <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
+                {driverName(num)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
