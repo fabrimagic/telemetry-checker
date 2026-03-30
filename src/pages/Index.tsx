@@ -486,6 +486,18 @@ export default function Index() {
                 onCursorChange={setCursorTime}
                 onCursorClick={setClickedTime}
               />
+              <SectorMiniSectors
+                drivers={[...driverStates.values()]
+                  .filter((s) => s.selectedLap != null && s.carData.length > 0)
+                  .map((s) => {
+                    const lap = s.laps.find((l) => l.lap_number === s.selectedLap)!;
+                    return {
+                      driver: s.driver,
+                      lap,
+                      color: getColor(s.driver.driver_number),
+                    };
+                  })}
+              />
             </section>
             <div className="space-y-6">
               <TrackMap drivers={mapDrivers} activeDate={activeDate} />
