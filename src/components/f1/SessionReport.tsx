@@ -217,6 +217,44 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return results.slice(0, 20).map((r) => r.driver_number);
   }, [results]);
 
+  // Build gap-to-leader chart data from intervals, sampled
+  const gapChartData = useMemo(() => {
+    if (!intervals.length || !results.length) return [];
+    const driverNums = results.slice(0, 20).map((r) => r.driver_number);
+    
+    // Sort intervals by date
+    const sorted = [...intervals].sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Sample to keep chart performant
+    const maxPoints = 300;
+    const step = Math.max(1, Math.floor(sorted.length / maxPoints));
+    
+    const currentGap = new Map<number, number | null>();
+    const currentInterval = new Map<number, number | null>();
+    const data: Record<string, any>[] = [];
+    let pointIdx = 0;
+    
+    for (let i = 0; i < sorted.length; i++) {
+      const item = sorted[i];
+      const gap = typeof item.gap_to_leader === "number" ? item.gap_to_leader : null;
+      const ivl = typeof item.interval === "number" ? item.interval : null;
+      currentGap.set(item.driver_number, gap);
+      currentInterval.set(item.driver_number, ivl);
+      
+      if (i % step === 0 || i === sorted.length - 1) {
+        const point: Record<string, any> = { idx: pointIdx++ };
+        for (const num of driverNums) {
+          const g = currentGap.get(num);
+          if (g != null) point[`gap_${num}`] = g;
+          const iv = currentInterval.get(num);
+          if (iv != null) point[`ivl_${num}`] = iv;
+        }
+        data.push(point);
+      }
+    }
+    return data;
+  }, [intervals, results]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground text-sm py-8 justify-center">
