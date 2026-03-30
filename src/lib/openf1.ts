@@ -88,6 +88,15 @@ export interface PitData {
   stop_duration: number | null;
 }
 
+export interface IntervalData {
+  date: string;
+  driver_number: number;
+  gap_to_leader: number | string | null;
+  interval: number | string | null;
+  meeting_key: number;
+  session_key: number;
+}
+
 // Simple queue to enforce max 2 requests/second
 let lastRequestTime = 0;
 const MIN_INTERVAL = 500; // ms between requests
@@ -202,4 +211,8 @@ export function getAllPitStops(sessionKey: number) {
 
 export function getWeatherForSession(sessionKey: number) {
   return fetchApi<WeatherData[]>(`/weather?session_key=${sessionKey}`);
+}
+
+export function getIntervals(sessionKey: number) {
+  return fetchApi<IntervalData[]>(`/intervals?session_key=${sessionKey}`);
 }
