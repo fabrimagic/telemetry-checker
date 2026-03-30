@@ -499,6 +499,41 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         </div>
       )}
 
+      {/* Driver Filter */}
+      {isRace && positionDrivers.length > 0 && (
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter Drivers in Charts</h3>
+            <div className="flex gap-2">
+              <button onClick={selectAllDrivers} className="text-[10px] text-primary hover:underline">All</button>
+              <button onClick={selectNoneDrivers} className="text-[10px] text-primary hover:underline">None</button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {positionDrivers.map((num) => {
+              const active = !visibleDrivers || visibleDrivers.has(num);
+              return (
+                <button
+                  key={num}
+                  onClick={() => toggleDriver(num)}
+                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
+                    active
+                      ? "border-border bg-muted/80 text-foreground"
+                      : "border-transparent bg-muted/20 text-muted-foreground opacity-40"
+                  }`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: `#${driverColor(num)}` }}
+                  />
+                  {driverName(num)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {isRace && positionChartData.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-4">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
