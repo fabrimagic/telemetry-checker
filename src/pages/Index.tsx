@@ -36,6 +36,7 @@ import {
 interface DriverState {
   driver: Driver;
   laps: Lap[];
+  stints: StintData[];
   selectedLap: number | null;
   carData: CarData[];
   locationData: LocationData[];
@@ -94,9 +95,13 @@ export default function Index() {
       setError(null);
       try {
         const laps = await getLaps(sessionKey, driverNumber);
+        let driverStints: StintData[] = [];
+        try {
+          driverStints = await getStints(sessionKey, driverNumber);
+        } catch { /* optional */ }
         setDriverStates((prev) => {
           const next = new Map(prev);
-          next.set(driverNumber, { driver, laps, selectedLap: null, carData: [], locationData: [] });
+          next.set(driverNumber, { driver, laps, stints: driverStints, selectedLap: null, carData: [], locationData: [] });
           return next;
         });
       } catch (e: any) {
@@ -362,6 +367,7 @@ export default function Index() {
         .map((s) => ({
           driver: s.driver,
           laps: s.laps,
+          stints: s.stints,
           selectedLap: s.selectedLap,
         })),
     [selectedDriverNumbers, driverStates]
@@ -430,6 +436,7 @@ export default function Index() {
                 acronym: dl.driver.name_acronym,
                 color: getColor(dl.driver.driver_number),
                 laps: dl.laps,
+                stints: dl.stints,
               }))}
               selectedLaps={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
