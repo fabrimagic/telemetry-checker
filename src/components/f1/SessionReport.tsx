@@ -429,7 +429,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             Tyre Strategy
           </h3>
           <div className="space-y-1">
-            {tyreStrategy.map(({ driverNumber, stints: dStints }) => (
+            {tyreStrategy.filter(({ driverNumber }) => !visibleDrivers || visibleDrivers.has(driverNumber)).map(({ driverNumber, stints: dStints }) => (
               <div key={driverNumber} className="flex items-center gap-2 text-xs">
                 <span className="font-mono font-bold w-10 shrink-0 text-right">
                   {driverName(driverNumber)}
