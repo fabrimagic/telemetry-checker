@@ -183,6 +183,20 @@ export default function Index() {
             setDiaryEvents(diary);
           } catch { /* optional */ }
           setLoadingDiary(false);
+
+          // Build Virtual Race Engineer
+          setLoadingVre(true);
+          try {
+            const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber).catch(() => []);
+            const vre = computeVirtualRaceEngineer(
+              driverNumber, driver.name_acronym, sessionKey,
+              laps, driverStints, pitsForVre,
+              sessionWeather, raceControlMessages,
+              ivls, pos, allDrivers,
+            );
+            setVreResult(vre);
+          } catch { /* optional */ }
+          setLoadingVre(false);
         }
       } catch (e: any) {
         setError(e.message);
