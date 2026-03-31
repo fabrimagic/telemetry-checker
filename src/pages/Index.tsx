@@ -48,6 +48,8 @@ import {
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
+import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
+import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 
 interface DriverState {
   driver: Driver;
@@ -79,6 +81,8 @@ export default function Index() {
   const [diaryEvents, setDiaryEvents] = useState<DiaryEvent[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
+  const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
+  const [loadingVre, setLoadingVre] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -161,10 +165,11 @@ export default function Index() {
 
         // Build diary immediately for single driver Race/Sprint
         if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
+          let ivls: IntervalData[] = [];
+          let pos: PositionData[] = [];
+
           setLoadingDiary(true);
           try {
-            let ivls: IntervalData[] = [];
-            let pos: PositionData[] = [];
             try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
             try { pos = await getPositions(sessionKey); setDiaryPositions(pos); } catch {}
 
@@ -179,6 +184,20 @@ export default function Index() {
             setDiaryEvents(diary);
           } catch { /* optional */ }
           setLoadingDiary(false);
+
+          // Build Virtual Race Engineer
+          setLoadingVre(true);
+          try {
+            const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber).catch(() => []);
+            const vre = computeVirtualRaceEngineer(
+              driverNumber, driver.name_acronym, sessionKey,
+              laps, driverStints, pitsForVre,
+              sessionWeather, raceControlMessages,
+              ivls, pos, allDrivers,
+            );
+            setVreResult(vre);
+          } catch { /* optional */ }
+          setLoadingVre(false);
         }
       } catch (e: any) {
         setError(e.message);
@@ -208,6 +227,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
+    setVreResult(null);
   }, []);
 
   // Select lap for a driver
@@ -309,6 +329,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
+    setVreResult(null);
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -597,6 +618,17 @@ export default function Index() {
                   />
                 );
               })()}
+            {/* Virtual Race Engineer - single driver, Race/Sprint only */}
+            {selectedDriverNumbers.length === 1 &&
+              (sessionType === "Race" || sessionType === "Sprint") && (
+                loadingVre ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+                  </div>
+                ) : vreResult ? (
+                  <VirtualRaceEngineerCard result={vreResult} />
+                ) : null
+              )}
             {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {stintsData.length > 0 && (
