@@ -71,8 +71,12 @@ export default function Index() {
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
+  const [overtakesReceivedData, setOvertakesReceivedData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
   const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
+  const [diaryIntervals, setDiaryIntervals] = useState<IntervalData[]>([]);
+  const [diaryPositions, setDiaryPositions] = useState<PositionData[]>([]);
+  const [diaryEvents, setDiaryEvents] = useState<DiaryEvent[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
