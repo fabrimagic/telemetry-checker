@@ -27,10 +27,13 @@ import {
   getLocation,
   getWeather,
   getOvertakes,
+  getOvertakesReceived,
   getStints,
   getPitStops,
   getWeatherForSession,
   getRaceControl,
+  getIntervals,
+  getPositions,
   type Driver,
   type Lap,
   type CarData,
@@ -40,7 +43,11 @@ import {
   type StintData,
   type PitData,
   type RaceControlMessage,
+  type IntervalData,
+  type PositionData,
 } from "@/lib/openf1";
+import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
+import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 
 interface DriverState {
   driver: Driver;
@@ -64,8 +71,12 @@ export default function Index() {
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
+  const [overtakesReceivedData, setOvertakesReceivedData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
   const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
+  const [diaryIntervals, setDiaryIntervals] = useState<IntervalData[]>([]);
+  const [diaryPositions, setDiaryPositions] = useState<PositionData[]>([]);
+  const [diaryEvents, setDiaryEvents] = useState<DiaryEvent[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -178,8 +189,12 @@ export default function Index() {
     setCursorTime(null);
     setWeatherData(null);
     setOvertakesData([]);
+    setOvertakesReceivedData([]);
     setStintsData([]);
     setPitStopsData([]);
+    setDiaryIntervals([]);
+    setDiaryPositions([]);
+    setDiaryEvents([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
@@ -221,22 +236,39 @@ export default function Index() {
       }
 
       // Fetch overtakes for single driver in Race/Sprint sessions
+      let fetchedOvertakes: OvertakeData[] = [];
+      let fetchedOvertakesReceived: OvertakeData[] = [];
+      let fetchedStints: StintData[] = [];
+      let fetchedPits: PitData[] = [];
+      let fetchedIntervals: IntervalData[] = [];
+      let fetchedPositions: PositionData[] = [];
+
       if (
         selectedDriverNumbers.length === 1 &&
         (sessionType === "Race" || sessionType === "Sprint")
       ) {
+        const dNum = selectedDriverNumbers[0];
         try {
-          const ot = await getOvertakes(sessionKey, selectedDriverNumbers[0]);
-          setOvertakesData(ot);
-        } catch {
-          // Overtakes are optional
-        }
+          fetchedOvertakes = await getOvertakes(sessionKey, dNum);
+          setOvertakesData(fetchedOvertakes);
+        } catch { /* optional */ }
         try {
-          const st = await getStints(sessionKey, selectedDriverNumbers[0]);
-          setStintsData(st);
-        } catch {
-          // Stints are optional
-        }
+          fetchedOvertakesReceived = await getOvertakesReceived(sessionKey, dNum);
+          setOvertakesReceivedData(fetchedOvertakesReceived);
+        } catch { /* optional */ }
+        try {
+          fetchedStints = await getStints(sessionKey, dNum);
+          setStintsData(fetchedStints);
+        } catch { /* optional */ }
+        // Fetch intervals & positions for diary battles
+        try {
+          fetchedIntervals = await getIntervals(sessionKey);
+          setDiaryIntervals(fetchedIntervals);
+        } catch { /* optional */ }
+        try {
+          fetchedPositions = await getPositions(sessionKey);
+          setDiaryPositions(fetchedPositions);
+        } catch { /* optional */ }
       }
 
       // Fetch pit stops in Race/Sprint sessions for all selected drivers
@@ -246,12 +278,35 @@ export default function Index() {
           try {
             const pits = await getPitStops(sessionKey, num);
             allPits.push(...pits);
-          } catch {
-            // Pit data is optional
-          }
+          } catch { /* optional */ }
         }
         allPits.sort((a, b) => a.lap_number - b.lap_number);
         setPitStopsData(allPits);
+        fetchedPits = allPits;
+      }
+
+      // Build race diary for single driver Race/Sprint
+      if (
+        selectedDriverNumbers.length === 1 &&
+        (sessionType === "Race" || sessionType === "Sprint")
+      ) {
+        const dNum = selectedDriverNumbers[0];
+        const state = driverStates.get(dNum);
+        if (state) {
+          const diary = buildRaceDiary(
+            dNum,
+            fetchedOvertakes,
+            fetchedOvertakesReceived,
+            raceControlMessages,
+            fetchedPits,
+            fetchedStints.length > 0 ? fetchedStints : state.stints,
+            fetchedIntervals,
+            fetchedPositions,
+            allDrivers,
+            state.laps,
+          );
+          setDiaryEvents(diary);
+        }
       }
 
       setDriverStates((prev) => {
@@ -277,8 +332,12 @@ export default function Index() {
     setDriverStates(new Map());
     setWeatherData(null);
     setOvertakesData([]);
+    setOvertakesReceivedData([]);
     setStintsData([]);
     setPitStopsData([]);
+    setDiaryIntervals([]);
+    setDiaryPositions([]);
+    setDiaryEvents([]);
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -612,6 +671,19 @@ export default function Index() {
                     carData: s.carData,
                   }))}
               />
+              {/* Race Diary - single driver, Race/Sprint only */}
+              {selectedDriverNumbers.length === 1 &&
+                (sessionType === "Race" || sessionType === "Sprint") && (() => {
+                  const state = driverStates.get(selectedDriverNumbers[0]);
+                  if (!state) return null;
+                  return (
+                    <RaceDiaryCard
+                      events={diaryEvents}
+                      driverAcronym={state.driver.name_acronym}
+                      driverColor={getColor(state.driver.driver_number)}
+                    />
+                  );
+                })()}
             </section>
             <div className="space-y-6">
               <TrackMap
