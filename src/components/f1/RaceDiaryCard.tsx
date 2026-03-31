@@ -1,5 +1,4 @@
-import { useMemo } from "react";
-import { BookOpen, ArrowUp, ArrowDown, Flag, Wrench, Swords, ChevronDown, Info } from "lucide-react";
+import { BookOpen, ArrowUp, ArrowDown, Flag, Wrench, ChevronDown, Info } from "lucide-react";
 import type { DiaryEvent } from "@/lib/raceDiary";
 
 interface Props {
