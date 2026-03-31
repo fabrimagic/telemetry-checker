@@ -227,6 +227,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
+    setVreResult(null);
   }, []);
 
   // Select lap for a driver
