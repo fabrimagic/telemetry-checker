@@ -125,8 +125,14 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                 ))}
               </tbody>
             </table>
+            <ul className="text-[10px] text-muted-foreground mt-2 space-y-1 pl-4 list-disc">
+              <li><span className="font-mono font-bold text-foreground/80">Media</span> — Tempo medio sul giro nella sequenza long run identificata.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Std</span> — Deviazione standard dei tempi sul giro: misura la regolarità del passo. Valori bassi (&lt; 0.5 s) indicano un passo costante.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Slope</span> — Pendenza della regressione lineare (sec/giro): indica il degrado. Un valore positivo significa che il tempo peggiora ad ogni giro.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Punteggio complessivo basato su lunghezza, regolarità, trend e penalità. ≥ 60: probabile long run • 40–59: possibile • &lt; 40: non long run.</li>
+            </ul>
             <p className="text-[10px] text-muted-foreground mt-1.5 italic">
-              Score ≥ 60: probabile long run • Score 40–59: possibile • Score &lt; 40: non long run. Solo i long run identificati (score ≥ 40) vengono usati per il calcolo del degrado.
+              Solo i long run identificati (score ≥ 40) vengono usati per il calcolo del degrado.
             </p>
           </div>
         </details>
