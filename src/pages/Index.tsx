@@ -180,6 +180,8 @@ export default function Index() {
       next.delete(driverNumber);
       return next;
     });
+    // Clear diary if no longer single driver
+    setDiaryEvents([]);
   }, []);
 
   // Select lap for a driver
