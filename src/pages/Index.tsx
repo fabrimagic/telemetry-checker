@@ -9,6 +9,7 @@ import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnalysis";
 import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
 import { calculateTyreDegradation } from "@/lib/tyreDegradation";
+import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
@@ -377,6 +378,27 @@ export default function Index() {
     [selectedDriverNumbers, driverStates]
   );
 
+  // Long-run detection for Practice sessions
+  const longRunResults = useMemo(() => {
+    if (!sessionType.includes("Practice")) return [];
+    return selectedDriverNumbers.flatMap((num) => {
+      const state = driverStates.get(num);
+      if (!state) return [];
+      // Infer pit-in laps from stints (last lap of each stint except final)
+      const pitInLaps: import("@/lib/openf1").PitData[] = state.stints
+        .slice(0, -1)
+        .map((s) => ({ lap_number: s.lap_end } as import("@/lib/openf1").PitData));
+      return detectLongRuns(
+        num,
+        state.driver.name_acronym,
+        getColor(num),
+        state.laps,
+        state.stints,
+        pitInLaps
+      );
+    });
+  }, [selectedDriverNumbers, driverStates, sessionType, getColor]);
+
   // Tyre degradation results
   const degradationResults = useMemo(() => {
     const validTypes = ["Race", "Sprint", "Practice"];
@@ -384,6 +406,25 @@ export default function Index() {
     return selectedDriverNumbers.flatMap((num) => {
       const state = driverStates.get(num);
       if (!state) return [];
+
+      // For Practice: use only long-run laps
+      if (sessionType.includes("Practice")) {
+        const driverLongRuns = longRunResults.filter((lr) => lr.driverNumber === num);
+        const { filteredLaps, virtualStints } = longRunToStintsAndLaps(
+          state.laps,
+          driverLongRuns,
+          state.stints
+        );
+        if (!filteredLaps.length) return [];
+        return calculateTyreDegradation(
+          num,
+          state.driver.name_acronym,
+          getColor(num),
+          filteredLaps,
+          virtualStints
+        );
+      }
+
       return calculateTyreDegradation(
         num,
         state.driver.name_acronym,
@@ -392,7 +433,7 @@ export default function Index() {
         state.stints
       );
     });
-  }, [selectedDriverNumbers, driverStates, sessionType, getColor]);
+  }, [selectedDriverNumbers, driverStates, sessionType, getColor, longRunResults]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -467,7 +508,7 @@ export default function Index() {
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
             {degradationResults.length > 0 && (
-              <TyreDegradationCard results={degradationResults} />
+              <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
             )}
             {hasLapsSelected && (
               <Button
