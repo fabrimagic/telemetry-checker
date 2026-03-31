@@ -299,11 +299,15 @@ export function computeVirtualRaceEngineer(
 
     // Generate compound combos: actual + all permutations using available compounds
     const allAvailableCompounds = [...compoundModels.keys()];
-    const compoundCombos: string[][] = [actualCompounds];
+    const compoundCombos: string[][] = [];
+    // Only include actual compounds if they satisfy the 2-compound rule
+    if (hasMinTwoCompounds(actualCompounds)) compoundCombos.push(actualCompounds);
+
     if (actualCompounds.length === 2) {
       for (const c1 of allAvailableCompounds) {
         for (const c2 of allAvailableCompounds) {
           const combo = [c1, c2];
+          if (!hasMinTwoCompounds(combo)) continue;
           if (combo.join(",") !== actualCompounds.join(",")) compoundCombos.push(combo);
         }
       }
@@ -312,6 +316,7 @@ export function computeVirtualRaceEngineer(
         for (const c2 of allAvailableCompounds) {
           for (const c3 of allAvailableCompounds) {
             const combo = [c1, c2, c3];
+            if (!hasMinTwoCompounds(combo)) continue;
             if (combo.join(",") !== actualCompounds.join(",")) compoundCombos.push(combo);
           }
         }
