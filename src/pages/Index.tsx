@@ -507,8 +507,18 @@ export default function Index() {
               onSelectLap={handleSelectLap}
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
-            {degradationResults.length > 0 && (
+            {degradationResults.length > 0 ? (
               <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
+            ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
+              <div className="bg-card rounded-lg border border-border p-4">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <TrendingDown className="h-3.5 w-3.5" />
+                  Tyre Degradation
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Dati insufficienti per calcolare il degrado gomme. Non sono state rilevate simulazioni passo gara (long run) con un numero sufficiente di giri validi per i piloti selezionati.
+                </p>
+              </div>
             )}
             {hasLapsSelected && (
               <Button
