@@ -515,9 +515,26 @@ export default function Index() {
                   <TrendingDown className="h-3.5 w-3.5" />
                   Tyre Degradation
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-3">
                   Dati insufficienti per calcolare il degrado gomme. Non sono state rilevate simulazioni passo gara (long run) con un numero sufficiente di giri validi per i piloti selezionati.
                 </p>
+                <details className="group">
+                  <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <Info className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium text-foreground/80">Come funziona il rilevamento Long Run</span>
+                    <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
+                    <ul className="space-y-1.5 pl-5 list-disc">
+                      <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint, che simula il passo gara in una sessione di prove libere.</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Vengono esclusi out lap, in lap e giri anomali (tempo &lt; 99% o &gt; 107% della mediana dello stint).</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Score</span> — Ogni sequenza riceve un punteggio basato su: lunghezza (max +30), regolarità del passo (max +25), trend di degrado positivo (max +20), con penalità per giri push (-25) o alta variabilità (-15).</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile long run • Score 40–59: possibile long run • Score &lt; 40: non long run.</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Soglia minima</span> — Solo le sequenze con score ≥ 40 vengono utilizzate per il calcolo del degrado gomme.</li>
+                    </ul>
+                    <p className="pt-1 italic">Se nessuna sequenza raggiunge lo score minimo, il degrado non viene calcolato per quel pilota.</p>
+                  </div>
+                </details>
               </div>
             )}
             {hasLapsSelected && (
