@@ -135,25 +135,46 @@ export default function Index() {
           return next;
         });
 
-        // Build diary immediately for single driver Race/Sprint
-        // Check if this will be the only selected driver
+        // Always fetch stints for display
+        setStintsData((prev) => {
+          const filtered = prev.filter((s) => s.driver_number !== driverNumber);
+          return [...filtered, ...driverStints];
+        });
+
+        // Fetch pit stops for Race/Sprint
+        if (sessionType === "Race" || sessionType === "Sprint") {
+          try {
+            const pits = await getPitStops(sessionKey, driverNumber);
+            setPitStopsData((prev) => {
+              const filtered = prev.filter((p) => p.driver_number !== driverNumber);
+              return [...filtered, ...pits].sort((a, b) => a.lap_number - b.lap_number);
+            });
+          } catch { /* optional */ }
+        }
+
+        // Fetch overtakes for single driver Race/Sprint
         const willBeSingle = selectedDriverNumbers.length === 0;
+        if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
+          try { const ot = await getOvertakes(sessionKey, driverNumber); setOvertakesData(ot); } catch {}
+          try { const otR = await getOvertakesReceived(sessionKey, driverNumber); setOvertakesReceivedData(otR); } catch {}
+        }
+
+        // Build diary immediately for single driver Race/Sprint
         if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
           setLoadingDiary(true);
           try {
-            let ot: OvertakeData[] = [];
-            let otR: OvertakeData[] = [];
-            let pits: PitData[] = [];
             let ivls: IntervalData[] = [];
             let pos: PositionData[] = [];
-            try { ot = await getOvertakes(sessionKey, driverNumber); setOvertakesData(ot); } catch {}
-            try { otR = await getOvertakesReceived(sessionKey, driverNumber); setOvertakesReceivedData(otR); } catch {}
-            try { pits = await getPitStops(sessionKey, driverNumber); setPitStopsData(pits); } catch {}
             try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
             try { pos = await getPositions(sessionKey); setDiaryPositions(pos); } catch {}
 
             const diary = buildRaceDiary(
-              driverNumber, ot, otR, raceControlMessages, pits, driverStints, ivls, pos, allDrivers, laps,
+              driverNumber,
+              overtakesData.length ? overtakesData : await getOvertakes(sessionKey, driverNumber).catch(() => []),
+              overtakesReceivedData.length ? overtakesReceivedData : await getOvertakesReceived(sessionKey, driverNumber).catch(() => []),
+              raceControlMessages,
+              pitStopsData.length ? pitStopsData : await getPitStops(sessionKey, driverNumber).catch(() => []),
+              driverStints, ivls, pos, allDrivers, laps,
             );
             setDiaryEvents(diary);
           } catch { /* optional */ }
@@ -169,7 +190,7 @@ export default function Index() {
         });
       }
     },
-    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages]
+    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages, overtakesData, overtakesReceivedData, pitStopsData]
   );
 
   // Remove driver
@@ -180,7 +201,12 @@ export default function Index() {
       next.delete(driverNumber);
       return next;
     });
-    // Clear diary if no longer single driver
+    // Clean up per-driver aggregated data
+    setStintsData((prev) => prev.filter((s) => s.driver_number !== driverNumber));
+    setPitStopsData((prev) => prev.filter((p) => p.driver_number !== driverNumber));
+    // Clear single-driver data
+    setOvertakesData([]);
+    setOvertakesReceivedData([]);
     setDiaryEvents([]);
   }, []);
 
@@ -218,13 +244,6 @@ export default function Index() {
     setClickedTime(null);
     setCursorTime(null);
     setWeatherData(null);
-    setOvertakesData([]);
-    setOvertakesReceivedData([]);
-    setStintsData([]);
-    setPitStopsData([]);
-    setDiaryIntervals([]);
-    setDiaryPositions([]);
-    setDiaryEvents([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
@@ -241,7 +260,6 @@ export default function Index() {
         const start = lap.date_start;
         const endDate = new Date(new Date(start).getTime() + lap.lap_duration * 1000).toISOString();
 
-        // Use first driver's lap time range for weather
         if (!weatherStart) {
           weatherStart = start;
           weatherEnd = endDate;
@@ -252,91 +270,14 @@ export default function Index() {
         updates.push([num, car, loc]);
       }
 
-      // Fetch weather only when single driver selected
+      // Fetch weather for selected lap (single driver)
       if (selectedDriverNumbers.length === 1 && weatherStart && weatherEnd) {
         try {
           const weather = await getWeather(sessionKey, weatherStart, weatherEnd);
           if (weather.length > 0) {
-            // Pick the weather reading closest to the lap start
             setWeatherData(weather[weather.length - 1]);
           }
-        } catch {
-          // Weather is optional, don't fail the whole load
-        }
-      }
-
-      // Fetch overtakes for single driver in Race/Sprint sessions
-      let fetchedOvertakes: OvertakeData[] = [];
-      let fetchedOvertakesReceived: OvertakeData[] = [];
-      let fetchedStints: StintData[] = [];
-      let fetchedPits: PitData[] = [];
-      let fetchedIntervals: IntervalData[] = [];
-      let fetchedPositions: PositionData[] = [];
-
-      if (
-        selectedDriverNumbers.length === 1 &&
-        (sessionType === "Race" || sessionType === "Sprint")
-      ) {
-        const dNum = selectedDriverNumbers[0];
-        try {
-          fetchedOvertakes = await getOvertakes(sessionKey, dNum);
-          setOvertakesData(fetchedOvertakes);
         } catch { /* optional */ }
-        try {
-          fetchedOvertakesReceived = await getOvertakesReceived(sessionKey, dNum);
-          setOvertakesReceivedData(fetchedOvertakesReceived);
-        } catch { /* optional */ }
-        try {
-          fetchedStints = await getStints(sessionKey, dNum);
-          setStintsData(fetchedStints);
-        } catch { /* optional */ }
-        // Fetch intervals & positions for diary battles
-        try {
-          fetchedIntervals = await getIntervals(sessionKey);
-          setDiaryIntervals(fetchedIntervals);
-        } catch { /* optional */ }
-        try {
-          fetchedPositions = await getPositions(sessionKey);
-          setDiaryPositions(fetchedPositions);
-        } catch { /* optional */ }
-      }
-
-      // Fetch pit stops in Race/Sprint sessions for all selected drivers
-      if (sessionType === "Race" || sessionType === "Sprint") {
-        const allPits: PitData[] = [];
-        for (const num of selectedDriverNumbers) {
-          try {
-            const pits = await getPitStops(sessionKey, num);
-            allPits.push(...pits);
-          } catch { /* optional */ }
-        }
-        allPits.sort((a, b) => a.lap_number - b.lap_number);
-        setPitStopsData(allPits);
-        fetchedPits = allPits;
-      }
-
-      // Build race diary for single driver Race/Sprint
-      if (
-        selectedDriverNumbers.length === 1 &&
-        (sessionType === "Race" || sessionType === "Sprint")
-      ) {
-        const dNum = selectedDriverNumbers[0];
-        const state = driverStates.get(dNum);
-        if (state) {
-          const diary = buildRaceDiary(
-            dNum,
-            fetchedOvertakes,
-            fetchedOvertakesReceived,
-            raceControlMessages,
-            fetchedPits,
-            fetchedStints.length > 0 ? fetchedStints : state.stints,
-            fetchedIntervals,
-            fetchedPositions,
-            allDrivers,
-            state.laps,
-          );
-          setDiaryEvents(diary);
-        }
       }
 
       setDriverStates((prev) => {
@@ -656,6 +597,25 @@ export default function Index() {
                   />
                 );
               })()}
+            {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {stintsData.length > 0 && (
+                <StintsCard stints={stintsData} />
+              )}
+              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
+                <PitStopsCard
+                  pitStops={pitStopsData}
+                  allDrivers={allDrivers}
+                  multiDriver={selectedDriverNumbers.length > 1}
+                />
+              )}
+              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+              )}
+              {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
+                <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
+              )}
+            </div>
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
@@ -729,19 +689,6 @@ export default function Index() {
               />
               {weatherData && selectedDriverNumbers.length === 1 && (
                 <WeatherCard weather={weatherData} />
-              )}
-              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
-                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
-              )}
-              {stintsData.length > 0 && selectedDriverNumbers.length === 1 && (
-                <StintsCard stints={stintsData} />
-              )}
-              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
-                <PitStopsCard
-                  pitStops={pitStopsData}
-                  allDrivers={allDrivers}
-                  multiDriver={selectedDriverNumbers.length > 1}
-                />
               )}
             </div>
           </div>
