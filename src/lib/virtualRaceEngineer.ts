@@ -375,6 +375,7 @@ export function computeVirtualRaceEngineer(
 
   const recommendedStrategy: RecommendedStrategy = {
     pit_windows: recommendedWindows,
+    compounds: [...bestCompounds],
     estimated_gain_seconds: Math.round(bestDelta * 10) / 10,
     reason: bestReason,
   };
