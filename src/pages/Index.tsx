@@ -505,6 +505,7 @@ export default function Index() {
                 laps: dl.laps,
                 stints: dl.stints,
               }))}
+              sessionWeather={sessionWeather}
               selectedLaps={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
                 lapNumber: dl.selectedLap,
