@@ -441,8 +441,7 @@ export default function Index() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
-            <h1 className="text-lg font-bold tracking-tight">Telemetry Checker</h1>
-            <span className="text-xs text-muted-foreground ml-1">OpenF1 Data</span>
+            <h1 className="text-lg font-bold tracking-tight">Formula Insights</h1>
           </div>
           {sessionKey && (
             <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-xs text-muted-foreground">
