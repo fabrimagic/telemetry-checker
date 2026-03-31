@@ -240,3 +240,15 @@ export interface RaceControlMessage {
 export function getRaceControl(sessionKey: number) {
   return fetchApi<RaceControlMessage[]>(`/race_control?session_key=${sessionKey}`);
 }
+
+export interface SessionInfo {
+  session_key: number;
+  session_type: string;
+  session_name: string;
+  meeting_key: number;
+  date_start: string;
+}
+
+export function getSessionsByMeetingKey(meetingKey: number) {
+  return fetchApi<SessionInfo[]>(`/sessions?meeting_key=${meetingKey}`);
+}

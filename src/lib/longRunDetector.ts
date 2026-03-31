@@ -21,7 +21,7 @@ interface ConsecutiveSequence {
   stintData: StintData;
 }
 
-const MIN_LAPS = 5;
+const DEFAULT_MIN_LAPS = 5;
 
 /**
  * Build a set of pit-in lap numbers (last lap before each pit stop).
@@ -66,7 +66,7 @@ function filterValidLaps(
 /**
  * Group laps into consecutive sequences by lap_number.
  */
-function buildConsecutiveSequences(laps: Lap[]): Lap[][] {
+function buildConsecutiveSequences(laps: Lap[], minLaps: number = DEFAULT_MIN_LAPS): Lap[][] {
   if (!laps.length) return [];
   const sorted = [...laps].sort((a, b) => a.lap_number - b.lap_number);
   const sequences: Lap[][] = [[sorted[0]]];
@@ -79,7 +79,7 @@ function buildConsecutiveSequences(laps: Lap[]): Lap[][] {
     }
   }
 
-  return sequences.filter((s) => s.length >= MIN_LAPS);
+  return sequences.filter((s) => s.length >= minLaps);
 }
 
 /**
@@ -164,7 +164,8 @@ export function detectLongRuns(
   color: string,
   laps: Lap[],
   stints: StintData[],
-  pits: PitData[]
+  pits: PitData[],
+  minLaps: number = DEFAULT_MIN_LAPS
 ): LongRunResult[] {
   if (!stints.length || !laps.length) return [];
 
@@ -177,7 +178,7 @@ export function detectLongRuns(
     );
 
     const valid = filterValidLaps(stintLaps, pitSet);
-    const sequences = buildConsecutiveSequences(valid);
+    const sequences = buildConsecutiveSequences(valid, minLaps);
 
     if (!sequences.length) continue;
 

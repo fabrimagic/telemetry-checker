@@ -63,6 +63,14 @@ export interface Verdict {
   confidence: Confidence;
 }
 
+export interface PracticeCompoundModel {
+  compound: string;
+  slope: number;
+  intercept: number;
+  rSquared: number;
+  source: string; // e.g. "Practice 1"
+}
+
 export interface VirtualRaceEngineerResult {
   driver_number: number;
   driver_acronym: string;
@@ -75,6 +83,7 @@ export interface VirtualRaceEngineerResult {
   confidence_factors: string[];
   weather_impact: string | null;
   neutralisation_impact: string | null;
+  practice_compounds_used: string[];
 }
 
 /* ── Helpers ── */
@@ -133,6 +142,7 @@ export function computeVirtualRaceEngineer(
   _intervals: IntervalData[],
   _positions: PositionData[],
   allDrivers: Driver[],
+  practiceModels: PracticeCompoundModel[] = [],
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -211,12 +221,34 @@ export function computeVirtualRaceEngineer(
 
   // ── 2. Simulate strategies ──
 
-  // Build a simple lap time predictor per compound
-  const compoundModels = new Map<string, { slope: number; intercept: number }>();
+  // Build a simple lap time predictor per compound (race data first)
+  const compoundModels = new Map<string, { slope: number; intercept: number; source: string }>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
     if (model && !compoundModels.has(sa.compound)) {
-      compoundModels.set(sa.compound, model);
+      compoundModels.set(sa.compound, { ...model, source: "race" });
+    }
+  }
+
+  // Enrich with practice compound models (only add compounds not already from race)
+  const practiceCompoundsUsed: string[] = [];
+  for (const pm of practiceModels) {
+    if (!compoundModels.has(pm.compound) && pm.rSquared > 0.3) {
+      // Adjust practice intercept to race pace: use median race lap time as baseline
+      const raceModels = [...compoundModels.values()].filter(m => m.source === "race");
+      let paceOffset = 0;
+      if (raceModels.length > 0) {
+        // Estimate offset between practice and race pace at tyre life = 5
+        const raceBasePace = raceModels[0].intercept + raceModels[0].slope * 5;
+        const practiceBasePace = pm.intercept + pm.slope * 5;
+        paceOffset = raceBasePace - practiceBasePace;
+      }
+      compoundModels.set(pm.compound, {
+        slope: pm.slope,
+        intercept: pm.intercept + paceOffset,
+        source: pm.source,
+      });
+      practiceCompoundsUsed.push(pm.compound);
     }
   }
 
@@ -254,28 +286,51 @@ export function computeVirtualRaceEngineer(
   let bestCompounds = actualCompounds;
   let bestReason = "Strategia reale già vicina all'ottimale";
 
-  // Only try shifts of ±5 laps for each pit stop
+  // Try shifts of ±5 laps for each pit stop AND different compound combinations
   if (actualPitLaps.length > 0 && actualSimTime != null) {
     let bestTime = actualSimTime;
 
-    for (const shift1 of [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) {
-      const candidatePits = actualPitLaps.map((p, i) => {
-        if (i === 0) return Math.max(3, Math.min(totalLaps - 3, p + shift1));
-        return p; // only shift first pit for simplicity
-      });
-
-      // Ensure pits are ordered and valid
-      let valid = true;
-      for (let i = 1; i < candidatePits.length; i++) {
-        if (candidatePits[i] <= candidatePits[i - 1] + 2) { valid = false; break; }
+    // Generate compound combos: actual + all permutations using available compounds
+    const allAvailableCompounds = [...compoundModels.keys()];
+    const compoundCombos: string[][] = [actualCompounds];
+    if (actualCompounds.length === 2) {
+      for (const c1 of allAvailableCompounds) {
+        for (const c2 of allAvailableCompounds) {
+          const combo = [c1, c2];
+          if (combo.join(",") !== actualCompounds.join(",")) compoundCombos.push(combo);
+        }
       }
-      if (!valid) continue;
+    } else if (actualCompounds.length === 3) {
+      for (const c1 of allAvailableCompounds) {
+        for (const c2 of allAvailableCompounds) {
+          for (const c3 of allAvailableCompounds) {
+            const combo = [c1, c2, c3];
+            if (combo.join(",") !== actualCompounds.join(",")) compoundCombos.push(combo);
+          }
+        }
+      }
+    }
 
-      const t = simulateTime(candidatePits, actualCompounds);
-      if (t != null && t < bestTime) {
-        bestTime = t;
-        bestPitLaps = candidatePits;
-        bestDelta = actualSimTime - t;
+    for (const compounds of compoundCombos) {
+      for (const shift1 of [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) {
+        const candidatePits = actualPitLaps.map((p, i) => {
+          if (i === 0) return Math.max(3, Math.min(totalLaps - 3, p + shift1));
+          return p;
+        });
+
+        let valid = true;
+        for (let i = 1; i < candidatePits.length; i++) {
+          if (candidatePits[i] <= candidatePits[i - 1] + 2) { valid = false; break; }
+        }
+        if (!valid) continue;
+
+        const t = simulateTime(candidatePits, compounds);
+        if (t != null && t < bestTime) {
+          bestTime = t;
+          bestPitLaps = candidatePits;
+          bestCompounds = compounds;
+          bestDelta = actualSimTime - t;
+        }
       }
     }
 
@@ -286,15 +341,22 @@ export function computeVirtualRaceEngineer(
         stint: i + 1,
         ideal_lap: idealLap,
         range: [Math.max(1, idealLap - 1), Math.min(totalLaps, idealLap + 1)],
-        compound_after: actualCompounds[i + 1] || actualCompounds[i],
+        compound_after: bestCompounds[i + 1] || bestCompounds[i],
       });
     }
 
     if (bestDelta > 1) {
       const diff = bestPitLaps[0] - actualPitLaps[0];
-      if (diff < 0) bestReason = `Degrado elevato nello stint iniziale: pit consigliato ${Math.abs(diff)} giri prima`;
-      else if (diff > 0) bestReason = `Stint iniziale estendibile: pit consigliato ${diff} giri dopo`;
-      else bestReason = "Timing del pit reale vicino all'ottimale";
+      const compoundsChanged = bestCompounds.join(",") !== actualCompounds.join(",");
+      if (compoundsChanged) {
+        bestReason = `Compound ottimale stimato: ${bestCompounds.join(" → ")}` + (diff !== 0 ? ` con pit spostato di ${Math.abs(diff)} giri` : "");
+      } else if (diff < 0) {
+        bestReason = `Degrado elevato nello stint iniziale: pit consigliato ${Math.abs(diff)} giri prima`;
+      } else if (diff > 0) {
+        bestReason = `Stint iniziale estendibile: pit consigliato ${diff} giri dopo`;
+      } else {
+        bestReason = "Timing del pit reale vicino all'ottimale";
+      }
     }
   }
 
@@ -338,7 +400,7 @@ export function computeVirtualRaceEngineer(
       });
     }
 
-    // Opposite compound if available
+    // Opposite compound if available (race compounds)
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
@@ -353,6 +415,48 @@ export function computeVirtualRaceEngineer(
           pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
           cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
         });
+      }
+    }
+
+    // Practice-derived compound alternatives
+    for (const practiceCompound of practiceCompoundsUsed) {
+      const raceCompoundsSet = new Set(actualCompounds);
+      if (raceCompoundsSet.has(practiceCompound)) continue;
+
+      // Try substituting the last stint compound with the practice compound
+      if (actualCompounds.length >= 2) {
+        const altCompounds = [...actualCompounds];
+        altCompounds[altCompounds.length - 1] = practiceCompound;
+        const altTime = simulateTime(actualPitLaps, altCompounds);
+        if (altTime != null) {
+          alternatives.push({
+            name: `Stint finale su ${practiceCompound}`,
+            description: `Ultimo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[actualCompounds.length - 1]}`,
+            pit_laps: actualPitLaps,
+            compounds: altCompounds,
+            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
+            cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
+          });
+        }
+      }
+
+      // Try substituting the first stint compound
+      if (actualCompounds.length >= 2) {
+        const altCompounds = [...actualCompounds];
+        altCompounds[0] = practiceCompound;
+        const altTime = simulateTime(actualPitLaps, altCompounds);
+        if (altTime != null) {
+          alternatives.push({
+            name: `Stint iniziale su ${practiceCompound}`,
+            description: `Primo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[0]}`,
+            pit_laps: actualPitLaps,
+            compounds: altCompounds,
+            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
+            cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
+          });
+        }
       }
     }
   }
@@ -424,6 +528,12 @@ export function computeVirtualRaceEngineer(
     verdictSummary = "Il pit stop effettuato durante una neutralizzazione ha reso la strategia reale competitiva.";
   }
 
+  // Adjust confidence for practice data
+  if (practiceCompoundsUsed.length > 0) {
+    confScore += 1;
+    confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
+  }
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
@@ -436,5 +546,6 @@ export function computeVirtualRaceEngineer(
     confidence_factors: confidenceFactors,
     weather_impact: weatherImpact,
     neutralisation_impact: neutralisationImpact,
+    practice_compounds_used: practiceCompoundsUsed,
   };
 }

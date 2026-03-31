@@ -48,8 +48,9 @@ import {
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
-import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
+import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
+import { getSessionsByMeetingKey, type SessionInfo } from "@/lib/openf1";
 
 interface DriverState {
   driver: Driver;
@@ -63,6 +64,7 @@ interface DriverState {
 export default function Index() {
   const [sessionKey, setSessionKey] = useState<number | null>(null);
   const [sessionType, setSessionType] = useState<string>("");
+  const [meetingKey, setMeetingKey] = useState<number>(0);
   const [viewMode, setViewMode] = useState<"drivers" | "report">("drivers");
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [selectedDriverNumbers, setSelectedDriverNumbers] = useState<number[]>([]);
@@ -89,10 +91,11 @@ export default function Index() {
   const [clickedTime, setClickedTime] = useState<number | null>(null);
 
   // Load drivers for session
-  const handleSessionSubmit = useCallback(async (key: number, type: string) => {
+  const handleSessionSubmit = useCallback(async (key: number, type: string, mKey: number) => {
     setError(null);
     setSessionKey(key);
     setSessionType(type);
+    setMeetingKey(mKey);
     setViewMode("drivers");
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
@@ -185,15 +188,88 @@ export default function Index() {
           } catch { /* optional */ }
           setLoadingDiary(false);
 
-          // Build Virtual Race Engineer
+          // Build Virtual Race Engineer (with practice compound models)
           setLoadingVre(true);
           try {
             const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber).catch(() => []);
+
+            // Fetch practice compound models from same weekend
+            let practiceModels: PracticeCompoundModel[] = [];
+            if (meetingKey) {
+              try {
+                const meetingSessions = await getSessionsByMeetingKey(meetingKey);
+                const practiceSessions = meetingSessions.filter(
+                  (s: SessionInfo) => s.session_type === "Practice" && s.session_key !== sessionKey
+                );
+
+                for (const ps of practiceSessions) {
+                  try {
+                    const [pLaps, pStints] = await Promise.all([
+                      getLaps(ps.session_key, driverNumber),
+                      getStints(ps.session_key, driverNumber),
+                    ]);
+                    if (!pLaps.length || !pStints.length) continue;
+
+                    // Detect long runs with min 3 laps
+                    const pitInLaps: PitData[] = pStints
+                      .slice(0, -1)
+                      .map((s) => ({ lap_number: s.lap_end } as PitData));
+                    const longRuns = detectLongRuns(
+                      driverNumber, driver.name_acronym, "ffffff",
+                      pLaps, pStints, pitInLaps, 3
+                    );
+                    const validRuns = longRuns.filter((lr) => lr.isLongRun);
+
+                    for (const lr of validRuns) {
+                      // Use the long run degradation slope and calculate intercept
+                      const runLaps = pLaps.filter(
+                        (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun && l.lap_duration != null
+                      );
+                      if (runLaps.length < 3) continue;
+
+                      const originalStint = pStints.find((s) => s.stint_number === lr.stintNumber);
+                      if (!originalStint) continue;
+
+                      const xs = runLaps.map((l) => (originalStint.tyre_age_at_start ?? 0) + (l.lap_number - originalStint.lap_start));
+                      const ys = runLaps.map((l) => l.lap_duration!);
+                      const n = xs.length;
+                      let sx = 0, sy = 0, sxy = 0, sxx = 0;
+                      for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; sxy += xs[i] * ys[i]; sxx += xs[i] * xs[i]; }
+                      const d = n * sxx - sx * sx;
+                      if (d === 0) continue;
+                      const slope = (n * sxy - sx * sy) / d;
+                      const intercept = (sy - slope * sx) / n;
+                      const yMean = sy / n;
+                      let ssTot = 0, ssRes = 0;
+                      for (let i = 0; i < n; i++) {
+                        ssTot += (ys[i] - yMean) ** 2;
+                        ssRes += (ys[i] - (slope * xs[i] + intercept)) ** 2;
+                      }
+                      const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+
+                      // Only add if not already present with better R²
+                      const existing = practiceModels.find((m) => m.compound === lr.compound);
+                      if (!existing || rSquared > existing.rSquared) {
+                        practiceModels = practiceModels.filter((m) => m.compound !== lr.compound);
+                        practiceModels.push({
+                          compound: lr.compound,
+                          slope,
+                          intercept,
+                          rSquared,
+                          source: ps.session_name,
+                        });
+                      }
+                    }
+                  } catch { /* skip individual practice session errors */ }
+                }
+              } catch { /* optional */ }
+            }
+
             const vre = computeVirtualRaceEngineer(
               driverNumber, driver.name_acronym, sessionKey,
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
-              ivls, pos, allDrivers,
+              ivls, pos, allDrivers, practiceModels,
             );
             setVreResult(vre);
           } catch { /* optional */ }
@@ -209,7 +285,7 @@ export default function Index() {
         });
       }
     },
-    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages, overtakesData, overtakesReceivedData, pitStopsData]
+    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages, overtakesData, overtakesReceivedData, pitStopsData, meetingKey, sessionWeather]
   );
 
   // Remove driver
