@@ -40,6 +40,7 @@ function fmtTime(sec: number) {
 
 interface Props {
   results: DegradationResult[];
+  longRuns?: LongRunResult[];
 }
 
 export function TyreDegradationCard({ results }: Props) {
