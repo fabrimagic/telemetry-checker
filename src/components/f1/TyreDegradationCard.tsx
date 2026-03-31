@@ -43,7 +43,7 @@ interface Props {
   longRuns?: LongRunResult[];
 }
 
-export function TyreDegradationCard({ results }: Props) {
+export function TyreDegradationCard({ results, longRuns }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const selected = selectedIdx != null ? results[selectedIdx] : null;
