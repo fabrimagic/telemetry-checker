@@ -671,6 +671,19 @@ export default function Index() {
                     carData: s.carData,
                   }))}
               />
+              {/* Race Diary - single driver, Race/Sprint only */}
+              {selectedDriverNumbers.length === 1 &&
+                (sessionType === "Race" || sessionType === "Sprint") && (() => {
+                  const state = driverStates.get(selectedDriverNumbers[0]);
+                  if (!state) return null;
+                  return (
+                    <RaceDiaryCard
+                      events={diaryEvents}
+                      driverAcronym={state.driver.name_acronym}
+                      driverColor={getColor(state.driver.driver_number)}
+                    />
+                  );
+                })()}
             </section>
             <div className="space-y-6">
               <TrackMap
