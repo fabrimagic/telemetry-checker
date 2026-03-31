@@ -109,6 +109,9 @@ export default function Index() {
     }
   }, []);
 
+  // Build diary when driver selection changes
+  const [loadingDiary, setLoadingDiary] = useState(false);
+
   // Add driver
   const handleAddDriver = useCallback(
     async (driverNumber: number) => {
@@ -131,6 +134,31 @@ export default function Index() {
           next.set(driverNumber, { driver, laps, stints: driverStints, selectedLap: null, carData: [], locationData: [] });
           return next;
         });
+
+        // Build diary immediately for single driver Race/Sprint
+        // Check if this will be the only selected driver
+        const willBeSingle = selectedDriverNumbers.length === 0;
+        if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
+          setLoadingDiary(true);
+          try {
+            let ot: OvertakeData[] = [];
+            let otR: OvertakeData[] = [];
+            let pits: PitData[] = [];
+            let ivls: IntervalData[] = [];
+            let pos: PositionData[] = [];
+            try { ot = await getOvertakes(sessionKey, driverNumber); setOvertakesData(ot); } catch {}
+            try { otR = await getOvertakesReceived(sessionKey, driverNumber); setOvertakesReceivedData(otR); } catch {}
+            try { pits = await getPitStops(sessionKey, driverNumber); setPitStopsData(pits); } catch {}
+            try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
+            try { pos = await getPositions(sessionKey); setDiaryPositions(pos); } catch {}
+
+            const diary = buildRaceDiary(
+              driverNumber, ot, otR, raceControlMessages, pits, driverStints, ivls, pos, allDrivers, laps,
+            );
+            setDiaryEvents(diary);
+          } catch { /* optional */ }
+          setLoadingDiary(false);
+        }
       } catch (e: any) {
         setError(e.message);
       } finally {
@@ -141,7 +169,7 @@ export default function Index() {
         });
       }
     },
-    [sessionKey, allDrivers]
+    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages]
   );
 
   // Remove driver
@@ -152,6 +180,8 @@ export default function Index() {
       next.delete(driverNumber);
       return next;
     });
+    // Clear diary if no longer single driver
+    setDiaryEvents([]);
   }, []);
 
   // Select lap for a driver
@@ -609,6 +639,23 @@ export default function Index() {
                 </details>
               </div>
             )}
+            {/* Race Diary - single driver, Race/Sprint only */}
+            {selectedDriverNumbers.length === 1 &&
+              (sessionType === "Race" || sessionType === "Sprint") && (() => {
+                const state = driverStates.get(selectedDriverNumbers[0]);
+                if (!state) return null;
+                return loadingDiary ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
+                  </div>
+                ) : (
+                  <RaceDiaryCard
+                    events={diaryEvents}
+                    driverAcronym={state.driver.name_acronym}
+                    driverColor={getColor(state.driver.driver_number)}
+                  />
+                );
+              })()}
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
@@ -671,19 +718,6 @@ export default function Index() {
                     carData: s.carData,
                   }))}
               />
-              {/* Race Diary - single driver, Race/Sprint only */}
-              {selectedDriverNumbers.length === 1 &&
-                (sessionType === "Race" || sessionType === "Sprint") && (() => {
-                  const state = driverStates.get(selectedDriverNumbers[0]);
-                  if (!state) return null;
-                  return (
-                    <RaceDiaryCard
-                      events={diaryEvents}
-                      driverAcronym={state.driver.name_acronym}
-                      driverColor={getColor(state.driver.driver_number)}
-                    />
-                  );
-                })()}
             </section>
             <div className="space-y-6">
               <TrackMap
