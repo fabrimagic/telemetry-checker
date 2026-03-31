@@ -64,6 +64,7 @@ interface DriverState {
 export default function Index() {
   const [sessionKey, setSessionKey] = useState<number | null>(null);
   const [sessionType, setSessionType] = useState<string>("");
+  const [meetingKey, setMeetingKey] = useState<number>(0);
   const [viewMode, setViewMode] = useState<"drivers" | "report">("drivers");
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [selectedDriverNumbers, setSelectedDriverNumbers] = useState<number[]>([]);
