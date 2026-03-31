@@ -508,7 +508,7 @@ export default function Index() {
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
             {degradationResults.length > 0 && (
-              <TyreDegradationCard results={degradationResults} />
+              <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
             )}
             {hasLapsSelected && (
               <Button
