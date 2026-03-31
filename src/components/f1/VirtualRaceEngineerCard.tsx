@@ -252,13 +252,24 @@ export function VirtualRaceEngineerCard({ result }: Props) {
               ✨ Strategia stimata ottimale
             </h4>
             <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
+              {/* Full compound sequence */}
+              {recommended_strategy.compounds?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  {recommended_strategy.compounds.map((c, i) => (
+                    <React.Fragment key={i}>
+                      <CompoundBadge compound={c} />
+                      {i < recommended_strategy.compounds.length - 1 && (
+                        <ArrowRight className="h-3 w-3 text-muted-foreground self-center" />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
               {recommended_strategy.pit_windows.map((pw, i) => (
                 <div key={i} className="flex items-center gap-2 text-[11px]">
                   <span className="text-muted-foreground">Pit {i + 1}:</span>
                   <span className="font-mono font-bold">Giro {pw.ideal_lap}</span>
                   <span className="text-muted-foreground">(finestra {pw.range[0]}–{pw.range[1]})</span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  <CompoundBadge compound={pw.compound_after} />
                 </div>
               ))}
               {recommended_strategy.estimated_gain_seconds > 0.1 && (
