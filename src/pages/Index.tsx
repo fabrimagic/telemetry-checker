@@ -48,8 +48,9 @@ import {
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
-import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
+import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
+import { getSessionsByMeetingKey, type SessionInfo } from "@/lib/openf1";
 
 interface DriverState {
   driver: Driver;
