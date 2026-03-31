@@ -164,7 +164,8 @@ export function detectLongRuns(
   color: string,
   laps: Lap[],
   stints: StintData[],
-  pits: PitData[]
+  pits: PitData[],
+  minLaps: number = DEFAULT_MIN_LAPS
 ): LongRunResult[] {
   if (!stints.length || !laps.length) return [];
 
