@@ -386,6 +386,27 @@ export function LapTimesChart({ drivers, sessionWeather, raceControlMessages, se
           ))}
         </LineChart>
       </ResponsiveContainer>
+      {hasTrackStatusData && (
+        <details className="group mt-3">
+          <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            <span className="font-medium text-foreground/80">Legenda stato pista</span>
+            <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-1.5 text-[11px] text-muted-foreground -mt-1">
+            {(["GREEN", "YELLOW", "DOUBLE_YELLOW", "VSC", "SC", "RED", "MIXED"] as TrackStatus[]).map((status) => (
+              <div key={status} className="flex items-center gap-2">
+                <span
+                  className="w-4 h-3 rounded-sm shrink-0"
+                  style={{ backgroundColor: status === "GREEN" ? "transparent" : trackStatusColors[status], border: status === "GREEN" ? "1px dashed hsl(215 12% 35%)" : "none" }}
+                />
+                <span className="font-mono font-bold text-foreground/80 w-24">{trackStatusLabels[status].icon} {trackStatusLabels[status].label}</span>
+                <span>{trackStatusLabels[status].description}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
