@@ -112,10 +112,27 @@ export function RaceDiaryCard({ events, driverAcronym, driverColor }: Props) {
                       : d.battleType === "DEFENDING"
                       ? "🛡 Difesa"
                       : "⚔️ Attacco/Difesa";
+                  const rival =
+                    d.battleType === "ATTACKING"
+                      ? d.driverAhead
+                      : d.battleType === "DEFENDING"
+                      ? d.driverBehind
+                      : d.driverAhead || d.driverBehind;
+                  const rivalContext =
+                    d.battleType === "ATTACKING"
+                      ? "in attacco su"
+                      : d.battleType === "DEFENDING"
+                      ? "sotto attacco da"
+                      : "in lotta con";
                   return (
                     <div key={i} className="bg-muted/50 rounded-md px-3 py-2 text-xs">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-orange-500">{typeLabel}</span>
+                        {rival && (
+                          <span className="text-foreground/90">
+                            {rivalContext} <span className="font-mono font-bold">{rival}</span>
+                          </span>
+                        )}
                         <span className="text-muted-foreground font-mono">
                           {d.startLap != null && d.endLap != null
                             ? d.startLap === d.endLap
@@ -128,12 +145,6 @@ export function RaceDiaryCard({ events, driverAcronym, driverColor }: Props) {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
-                        {d.driverAhead && (
-                          <span>Davanti: <span className="font-mono font-bold text-foreground">{d.driverAhead}</span></span>
-                        )}
-                        {d.driverBehind && (
-                          <span>Dietro: <span className="font-mono font-bold text-foreground">{d.driverBehind}</span></span>
-                        )}
                         <span>Gap min: <span className="font-mono font-bold text-foreground">{d.minGap.toFixed(2)}s</span></span>
                       </div>
                     </div>
