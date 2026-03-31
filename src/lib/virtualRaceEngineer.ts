@@ -498,6 +498,12 @@ export function computeVirtualRaceEngineer(
     verdictSummary = "Il pit stop effettuato durante una neutralizzazione ha reso la strategia reale competitiva.";
   }
 
+  // Adjust confidence for practice data
+  if (practiceCompoundsUsed.length > 0) {
+    confScore += 1;
+    confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
+  }
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
@@ -510,5 +516,6 @@ export function computeVirtualRaceEngineer(
     confidence_factors: confidenceFactors,
     weather_impact: weatherImpact,
     neutralisation_impact: neutralisationImpact,
+    practice_compounds_used: practiceCompoundsUsed,
   };
 }
