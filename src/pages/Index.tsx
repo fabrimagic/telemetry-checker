@@ -236,22 +236,39 @@ export default function Index() {
       }
 
       // Fetch overtakes for single driver in Race/Sprint sessions
+      let fetchedOvertakes: OvertakeData[] = [];
+      let fetchedOvertakesReceived: OvertakeData[] = [];
+      let fetchedStints: StintData[] = [];
+      let fetchedPits: PitData[] = [];
+      let fetchedIntervals: IntervalData[] = [];
+      let fetchedPositions: PositionData[] = [];
+
       if (
         selectedDriverNumbers.length === 1 &&
         (sessionType === "Race" || sessionType === "Sprint")
       ) {
+        const dNum = selectedDriverNumbers[0];
         try {
-          const ot = await getOvertakes(sessionKey, selectedDriverNumbers[0]);
-          setOvertakesData(ot);
-        } catch {
-          // Overtakes are optional
-        }
+          fetchedOvertakes = await getOvertakes(sessionKey, dNum);
+          setOvertakesData(fetchedOvertakes);
+        } catch { /* optional */ }
         try {
-          const st = await getStints(sessionKey, selectedDriverNumbers[0]);
-          setStintsData(st);
-        } catch {
-          // Stints are optional
-        }
+          fetchedOvertakesReceived = await getOvertakesReceived(sessionKey, dNum);
+          setOvertakesReceivedData(fetchedOvertakesReceived);
+        } catch { /* optional */ }
+        try {
+          fetchedStints = await getStints(sessionKey, dNum);
+          setStintsData(fetchedStints);
+        } catch { /* optional */ }
+        // Fetch intervals & positions for diary battles
+        try {
+          fetchedIntervals = await getIntervals(sessionKey);
+          setDiaryIntervals(fetchedIntervals);
+        } catch { /* optional */ }
+        try {
+          fetchedPositions = await getPositions(sessionKey);
+          setDiaryPositions(fetchedPositions);
+        } catch { /* optional */ }
       }
 
       // Fetch pit stops in Race/Sprint sessions for all selected drivers
@@ -261,12 +278,35 @@ export default function Index() {
           try {
             const pits = await getPitStops(sessionKey, num);
             allPits.push(...pits);
-          } catch {
-            // Pit data is optional
-          }
+          } catch { /* optional */ }
         }
         allPits.sort((a, b) => a.lap_number - b.lap_number);
         setPitStopsData(allPits);
+        fetchedPits = allPits;
+      }
+
+      // Build race diary for single driver Race/Sprint
+      if (
+        selectedDriverNumbers.length === 1 &&
+        (sessionType === "Race" || sessionType === "Sprint")
+      ) {
+        const dNum = selectedDriverNumbers[0];
+        const state = driverStates.get(dNum);
+        if (state) {
+          const diary = buildRaceDiary(
+            dNum,
+            fetchedOvertakes,
+            fetchedOvertakesReceived,
+            raceControlMessages,
+            fetchedPits,
+            fetchedStints.length > 0 ? fetchedStints : state.stints,
+            fetchedIntervals,
+            fetchedPositions,
+            allDrivers,
+            state.laps,
+          );
+          setDiaryEvents(diary);
+        }
       }
 
       setDriverStates((prev) => {
