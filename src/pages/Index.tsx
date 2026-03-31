@@ -329,6 +329,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
+    setVreResult(null);
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
