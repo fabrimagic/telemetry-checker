@@ -118,7 +118,7 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used } = result;
 
   return (
     <Card className="border-border">
@@ -132,6 +132,14 @@ export function VirtualRaceEngineerCard({ result }: Props) {
         <p className="text-[11px] text-muted-foreground mt-1">
           Analisi strategica basata su degrado gomme, pit stop, meteo e neutralizzazioni. I risultati sono stime del modello.
         </p>
+        {practice_compounds_used && practice_compounds_used.length > 0 && (
+          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+            <Info className="h-3 w-3 shrink-0" />
+            Degrado da Practice incluso per: {practice_compounds_used.map((c) => (
+              <CompoundBadge key={c} compound={c} />
+            ))}
+          </p>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-5 pt-0">
