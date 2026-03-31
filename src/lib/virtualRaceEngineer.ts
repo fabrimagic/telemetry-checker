@@ -286,28 +286,51 @@ export function computeVirtualRaceEngineer(
   let bestCompounds = actualCompounds;
   let bestReason = "Strategia reale già vicina all'ottimale";
 
-  // Only try shifts of ±5 laps for each pit stop
+  // Try shifts of ±5 laps for each pit stop AND different compound combinations
   if (actualPitLaps.length > 0 && actualSimTime != null) {
     let bestTime = actualSimTime;
 
-    for (const shift1 of [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) {
-      const candidatePits = actualPitLaps.map((p, i) => {
-        if (i === 0) return Math.max(3, Math.min(totalLaps - 3, p + shift1));
-        return p; // only shift first pit for simplicity
-      });
-
-      // Ensure pits are ordered and valid
-      let valid = true;
-      for (let i = 1; i < candidatePits.length; i++) {
-        if (candidatePits[i] <= candidatePits[i - 1] + 2) { valid = false; break; }
+    // Generate compound combos: actual + all permutations using available compounds
+    const allAvailableCompounds = [...compoundModels.keys()];
+    const compoundCombos: string[][] = [actualCompounds];
+    if (actualCompounds.length === 2) {
+      for (const c1 of allAvailableCompounds) {
+        for (const c2 of allAvailableCompounds) {
+          const combo = [c1, c2];
+          if (combo.join(",") !== actualCompounds.join(",")) compoundCombos.push(combo);
+        }
       }
-      if (!valid) continue;
+    } else if (actualCompounds.length === 3) {
+      for (const c1 of allAvailableCompounds) {
+        for (const c2 of allAvailableCompounds) {
+          for (const c3 of allAvailableCompounds) {
+            const combo = [c1, c2, c3];
+            if (combo.join(",") !== actualCompounds.join(",")) compoundCombos.push(combo);
+          }
+        }
+      }
+    }
 
-      const t = simulateTime(candidatePits, actualCompounds);
-      if (t != null && t < bestTime) {
-        bestTime = t;
-        bestPitLaps = candidatePits;
-        bestDelta = actualSimTime - t;
+    for (const compounds of compoundCombos) {
+      for (const shift1 of [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) {
+        const candidatePits = actualPitLaps.map((p, i) => {
+          if (i === 0) return Math.max(3, Math.min(totalLaps - 3, p + shift1));
+          return p;
+        });
+
+        let valid = true;
+        for (let i = 1; i < candidatePits.length; i++) {
+          if (candidatePits[i] <= candidatePits[i - 1] + 2) { valid = false; break; }
+        }
+        if (!valid) continue;
+
+        const t = simulateTime(candidatePits, compounds);
+        if (t != null && t < bestTime) {
+          bestTime = t;
+          bestPitLaps = candidatePits;
+          bestCompounds = compounds;
+          bestDelta = actualSimTime - t;
+        }
       }
     }
 
