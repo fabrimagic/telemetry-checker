@@ -165,10 +165,11 @@ export default function Index() {
 
         // Build diary immediately for single driver Race/Sprint
         if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
+          let ivls: IntervalData[] = [];
+          let pos: PositionData[] = [];
+
           setLoadingDiary(true);
           try {
-            let ivls: IntervalData[] = [];
-            let pos: PositionData[] = [];
             try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
             try { pos = await getPositions(sessionKey); setDiaryPositions(pos); } catch {}
 
