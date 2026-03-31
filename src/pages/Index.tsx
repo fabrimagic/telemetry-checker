@@ -7,6 +7,8 @@ import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/co
 import { TrackMap } from "@/components/f1/TrackMap";
 import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnalysis";
+import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
+import { calculateTyreDegradation } from "@/lib/tyreDegradation";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
@@ -375,6 +377,23 @@ export default function Index() {
     [selectedDriverNumbers, driverStates]
   );
 
+  // Tyre degradation results
+  const degradationResults = useMemo(() => {
+    const validTypes = ["Race", "Sprint", "Practice"];
+    if (!validTypes.some((t) => sessionType.includes(t))) return [];
+    return selectedDriverNumbers.flatMap((num) => {
+      const state = driverStates.get(num);
+      if (!state) return [];
+      return calculateTyreDegradation(
+        num,
+        state.driver.name_acronym,
+        getColor(num),
+        state.laps,
+        state.stints
+      );
+    });
+  }, [selectedDriverNumbers, driverStates, sessionType, getColor]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border px-6 py-4">
@@ -447,6 +466,9 @@ export default function Index() {
               onSelectLap={handleSelectLap}
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
+            {degradationResults.length > 0 && (
+              <TyreDegradationCard results={degradationResults} />
+            )}
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
