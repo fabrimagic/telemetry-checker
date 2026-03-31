@@ -313,6 +313,17 @@ export function LapTimesChart({ drivers, sessionWeather, raceControlMessages, se
               strokeOpacity={0}
             />
           ))}
+          {/* Track status bands */}
+          {trackStatusBands.map((band, i) => (
+            <ReferenceArea
+              key={`track-${i}`}
+              x1={band.start - 0.5}
+              x2={band.end + 0.5}
+              fill={trackStatusColors[band.status]}
+              fillOpacity={1}
+              strokeOpacity={0}
+            />
+          ))}
           <XAxis
             dataKey="lap"
             tick={AXIS_TICK}
