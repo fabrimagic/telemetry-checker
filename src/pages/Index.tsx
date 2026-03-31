@@ -201,7 +201,12 @@ export default function Index() {
       next.delete(driverNumber);
       return next;
     });
-    // Clear diary if no longer single driver
+    // Clean up per-driver aggregated data
+    setStintsData((prev) => prev.filter((s) => s.driver_number !== driverNumber));
+    setPitStopsData((prev) => prev.filter((p) => p.driver_number !== driverNumber));
+    // Clear single-driver data
+    setOvertakesData([]);
+    setOvertakesReceivedData([]);
     setDiaryEvents([]);
   }, []);
 
