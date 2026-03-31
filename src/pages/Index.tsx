@@ -82,6 +82,7 @@ export default function Index() {
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setSessionWeather([]);
+    setRaceControlMessages([]);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
