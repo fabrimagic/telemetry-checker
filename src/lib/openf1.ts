@@ -151,6 +151,12 @@ export function getOvertakes(sessionKey: number, driverNumber: number) {
   );
 }
 
+export function getOvertakesReceived(sessionKey: number, driverNumber: number) {
+  return fetchApi<OvertakeData[]>(
+    `/overtakes?session_key=${sessionKey}&overtaken_driver_number=${driverNumber}`
+  );
+}
+
 export function getStints(sessionKey: number, driverNumber: number) {
   return fetchApi<StintData[]>(
     `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
