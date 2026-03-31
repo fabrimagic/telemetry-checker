@@ -7,6 +7,8 @@ import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/co
 import { TrackMap } from "@/components/f1/TrackMap";
 import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnalysis";
+import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
+import { calculateTyreDegradation } from "@/lib/tyreDegradation";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
