@@ -10,6 +10,7 @@ import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnal
 import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
 import { calculateTyreDegradation } from "@/lib/tyreDegradation";
 import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
+import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
@@ -28,6 +29,7 @@ import {
   getOvertakes,
   getStints,
   getPitStops,
+  getWeatherForSession,
   type Driver,
   type Lap,
   type CarData,
