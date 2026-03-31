@@ -79,7 +79,7 @@ function buildConsecutiveSequences(laps: Lap[]): Lap[][] {
     }
   }
 
-  return sequences.filter((s) => s.length >= MIN_LAPS);
+  return sequences.filter((s) => s.length >= minLaps);
 }
 
 /**
