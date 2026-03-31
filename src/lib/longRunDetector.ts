@@ -178,7 +178,7 @@ export function detectLongRuns(
     );
 
     const valid = filterValidLaps(stintLaps, pitSet);
-    const sequences = buildConsecutiveSequences(valid);
+    const sequences = buildConsecutiveSequences(valid, minLaps);
 
     if (!sequences.length) continue;
 

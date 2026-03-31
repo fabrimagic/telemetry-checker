@@ -63,7 +63,7 @@ export function SessionPicker({ onSelect, isLoading }: Props) {
   const handleChange = (val: string) => {
     setSelected(val);
     const session = sessions.find((s) => s.session_key === Number(val));
-    onSelect(Number(val), session?.session_type ?? "");
+    onSelect(Number(val), session?.session_type ?? "", session?.meeting_key ?? 0);
   };
 
   if (loading) {
