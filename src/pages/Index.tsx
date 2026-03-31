@@ -30,6 +30,7 @@ import {
   getStints,
   getPitStops,
   getWeatherForSession,
+  getRaceControl,
   type Driver,
   type Lap,
   type CarData,
@@ -38,6 +39,7 @@ import {
   type OvertakeData,
   type StintData,
   type PitData,
+  type RaceControlMessage,
 } from "@/lib/openf1";
 
 interface DriverState {
@@ -65,6 +67,7 @@ export default function Index() {
   const [stintsData, setStintsData] = useState<StintData[]>([]);
   const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
+  const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -79,6 +82,7 @@ export default function Index() {
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setSessionWeather([]);
+    setRaceControlMessages([]);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
@@ -86,6 +90,7 @@ export default function Index() {
       if (!d.length) setError("No drivers found for this session.");
       // Fetch session weather for lap classification (fire and forget)
       getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
+      getRaceControl(key).then((rc) => setRaceControlMessages(rc)).catch(() => {});
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -274,6 +279,7 @@ export default function Index() {
     setOvertakesData([]);
     setStintsData([]);
     setPitStopsData([]);
+    setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
@@ -506,6 +512,7 @@ export default function Index() {
                 stints: dl.stints,
               }))}
               sessionWeather={sessionWeather}
+              raceControlMessages={raceControlMessages}
               selectedLaps={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
                 lapNumber: dl.selectedLap,

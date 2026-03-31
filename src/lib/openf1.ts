@@ -219,3 +219,18 @@ export function getWeatherForSession(sessionKey: number) {
 export function getIntervals(sessionKey: number) {
   return fetchApi<IntervalData[]>(`/intervals?session_key=${sessionKey}`);
 }
+
+export interface RaceControlMessage {
+  date: string;
+  category: string;
+  flag: string | null;
+  message: string;
+  scope: string | null;
+  sector: number | null;
+  meeting_key: number;
+  session_key: number;
+}
+
+export function getRaceControl(sessionKey: number) {
+  return fetchApi<RaceControlMessage[]>(`/race_control?session_key=${sessionKey}`);
+}

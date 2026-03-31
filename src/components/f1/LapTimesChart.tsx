@@ -11,9 +11,10 @@ import {
   ReferenceArea,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff } from "lucide-react";
-import type { StintData, WeatherData, Lap } from "@/lib/openf1";
+import { Eye, EyeOff, Info, ChevronDown } from "lucide-react";
+import type { StintData, WeatherData, Lap, RaceControlMessage } from "@/lib/openf1";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
+import { classifyLapsTrackStatus, type TrackStatus } from "@/lib/trackStatusClassification";
 import { Watermark } from "./Watermark";
 
 interface DriverLapTimes {
@@ -27,6 +28,7 @@ interface DriverLapTimes {
 interface Props {
   drivers: DriverLapTimes[];
   sessionWeather?: WeatherData[];
+  raceControlMessages?: RaceControlMessage[];
   selectedLaps?: { driverNumber: number; lapNumber: number | null }[];
   onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
@@ -49,6 +51,26 @@ const weatherBandColors: Record<WeatherCondition, string> = {
   MIXED: "hsla(35, 90%, 55%, 0.10)",
 };
 
+const trackStatusColors: Record<TrackStatus, string> = {
+  GREEN: "transparent",
+  YELLOW: "hsla(50, 100%, 50%, 0.15)",
+  DOUBLE_YELLOW: "hsla(50, 100%, 50%, 0.25)",
+  VSC: "hsla(270, 70%, 55%, 0.15)",
+  SC: "hsla(30, 90%, 50%, 0.18)",
+  RED: "hsla(0, 85%, 50%, 0.18)",
+  MIXED: "hsla(0, 0%, 50%, 0.12)",
+};
+
+const trackStatusLabels: Record<TrackStatus, { icon: string; label: string; description: string }> = {
+  GREEN: { icon: "🟢", label: "Green", description: "Condizioni normali, pista libera" },
+  YELLOW: { icon: "🟡", label: "Yellow Flag", description: "Bandiera gialla — pericolo in pista, ridurre velocità" },
+  DOUBLE_YELLOW: { icon: "🟡🟡", label: "Double Yellow", description: "Doppia bandiera gialla — pericolo grave, essere pronti a fermarsi" },
+  VSC: { icon: "🟣", label: "Virtual Safety Car", description: "VSC attiva — rispettare il delta time imposto" },
+  SC: { icon: "🟠", label: "Safety Car", description: "Safety Car in pista — seguire la Safety Car" },
+  RED: { icon: "🔴", label: "Red Flag", description: "Bandiera rossa — sessione interrotta" },
+  MIXED: { icon: "⚪", label: "Mixed", description: "Più condizioni durante il giro" },
+};
+
 function formatLapTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -57,7 +79,7 @@ function formatLapTime(seconds: number): string {
   return `${m}:${sWhole.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectLap }: Props) {
+export function LapTimesChart({ drivers, sessionWeather, raceControlMessages, selectedLaps, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
 
   // Build compound lookup: driverNumber -> lapNumber -> compound
@@ -111,6 +133,40 @@ export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectL
   }, [weatherMap]);
 
   const hasWeatherData = weatherBands.length > 0;
+
+  // Track status classification
+  const trackStatusMap = useMemo(() => {
+    if (!raceControlMessages?.length || !drivers.length) return new Map<number, TrackStatus>();
+    const refDriver = drivers.find((d) => d.laps.some((l) => l.date_start));
+    if (!refDriver) return new Map<number, TrackStatus>();
+    const lapsWithDates = refDriver.laps.filter((l) => l.date_start) as any as Lap[];
+    return classifyLapsTrackStatus(lapsWithDates, raceControlMessages);
+  }, [raceControlMessages, drivers]);
+
+  // Build contiguous track status bands
+  const trackStatusBands = useMemo(() => {
+    if (!trackStatusMap.size) return [];
+    const entries = Array.from(trackStatusMap.entries())
+      .filter(([, s]) => s !== "GREEN")
+      .sort(([a], [b]) => a - b);
+    if (!entries.length) return [];
+
+    const bands: { start: number; end: number; status: TrackStatus }[] = [];
+    let current: { start: number; end: number; status: TrackStatus } | null = null;
+
+    for (const [lap, status] of entries) {
+      if (current && current.status === status && lap === current.end + 1) {
+        current.end = lap;
+      } else {
+        if (current) bands.push(current);
+        current = { start: lap, end: lap, status };
+      }
+    }
+    if (current) bands.push(current);
+    return bands;
+  }, [trackStatusMap]);
+
+  const hasTrackStatusData = trackStatusBands.length > 0;
 
   const outlierLaps = useMemo(() => {
     const set = new Set<string>();
@@ -257,6 +313,17 @@ export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectL
               strokeOpacity={0}
             />
           ))}
+          {/* Track status bands */}
+          {trackStatusBands.map((band, i) => (
+            <ReferenceArea
+              key={`track-${i}`}
+              x1={band.start - 0.5}
+              x2={band.end + 0.5}
+              fill={trackStatusColors[band.status]}
+              fillOpacity={1}
+              strokeOpacity={0}
+            />
+          ))}
           <XAxis
             dataKey="lap"
             tick={AXIS_TICK}
@@ -284,7 +351,9 @@ export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectL
               const lapNum = Number(v);
               const cond = weatherMap.get(lapNum);
               const condLabel = cond === "WET" ? " 🌧" : cond === "MIXED" ? " 🌦" : "";
-              return `Lap ${v}${condLabel}`;
+              const ts = trackStatusMap.get(lapNum);
+              const tsLabel = ts && ts !== "GREEN" ? ` ${trackStatusLabels[ts].icon} ${trackStatusLabels[ts].label}` : "";
+              return `Lap ${v}${condLabel}${tsLabel}`;
             }}
             formatter={(value: number, name: string) => {
               const driverNum = parseInt(name.replace("t_", ""));
@@ -317,6 +386,27 @@ export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectL
           ))}
         </LineChart>
       </ResponsiveContainer>
+      {hasTrackStatusData && (
+        <details className="group mt-3">
+          <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            <span className="font-medium text-foreground/80">Legenda stato pista</span>
+            <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-1.5 text-[11px] text-muted-foreground -mt-1">
+            {(["GREEN", "YELLOW", "DOUBLE_YELLOW", "VSC", "SC", "RED", "MIXED"] as TrackStatus[]).map((status) => (
+              <div key={status} className="flex items-center gap-2">
+                <span
+                  className="w-4 h-3 rounded-sm shrink-0"
+                  style={{ backgroundColor: status === "GREEN" ? "transparent" : trackStatusColors[status], border: status === "GREEN" ? "1px dashed hsl(215 12% 35%)" : "none" }}
+                />
+                <span className="font-mono font-bold text-foreground/80 w-24">{trackStatusLabels[status].icon} {trackStatusLabels[status].label}</span>
+                <span>{trackStatusLabels[status].description}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
