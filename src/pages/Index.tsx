@@ -90,6 +90,7 @@ export default function Index() {
       if (!d.length) setError("No drivers found for this session.");
       // Fetch session weather for lap classification (fire and forget)
       getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
+      getRaceControl(key).then((rc) => setRaceControlMessages(rc)).catch(() => {});
     } catch (e: any) {
       setError(e.message);
     } finally {
