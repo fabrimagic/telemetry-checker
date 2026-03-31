@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { type DegradationResult } from "@/lib/tyreDegradation";
 import { Watermark } from "./Watermark";
 import {
@@ -77,21 +79,26 @@ export function TyreDegradationCard({ results }: Props) {
         Tyre Degradation
       </h3>
 
-      {/* Legend */}
-      <div className="bg-muted/40 rounded-md px-3 py-3 space-y-2 text-[11px] text-muted-foreground">
-        <div className="flex items-start gap-2">
-          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+      {/* Legend - Collapsible */}
+      <Collapsible>
+        <CollapsibleTrigger className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors group">
+          <Info className="h-3.5 w-3.5 shrink-0" />
           <span className="font-medium text-foreground/80">Legenda</span>
-        </div>
-        <ul className="space-y-1.5 pl-5 list-disc">
-          <li><span className="font-mono font-bold text-foreground/80">Degrado (sec/giro)</span> — Pendenza della regressione lineare: indica quanti secondi si perdono mediamente ad ogni giro con l'invecchiamento della gomma. Un valore positivo più alto indica un degrado più rapido.</li>
-          <li><span className="font-mono font-bold text-foreground/80">R²</span> — Coefficiente di determinazione: misura quanto il modello lineare si adatta ai dati. Valori vicini a 1 indicano un degrado costante e prevedibile; valori bassi indicano alta variabilità.</li>
-          <li><span className="font-mono font-bold text-foreground/80">Giri analizzati</span> — Numero di giri validi utilizzati per il calcolo, esclusi out lap, in lap e giri anomali (&gt;7% dal tempo mediano).</li>
-          <li><span className="font-mono font-bold text-foreground/80">Stint</span> — Periodo di guida con lo stesso set di pneumatici, dall'uscita dai box fino al pit stop successivo.</li>
-          <li><span className="font-mono font-bold text-foreground/80">Compound</span> — Mescola di pneumatico utilizzata nello stint (Soft, Medium, Hard, Intermediate, Wet).</li>
-        </ul>
-        <p className="pt-1 italic">Clicca su una riga della tabella per visualizzare il grafico di regressione dello stint selezionato.</p>
-      </div>
+          <ChevronDown className="h-3 w-3 ml-auto transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
+            <ul className="space-y-1.5 pl-5 list-disc">
+              <li><span className="font-mono font-bold text-foreground/80">Degrado (sec/giro)</span> — Pendenza della regressione lineare: indica quanti secondi si perdono mediamente ad ogni giro con l'invecchiamento della gomma. Un valore positivo più alto indica un degrado più rapido.</li>
+              <li><span className="font-mono font-bold text-foreground/80">R²</span> — Coefficiente di determinazione: misura quanto il modello lineare si adatta ai dati. Valori vicini a 1 indicano un degrado costante e prevedibile; valori bassi indicano alta variabilità.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Giri analizzati</span> — Numero di giri validi utilizzati per il calcolo, esclusi out lap, in lap e giri anomali (&gt;7% dal tempo mediano).</li>
+              <li><span className="font-mono font-bold text-foreground/80">Stint</span> — Periodo di guida con lo stesso set di pneumatici, dall'uscita dai box fino al pit stop successivo.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Compound</span> — Mescola di pneumatico utilizzata nello stint (Soft, Medium, Hard, Intermediate, Wet).</li>
+            </ul>
+            <p className="pt-1 italic">Clicca su una riga della tabella per visualizzare il grafico di regressione dello stint selezionato.</p>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Table */}
       <div className="overflow-x-auto">
