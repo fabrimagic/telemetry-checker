@@ -347,9 +347,16 @@ export function computeVirtualRaceEngineer(
 
     if (bestDelta > 1) {
       const diff = bestPitLaps[0] - actualPitLaps[0];
-      if (diff < 0) bestReason = `Degrado elevato nello stint iniziale: pit consigliato ${Math.abs(diff)} giri prima`;
-      else if (diff > 0) bestReason = `Stint iniziale estendibile: pit consigliato ${diff} giri dopo`;
-      else bestReason = "Timing del pit reale vicino all'ottimale";
+      const compoundsChanged = bestCompounds.join(",") !== actualCompounds.join(",");
+      if (compoundsChanged) {
+        bestReason = `Compound ottimale stimato: ${bestCompounds.join(" → ")}` + (diff !== 0 ? ` con pit spostato di ${Math.abs(diff)} giri` : "");
+      } else if (diff < 0) {
+        bestReason = `Degrado elevato nello stint iniziale: pit consigliato ${Math.abs(diff)} giri prima`;
+      } else if (diff > 0) {
+        bestReason = `Stint iniziale estendibile: pit consigliato ${diff} giri dopo`;
+      } else {
+        bestReason = "Timing del pit reale vicino all'ottimale";
+      }
     }
   }
 
