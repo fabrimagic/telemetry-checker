@@ -66,7 +66,7 @@ function filterValidLaps(
 /**
  * Group laps into consecutive sequences by lap_number.
  */
-function buildConsecutiveSequences(laps: Lap[]): Lap[][] {
+function buildConsecutiveSequences(laps: Lap[], minLaps: number = DEFAULT_MIN_LAPS): Lap[][] {
   if (!laps.length) return [];
   const sorted = [...laps].sort((a, b) => a.lap_number - b.lap_number);
   const sequences: Lap[][] = [[sorted[0]]];
