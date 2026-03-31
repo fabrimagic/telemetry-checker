@@ -285,7 +285,7 @@ export default function Index() {
         });
       }
     },
-    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages, overtakesData, overtakesReceivedData, pitStopsData]
+    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages, overtakesData, overtakesReceivedData, pitStopsData, meetingKey, sessionWeather]
   );
 
   // Remove driver
