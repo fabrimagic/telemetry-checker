@@ -511,6 +511,7 @@ export default function Index() {
                 stints: dl.stints,
               }))}
               sessionWeather={sessionWeather}
+              raceControlMessages={raceControlMessages}
               selectedLaps={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
                 lapNumber: dl.selectedLap,
