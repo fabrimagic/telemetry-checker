@@ -57,19 +57,18 @@ function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; rec
     : 0;
   if (totalLaps === 0) return null;
 
-  // Build recommended stints from pit windows
+  // Build recommended stints from pit windows + compounds array
   const recStints: { compound: string; lap_start: number; lap_end: number }[] = [];
-  if (recommended.pit_windows.length > 0) {
+  if (recommended.pit_windows.length > 0 && recommended.compounds?.length > 0) {
     const sortedWindows = [...recommended.pit_windows].sort((a, b) => a.ideal_lap - b.ideal_lap);
     let cursor = actual.stints[0]?.lap_start ?? 1;
-    const firstCompound = actual.stints[0]?.compound ?? "MEDIUM";
 
     for (let i = 0; i < sortedWindows.length; i++) {
       const w = sortedWindows[i];
-      recStints.push({ compound: i === 0 ? firstCompound : sortedWindows[i - 1].compound_after, lap_start: cursor, lap_end: w.ideal_lap });
+      recStints.push({ compound: recommended.compounds[i] ?? actual.stints[i]?.compound ?? "MEDIUM", lap_start: cursor, lap_end: w.ideal_lap });
       cursor = w.ideal_lap + 1;
     }
-    recStints.push({ compound: sortedWindows[sortedWindows.length - 1].compound_after, lap_start: cursor, lap_end: totalLaps });
+    recStints.push({ compound: recommended.compounds[sortedWindows.length] ?? sortedWindows[sortedWindows.length - 1].compound_after, lap_start: cursor, lap_end: totalLaps });
   }
 
   const renderRow = (label: string, stints: { compound: string; lap_start: number; lap_end: number }[]) => (
