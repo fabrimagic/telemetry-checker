@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { type DegradationResult } from "@/lib/tyreDegradation";
 import { Watermark } from "./Watermark";
 import {
