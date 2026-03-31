@@ -28,6 +28,7 @@ interface DriverLapTimes {
 interface Props {
   drivers: DriverLapTimes[];
   sessionWeather?: WeatherData[];
+  raceControlMessages?: RaceControlMessage[];
   selectedLaps?: { driverNumber: number; lapNumber: number | null }[];
   onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
