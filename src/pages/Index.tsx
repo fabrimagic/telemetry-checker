@@ -109,6 +109,9 @@ export default function Index() {
     }
   }, []);
 
+  // Build diary when driver selection changes
+  const [loadingDiary, setLoadingDiary] = useState(false);
+
   // Add driver
   const handleAddDriver = useCallback(
     async (driverNumber: number) => {
@@ -131,6 +134,31 @@ export default function Index() {
           next.set(driverNumber, { driver, laps, stints: driverStints, selectedLap: null, carData: [], locationData: [] });
           return next;
         });
+
+        // Build diary immediately for single driver Race/Sprint
+        // Check if this will be the only selected driver
+        const willBeSingle = selectedDriverNumbers.length === 0;
+        if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
+          setLoadingDiary(true);
+          try {
+            let ot: OvertakeData[] = [];
+            let otR: OvertakeData[] = [];
+            let pits: PitData[] = [];
+            let ivls: IntervalData[] = [];
+            let pos: PositionData[] = [];
+            try { ot = await getOvertakes(sessionKey, driverNumber); setOvertakesData(ot); } catch {}
+            try { otR = await getOvertakesReceived(sessionKey, driverNumber); setOvertakesReceivedData(otR); } catch {}
+            try { pits = await getPitStops(sessionKey, driverNumber); setPitStopsData(pits); } catch {}
+            try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
+            try { pos = await getPositions(sessionKey); setDiaryPositions(pos); } catch {}
+
+            const diary = buildRaceDiary(
+              driverNumber, ot, otR, raceControlMessages, pits, driverStints, ivls, pos, allDrivers, laps,
+            );
+            setDiaryEvents(diary);
+          } catch { /* optional */ }
+          setLoadingDiary(false);
+        }
       } catch (e: any) {
         setError(e.message);
       } finally {
@@ -141,7 +169,7 @@ export default function Index() {
         });
       }
     },
-    [sessionKey, allDrivers]
+    [sessionKey, allDrivers, selectedDriverNumbers, sessionType, raceControlMessages]
   );
 
   // Remove driver
