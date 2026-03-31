@@ -63,6 +63,14 @@ export interface Verdict {
   confidence: Confidence;
 }
 
+export interface PracticeCompoundModel {
+  compound: string;
+  slope: number;
+  intercept: number;
+  rSquared: number;
+  source: string; // e.g. "Practice 1"
+}
+
 export interface VirtualRaceEngineerResult {
   driver_number: number;
   driver_acronym: string;
@@ -75,6 +83,7 @@ export interface VirtualRaceEngineerResult {
   confidence_factors: string[];
   weather_impact: string | null;
   neutralisation_impact: string | null;
+  practice_compounds_used: string[];
 }
 
 /* ── Helpers ── */
