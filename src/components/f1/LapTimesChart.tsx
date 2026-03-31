@@ -11,9 +11,10 @@ import {
   ReferenceArea,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff } from "lucide-react";
-import type { StintData, WeatherData, Lap } from "@/lib/openf1";
+import { Eye, EyeOff, Info, ChevronDown } from "lucide-react";
+import type { StintData, WeatherData, Lap, RaceControlMessage } from "@/lib/openf1";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
+import { classifyLapsTrackStatus, type TrackStatus } from "@/lib/trackStatusClassification";
 import { Watermark } from "./Watermark";
 
 interface DriverLapTimes {
