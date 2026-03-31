@@ -80,6 +80,58 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
         Tyre Degradation
       </h3>
 
+      {/* Long-run detection info for Practice */}
+      {longRuns && longRuns.length > 0 && (
+        <details className="group">
+          <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-accent/30 rounded-md px-3 py-2 w-full hover:bg-accent/50 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <span className="font-medium text-foreground/80">🔍 Long Run rilevati (Practice)</span>
+            <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="bg-accent/20 rounded-b-md px-3 py-2 -mt-1 overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-muted-foreground">
+                  <th className="text-left py-1 pr-2">Pilota</th>
+                  <th className="text-left py-1 pr-2">Stint</th>
+                  <th className="text-left py-1 pr-2">Compound</th>
+                  <th className="text-right py-1 pr-2">Giri</th>
+                  <th className="text-right py-1 pr-2">Da–A</th>
+                  <th className="text-right py-1 pr-2">Media</th>
+                  <th className="text-right py-1 pr-2">Std</th>
+                  <th className="text-right py-1 pr-2">Slope</th>
+                  <th className="text-right py-1 pr-2">Score</th>
+                  <th className="text-center py-1">Long Run?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {longRuns.map((lr) => (
+                  <tr key={`${lr.driverNumber}-${lr.stintNumber}`} className={lr.isLongRun ? "text-foreground" : "text-muted-foreground/60"}>
+                    <td className="py-0.5 pr-2">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: `#${lr.color}` }} />
+                        <span className="font-mono font-bold">{lr.acronym}</span>
+                      </span>
+                    </td>
+                    <td className="py-0.5 pr-2 font-mono">{lr.stintNumber}</td>
+                    <td className="py-0.5 pr-2">{lr.compound}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{lr.lapsCount}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{lr.lapStartLongRun}–{lr.lapEndLongRun}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{fmtTime(lr.avgLapTime)}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{lr.stdLapTime.toFixed(3)}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{lr.degradationSlope > 0 ? "+" : ""}{lr.degradationSlope.toFixed(3)}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono font-bold">{lr.score}</td>
+                    <td className="py-0.5 text-center">{lr.isLongRun ? "✅" : lr.score >= 40 ? "⚠️" : "❌"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[10px] text-muted-foreground mt-1.5 italic">
+              Score ≥ 60: probabile long run • Score 40–59: possibile • Score &lt; 40: non long run. Solo i long run identificati (score ≥ 40) vengono usati per il calcolo del degrado.
+            </p>
+          </div>
+        </details>
+      )}
+
       {/* Legend - Collapsible */}
       <details className="group">
         <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
