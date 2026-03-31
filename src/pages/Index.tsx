@@ -377,6 +377,22 @@ export default function Index() {
     [selectedDriverNumbers, driverStates]
   );
 
+  // Tyre degradation results
+  const degradationResults = useMemo(() => {
+    if (!["Race", "Sprint", "Practice 1", "Practice 2", "Practice 3", "Practice"].some((t) => sessionType.startsWith(t) || sessionType === t)) return [];
+    return selectedDriverNumbers.flatMap((num) => {
+      const state = driverStates.get(num);
+      if (!state) return [];
+      return calculateTyreDegradation(
+        num,
+        state.driver.name_acronym,
+        getColor(num),
+        state.laps,
+        state.stints
+      );
+    });
+  }, [selectedDriverNumbers, driverStates, sessionType, getColor]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border px-6 py-4">
