@@ -292,8 +292,12 @@ export default function Index() {
     setDriverStates(new Map());
     setWeatherData(null);
     setOvertakesData([]);
+    setOvertakesReceivedData([]);
     setStintsData([]);
     setPitStopsData([]);
+    setDiaryIntervals([]);
+    setDiaryPositions([]);
+    setDiaryEvents([]);
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
