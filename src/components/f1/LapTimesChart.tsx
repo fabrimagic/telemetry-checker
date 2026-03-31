@@ -351,7 +351,9 @@ export function LapTimesChart({ drivers, sessionWeather, raceControlMessages, se
               const lapNum = Number(v);
               const cond = weatherMap.get(lapNum);
               const condLabel = cond === "WET" ? " 🌧" : cond === "MIXED" ? " 🌦" : "";
-              return `Lap ${v}${condLabel}`;
+              const ts = trackStatusMap.get(lapNum);
+              const tsLabel = ts && ts !== "GREEN" ? ` ${trackStatusLabels[ts].icon} ${trackStatusLabels[ts].label}` : "";
+              return `Lap ${v}${condLabel}${tsLabel}`;
             }}
             formatter={(value: number, name: string) => {
               const driverNum = parseInt(name.replace("t_", ""));
