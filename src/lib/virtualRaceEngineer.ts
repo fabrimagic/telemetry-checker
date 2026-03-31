@@ -221,12 +221,34 @@ export function computeVirtualRaceEngineer(
 
   // ── 2. Simulate strategies ──
 
-  // Build a simple lap time predictor per compound
-  const compoundModels = new Map<string, { slope: number; intercept: number }>();
+  // Build a simple lap time predictor per compound (race data first)
+  const compoundModels = new Map<string, { slope: number; intercept: number; source: string }>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
     if (model && !compoundModels.has(sa.compound)) {
-      compoundModels.set(sa.compound, model);
+      compoundModels.set(sa.compound, { ...model, source: "race" });
+    }
+  }
+
+  // Enrich with practice compound models (only add compounds not already from race)
+  const practiceCompoundsUsed: string[] = [];
+  for (const pm of practiceModels) {
+    if (!compoundModels.has(pm.compound) && pm.rSquared > 0.3) {
+      // Adjust practice intercept to race pace: use median race lap time as baseline
+      const raceModels = [...compoundModels.values()].filter(m => m.source === "race");
+      let paceOffset = 0;
+      if (raceModels.length > 0) {
+        // Estimate offset between practice and race pace at tyre life = 5
+        const raceBasePace = raceModels[0].intercept + raceModels[0].slope * 5;
+        const practiceBasePace = pm.intercept + pm.slope * 5;
+        paceOffset = raceBasePace - practiceBasePace;
+      }
+      compoundModels.set(pm.compound, {
+        slope: pm.slope,
+        intercept: pm.intercept + paceOffset,
+        source: pm.source,
+      });
+      practiceCompoundsUsed.push(pm.compound);
     }
   }
 
