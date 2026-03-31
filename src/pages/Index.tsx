@@ -379,7 +379,8 @@ export default function Index() {
 
   // Tyre degradation results
   const degradationResults = useMemo(() => {
-    if (!["Race", "Sprint", "Practice 1", "Practice 2", "Practice 3", "Practice"].some((t) => sessionType.startsWith(t) || sessionType === t)) return [];
+    const validTypes = ["Race", "Sprint", "Practice"];
+    if (!validTypes.some((t) => sessionType.includes(t))) return [];
     return selectedDriverNumbers.flatMap((num) => {
       const state = driverStates.get(num);
       if (!state) return [];
