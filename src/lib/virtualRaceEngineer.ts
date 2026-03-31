@@ -341,7 +341,7 @@ export function computeVirtualRaceEngineer(
         stint: i + 1,
         ideal_lap: idealLap,
         range: [Math.max(1, idealLap - 1), Math.min(totalLaps, idealLap + 1)],
-        compound_after: actualCompounds[i + 1] || actualCompounds[i],
+        compound_after: bestCompounds[i + 1] || bestCompounds[i],
       });
     }
 
