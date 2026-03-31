@@ -78,11 +78,14 @@ export default function Index() {
     setViewMode("drivers");
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
+    setSessionWeather([]);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
       setAllDrivers(d);
       if (!d.length) setError("No drivers found for this session.");
+      // Fetch session weather for lap classification (fire and forget)
+      getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
     } catch (e: any) {
       setError(e.message);
     } finally {
