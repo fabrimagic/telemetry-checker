@@ -142,6 +142,7 @@ export function computeVirtualRaceEngineer(
   _intervals: IntervalData[],
   _positions: PositionData[],
   allDrivers: Driver[],
+  practiceModels: PracticeCompoundModel[] = [],
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
