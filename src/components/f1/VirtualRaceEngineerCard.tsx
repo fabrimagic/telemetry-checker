@@ -1,7 +1,8 @@
-import type { VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
+import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge } from "lucide-react";
+import React from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -49,6 +50,69 @@ function DeltaBadge({ delta }: { delta: number }) {
   );
 }
 
+/* ── Strategy Timeline Chart ── */
+function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; recommended: RecommendedStrategy }) {
+  const totalLaps = actual.stints.length > 0
+    ? Math.max(...actual.stints.map((s) => s.lap_end))
+    : 0;
+  if (totalLaps === 0) return null;
+
+  // Build recommended stints from pit windows
+  const recStints: { compound: string; lap_start: number; lap_end: number }[] = [];
+  if (recommended.pit_windows.length > 0) {
+    const sortedWindows = [...recommended.pit_windows].sort((a, b) => a.ideal_lap - b.ideal_lap);
+    let cursor = actual.stints[0]?.lap_start ?? 1;
+    const firstCompound = actual.stints[0]?.compound ?? "MEDIUM";
+
+    for (let i = 0; i < sortedWindows.length; i++) {
+      const w = sortedWindows[i];
+      recStints.push({ compound: i === 0 ? firstCompound : sortedWindows[i - 1].compound_after, lap_start: cursor, lap_end: w.ideal_lap });
+      cursor = w.ideal_lap + 1;
+    }
+    recStints.push({ compound: sortedWindows[sortedWindows.length - 1].compound_after, lap_start: cursor, lap_end: totalLaps });
+  }
+
+  const renderRow = (label: string, stints: { compound: string; lap_start: number; lap_end: number }[]) => (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] text-muted-foreground w-24 shrink-0 text-right">{label}</span>
+      <div className="flex-1 flex h-7 rounded overflow-hidden border border-border/50">
+        {stints.map((s, i) => {
+          const width = ((s.lap_end - s.lap_start + 1) / totalLaps) * 100;
+          const bg = COMPOUND_COLORS[s.compound] || "hsl(var(--muted))";
+          const isDark = s.compound === "HARD" || s.compound === "MEDIUM";
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-center text-[9px] font-bold relative"
+              style={{ width: `${width}%`, backgroundColor: bg, color: isDark ? "#1a1a1a" : "#fff" }}
+              title={`${s.compound} L${s.lap_start}–${s.lap_end}`}
+            >
+              {width > 8 && <span>{s.compound.substring(0, 3)}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        📊 Confronto visivo strategia
+      </h4>
+      {renderRow("Reale", actual.stints.map((s) => ({ compound: s.compound, lap_start: s.lap_start, lap_end: s.lap_end })))}
+      {recStints.length > 0 && renderRow("Consigliata", recStints)}
+      <div className="flex items-center gap-2">
+        <span className="w-24 shrink-0" />
+        <div className="flex-1 flex justify-between text-[9px] text-muted-foreground px-0.5">
+          <span>L1</span>
+          <span>L{totalLaps}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   result: VirtualRaceEngineerResult;
 }
@@ -89,6 +153,9 @@ export function VirtualRaceEngineerCard({ result }: Props) {
             </div>
           </div>
         </div>
+
+        {/* ── Visual Timeline ── */}
+        <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} />
 
         {/* ── Actual Strategy ── */}
         <div>
