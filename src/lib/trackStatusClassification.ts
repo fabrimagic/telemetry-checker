@@ -99,12 +99,13 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
 
     if (detected === "CLEAR") {
       closeInterval(t);
-    } else if (detected && detected !== "CLEAR") {
+    } else if (detected) {
+      const status = detected as TrackStatus;
       // If higher priority than current, close and start new
       if (current) {
-        if (STATUS_PRIORITY[detected] >= STATUS_PRIORITY[current.status]) {
+        if (STATUS_PRIORITY[status] >= STATUS_PRIORITY[current.status]) {
           closeInterval(t);
-          current = { start: t, status: detected };
+          current = { start: t, status };
         }
         // else keep current higher-priority interval
       } else {
