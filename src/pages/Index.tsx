@@ -465,6 +465,9 @@ export default function Index() {
               onSelectLap={handleSelectLap}
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
+            {degradationResults.length > 0 && (
+              <TyreDegradationCard results={degradationResults} />
+            )}
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
