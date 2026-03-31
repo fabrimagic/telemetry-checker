@@ -617,6 +617,17 @@ export default function Index() {
                   />
                 );
               })()}
+            {/* Virtual Race Engineer - single driver, Race/Sprint only */}
+            {selectedDriverNumbers.length === 1 &&
+              (sessionType === "Race" || sessionType === "Sprint") && (
+                loadingVre ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+                  </div>
+                ) : vreResult ? (
+                  <VirtualRaceEngineerCard result={vreResult} />
+                ) : null
+              )}
             {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {stintsData.length > 0 && (
