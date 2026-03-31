@@ -597,6 +597,25 @@ export default function Index() {
                   />
                 );
               })()}
+            {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {stintsData.length > 0 && (
+                <StintsCard stints={stintsData} />
+              )}
+              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
+                <PitStopsCard
+                  pitStops={pitStopsData}
+                  allDrivers={allDrivers}
+                  multiDriver={selectedDriverNumbers.length > 1}
+                />
+              )}
+              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+              )}
+              {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
+                <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
+              )}
+            </div>
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
