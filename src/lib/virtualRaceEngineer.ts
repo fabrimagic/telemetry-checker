@@ -40,6 +40,7 @@ export interface ActualStrategy {
 
 export interface RecommendedStrategy {
   pit_windows: { stint: number; ideal_lap: number; range: [number, number]; compound_after: string }[];
+  compounds: string[]; // full compound sequence per stint
   estimated_gain_seconds: number;
   reason: string;
 }
@@ -323,25 +324,31 @@ export function computeVirtualRaceEngineer(
       }
     }
 
+    const shifts = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+    const shift2Range = actualPitLaps.length >= 2 ? shifts : [0];
+
     for (const compounds of compoundCombos) {
-      for (const shift1 of [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]) {
-        const candidatePits = actualPitLaps.map((p, i) => {
-          if (i === 0) return Math.max(3, Math.min(totalLaps - 3, p + shift1));
-          return p;
-        });
+      for (const shift1 of shifts) {
+        for (const shift2 of shift2Range) {
+          const candidatePits = actualPitLaps.map((p, i) => {
+            const s = i === 0 ? shift1 : i === 1 ? shift2 : 0;
+            return Math.max(3, Math.min(totalLaps - 3, p + s));
+          });
 
-        let valid = true;
-        for (let i = 1; i < candidatePits.length; i++) {
-          if (candidatePits[i] <= candidatePits[i - 1] + 2) { valid = false; break; }
-        }
-        if (!valid) continue;
+          let valid = true;
+          for (let i = 1; i < candidatePits.length; i++) {
+            if (candidatePits[i] <= candidatePits[i - 1] + 2) { valid = false; break; }
+          }
+          if (candidatePits[0] < 2) valid = false;
+          if (!valid) continue;
 
-        const t = simulateTime(candidatePits, compounds);
-        if (t != null && t < bestTime) {
-          bestTime = t;
-          bestPitLaps = candidatePits;
-          bestCompounds = compounds;
-          bestDelta = actualSimTime - t;
+          const t = simulateTime(candidatePits, compounds);
+          if (t != null && t < bestTime) {
+            bestTime = t;
+            bestPitLaps = candidatePits;
+            bestCompounds = compounds;
+            bestDelta = actualSimTime - t;
+          }
         }
       }
     }
@@ -374,6 +381,7 @@ export function computeVirtualRaceEngineer(
 
   const recommendedStrategy: RecommendedStrategy = {
     pit_windows: recommendedWindows,
+    compounds: [...bestCompounds],
     estimated_gain_seconds: Math.round(bestDelta * 10) / 10,
     reason: bestReason,
   };
