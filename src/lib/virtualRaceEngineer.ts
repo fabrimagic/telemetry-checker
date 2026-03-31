@@ -370,7 +370,7 @@ export function computeVirtualRaceEngineer(
       });
     }
 
-    // Opposite compound if available
+    // Opposite compound if available (race compounds)
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
@@ -385,6 +385,48 @@ export function computeVirtualRaceEngineer(
           pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
           cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
         });
+      }
+    }
+
+    // Practice-derived compound alternatives
+    for (const practiceCompound of practiceCompoundsUsed) {
+      const raceCompoundsSet = new Set(actualCompounds);
+      if (raceCompoundsSet.has(practiceCompound)) continue;
+
+      // Try substituting the last stint compound with the practice compound
+      if (actualCompounds.length >= 2) {
+        const altCompounds = [...actualCompounds];
+        altCompounds[altCompounds.length - 1] = practiceCompound;
+        const altTime = simulateTime(actualPitLaps, altCompounds);
+        if (altTime != null) {
+          alternatives.push({
+            name: `Stint finale su ${practiceCompound}`,
+            description: `Ultimo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[actualCompounds.length - 1]}`,
+            pit_laps: actualPitLaps,
+            compounds: altCompounds,
+            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
+            cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
+          });
+        }
+      }
+
+      // Try substituting the first stint compound
+      if (actualCompounds.length >= 2) {
+        const altCompounds = [...actualCompounds];
+        altCompounds[0] = practiceCompound;
+        const altTime = simulateTime(actualPitLaps, altCompounds);
+        if (altTime != null) {
+          alternatives.push({
+            name: `Stint iniziale su ${practiceCompound}`,
+            description: `Primo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[0]}`,
+            pit_laps: actualPitLaps,
+            compounds: altCompounds,
+            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
+            cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
+          });
+        }
       }
     }
   }
