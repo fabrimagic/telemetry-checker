@@ -17,10 +17,11 @@ interface Session {
   date_start: string;
   date_end: string;
   year: number;
+  meeting_key: number;
 }
 
 interface Props {
-  onSelect: (sessionKey: number, sessionType: string) => void;
+  onSelect: (sessionKey: number, sessionType: string, meetingKey: number) => void;
   isLoading: boolean;
 }
 
