@@ -690,19 +690,6 @@ export default function Index() {
               {weatherData && selectedDriverNumbers.length === 1 && (
                 <WeatherCard weather={weatherData} />
               )}
-              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
-                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
-              )}
-              {stintsData.length > 0 && selectedDriverNumbers.length === 1 && (
-                <StintsCard stints={stintsData} />
-              )}
-              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
-                <PitStopsCard
-                  pitStops={pitStopsData}
-                  allDrivers={allDrivers}
-                  multiDriver={selectedDriverNumbers.length > 1}
-                />
-              )}
             </div>
           </div>
         )}
