@@ -279,6 +279,7 @@ export default function Index() {
     setOvertakesData([]);
     setStintsData([]);
     setPitStopsData([]);
+    setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
     setClickedTime(null);
