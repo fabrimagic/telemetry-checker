@@ -134,6 +134,40 @@ export function LapTimesChart({ drivers, sessionWeather, raceControlMessages, se
 
   const hasWeatherData = weatherBands.length > 0;
 
+  // Track status classification
+  const trackStatusMap = useMemo(() => {
+    if (!raceControlMessages?.length || !drivers.length) return new Map<number, TrackStatus>();
+    const refDriver = drivers.find((d) => d.laps.some((l) => l.date_start));
+    if (!refDriver) return new Map<number, TrackStatus>();
+    const lapsWithDates = refDriver.laps.filter((l) => l.date_start) as any as Lap[];
+    return classifyLapsTrackStatus(lapsWithDates, raceControlMessages);
+  }, [raceControlMessages, drivers]);
+
+  // Build contiguous track status bands
+  const trackStatusBands = useMemo(() => {
+    if (!trackStatusMap.size) return [];
+    const entries = Array.from(trackStatusMap.entries())
+      .filter(([, s]) => s !== "GREEN")
+      .sort(([a], [b]) => a - b);
+    if (!entries.length) return [];
+
+    const bands: { start: number; end: number; status: TrackStatus }[] = [];
+    let current: { start: number; end: number; status: TrackStatus } | null = null;
+
+    for (const [lap, status] of entries) {
+      if (current && current.status === status && lap === current.end + 1) {
+        current.end = lap;
+      } else {
+        if (current) bands.push(current);
+        current = { start: lap, end: lap, status };
+      }
+    }
+    if (current) bands.push(current);
+    return bands;
+  }, [trackStatusMap]);
+
+  const hasTrackStatusData = trackStatusBands.length > 0;
+
   const outlierLaps = useMemo(() => {
     const set = new Set<string>();
     for (const d of drivers) {
