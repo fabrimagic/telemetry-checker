@@ -79,7 +79,7 @@ function formatLapTime(seconds: number): string {
   return `${m}:${sWhole.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectLap }: Props) {
+export function LapTimesChart({ drivers, sessionWeather, raceControlMessages, selectedLaps, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
 
   // Build compound lookup: driverNumber -> lapNumber -> compound
