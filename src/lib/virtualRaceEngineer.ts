@@ -40,6 +40,7 @@ export interface ActualStrategy {
 
 export interface RecommendedStrategy {
   pit_windows: { stint: number; ideal_lap: number; range: [number, number]; compound_after: string }[];
+  compounds: string[]; // full compound sequence per stint
   estimated_gain_seconds: number;
   reason: string;
 }
