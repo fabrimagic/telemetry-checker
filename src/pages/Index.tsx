@@ -189,8 +189,12 @@ export default function Index() {
     setCursorTime(null);
     setWeatherData(null);
     setOvertakesData([]);
+    setOvertakesReceivedData([]);
     setStintsData([]);
     setPitStopsData([]);
+    setDiaryIntervals([]);
+    setDiaryPositions([]);
+    setDiaryEvents([]);
 
     const updates: [number, CarData[], LocationData[]][] = [];
 
