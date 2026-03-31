@@ -252,8 +252,15 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // F1 regulation: at least 2 different compounds must be used during a dry race
+  function hasMinTwoCompounds(compounds: string[]): boolean {
+    return new Set(compounds).size >= 2;
+  }
+
   // Estimate total time for a given strategy
   function simulateTime(pitLaps: number[], compounds: string[]): number | null {
+    // Enforce mandatory 2-compound rule
+    if (!hasMinTwoCompounds(compounds)) return null;
     let total = 0;
     const stintBounds: { start: number; end: number; compound: string }[] = [];
     let start = 1;
