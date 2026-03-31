@@ -51,6 +51,26 @@ const weatherBandColors: Record<WeatherCondition, string> = {
   MIXED: "hsla(35, 90%, 55%, 0.10)",
 };
 
+const trackStatusColors: Record<TrackStatus, string> = {
+  GREEN: "transparent",
+  YELLOW: "hsla(50, 100%, 50%, 0.15)",
+  DOUBLE_YELLOW: "hsla(50, 100%, 50%, 0.25)",
+  VSC: "hsla(270, 70%, 55%, 0.15)",
+  SC: "hsla(30, 90%, 50%, 0.18)",
+  RED: "hsla(0, 85%, 50%, 0.18)",
+  MIXED: "hsla(0, 0%, 50%, 0.12)",
+};
+
+const trackStatusLabels: Record<TrackStatus, { icon: string; label: string; description: string }> = {
+  GREEN: { icon: "🟢", label: "Green", description: "Condizioni normali, pista libera" },
+  YELLOW: { icon: "🟡", label: "Yellow Flag", description: "Bandiera gialla — pericolo in pista, ridurre velocità" },
+  DOUBLE_YELLOW: { icon: "🟡🟡", label: "Double Yellow", description: "Doppia bandiera gialla — pericolo grave, essere pronti a fermarsi" },
+  VSC: { icon: "🟣", label: "Virtual Safety Car", description: "VSC attiva — rispettare il delta time imposto" },
+  SC: { icon: "🟠", label: "Safety Car", description: "Safety Car in pista — seguire la Safety Car" },
+  RED: { icon: "🔴", label: "Red Flag", description: "Bandiera rossa — sessione interrotta" },
+  MIXED: { icon: "⚪", label: "Mixed", description: "Più condizioni durante il giro" },
+};
+
 function formatLapTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
