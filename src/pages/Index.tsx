@@ -15,7 +15,7 @@ import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
 import { SessionReport } from "@/components/f1/SessionReport";
-import { Loader2, RotateCcw, TrendingDown } from "lucide-react";
+import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Play } from "lucide-react";
