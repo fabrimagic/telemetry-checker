@@ -81,6 +81,8 @@ export default function Index() {
   const [diaryEvents, setDiaryEvents] = useState<DiaryEvent[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
+  const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
+  const [loadingVre, setLoadingVre] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
