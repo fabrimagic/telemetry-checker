@@ -21,7 +21,7 @@ interface ConsecutiveSequence {
   stintData: StintData;
 }
 
-const MIN_LAPS = 5;
+const DEFAULT_MIN_LAPS = 5;
 
 /**
  * Build a set of pit-in lap numbers (last lap before each pit stop).
