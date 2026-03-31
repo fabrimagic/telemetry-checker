@@ -639,6 +639,23 @@ export default function Index() {
                 </details>
               </div>
             )}
+            {/* Race Diary - single driver, Race/Sprint only */}
+            {selectedDriverNumbers.length === 1 &&
+              (sessionType === "Race" || sessionType === "Sprint") && (() => {
+                const state = driverStates.get(selectedDriverNumbers[0]);
+                if (!state) return null;
+                return loadingDiary ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
+                  </div>
+                ) : (
+                  <RaceDiaryCard
+                    events={diaryEvents}
+                    driverAcronym={state.driver.name_acronym}
+                    driverColor={getColor(state.driver.driver_number)}
+                  />
+                );
+              })()}
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
