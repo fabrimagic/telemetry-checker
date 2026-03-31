@@ -90,6 +90,9 @@ export function VirtualRaceEngineerCard({ result }: Props) {
           </div>
         </div>
 
+        {/* ── Visual Timeline ── */}
+        <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} />
+
         {/* ── Actual Strategy ── */}
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
