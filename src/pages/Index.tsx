@@ -27,10 +27,13 @@ import {
   getLocation,
   getWeather,
   getOvertakes,
+  getOvertakesReceived,
   getStints,
   getPitStops,
   getWeatherForSession,
   getRaceControl,
+  getIntervals,
+  getPositions,
   type Driver,
   type Lap,
   type CarData,
@@ -40,7 +43,11 @@ import {
   type StintData,
   type PitData,
   type RaceControlMessage,
+  type IntervalData,
+  type PositionData,
 } from "@/lib/openf1";
+import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
+import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 
 interface DriverState {
   driver: Driver;
