@@ -10,6 +10,7 @@ import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnal
 import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
 import { calculateTyreDegradation } from "@/lib/tyreDegradation";
 import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
+import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
@@ -28,6 +29,7 @@ import {
   getOvertakes,
   getStints,
   getPitStops,
+  getWeatherForSession,
   type Driver,
   type Lap,
   type CarData,
@@ -62,6 +64,7 @@ export default function Index() {
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
   const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
+  const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -75,11 +78,14 @@ export default function Index() {
     setViewMode("drivers");
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
+    setSessionWeather([]);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
       setAllDrivers(d);
       if (!d.length) setError("No drivers found for this session.");
+      // Fetch session weather for lap classification (fire and forget)
+      getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -499,6 +505,7 @@ export default function Index() {
                 laps: dl.laps,
                 stints: dl.stints,
               }))}
+              sessionWeather={sessionWeather}
               selectedLaps={driversLaps.map((dl) => ({
                 driverNumber: dl.driver.driver_number,
                 lapNumber: dl.selectedLap,

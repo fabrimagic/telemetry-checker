@@ -8,22 +8,25 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
+  ReferenceArea,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
-import type { StintData } from "@/lib/openf1";
+import type { StintData, WeatherData, Lap } from "@/lib/openf1";
+import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { Watermark } from "./Watermark";
 
 interface DriverLapTimes {
   driverNumber: number;
   acronym: string;
   color: string;
-  laps: { lap_number: number; lap_duration: number | null }[];
+  laps: { lap_number: number; lap_duration: number | null; date_start?: string | null }[];
   stints?: StintData[];
 }
 
 interface Props {
   drivers: DriverLapTimes[];
+  sessionWeather?: WeatherData[];
   selectedLaps?: { driverNumber: number; lapNumber: number | null }[];
   onSelectLap?: (driverNumber: number, lapNumber: number) => void;
 }
@@ -40,6 +43,12 @@ const compoundColors: Record<string, string> = {
   WET: "#1e88e5",
 };
 
+const weatherBandColors: Record<WeatherCondition, string> = {
+  DRY: "transparent",
+  WET: "hsla(210, 80%, 50%, 0.12)",
+  MIXED: "hsla(35, 90%, 55%, 0.10)",
+};
+
 function formatLapTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -48,7 +57,7 @@ function formatLapTime(seconds: number): string {
   return `${m}:${sWhole.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
+export function LapTimesChart({ drivers, sessionWeather, selectedLaps, onSelectLap }: Props) {
   const [showOutliers, setShowOutliers] = useState(false);
 
   // Build compound lookup: driverNumber -> lapNumber -> compound
@@ -66,6 +75,42 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
     }
     return map;
   }, [drivers]);
+
+  // Build weather classification per lap using first driver's lap data (all drivers share same weather)
+  const weatherMap = useMemo(() => {
+    if (!sessionWeather?.length || !drivers.length) return new Map<number, WeatherCondition>();
+    // Use the first driver that has laps with date_start
+    const refDriver = drivers.find((d) => d.laps.some((l) => l.date_start));
+    if (!refDriver) return new Map<number, WeatherCondition>();
+    // Cast laps to the format expected by classifyLapsWeather
+    const lapsWithDates = refDriver.laps.filter((l) => l.date_start) as any as import("@/lib/openf1").Lap[];
+    return classifyLapsWeather(lapsWithDates, sessionWeather);
+  }, [sessionWeather, drivers]);
+
+  // Build contiguous weather bands for ReferenceArea rendering
+  const weatherBands = useMemo(() => {
+    if (!weatherMap.size) return [];
+    const entries = Array.from(weatherMap.entries())
+      .filter(([, c]) => c !== "DRY")
+      .sort(([a], [b]) => a - b);
+    if (!entries.length) return [];
+
+    const bands: { start: number; end: number; condition: WeatherCondition }[] = [];
+    let current: { start: number; end: number; condition: WeatherCondition } | null = null;
+
+    for (const [lap, cond] of entries) {
+      if (current && current.condition === cond && lap === current.end + 1) {
+        current.end = lap;
+      } else {
+        if (current) bands.push(current);
+        current = { start: lap, end: lap, condition: cond };
+      }
+    }
+    if (current) bands.push(current);
+    return bands;
+  }, [weatherMap]);
+
+  const hasWeatherData = weatherBands.length > 0;
 
   const outlierLaps = useMemo(() => {
     const set = new Set<string>();
@@ -167,6 +212,22 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
           ))}
         </div>
       )}
+      {hasWeatherData && (
+        <div className="flex gap-3 mb-2">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span className="w-3 h-2.5 rounded-sm" style={{ backgroundColor: "hsla(210, 80%, 50%, 0.35)" }} />
+            🌧 Wet
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span className="w-3 h-2.5 rounded-sm" style={{ backgroundColor: "hsla(35, 90%, 55%, 0.30)" }} />
+            🌦 Mixed
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span className="w-3 h-2.5 rounded-sm" style={{ backgroundColor: "transparent", border: "1px dashed hsl(215 12% 35%)" }} />
+            ☀️ Dry
+          </span>
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={240}>
         <LineChart
           data={data}
@@ -185,6 +246,17 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
           }}
         >
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
+          {/* Weather bands */}
+          {weatherBands.map((band, i) => (
+            <ReferenceArea
+              key={`weather-${i}`}
+              x1={band.start - 0.5}
+              x2={band.end + 0.5}
+              fill={weatherBandColors[band.condition]}
+              fillOpacity={1}
+              strokeOpacity={0}
+            />
+          ))}
           <XAxis
             dataKey="lap"
             tick={AXIS_TICK}
@@ -208,11 +280,14 @@ export function LapTimesChart({ drivers, selectedLaps, onSelectLap }: Props) {
               fontSize: 11,
             }}
             labelStyle={{ color: "hsl(215 12% 55%)" }}
-            labelFormatter={(v) => `Lap ${v}`}
+            labelFormatter={(v) => {
+              const lapNum = Number(v);
+              const cond = weatherMap.get(lapNum);
+              const condLabel = cond === "WET" ? " 🌧" : cond === "MIXED" ? " 🌦" : "";
+              return `Lap ${v}${condLabel}`;
+            }}
             formatter={(value: number, name: string) => {
               const driverNum = parseInt(name.replace("t_", ""));
-              const driverCompounds = compoundMap.get(driverNum);
-              const lapNum = undefined; // tooltip doesn't give us lap directly, but value is sufficient
               const driver = drivers.find((d) => d.driverNumber === driverNum);
               return [formatLapTime(value), driver?.acronym || ""];
             }}
