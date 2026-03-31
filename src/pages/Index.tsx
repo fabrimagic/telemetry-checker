@@ -67,6 +67,7 @@ export default function Index() {
   const [stintsData, setStintsData] = useState<StintData[]>([]);
   const [pitStopsData, setPitStopsData] = useState<PitData[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
+  const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
