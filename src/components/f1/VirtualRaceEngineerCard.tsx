@@ -233,10 +233,10 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         )}
         {/* Simulated scenario banner */}
         {scenario_is_simulated && (
-          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
+         <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
             <p className="text-[11px] text-amber-400 font-semibold">
-              What-if scenario attivo: {scenario_label}
+              What-if scenario attivo: {scenario_label}{scenario_activation_lap != null ? ` dal giro ${scenario_activation_lap}` : ""}
             </p>
           </div>
         )}
