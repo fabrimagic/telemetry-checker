@@ -242,9 +242,9 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                 <TableCell className="text-xs text-center">
                   {cr ? (
                     <span className="inline-flex items-center gap-0.5" title={`${cr.model_type}${cr.weather_correction_used ? " (temp)" : ""} — fuel: ${cr.fuel_proxy_type}`}>
-                      {cr.model_type === "corrected_multivariate" ? (
+                      {cr.model_type !== "simple_fallback" ? (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">
-                          MV{cr.weather_correction_used ? "+T" : ""}
+                          {cr.model_type === "corrected_two_stage" ? "2S" : "FP"}{cr.weather_correction_used ? "+T" : ""}
                         </span>
                       ) : (
                         <span className="text-[9px] text-muted-foreground">Simple</span>

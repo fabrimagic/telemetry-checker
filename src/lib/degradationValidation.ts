@@ -29,6 +29,8 @@ export interface DegradationValidationConfig {
   min_r_squared: number;
   /** Fallback degradation slope when no valid estimate is available (sec/lap, conservative) */
   neutral_fallback_slope: number;
+  /** Maximum plausible slope (s/lap) — above this → INVALID (physically implausible) */
+  max_plausible_slope: number;
 }
 
 export const DEFAULT_VALIDATION_CONFIG: DegradationValidationConfig = {
@@ -36,7 +38,8 @@ export const DEFAULT_VALIDATION_CONFIG: DegradationValidationConfig = {
   neutral_tolerance: 0.01,
   min_valid_laps: 4,
   min_r_squared: 0.1,
-  neutral_fallback_slope: 0.03, // conservative neutral fallback ~30ms/lap
+  neutral_fallback_slope: 0.03,
+  max_plausible_slope: 0.30,
 };
 
 /* ── Types ── */
@@ -121,9 +124,12 @@ export function validateDegradationEstimate(
     reasons.push(`Qualità del fit insufficiente (R²=${rSq.toFixed(3)} < ${config.min_r_squared})`);
   }
 
-  // 3. Check slope (corrected)
+  // 3. Check slope (corrected) — including plausibility
   if (status !== "INVALID") {
-    if (slope < config.negative_tolerance) {
+    if (slope > config.max_plausible_slope) {
+      status = "INVALID";
+      reasons.push(`Slope ${corrected ? "corretta " : ""}fisicamente implausibile (${slope.toFixed(3)} > ${config.max_plausible_slope} s/giro)`);
+    } else if (slope < config.negative_tolerance) {
       status = "INVALID";
       reasons.push(`Slope ${corrected ? "corretta" : ""} negativa oltre la tolleranza (${slope.toFixed(3)} < ${config.negative_tolerance})`);
       if (corrected && slopeRaw < 0 && slopeCorrected < 0) {
