@@ -272,7 +272,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
         )}
 
         {/* ── Visual Timeline ── */}
-        <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} />
+        <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} riskMode={risk_mode} />
 
         {/* ── Actual Strategy ── */}
         <div>
