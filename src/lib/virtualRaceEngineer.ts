@@ -509,13 +509,13 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[0] = practiceCompound;
-        const altTime2 = simulateTimeRiskAdjusted(actualPitLaps, altCompounds2);
+        const altTime2 = simulateTimeRiskAdjusted(actualPitLaps, altCompounds);
         if (altTime2 != null) {
           alternatives.push({
             name: `Stint iniziale su ${practiceCompound}`,
             description: `Primo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[0]}`,
             pit_laps: actualPitLaps,
-            compounds: altCompounds2,
+            compounds: altCompounds,
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
             cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
