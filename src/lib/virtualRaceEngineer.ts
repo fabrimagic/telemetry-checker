@@ -329,8 +329,9 @@ export function computeVirtualRaceEngineer(
   const actualCompounds = stints.map(s => s.compound);
   const actualPitLaps = pitStops.map(p => p.lap_number);
   const actualSimTime = simulateTime(actualPitLaps, actualCompounds);
+  const actualAdjustedTime = simulateTimeRiskAdjusted(actualPitLaps, actualCompounds);
 
-  // ── 3. Find optimal pit window ──
+  // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
   const recommendedWindows: RecommendedStrategy["pit_windows"] = [];
   let bestDelta = 0;
   let bestPitLaps = actualPitLaps;
@@ -338,8 +339,8 @@ export function computeVirtualRaceEngineer(
   let bestReason = "Strategia reale già vicina all'ottimale";
 
   // Try shifts of ±5 laps for each pit stop AND different compound combinations
-  if (actualPitLaps.length > 0 && actualSimTime != null) {
-    let bestTime = actualSimTime;
+  if (actualPitLaps.length > 0 && actualAdjustedTime != null && actualSimTime != null) {
+    let bestTime = actualAdjustedTime;
 
     // Generate compound combos: actual + all permutations using available compounds
     const allAvailableCompounds = [...compoundModels.keys()];
