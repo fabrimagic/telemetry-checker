@@ -442,7 +442,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED");
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
