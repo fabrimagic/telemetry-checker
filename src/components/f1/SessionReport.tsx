@@ -9,6 +9,7 @@ import {
   getWeatherForSession,
   getDrivers,
   getIntervals,
+  getAllLaps,
   type SessionResult,
   type StartingGridEntry,
   type PositionData,
@@ -17,6 +18,7 @@ import {
   type WeatherData,
   type Driver,
   type IntervalData,
+  type Lap,
 } from "@/lib/openf1";
 import { Watermark } from "./Watermark";
 import { CumulativeDeviationCard } from "./CumulativeDeviationCard";
