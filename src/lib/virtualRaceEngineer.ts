@@ -194,8 +194,17 @@ export function computeVirtualRaceEngineer(
   const degResults = calculateTyreDegradation(
     driverNumber, driverAcronym, "ffffff", laps, stints
   );
-  for (const dr of degResults) {
-    degradationModels.set(dr.stint, { slope: dr.slopeSecPerLap, intercept: dr.intercept });
+
+  // ── Degradation validation ──
+  const rawValidated = validateAllDegradationEstimates(degResults);
+  const degradationValidations = resolveDegradationForStrategy(rawValidated);
+
+  for (const dv of degradationValidations) {
+    // Use effective_slope (validated/fallback) instead of raw slope
+    degradationModels.set(dv.original.stint, {
+      slope: dv.effective_slope,
+      intercept: dv.original.intercept,
+    });
   }
 
   for (let i = 0; i < stints.length; i++) {
