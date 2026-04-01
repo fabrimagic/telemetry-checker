@@ -56,7 +56,7 @@ function DeltaBadge({ delta }: { delta: number }) {
 }
 
 /* ── Strategy Timeline Chart ── */
-function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; recommended: RecommendedStrategy }) {
+function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStrategy; recommended: RecommendedStrategy; riskMode?: RiskMode }) {
   const totalLaps = actual.stints.length > 0
     ? Math.max(...actual.stints.map((s) => s.lap_end))
     : 0;
