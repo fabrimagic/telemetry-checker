@@ -276,9 +276,11 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const selectAllDrivers = useCallback(() => setVisibleDrivers(null), []);
   const selectNoneDrivers = useCallback(() => setVisibleDrivers(new Set()), []);
 
-  // Build position lookup: lap -> position -> driver_number
+  // Build position lookup: lap -> position -> driver_number (with carry-forward)
   const positionByLap = useMemo(() => {
     if (!positions.length || !allLaps.length) return new Map<number, Map<number, number>>();
+
+    // 1. Build driver laps map for timestamp-to-lap correlation
     const driverLapsMap = new Map<number, Lap[]>();
     for (const lap of allLaps) {
       if (!lap.date_start) continue;
@@ -287,8 +289,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     }
     for (const [, laps] of driverLapsMap) laps.sort((a, b) => a.lap_number - b.lap_number);
 
-    // lap -> driver -> position (keep last per lap)
-    const lapDriverPos = new Map<number, Map<number, number>>();
+    // 2. Map each position entry to a lap number, keep last per driver per lap
+    const lapDriverPos = new Map<number, Map<number, number>>(); // lap -> driver -> position
     for (const p of positions) {
       const dLaps = driverLapsMap.get(p.driver_number);
       if (!dLaps?.length) continue;
@@ -296,18 +298,46 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
       for (let i = dLaps.length - 1; i >= 0; i--) {
         if (dLaps[i].date_start! <= p.date) { matchedLap = dLaps[i].lap_number; break; }
       }
-      if (matchedLap == null) continue;
+      if (matchedLap == null) {
+        // If timestamp is before first lap, assign to lap 1
+        matchedLap = dLaps[0].lap_number;
+      }
       if (!lapDriverPos.has(matchedLap)) lapDriverPos.set(matchedLap, new Map());
       lapDriverPos.get(matchedLap)!.set(p.driver_number, p.position);
     }
 
-    // Invert to lap -> position -> driver
-    const result = new Map<number, Map<number, number>>();
-    for (const [lap, driverMap] of lapDriverPos) {
-      const posMap = new Map<number, number>();
-      for (const [dNum, pos] of driverMap) posMap.set(pos, dNum);
-      result.set(lap, posMap);
+    // 3. Determine all laps and all drivers
+    const allLapNumbers = new Set<number>();
+    for (const lap of allLaps) allLapNumbers.add(lap.lap_number);
+    const sortedLaps = [...allLapNumbers].sort((a, b) => a - b);
+
+    const allDriverNums = new Set<number>();
+    for (const [, dMap] of lapDriverPos) {
+      for (const dNum of dMap.keys()) allDriverNums.add(dNum);
     }
+
+    // 4. Carry-forward: for each lap, use current position or last known
+    const lastKnownPos = new Map<number, number>(); // driver -> last known position
+    const result = new Map<number, Map<number, number>>(); // lap -> position -> driver
+
+    for (const lap of sortedLaps) {
+      const currentLapData = lapDriverPos.get(lap);
+      // Update last known positions with any new data from this lap
+      if (currentLapData) {
+        for (const [dNum, pos] of currentLapData) {
+          lastKnownPos.set(dNum, pos);
+        }
+      }
+
+      // Build position -> driver map from all last-known positions
+      const posMap = new Map<number, number>();
+      for (const [dNum, pos] of lastKnownPos) {
+        // If multiple drivers share a position, the latest update wins
+        posMap.set(pos, dNum);
+      }
+      if (posMap.size > 0) result.set(lap, posMap);
+    }
+
     return result;
   }, [positions, allLaps]);
 
