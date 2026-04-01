@@ -12,6 +12,7 @@ import type { RiskMode } from "./riskAppetite";
 import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult } from "./cumulativeDeviation";
+import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments } from "./scenarioContext";
 
 /* ── Types ── */
 
@@ -101,6 +102,11 @@ export interface VirtualRaceEngineerResult {
   risk_mode: RiskMode;
   integrated_context?: IntegratedStrategyContext;
   narrative_insights: string[];
+  scenario_id: ScenarioId;
+  scenario_is_simulated: boolean;
+  scenario_label: string;
+  scenario_description: string;
+  scenario_modifiers_applied: Record<string, number>;
 }
 
 /* ── Helpers ── */
@@ -163,6 +169,7 @@ export function computeVirtualRaceEngineer(
   riskMode: RiskMode = "BALANCED",
   diaryEvents: DiaryEvent[] | null = null,
   cumDevResult: CumulativeDeviationResult | null = null,
+  scenarioId: ScenarioId = "REAL_CONTEXT",
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -277,11 +284,14 @@ export function computeVirtualRaceEngineer(
     return new Set(compounds).size >= 2;
   }
 
-  // Risk mode weight multipliers for strategy scoring
+  const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
+  const scenarioMods = scenarioDef.modifiers;
+
+  // Risk mode weight multipliers for strategy scoring, combined with scenario modifiers
   const riskWeights = {
-    CONSERVATIVE: { degradation: 1.15, traffic: 1.3, pitLoss: 1.0 },
-    BALANCED: { degradation: 1.0, traffic: 1.0, pitLoss: 1.0 },
-    AGGRESSIVE: { degradation: 0.85, traffic: 0.7, pitLoss: 1.0 },
+    CONSERVATIVE: { degradation: 1.15 * scenarioMods.degradation_weight, traffic: 1.3 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
+    BALANCED: { degradation: 1.0 * scenarioMods.degradation_weight, traffic: 1.0 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
+    AGGRESSIVE: { degradation: 0.85 * scenarioMods.degradation_weight, traffic: 0.7 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
   }[riskMode];
 
   // Estimate total time for a given strategy (raw, no risk adjustment)
@@ -802,8 +812,17 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`⚠️ ${gap}`);
   }
 
+  // Apply scenario confidence penalty
+  confScore += scenarioMods.confidence_penalty;
+
   // Recalculate confidence after all adjustments
   const finalConfidence: Confidence = confScore >= 6 ? "HIGH" : confScore >= 3 ? "MEDIUM" : "LOW";
+
+  // Add scenario note if simulated
+  if (isSimulatedScenario(scenarioId)) {
+    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label} — ${scenarioDef.description}`);
+    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}". I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+  }
 
   // ── 8. Verdict ──
   let verdictLabel: string;
@@ -858,10 +877,15 @@ export function computeVirtualRaceEngineer(
     ? recommendedWindows[recommendedWindows.length - 1].range[1]
     : actualPitLaps.length > 0 ? actualPitLaps[actualPitLaps.length - 1] + 3 : null;
 
-  const racePhase = detectRacePhase(
+  const rawRacePhase = detectRacePhase(
     lastLap, totalLaps, pitWindowStartLap, pitWindowEndLap,
     actualPitLaps.length > 0, weatherMap, trackStatusMap,
   );
+  // Apply scenario modifiers to phase adjustments
+  const racePhase: RacePhaseResult = {
+    ...rawRacePhase,
+    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments),
+  };
 
   return {
     driver_number: driverNumber,
@@ -882,5 +906,12 @@ export function computeVirtualRaceEngineer(
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,
+    scenario_id: scenarioId,
+    scenario_is_simulated: isSimulatedScenario(scenarioId),
+    scenario_label: scenarioDef.label,
+    scenario_description: scenarioDef.description,
+    scenario_modifiers_applied: Object.fromEntries(
+      Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
+    ) as Record<string, number>,
   };
 }

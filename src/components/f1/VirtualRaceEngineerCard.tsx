@@ -4,9 +4,11 @@ import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
 import { getPhaseLabel } from "@/lib/racePhase";
 import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
+import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical } from "lucide-react";
 import React, { useMemo } from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
@@ -133,10 +135,12 @@ function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStr
 interface Props {
   result: VirtualRaceEngineerResult;
   onRiskModeChange?: (mode: RiskMode) => void;
+  onScenarioChange?: (scenario: ScenarioId) => void;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description } = result;
+  
 
   // Use risk_mode from result (backend-computed) as source of truth
 
@@ -223,6 +227,15 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
               <CompoundBadge key={c} compound={c} />
             ))}
           </p>
+        )}
+        {/* Simulated scenario banner */}
+        {scenario_is_simulated && (
+          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
+            <p className="text-[11px] text-amber-400 font-semibold">
+              What-if scenario attivo: {scenario_label}
+            </p>
+          </div>
         )}
       </CardHeader>
 
@@ -316,8 +329,42 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
               <Activity className="h-3.5 w-3.5" /> Race Context
             </h4>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Questa sezione identifica automaticamente la fase della gara in base ai giri rimanenti e permette di selezionare un profilo di rischio. La fase gara e il profilo di rischio influenzano il ranking delle strategie alternative, la scomposizione del giudizio e il verdetto finale del Virtual Race Engineer.
+              Questa sezione identifica automaticamente la fase della gara e permette di selezionare un profilo di rischio e uno scenario what-if. Fase gara, profilo di rischio e scenario influenzano il ranking delle strategie, la scomposizione del giudizio e il verdetto finale.
             </p>
+
+            {/* Scenario selector */}
+            <div className="flex items-start gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0 w-20 pt-2">Scenario:</span>
+              <div className="flex-1 space-y-1">
+                <Select
+                  value={scenario_id}
+                  onValueChange={(val) => onScenarioChange?.(val as ScenarioId)}
+                >
+                  <SelectTrigger className="h-8 text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_SCENARIO_IDS.map((sid) => {
+                      const def = SCENARIO_DEFINITIONS[sid];
+                      return (
+                        <SelectItem key={sid} value={sid} className="text-[11px]">
+                          <span className="flex items-center gap-1.5">
+                            {isSimulatedScenario(sid) && <FlaskConical className="h-3 w-3 text-amber-400" />}
+                            {def.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
+                {scenario_is_simulated && (
+                  <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                    <FlaskConical className="h-3 w-3" /> Scenario simulato — i risultati riflettono modificatori ipottetici, non dati reali alterati
+                  </p>
+                )}
+              </div>
+            </div>
 
             {/* Phase indicator */}
             <div className="flex items-start gap-2">
@@ -639,10 +686,23 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
             </h4>
             <p className="text-[10px] text-muted-foreground mb-2">
               Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
+              Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
               {risk_mode !== "BALANCED" && (
                 <span className="font-semibold"> Pesi aggiustati per profilo {RISK_MODES[risk_mode].label}.</span>
               )}
+              {scenario_is_simulated && (
+                <span className="font-semibold text-amber-400"> Scenario: {scenario_label}.</span>
+              )}
             </p>
+            {scenario_is_simulated && Object.keys(result.scenario_modifiers_applied).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {Object.entries(result.scenario_modifiers_applied).map(([key, val]) => (
+                  <span key={key} className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {key.replace(/_/g, " ")}: {typeof val === "number" ? val.toFixed(2) : val}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
                 <thead>
