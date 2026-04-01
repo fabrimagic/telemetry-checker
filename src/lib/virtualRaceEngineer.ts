@@ -154,6 +154,7 @@ export function computeVirtualRaceEngineer(
   positions: PositionData[],
   allDrivers: Driver[],
   practiceModels: PracticeCompoundModel[] = [],
+  riskMode: RiskMode = "BALANCED",
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
