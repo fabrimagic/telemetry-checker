@@ -342,7 +342,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null);
   }, []);
 
   // Select lap for a driver
