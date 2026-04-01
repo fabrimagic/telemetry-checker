@@ -207,32 +207,47 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   }, [stints]);
 
   const positionChartData = useMemo(() => {
-    if (!positions.length || !results.length) return [];
-    const allDates = [...new Set(positions.map((p) => p.date))].sort();
-    const maxPoints = 200;
-    const step = Math.max(1, Math.floor(allDates.length / maxPoints));
-    const sampledDates = allDates.filter((_, i) => i % step === 0 || i === allDates.length - 1);
+    if (!positions.length || !results.length || !allLaps.length) return [];
     const driverNums = results.map((r) => r.driver_number);
+
+    // Build driver laps map for timestamp-to-lap correlation
+    const driverLapsMap = new Map<number, Lap[]>();
+    for (const lap of allLaps) {
+      if (!lap.date_start) continue;
+      if (!driverLapsMap.has(lap.driver_number)) driverLapsMap.set(lap.driver_number, []);
+      driverLapsMap.get(lap.driver_number)!.push(lap);
+    }
+    for (const [, laps] of driverLapsMap) {
+      laps.sort((a, b) => a.lap_number - b.lap_number);
+    }
+
+    // For each position entry, find its lap number and keep last position per driver per lap
+    const lapPositions = new Map<number, Map<number, number>>(); // lap -> driver -> position
+    for (const p of positions) {
+      // Find lap for this driver at this timestamp
+      const dLaps = driverLapsMap.get(p.driver_number);
+      if (!dLaps?.length) continue;
+      let matchedLap: number | null = null;
+      for (let i = dLaps.length - 1; i >= 0; i--) {
+        if (dLaps[i].date_start! <= p.date) { matchedLap = dLaps[i].lap_number; break; }
+      }
+      if (matchedLap == null) continue;
+      if (!lapPositions.has(matchedLap)) lapPositions.set(matchedLap, new Map());
+      lapPositions.get(matchedLap)!.set(p.driver_number, p.position);
+    }
+
+    const lapNumbers = [...lapPositions.keys()].sort((a, b) => a - b);
     const data: Record<string, any>[] = [];
-    const currentPos = new Map<number, number>();
-    let sampleIdx = 0;
-    for (const date of allDates) {
-      const atDate = positions.filter((p) => p.date === date);
-      for (const p of atDate) {
-        currentPos.set(p.driver_number, p.position);
+    for (const lap of lapNumbers) {
+      const point: Record<string, any> = { lap };
+      const posMap = lapPositions.get(lap)!;
+      for (const num of driverNums) {
+        if (posMap.has(num)) point[`d${num}`] = posMap.get(num);
       }
-      if (date === sampledDates[sampleIdx]) {
-        const point: Record<string, any> = { idx: sampleIdx + 1 };
-        for (const num of driverNums) {
-          if (currentPos.has(num)) {
-            point[`d${num}`] = currentPos.get(num);
-          }
-        }
-        data.push(point);
-        sampleIdx++;
-      }
+      if (Object.keys(point).length > 1) data.push(point);
     }
     return data;
+  }, [positions, results, allLaps]);
   }, [positions, results]);
 
   const positionDrivers = useMemo(() => {
