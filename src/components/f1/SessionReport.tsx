@@ -138,6 +138,12 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             if (cancelled) return;
             setIntervals(ivl);
           } catch { /* optional */ }
+
+          try {
+            const laps = await getAllLaps(sessionKey);
+            if (cancelled) return;
+            setAllLaps(laps);
+          } catch { /* optional */ }
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message);
