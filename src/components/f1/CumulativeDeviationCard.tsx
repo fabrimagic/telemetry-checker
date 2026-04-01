@@ -225,6 +225,9 @@ export function CumulativeDeviationCard({ sessionKey, results, drivers, visibleD
           <p><strong className="text-foreground">Benchmark:</strong> tempo medio del vincitore calcolato escludendo out lap, primo giro, e giri anomali ({">"} 1.5× mediana).</p>
           <p><strong className="text-foreground">Delta giro:</strong> differenza tra il tempo sul giro del pilota e il benchmark del vincitore.</p>
           <p><strong className="text-foreground">Nota:</strong> questa metrica è descrittiva e non rappresenta direttamente il degrado gomme. Giri con pit stop, out lap o tempi anomali sono esclusi dal calcolo.</p>
+          {filteredDriverData.some((d) => d.final_cumulative_delta != null && d.final_cumulative_delta < 0) && (
+            <p><strong className="text-foreground">Valori negativi:</strong> un valore negativo indica che il pilota ha avuto un passo medio sui giri validi più veloce rispetto al benchmark del vincitore. Questo può accadere quando un pilota ha un ritmo puro superiore ma perde la gara per fattori esterni al passo (strategia, pit stop, safety car, incidenti o penalità).</p>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </div>
