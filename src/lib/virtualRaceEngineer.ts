@@ -112,6 +112,7 @@ export interface VirtualRaceEngineerResult {
   scenario_duration_laps: number | null;
   scenario_window: { start: number; end: number } | null;
   scenario_activation_warning: string | null;
+  degradation_validations: DegradationValidationResult[];
 }
 
 /* ── Helpers ── */
