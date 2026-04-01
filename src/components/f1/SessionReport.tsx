@@ -657,6 +657,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   const num = parseInt(name.replace("gap_", ""));
                   return [`${Number(value).toFixed(3)}s`, driverName(num)];
                 }}
+                labelFormatter={(label) => `Lap ${label}`}
               />
               {filteredDrivers.map((num) => (
                 <Line
