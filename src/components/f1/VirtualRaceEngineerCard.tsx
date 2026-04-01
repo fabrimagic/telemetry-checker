@@ -459,6 +459,25 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
               </div>
             </div>
 
+            {/* Risk mode explanation note */}
+            <div className="rounded-md bg-muted/40 border border-border px-3 py-2 text-[10px] text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                {risk_mode === "CONSERVATIVE" && "Conservative: priorità a robustezza e track position"}
+                {risk_mode === "BALANCED" && "Balanced: compromesso equilibrato tra rischio e guadagno"}
+                {risk_mode === "AGGRESSIVE" && "Aggressive: massimizza il guadagno strategico, accetta più rischio"}
+              </p>
+              {risk_mode === "CONSERVATIVE" && (
+                <p>Il degrado gomme e il traffico vengono penalizzati maggiormente (+15% e +30%). Il guadagno potenziale delle strategie alternative è ridotto (−20%). Strategie con bassa confidenza sono penalizzate più severamente (+40%). Favorisce scelte difensive e prevedibili.</p>
+              )}
+              {risk_mode === "BALANCED" && (
+                <p>Tutti i pesi del modello sono applicati senza modifiche. Degrado, traffico, pit loss e guadagno potenziale contribuiscono in modo neutro al ranking delle strategie. È il profilo di riferimento standard.</p>
+              )}
+              {risk_mode === "AGGRESSIVE" && (
+                <p>Il degrado gomme e il traffico sono penalizzati meno (−10% e −30%). Il guadagno potenziale è amplificato (+30%). La penalità per bassa confidenza è ridotta (−40%). Favorisce strategie con alto upside anche se più rischiose.</p>
+              )}
+            </div>
+
             {/* Impact note */}
             {topScoredName && risk_mode !== "BALANCED" && (
               <p className="text-[10px] text-muted-foreground italic">
