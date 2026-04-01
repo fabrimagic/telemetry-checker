@@ -57,6 +57,7 @@ export interface AlternativeStrategy {
   pros: string[];
   cons: string[];
   traffic_predictions?: TrafficPrediction[];
+  breakdown?: StrategyBreakdown;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
