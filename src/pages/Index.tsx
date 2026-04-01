@@ -92,6 +92,7 @@ export default function Index() {
   const [loadingVre, setLoadingVre] = useState(false);
   const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
   const [vreScenario, setVreScenario] = useState<import("@/lib/scenarioContext").ScenarioId>("REAL_CONTEXT");
+  const [vreScenarioLap, setVreScenarioLap] = useState<number | null>(null);
   const vreArgsRef = useRef<{
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
