@@ -383,6 +383,29 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                       />
                       <span className="text-[9px] text-muted-foreground">(vuoto = intera gara)</span>
                     </div>
+                    {/* Duration input */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Durata (giri):</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
+                        value={scenarioDurationLaps ?? ""}
+                        placeholder="Intera gara"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onScenarioDurationChange?.(val === "" ? null : parseInt(val, 10));
+                        }}
+                        className="h-7 w-20 text-[11px] font-mono"
+                      />
+                      <span className="text-[9px] text-muted-foreground">(vuoto = fino a fine gara)</span>
+                    </div>
+                    {/* Scenario window summary */}
+                    {scenario_window && (
+                      <p className="text-[10px] text-foreground/70 font-mono mt-0.5">
+                        📌 Finestra attiva: giro {scenario_window.start} → giro {scenario_window.end}
+                      </p>
+                    )}
                     {scenario_activation_warning && (
                       <p className="text-[10px] text-amber-400 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
