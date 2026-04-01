@@ -119,12 +119,13 @@ function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; rec
 
 interface Props {
   result: VirtualRaceEngineerResult;
+  onRiskModeChange?: (mode: RiskMode) => void;
 }
 
-export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode } = result;
 
-  const [riskMode, setRiskMode] = useState<RiskMode>("BALANCED");
+  // Use risk_mode from result (backend-computed) as source of truth
 
   // Determine which breakdown to show (recommended if available, otherwise actual)
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
