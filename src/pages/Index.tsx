@@ -751,7 +751,7 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} onRiskModeChange={(mode) => {
+                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} onRiskModeChange={(mode) => {
                     setVreRiskMode(mode);
                     const args = vreArgsRef.current;
                     if (args) {
@@ -760,13 +760,14 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration,
                       );
                       setVreResult(newVre);
                     }
                   }} onScenarioChange={(scenario) => {
                     setVreScenario(scenario);
-                    if (scenario === "REAL_CONTEXT") setVreScenarioLap(null);
+                    const isReal = scenario === "REAL_CONTEXT";
+                    if (isReal) { setVreScenarioLap(null); setVreScenarioDuration(null); }
                     const args = vreArgsRef.current;
                     if (args) {
                       const newVre = computeVirtualRaceEngineer(
@@ -774,7 +775,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, scenario, scenario === "REAL_CONTEXT" ? null : vreScenarioLap,
+                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration,
                       );
                       setVreResult(newVre);
                     }
@@ -787,7 +788,20 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, lap,
+                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} onScenarioDurationChange={(duration) => {
+                    setVreScenarioDuration(duration);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration,
                       );
                       setVreResult(newVre);
                     }
