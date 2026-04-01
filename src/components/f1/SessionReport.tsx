@@ -383,15 +383,25 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         if (vals?.gap != null) point[`gap_${num}`] = vals.gap;
         if (vals?.ivl != null) point[`ivl_${num}`] = vals.ivl;
         // Determine car ahead driver from position data
-        if (posMap) {
-          // Find this driver's position on this lap
+        // Try current lap, then nearby laps as fallback
+        let aheadFound = false;
+        const lapsToTry = [lap, lap - 1, lap + 1];
+        for (const tryLap of lapsToTry) {
+          const posMap = positionByLap.get(tryLap);
+          if (!posMap) continue;
           let driverPos: number | null = null;
           for (const [pos, dNum] of posMap) {
             if (dNum === num) { driverPos = pos; break; }
           }
-          if (driverPos != null && driverPos > 1) {
-            const aheadNum = posMap.get(driverPos - 1);
-            if (aheadNum != null) point[`ahead_${num}`] = aheadNum;
+          if (driverPos != null) {
+            if (driverPos === 1) {
+              point[`ahead_${num}`] = -1; // sentinel for "Leader"
+            } else {
+              const aheadNum = posMap.get(driverPos - 1);
+              if (aheadNum != null) point[`ahead_${num}`] = aheadNum;
+            }
+            aheadFound = true;
+            break;
           }
         }
       }
