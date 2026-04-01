@@ -272,11 +272,17 @@ export default function Index() {
               } catch { /* optional */ }
             }
 
+            vreArgsRef.current = {
+              driverNumber, driverAcronym: driver.name_acronym, sessionKey,
+              laps, stints: driverStints, pits: pitsForVre,
+              weather: sessionWeather, raceControl: raceControlMessages,
+              intervals: ivls, positions: pos, allDrivers, practiceModels,
+            };
             const vre = computeVirtualRaceEngineer(
               driverNumber, driver.name_acronym, sessionKey,
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
-              ivls, pos, allDrivers, practiceModels,
+              ivls, pos, allDrivers, practiceModels, vreRiskMode,
             );
             setVreResult(vre);
           } catch { /* optional */ }
