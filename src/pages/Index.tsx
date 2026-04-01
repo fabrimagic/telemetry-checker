@@ -86,6 +86,12 @@ export default function Index() {
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [loadingVre, setLoadingVre] = useState(false);
+  const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
+  const vreArgsRef = useRef<{
+    driverNumber: number; driverAcronym: string; sessionKey: number;
+    laps: any; stints: any; pits: any; weather: any; raceControl: any;
+    intervals: any; positions: any; allDrivers: any; practiceModels: any;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
