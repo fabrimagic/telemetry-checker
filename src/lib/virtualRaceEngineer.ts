@@ -683,6 +683,20 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
   }
 
+  // ── 8. Race Phase Detection ──
+  const lastLap = Math.max(...laps.map(l => l.lap_number));
+  const pitWindowStartLap = recommendedWindows.length > 0
+    ? recommendedWindows[0].range[0]
+    : actualPitLaps.length > 0 ? actualPitLaps[0] - 3 : null;
+  const pitWindowEndLap = recommendedWindows.length > 0
+    ? recommendedWindows[recommendedWindows.length - 1].range[1]
+    : actualPitLaps.length > 0 ? actualPitLaps[actualPitLaps.length - 1] + 3 : null;
+
+  const racePhase = detectRacePhase(
+    lastLap, totalLaps, pitWindowStartLap, pitWindowEndLap,
+    actualPitLaps.length > 0, weatherMap, trackStatusMap,
+  );
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
@@ -698,5 +712,6 @@ export function computeVirtualRaceEngineer(
     practice_compounds_used: practiceCompoundsUsed,
     traffic_analysis: trafficAnalysis,
     actual_breakdown: actualBreakdown,
+    race_phase: racePhase,
   };
 }
