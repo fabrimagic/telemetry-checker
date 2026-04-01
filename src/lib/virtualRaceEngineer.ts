@@ -107,6 +107,8 @@ export interface VirtualRaceEngineerResult {
   scenario_label: string;
   scenario_description: string;
   scenario_modifiers_applied: Record<string, number>;
+  scenario_activation_lap: number | null;
+  scenario_activation_warning: string | null;
 }
 
 /* ── Helpers ── */
