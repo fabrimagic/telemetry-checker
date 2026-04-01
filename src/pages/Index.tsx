@@ -582,11 +582,19 @@ export default function Index() {
   const degradationResults = useMemo(() => {
     const validTypes = ["Race", "Sprint", "Practice"];
     if (!validTypes.some((t) => sessionType.includes(t))) return [];
+    const isRaceOrSprint = sessionType === "Race" || sessionType === "Sprint";
+    const totalLaps = isRaceOrSprint
+      ? Math.max(0, ...selectedDriverNumbers.flatMap(num => {
+          const state = driverStates.get(num);
+          return state ? state.laps.map(l => l.lap_number) : [];
+        }))
+      : 0;
+
     return selectedDriverNumbers.flatMap((num) => {
       const state = driverStates.get(num);
       if (!state) return [];
 
-      // For Practice: use only long-run laps
+      // For Practice: use only long-run laps (simple model)
       if (sessionType.includes("Practice")) {
         const driverLongRuns = longRunResults.filter((lr) => lr.driverNumber === num);
         const { filteredLaps, virtualStints } = longRunToStintsAndLaps(
@@ -604,6 +612,19 @@ export default function Index() {
         );
       }
 
+      // For Race/Sprint: use corrected multivariate model
+      if (isRaceOrSprint && sessionWeather.length > 0) {
+        return calculateCorrectedTyreDegradation(
+          num,
+          state.driver.name_acronym,
+          getColor(num),
+          state.laps,
+          state.stints,
+          sessionWeather,
+          totalLaps,
+        );
+      }
+
       return calculateTyreDegradation(
         num,
         state.driver.name_acronym,
@@ -612,7 +633,7 @@ export default function Index() {
         state.stints
       );
     });
-  }, [selectedDriverNumbers, driverStates, sessionType, getColor, longRunResults]);
+  }, [selectedDriverNumbers, driverStates, sessionType, getColor, longRunResults, sessionWeather]);
 
   return (
     <div className="min-h-screen bg-background">
