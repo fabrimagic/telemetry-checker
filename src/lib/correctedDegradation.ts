@@ -1,15 +1,15 @@
 /**
- * Corrected Tyre Degradation Module
+ * Corrected Tyre Degradation Module — Two-Stage Model
  *
- * Replaces the simple lap_time ~ tyre_life regression with a multivariate model:
- *   lap_time = b + a1*tyre_life + a2*fuel_proxy + a3*track_temp + a4*air_temp
+ * Stage A: Estimate non-tyre effects (fuel proxy, track temp, air temp)
+ *          using centered variables, then compute residual lap times.
+ * Stage B: Regress residual lap times on tyre_life to isolate degradation.
  *
- * The strategic degradation coefficient is a1 (tyre_life), isolated from
- * fuel effect, track temperature, and air temperature.
+ * This avoids multicollinearity issues from fitting all variables simultaneously
+ * on short stints, which produced absurd coefficients (e.g. -17 s/lap).
  *
  * IMPORTANT:
  * - fuel_proxy is NOT real fuel load (OpenF1 does not expose it).
- *   It is a proxy representing progressive car lightening.
  * - Temperature corrections use nearest-timestamp matching from OpenF1 weather.
  * - The corrected slope is a better estimate but NOT a perfect team-grade measure.
  */
@@ -24,16 +24,22 @@ import type { TrackStatus } from "./trackStatusClassification";
 export interface CorrectedDegradationConfig {
   /** Fuel proxy type */
   fuel_proxy_type: "laps_remaining" | "lap_number";
-  /** Minimum laps for multivariate regression */
+  /** Minimum laps for simple model */
   min_laps: number;
+  /** Minimum laps for corrected multivariate model (higher than simple) */
+  min_laps_corrected: number;
   /** Outlier threshold: exclude laps > median * (1 + threshold) */
   outlier_threshold: number;
+  /** Maximum plausible degradation slope (s/lap) — above this, result is suspect */
+  max_plausible_slope: number;
 }
 
 export const DEFAULT_CORRECTED_CONFIG: CorrectedDegradationConfig = {
   fuel_proxy_type: "laps_remaining",
   min_laps: 4,
+  min_laps_corrected: 8,
   outlier_threshold: 0.07,
+  max_plausible_slope: 0.30,
 };
 
 /* ── Types ── */
@@ -46,10 +52,10 @@ export interface LapWeatherData {
 
 export interface CorrectedDegradationResult extends DegradationResult {
   /** Model type identifier */
-  model_type: "corrected_multivariate" | "simple_fallback";
+  model_type: "corrected_two_stage" | "corrected_fuel_only" | "simple_fallback";
   /** Raw slope from simple tyre_life-only regression */
   slope_raw: number;
-  /** Corrected slope: coefficient of tyre_life in multivariate model */
+  /** Corrected slope: coefficient of tyre_life on residualized lap times */
   slope_corrected: number;
   /** Fuel proxy type used */
   fuel_proxy_type: string;
@@ -63,16 +69,14 @@ export interface CorrectedDegradationResult extends DegradationResult {
     track_temp: number | null;
     air_temp: number | null;
   };
-  /** R² of the corrected model */
+  /** R² of the corrected model (stage B) */
   r_squared_corrected: number;
+  /** R² of stage A (non-tyre effect removal) */
+  r_squared_stage_a: number | null;
 }
 
 /* ── Weather association ── */
 
-/**
- * Associate weather data to each lap by nearest timestamp.
- * Does NOT invent data — returns null if no weather available.
- */
 export function associateWeatherToLaps(
   laps: Lap[],
   weather: WeatherData[],
@@ -90,7 +94,6 @@ export function associateWeatherToLaps(
     }
 
     const lapTime = new Date(lap.date_start).getTime();
-    // Find nearest weather record
     let bestIdx = 0;
     let bestDist = Math.abs(weatherTimes[0] - lapTime);
     for (let i = 1; i < weatherTimes.length; i++) {
@@ -98,7 +101,6 @@ export function associateWeatherToLaps(
       if (dist < bestDist) { bestDist = dist; bestIdx = i; }
     }
 
-    // Only use if within 5 minutes (300s)
     if (bestDist > 300_000) {
       result.set(lap.lap_number, { lap_number: lap.lap_number, track_temperature: null, air_temperature: null });
     } else {
@@ -121,85 +123,10 @@ export function buildFuelProxy(
   type: CorrectedDegradationConfig["fuel_proxy_type"],
 ): number {
   if (type === "laps_remaining") return totalLaps - lapNumber;
-  return lapNumber; // lap_number proxy
+  return lapNumber;
 }
 
-/* ── Multivariate OLS regression ── */
-
-/**
- * Ordinary Least Squares for y = b0 + b1*x1 + b2*x2 + ... + bk*xk
- * Uses normal equations: b = (X'X)^-1 X'y
- * Returns coefficients array [b0, b1, ..., bk] and R²
- */
-function multivariateOLS(
-  X: number[][], // each row is [x1, x2, ..., xk] (NO intercept column)
-  y: number[],
-): { coefficients: number[]; rSquared: number } | null {
-  const n = X.length;
-  if (n < 2) return null;
-  const k = X[0].length;
-  if (n <= k + 1) return null; // need more observations than parameters
-
-  // Augment X with intercept column: [1, x1, x2, ..., xk]
-  const p = k + 1;
-  const Xa: number[][] = X.map(row => [1, ...row]);
-
-  // Compute X'X (p x p)
-  const XtX: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
-  for (let i = 0; i < p; i++) {
-    for (let j = 0; j < p; j++) {
-      let sum = 0;
-      for (let r = 0; r < n; r++) sum += Xa[r][i] * Xa[r][j];
-      XtX[i][j] = sum;
-    }
-  }
-
-  // Compute X'y (p x 1)
-  const Xty: number[] = new Array(p).fill(0);
-  for (let i = 0; i < p; i++) {
-    let sum = 0;
-    for (let r = 0; r < n; r++) sum += Xa[r][i] * y[r];
-    Xty[i] = sum;
-  }
-
-  // Solve XtX * b = Xty using Gaussian elimination with partial pivoting
-  const aug: number[][] = XtX.map((row, i) => [...row, Xty[i]]);
-
-  for (let col = 0; col < p; col++) {
-    // Partial pivoting
-    let maxRow = col;
-    let maxVal = Math.abs(aug[col][col]);
-    for (let row = col + 1; row < p; row++) {
-      if (Math.abs(aug[row][col]) > maxVal) { maxVal = Math.abs(aug[row][col]); maxRow = row; }
-    }
-    if (maxVal < 1e-12) return null; // singular
-    if (maxRow !== col) [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
-
-    // Eliminate
-    for (let row = 0; row < p; row++) {
-      if (row === col) continue;
-      const factor = aug[row][col] / aug[col][col];
-      for (let j = col; j <= p; j++) aug[row][j] -= factor * aug[col][j];
-    }
-  }
-
-  const coefficients = aug.map((row, i) => row[p] / row[i]);
-
-  // R²
-  const meanY = y.reduce((a, b) => a + b, 0) / n;
-  let ssTot = 0, ssRes = 0;
-  for (let r = 0; r < n; r++) {
-    let yPred = 0;
-    for (let j = 0; j < p; j++) yPred += coefficients[j] * Xa[r][j];
-    ssTot += (y[r] - meanY) ** 2;
-    ssRes += (y[r] - yPred) ** 2;
-  }
-  const rSquared = ssTot === 0 ? 0 : Math.max(0, 1 - ssRes / ssTot);
-
-  return { coefficients, rSquared };
-}
-
-/* ── Simple linear regression (fallback) ── */
+/* ── Simple linear regression ── */
 
 function simpleLinearRegression(xs: number[], ys: number[]): { slope: number; intercept: number; rSquared: number } | null {
   const n = xs.length;
@@ -220,6 +147,180 @@ function simpleLinearRegression(xs: number[], ys: number[]): { slope: number; in
   }
   const rSquared = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
   return { slope, intercept, rSquared };
+}
+
+/* ── Multivariate OLS (for Stage A: non-tyre features only) ── */
+
+function multivariateOLS(
+  X: number[][], // each row is [x1, x2, ..., xk] (NO intercept column)
+  y: number[],
+): { coefficients: number[]; rSquared: number; residuals: number[] } | null {
+  const n = X.length;
+  if (n < 2) return null;
+  const k = X[0].length;
+  if (n <= k + 1) return null;
+
+  const p = k + 1;
+  const Xa: number[][] = X.map(row => [1, ...row]);
+
+  const XtX: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
+  for (let i = 0; i < p; i++) {
+    for (let j = 0; j < p; j++) {
+      let sum = 0;
+      for (let r = 0; r < n; r++) sum += Xa[r][i] * Xa[r][j];
+      XtX[i][j] = sum;
+    }
+  }
+
+  const Xty: number[] = new Array(p).fill(0);
+  for (let i = 0; i < p; i++) {
+    let sum = 0;
+    for (let r = 0; r < n; r++) sum += Xa[r][i] * y[r];
+    Xty[i] = sum;
+  }
+
+  const aug: number[][] = XtX.map((row, i) => [...row, Xty[i]]);
+  for (let col = 0; col < p; col++) {
+    let maxRow = col;
+    let maxVal = Math.abs(aug[col][col]);
+    for (let row = col + 1; row < p; row++) {
+      if (Math.abs(aug[row][col]) > maxVal) { maxVal = Math.abs(aug[row][col]); maxRow = row; }
+    }
+    if (maxVal < 1e-12) return null;
+    if (maxRow !== col) [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
+    for (let row = 0; row < p; row++) {
+      if (row === col) continue;
+      const factor = aug[row][col] / aug[col][col];
+      for (let j = col; j <= p; j++) aug[row][j] -= factor * aug[col][j];
+    }
+  }
+
+  const coefficients = aug.map((row, i) => row[p] / row[i]);
+
+  const meanY = y.reduce((a, b) => a + b, 0) / n;
+  let ssTot = 0, ssRes = 0;
+  const residuals: number[] = [];
+  for (let r = 0; r < n; r++) {
+    let yPred = 0;
+    for (let j = 0; j < p; j++) yPred += coefficients[j] * Xa[r][j];
+    const res = y[r] - yPred;
+    residuals.push(res);
+    ssTot += (y[r] - meanY) ** 2;
+    ssRes += res ** 2;
+  }
+  const rSquared = ssTot === 0 ? 0 : Math.max(0, 1 - ssRes / ssTot);
+
+  return { coefficients, rSquared, residuals };
+}
+
+/* ── Utility ── */
+
+function mean(arr: number[]): number {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function std(arr: number[]): number {
+  if (arr.length < 2) return 0;
+  const m = mean(arr);
+  const variance = arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1);
+  return Math.sqrt(variance);
+}
+
+/* ── Two-Stage Corrected Degradation ── */
+
+/**
+ * Stage A: Remove non-tyre effects from lap times.
+ * Regresses lap_time on centered fuel_proxy [+ centered temps],
+ * returns residuals (lap_time minus predicted non-tyre contribution).
+ *
+ * Stage B: Regress residuals on tyre_life to get corrected degradation.
+ */
+function twoStageDegradation(
+  tyreLifes: number[],
+  fuelProxies: number[],
+  trackTemps: number[] | null,
+  airTemps: number[] | null,
+  lapTimes: number[],
+): {
+  slope_corrected: number;
+  r_squared_stage_a: number;
+  r_squared_stage_b: number;
+  model_type: CorrectedDegradationResult["model_type"];
+  coefficients: CorrectedDegradationResult["coefficients"];
+  weather_used: boolean;
+} | null {
+  const n = lapTimes.length;
+  if (n < 4) return null;
+
+  // Center non-tyre features for numerical stability
+  const fuelMean = mean(fuelProxies);
+  const fuelCentered = fuelProxies.map(f => f - fuelMean);
+
+  const hasWeather = trackTemps != null && airTemps != null && trackTemps.length === n;
+  let trackCentered: number[] | null = null;
+  let airCentered: number[] | null = null;
+
+  if (hasWeather) {
+    const trackMean = mean(trackTemps!);
+    const airMean = mean(airTemps!);
+    const trackStd = std(trackTemps!);
+    const airStd = std(airTemps!);
+    // Only include temps if there's meaningful variance
+    if (trackStd > 0.3 || airStd > 0.3) {
+      trackCentered = trackTemps!.map(t => t - trackMean);
+      airCentered = airTemps!.map(t => t - airMean);
+    }
+  }
+
+  // Stage A: Regress lap_time on non-tyre features (centered)
+  let stageAResult: { coefficients: number[]; rSquared: number; residuals: number[] } | null = null;
+  let weatherUsed = false;
+  let modelType: CorrectedDegradationResult["model_type"] = "corrected_fuel_only";
+
+  if (trackCentered && airCentered && n > 4) {
+    // Try fuel + track_temp + air_temp
+    const X = fuelCentered.map((f, i) => [f, trackCentered![i], airCentered![i]]);
+    stageAResult = multivariateOLS(X, lapTimes);
+    if (stageAResult) {
+      weatherUsed = true;
+      modelType = "corrected_two_stage";
+    }
+  }
+
+  if (!stageAResult && n > 2) {
+    // Fallback: fuel proxy only
+    const X = fuelCentered.map(f => [f]);
+    stageAResult = multivariateOLS(X, lapTimes);
+    if (stageAResult) {
+      modelType = "corrected_fuel_only";
+    }
+  }
+
+  if (!stageAResult) return null;
+
+  // Stage B: Regress residuals on tyre_life
+  const residuals = stageAResult.residuals;
+  const stageBResult = simpleLinearRegression(tyreLifes, residuals);
+  if (!stageBResult) return null;
+
+  // Build coefficient summary
+  const stageACoeffs = stageAResult.coefficients;
+  const coefficients: CorrectedDegradationResult["coefficients"] = {
+    intercept: stageBResult.intercept + stageACoeffs[0],
+    tyre_life: stageBResult.slope,
+    fuel_proxy: stageACoeffs[1],
+    track_temp: weatherUsed ? (stageACoeffs[2] ?? null) : null,
+    air_temp: weatherUsed ? (stageACoeffs[3] ?? null) : null,
+  };
+
+  return {
+    slope_corrected: stageBResult.slope,
+    r_squared_stage_a: stageAResult.rSquared,
+    r_squared_stage_b: stageBResult.rSquared,
+    model_type: modelType,
+    coefficients,
+    weather_used: weatherUsed,
+  };
 }
 
 /* ── Main corrected degradation calculation ── */
@@ -250,13 +351,13 @@ export function calculateCorrectedTyreDegradation(
       return true;
     });
 
-    // Exclude in-lap (last lap of non-final stint)
+    // Exclude in-lap
     const isLastStint = stint.lap_end === Math.max(...stints.map(s => s.lap_end));
     const withoutInLap = stintLaps.filter(l =>
       isLastStint || l.lap_number !== stint.lap_end
     );
 
-    // Exclude wet/mixed laps if classification available
+    // Exclude wet/mixed laps
     let filteredLaps = withoutInLap;
     if (weatherMap) {
       filteredLaps = filteredLaps.filter(l => {
@@ -265,7 +366,7 @@ export function calculateCorrectedTyreDegradation(
       });
     }
 
-    // Exclude neutralised laps if classification available
+    // Exclude neutralised laps
     if (trackStatusMap) {
       filteredLaps = filteredLaps.filter(l => {
         const ts = trackStatusMap.get(l.lap_number);
@@ -275,7 +376,7 @@ export function calculateCorrectedTyreDegradation(
 
     if (filteredLaps.length < config.min_laps) continue;
 
-    // Outlier removal: exclude laps > median * (1 + threshold)
+    // Outlier removal
     const durations = filteredLaps.map(l => l.lap_duration!).sort((a, b) => a - b);
     const med = durations[Math.floor(durations.length / 2)];
     const threshold = med * (1 + config.outlier_threshold);
@@ -290,7 +391,7 @@ export function calculateCorrectedTyreDegradation(
     const airTemps: number[] = [];
     const lapTimes: number[] = [];
     const points: { tyreLife: number; lapTime: number }[] = [];
-    let hasWeather = true;
+    let weatherComplete = true;
 
     for (const l of validLaps) {
       const tyreLife = (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start);
@@ -306,25 +407,20 @@ export function calculateCorrectedTyreDegradation(
         trackTemps.push(wData.track_temperature);
         airTemps.push(wData.air_temperature);
       } else {
-        hasWeather = false;
+        weatherComplete = false;
       }
     }
 
-    // Simple regression for raw slope
+    // Simple regression for raw slope (always computed)
     const rawReg = simpleLinearRegression(tyreLifes, lapTimes);
     if (!rawReg) continue;
 
-    // Check variance in features (need variation for multivariate to make sense)
-    const fuelStd = std(fuelProxies);
-    const hasFuelVariance = fuelStd > 0.5;
-    const trackTempStd = hasWeather ? std(trackTemps) : 0;
-    const airTempStd = hasWeather ? std(airTemps) : 0;
-    const hasTempVariance = trackTempStd > 0.3 || airTempStd > 0.3;
-
-    // Build multivariate model
+    // Attempt two-stage corrected model if enough laps
     let modelType: CorrectedDegradationResult["model_type"] = "simple_fallback";
     let slopeCorrected = rawReg.slope;
     let rSquaredCorrected = rawReg.rSquared;
+    let rSquaredStageA: number | null = null;
+    let weatherCorrectionUsed = false;
     let coefficients: CorrectedDegradationResult["coefficients"] = {
       intercept: rawReg.intercept,
       tyre_life: rawReg.slope,
@@ -332,90 +428,79 @@ export function calculateCorrectedTyreDegradation(
       track_temp: null,
       air_temp: null,
     };
-    let weatherCorrectionUsed = false;
 
-    // Try multivariate: tyre_life + fuel_proxy [+ temps]
-    if (hasFuelVariance && validLaps.length >= config.min_laps + 1) {
-      let X: number[][];
-      if (hasWeather && hasTempVariance && trackTemps.length === validLaps.length) {
-        // Full model: tyre_life, fuel_proxy, track_temp, air_temp
-        X = validLaps.map((_, i) => [tyreLifes[i], fuelProxies[i], trackTemps[i], airTemps[i]]);
-        if (X.length > 5) { // Need enough data points for 5 params
-          const mvResult = multivariateOLS(X, lapTimes);
-          if (mvResult) {
-            modelType = "corrected_multivariate";
-            slopeCorrected = mvResult.coefficients[1]; // tyre_life coefficient
-            rSquaredCorrected = mvResult.rSquared;
-            coefficients = {
-              intercept: mvResult.coefficients[0],
-              tyre_life: mvResult.coefficients[1],
-              fuel_proxy: mvResult.coefficients[2],
-              track_temp: mvResult.coefficients[3],
-              air_temp: mvResult.coefficients[4],
-            };
-            weatherCorrectionUsed = true;
-          }
+    // Only attempt corrected model if we have enough laps
+    const fuelStd = std(fuelProxies);
+    const hasFuelVariance = fuelStd > 0.5;
+
+    if (hasFuelVariance && validLaps.length >= config.min_laps_corrected) {
+      const twoStage = twoStageDegradation(
+        tyreLifes,
+        fuelProxies,
+        weatherComplete ? trackTemps : null,
+        weatherComplete ? airTemps : null,
+        lapTimes,
+      );
+
+      if (twoStage) {
+        // Plausibility check: reject absurd coefficients
+        if (Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
+          modelType = twoStage.model_type;
+          slopeCorrected = twoStage.slope_corrected;
+          rSquaredCorrected = twoStage.r_squared_stage_b;
+          rSquaredStageA = twoStage.r_squared_stage_a;
+          weatherCorrectionUsed = twoStage.weather_used;
+          coefficients = twoStage.coefficients;
         }
+        // If implausible, we silently fall back to simple model (already set as default)
       }
+    } else if (hasFuelVariance && validLaps.length >= config.min_laps + 1) {
+      // Not enough for full corrected model, but try fuel-only two-stage
+      const twoStage = twoStageDegradation(
+        tyreLifes,
+        fuelProxies,
+        null, null,
+        lapTimes,
+      );
 
-      if (modelType === "simple_fallback") {
-        // Fallback: tyre_life + fuel_proxy only
-        X = validLaps.map((_, i) => [tyreLifes[i], fuelProxies[i]]);
-        if (X.length > 3) {
-          const mvResult = multivariateOLS(X, lapTimes);
-          if (mvResult) {
-            modelType = "corrected_multivariate";
-            slopeCorrected = mvResult.coefficients[1]; // tyre_life coefficient
-            rSquaredCorrected = mvResult.rSquared;
-            coefficients = {
-              intercept: mvResult.coefficients[0],
-              tyre_life: mvResult.coefficients[1],
-              fuel_proxy: mvResult.coefficients[2],
-              track_temp: null,
-              air_temp: null,
-            };
-          }
-        }
+      if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
+        modelType = twoStage.model_type;
+        slopeCorrected = twoStage.slope_corrected;
+        rSquaredCorrected = twoStage.r_squared_stage_b;
+        rSquaredStageA = twoStage.r_squared_stage_a;
+        coefficients = twoStage.coefficients;
       }
     }
 
+    const round3 = (v: number) => Math.round(v * 1000) / 1000;
+
     results.push({
-      // Base DegradationResult fields
       driverNumber,
       acronym,
       color,
       stint: stint.stint_number,
       compound: stint.compound,
       lapsUsed: validLaps.length,
-      slopeSecPerLap: Math.round(slopeCorrected * 1000) / 1000,
-      intercept: Math.round(coefficients.intercept * 1000) / 1000,
-      rSquared: Math.round(rSquaredCorrected * 1000) / 1000,
+      slopeSecPerLap: round3(slopeCorrected),
+      intercept: round3(coefficients.intercept),
+      rSquared: round3(rSquaredCorrected),
       points,
-      // Corrected-specific fields
       model_type: modelType,
-      slope_raw: Math.round(rawReg.slope * 1000) / 1000,
-      slope_corrected: Math.round(slopeCorrected * 1000) / 1000,
+      slope_raw: round3(rawReg.slope),
+      slope_corrected: round3(slopeCorrected),
       fuel_proxy_type: config.fuel_proxy_type,
       weather_correction_used: weatherCorrectionUsed,
       coefficients: {
-        intercept: Math.round(coefficients.intercept * 1000) / 1000,
-        tyre_life: Math.round(coefficients.tyre_life * 1000) / 1000,
-        fuel_proxy: Math.round(coefficients.fuel_proxy * 1000) / 1000,
-        track_temp: coefficients.track_temp != null ? Math.round(coefficients.track_temp * 1000) / 1000 : null,
-        air_temp: coefficients.air_temp != null ? Math.round(coefficients.air_temp * 1000) / 1000 : null,
+        intercept: round3(coefficients.intercept),
+        tyre_life: round3(coefficients.tyre_life),
+        fuel_proxy: round3(coefficients.fuel_proxy),
+        track_temp: coefficients.track_temp != null ? round3(coefficients.track_temp) : null,
+        air_temp: coefficients.air_temp != null ? round3(coefficients.air_temp) : null,
       },
-      r_squared_corrected: Math.round(rSquaredCorrected * 1000) / 1000,
+      r_squared_corrected: round3(rSquaredCorrected),
+      r_squared_stage_a: rSquaredStageA != null ? round3(rSquaredStageA) : null,
     });
   }
 
   return results;
-}
-
-/* ── Utility ── */
-
-function std(arr: number[]): number {
-  if (arr.length < 2) return 0;
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const variance = arr.reduce((s, v) => s + (v - mean) ** 2, 0) / (arr.length - 1);
-  return Math.sqrt(variance);
 }
