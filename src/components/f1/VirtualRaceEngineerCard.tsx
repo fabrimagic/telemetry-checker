@@ -525,9 +525,10 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                   <th className="text-left py-1.5 pr-2">Compound</th>
                   <th className="text-right py-1.5 pr-2">Giri</th>
                   <th className="text-right py-1.5 pr-2">Media</th>
-                  <th className="text-right py-1.5 pr-2">Degrado</th>
+                  <th className="text-right py-1.5 pr-2">Grezzo</th>
+                  <th className="text-right py-1.5 pr-2">Corretto</th>
                   <th className="text-right py-1.5 pr-2">R²</th>
-                  <th className="text-center py-1.5">Validazione</th>
+                  <th className="text-center py-1.5">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -544,14 +545,27 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                     <td className="py-1.5 pr-2"><CompoundBadge compound={s.compound} /></td>
                     <td className="py-1.5 pr-2 text-right font-mono">{s.laps_count}</td>
                     <td className="py-1.5 pr-2 text-right font-mono">{s.avg_lap_time ? s.avg_lap_time.toFixed(3) + "s" : "—"}</td>
-                    <td className="py-1.5 pr-2 text-right font-mono">
-                      {s.degradation_slope != null ? (
-                        <span className={s.degradation_slope > 0.08 ? "text-red-400" : s.degradation_slope > 0.04 ? "text-amber-400" : "text-emerald-400"}>
-                          {s.degradation_slope > 0 ? "+" : ""}{s.degradation_slope.toFixed(3)}s/giro
+                    {/* Raw slope */}
+                    <td className="py-1.5 pr-2 text-right font-mono text-muted-foreground">
+                      {dv ? (
+                        <span className={dv.slope_raw < 0 ? "text-red-400/60" : ""}>
+                          {dv.slope_raw > 0 ? "+" : ""}{dv.slope_raw.toFixed(3)}
                         </span>
+                      ) : s.degradation_slope != null ? (
+                        <span>{s.degradation_slope > 0 ? "+" : ""}{s.degradation_slope.toFixed(3)}</span>
                       ) : "—"}
-                      {dv && dv.status === "INVALID" && dv.original_slope !== dv.effective_slope && (
-                        <span className="block text-[9px] text-red-400/60 line-through">{dv.original_slope > 0 ? "+" : ""}{dv.original_slope.toFixed(3)}</span>
+                    </td>
+                    {/* Corrected slope (effective) */}
+                    <td className="py-1.5 pr-2 text-right font-mono font-bold">
+                      {dv ? (
+                        <span className={dv.effective_slope > 0.08 ? "text-red-400" : dv.effective_slope > 0.04 ? "text-amber-400" : "text-emerald-400"}>
+                          {dv.effective_slope > 0 ? "+" : ""}{dv.effective_slope.toFixed(3)}s/g
+                        </span>
+                      ) : s.degradation_slope != null ? (
+                        <span>{s.degradation_slope > 0 ? "+" : ""}{s.degradation_slope.toFixed(3)}s/g</span>
+                      ) : "—"}
+                      {dv && dv.fallback_applied && (
+                        <span className="block text-[8px] text-amber-400/70">fallback</span>
                       )}
                     </td>
                     <td className="py-1.5 pr-2 text-right font-mono">{s.r_squared != null ? s.r_squared.toFixed(3) : "—"}</td>
@@ -559,6 +573,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                       {dv ? (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[dv.status]}`} title={dv.reason}>
                           {dv.status}
+                          {dv.model_corrected && <span className="ml-0.5 text-[7px]">MV</span>}
                         </span>
                       ) : "—"}
                     </td>
