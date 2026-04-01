@@ -180,6 +180,7 @@ export default function Index() {
           let ivls: IntervalData[] = [];
           let pos: PositionData[] = [];
 
+          let diaryForVre: DiaryEvent[] = [];
           setLoadingDiary(true);
           try {
             try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
@@ -194,6 +195,7 @@ export default function Index() {
               driverStints, ivls, pos, allDrivers, laps,
             );
             setDiaryEvents(diary);
+            diaryForVre = diary;
           } catch { /* optional */ }
           setLoadingDiary(false);
 
