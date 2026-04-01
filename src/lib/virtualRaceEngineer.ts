@@ -484,6 +484,88 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 4b. Traffic Release Predictor ──
+  // Build allLaps map (only selected driver's laps available; predictor handles missing data)
+  const allLapsMap = new Map<number, Lap[]>();
+  allLapsMap.set(driverNumber, laps);
+
+  // Generate candidate pit laps for traffic analysis (around actual pit laps ± 4)
+  const candidatePitLaps: number[] = [];
+  const actualFirstPit = actualPitLaps[0] ?? Math.floor(totalLaps / 2);
+  for (let offset = -4; offset <= 4; offset += 2) {
+    const candidate = actualFirstPit + offset;
+    if (candidate >= 2 && candidate <= totalLaps - 2) {
+      candidatePitLaps.push(candidate);
+    }
+  }
+
+  const trafficAnalysis = predictTrafficForPitLaps(
+    driverNumber,
+    candidatePitLaps,
+    pitLoss,
+    totalLaps,
+    allLapsMap,
+    positions,
+    intervals,
+    allDrivers,
+  );
+
+  // Add traffic predictions to each alternative strategy
+  for (const alt of alternatives) {
+    if (alt.pit_laps.length > 0) {
+      const altTraffic = predictTrafficForPitLaps(
+        driverNumber,
+        alt.pit_laps,
+        pitLoss,
+        totalLaps,
+        allLapsMap,
+        positions,
+        intervals,
+        allDrivers,
+      );
+      alt.traffic_predictions = altTraffic;
+
+      // Adjust estimated delta with traffic loss
+      const trafficLoss = altTraffic.reduce((sum, t) => sum + t.estimated_traffic_time_loss, 0);
+      if (trafficLoss > 0) {
+        alt.estimated_delta_vs_actual = Math.round((alt.estimated_delta_vs_actual - trafficLoss) * 10) / 10;
+      }
+
+      // Enrich pros/cons based on traffic
+      const worstTraffic = altTraffic.reduce((worst, t) => {
+        if (t.traffic_level === "HEAVY") return "HEAVY";
+        if (t.traffic_level === "LIGHT" && worst !== "HEAVY") return "LIGHT";
+        return worst;
+      }, "CLEAN" as TrafficLevel);
+
+      if (worstTraffic === "HEAVY") {
+        alt.cons.push(`Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`);
+      } else if (worstTraffic === "LIGHT") {
+        alt.cons.push(`Rientro in traffico leggero (−${trafficLoss.toFixed(1)}s stimati)`);
+      } else if (worstTraffic === "CLEAN") {
+        alt.pros.push("Rientro in aria pulita");
+      }
+    }
+  }
+
+  // Also compute traffic for recommended strategy pit laps
+  if (bestPitLaps.length > 0) {
+    const recTraffic = predictTrafficForPitLaps(
+      driverNumber,
+      bestPitLaps,
+      pitLoss,
+      totalLaps,
+      allLapsMap,
+      positions,
+      intervals,
+      allDrivers,
+    );
+    const recTrafficLoss = recTraffic.reduce((sum, t) => sum + t.estimated_traffic_time_loss, 0);
+    if (recTrafficLoss > 0) {
+      recommendedStrategy.reason += ` (traffico stimato: −${recTrafficLoss.toFixed(1)}s)`;
+    }
+  }
+
   // ── 5. Confidence ──
   const confidenceFactors: string[] = [];
   let confScore = 0;
@@ -502,6 +584,13 @@ export function computeVirtualRaceEngineer(
   const hasNeutralisations = [...trackStatusMap.values()].some(s => s !== "GREEN");
   if (hasNeutralisations) { confidenceFactors.push("Neutralizzazioni rilevate durante la gara"); }
   else { confScore += 1; }
+
+  if (intervals.length > 0 || positions.length > 0) {
+    confScore += 1;
+    confidenceFactors.push("Dati posizione/intervalli disponibili per analisi traffico");
+  } else {
+    confidenceFactors.push("Dati posizione/intervalli non disponibili – analisi traffico limitata");
+  }
 
   const confidence: Confidence = confScore >= 6 ? "HIGH" : confScore >= 3 ? "MEDIUM" : "LOW";
 
@@ -570,5 +659,6 @@ export function computeVirtualRaceEngineer(
     weather_impact: weatherImpact,
     neutralisation_impact: neutralisationImpact,
     practice_compounds_used: practiceCompoundsUsed,
+    traffic_analysis: trafficAnalysis,
   };
 }
