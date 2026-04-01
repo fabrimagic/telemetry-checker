@@ -102,6 +102,11 @@ export interface VirtualRaceEngineerResult {
   risk_mode: RiskMode;
   integrated_context?: IntegratedStrategyContext;
   narrative_insights: string[];
+  scenario_id: ScenarioId;
+  scenario_is_simulated: boolean;
+  scenario_label: string;
+  scenario_description: string;
+  scenario_modifiers_applied: Record<string, number>;
 }
 
 /* ── Helpers ── */
