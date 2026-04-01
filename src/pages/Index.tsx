@@ -725,7 +725,19 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} />
+                  <VirtualRaceEngineerCard result={vreResult} onRiskModeChange={(mode) => {
+                    setVreRiskMode(mode);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} />
                 ) : null
               )}
             {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
