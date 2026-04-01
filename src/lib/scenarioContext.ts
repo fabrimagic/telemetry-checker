@@ -229,23 +229,56 @@ export function isSimulatedScenario(id: ScenarioId): boolean {
  */
 /**
  * Compute a scaling factor for timed scenarios.
+ * When durationLaps is provided, the factor is based on the duration window
+ * relative to total race length instead of remaining race fraction.
  * Before activation_lap: modifiers are NOT applied (factor = 0).
- * From activation_lap onward: modifiers apply proportionally to remaining race fraction.
+ * From activation_lap onward: modifiers apply proportionally.
  * Returns a value between 0 and 1 that blends the modifier toward full strength.
  */
 export function computeTimedScenarioScale(
   activationLap: number | null,
   totalLaps: number,
   currentContextLap?: number,
+  durationLaps?: number | null,
 ): number {
-  if (activationLap == null || activationLap <= 1) return 1.0; // full effect
+  if (activationLap == null || activationLap <= 1) {
+    // No activation lap: if duration is set, scale by duration/totalLaps
+    if (durationLaps != null && durationLaps > 0 && totalLaps > 0) {
+      const effectiveDuration = Math.min(durationLaps, totalLaps);
+      return Math.max(0.1, Math.min(1.0, effectiveDuration / totalLaps));
+    }
+    return 1.0; // full effect
+  }
   if (totalLaps <= 0) return 1.0;
   if (activationLap > totalLaps) return 0.0; // beyond race end, no effect
 
-  // Fraction of race remaining from activation lap
+  if (durationLaps != null && durationLaps > 0) {
+    // Window-based: scale by duration window / total laps
+    const effectiveEnd = Math.min(activationLap + durationLaps - 1, totalLaps);
+    const effectiveDuration = effectiveEnd - activationLap + 1;
+    return Math.max(0.1, Math.min(1.0, effectiveDuration / totalLaps));
+  }
+
+  // Legacy: remaining race fraction from activation lap
   const remainingFraction = (totalLaps - activationLap + 1) / totalLaps;
-  // Scale: at lap 1 → full, at last lap → minimal, proportional to remaining race
   return Math.max(0.1, Math.min(1.0, remainingFraction));
+}
+
+/**
+ * Compute the scenario active window (start/end laps).
+ * Returns null if scenario is REAL_CONTEXT or no activation lap set.
+ */
+export function computeScenarioWindow(
+  activationLap: number | null,
+  durationLaps: number | null,
+  totalLaps: number,
+): { start: number; end: number } | null {
+  if (activationLap == null && durationLaps == null) return null;
+  const start = activationLap ?? 1;
+  if (durationLaps != null && durationLaps > 0) {
+    return { start, end: Math.min(start + durationLaps - 1, totalLaps) };
+  }
+  return { start, end: totalLaps };
 }
 
 /**
@@ -259,18 +292,19 @@ function blendModifier(value: number, scale: number, neutral: number): number {
 /**
  * Build effective modifiers combining scenario + existing phase adjustments.
  * Scenario modifiers multiply on top of phase adjustments.
- * When activationLap is set, modifiers are scaled by the timed scenario factor.
+ * When activationLap/durationLaps are set, modifiers are scaled by the timed scenario factor.
  */
 export function applyScenarioToPhaseAdjustments(
   scenarioId: ScenarioId,
   phaseAdjustments: { degradation_weight: number; traffic_weight: number; track_position_weight: number; risk_penalty_weight: number; neutralization_opportunity_weight: number },
   activationLap?: number | null,
   totalLaps?: number,
+  durationLaps?: number | null,
 ): typeof phaseAdjustments {
   if (scenarioId === "REAL_CONTEXT") return phaseAdjustments;
   
   const mods = SCENARIO_DEFINITIONS[scenarioId].modifiers;
-  const scale = computeTimedScenarioScale(activationLap ?? null, totalLaps ?? 0);
+  const scale = computeTimedScenarioScale(activationLap ?? null, totalLaps ?? 0, undefined, durationLaps);
 
   return {
     degradation_weight: phaseAdjustments.degradation_weight * blendModifier(mods.degradation_weight, scale, 1.0),
@@ -288,11 +322,12 @@ export function buildTimedScenarioModifiers(
   scenarioId: ScenarioId,
   activationLap: number | null,
   totalLaps: number,
+  durationLaps?: number | null,
 ): ScenarioModifiers {
   if (scenarioId === "REAL_CONTEXT") return { ...DEFAULT_MODIFIERS };
   
   const mods = SCENARIO_DEFINITIONS[scenarioId].modifiers;
-  const scale = computeTimedScenarioScale(activationLap, totalLaps);
+  const scale = computeTimedScenarioScale(activationLap, totalLaps, undefined, durationLaps);
 
   return {
     pit_loss_multiplier: blendModifier(mods.pit_loss_multiplier, scale, 1.0),
@@ -308,18 +343,27 @@ export function buildTimedScenarioModifiers(
 }
 
 /**
- * Validate scenario activation lap.
+ * Validate scenario activation lap and duration.
  * Returns null if valid, or an error message string.
  */
 export function validateScenarioActivationLap(
   scenarioId: ScenarioId,
   activationLap: number | null,
   totalLaps: number,
+  durationLaps?: number | null,
 ): string | null {
-  if (scenarioId === "REAL_CONTEXT") return null; // no validation needed
-  if (activationLap == null) return null; // no lap set, use full effect
-  if (!Number.isInteger(activationLap) || activationLap < 1) return "Il giro deve essere un intero ≥ 1";
-  if (activationLap > totalLaps) return `Il giro deve essere ≤ ${totalLaps} (giri totali della gara)`;
-  if (totalLaps - activationLap < 3) return "Scenario con impatto limitato negli ultimi giri";
+  if (scenarioId === "REAL_CONTEXT") return null;
+  if (activationLap != null) {
+    if (!Number.isInteger(activationLap) || activationLap < 1) return "Il giro deve essere un intero ≥ 1";
+    if (activationLap > totalLaps) return `Il giro deve essere ≤ ${totalLaps} (giri totali della gara)`;
+    if (totalLaps - activationLap < 3 && (durationLaps == null || durationLaps <= 0)) return "Scenario con impatto limitato negli ultimi giri";
+  }
+  if (durationLaps != null) {
+    if (!Number.isInteger(durationLaps) || durationLaps < 1) return "La durata deve essere un intero ≥ 1";
+    const startLap = activationLap ?? 1;
+    const endLap = startLap + durationLaps - 1;
+    if (endLap > totalLaps) return `Finestra scenario troncata al giro ${totalLaps} (fine gara)`;
+    if (durationLaps <= 1) return "Durata molto breve — impatto limitato";
+  }
   return null;
 }

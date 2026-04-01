@@ -12,7 +12,7 @@ import type { RiskMode } from "./riskAppetite";
 import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult } from "./cumulativeDeviation";
-import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap } from "./scenarioContext";
+import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
 
 /* ── Types ── */
 
@@ -108,6 +108,8 @@ export interface VirtualRaceEngineerResult {
   scenario_description: string;
   scenario_modifiers_applied: Record<string, number>;
   scenario_activation_lap: number | null;
+  scenario_duration_laps: number | null;
+  scenario_window: { start: number; end: number } | null;
   scenario_activation_warning: string | null;
 }
 
@@ -173,6 +175,7 @@ export function computeVirtualRaceEngineer(
   cumDevResult: CumulativeDeviationResult | null = null,
   scenarioId: ScenarioId = "REAL_CONTEXT",
   scenarioActivationLap: number | null = null,
+  scenarioDurationLaps: number | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -288,8 +291,9 @@ export function computeVirtualRaceEngineer(
   }
 
   const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
-  const scenarioMods = buildTimedScenarioModifiers(scenarioId, scenarioActivationLap, totalLaps);
-  const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps);
+  const scenarioMods = buildTimedScenarioModifiers(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioWindow = isSimulatedScenario(scenarioId) ? computeScenarioWindow(scenarioActivationLap, scenarioDurationLaps, totalLaps) : null;
 
   // Risk mode weight multipliers for strategy scoring, combined with scenario modifiers
   const riskWeights = {
@@ -825,8 +829,10 @@ export function computeVirtualRaceEngineer(
   // Add scenario note if simulated
   if (isSimulatedScenario(scenarioId)) {
     const lapNote = scenarioActivationLap != null ? ` dal giro ${scenarioActivationLap}` : "";
-    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote} — ${scenarioDef.description}`);
-    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+    const durNote = scenarioDurationLaps != null ? ` per ${scenarioDurationLaps} giri` : "";
+    const windowNote = scenarioWindow ? ` (giri ${scenarioWindow.start}–${scenarioWindow.end})` : "";
+    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote}${durNote}${windowNote} — ${scenarioDef.description}`);
+    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}${durNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
     if (scenarioActivationWarning) {
       narrativeInsights.push(`⚠️ ${scenarioActivationWarning}`);
     }
@@ -892,7 +898,7 @@ export function computeVirtualRaceEngineer(
   // Apply scenario modifiers to phase adjustments (with timed scaling)
   const racePhase: RacePhaseResult = {
     ...rawRacePhase,
-    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps),
+    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
   };
 
   return {
@@ -917,13 +923,20 @@ export function computeVirtualRaceEngineer(
     scenario_id: scenarioId,
     scenario_is_simulated: isSimulatedScenario(scenarioId),
     scenario_label: scenarioDef.label,
-    scenario_description: scenarioActivationLap != null && isSimulatedScenario(scenarioId)
-      ? `${scenarioDef.description} (dal giro ${scenarioActivationLap})`
-      : scenarioDef.description,
+    scenario_description: (() => {
+      if (!isSimulatedScenario(scenarioId)) return scenarioDef.description;
+      const parts = [scenarioDef.description];
+      if (scenarioActivationLap != null) parts.push(`dal giro ${scenarioActivationLap}`);
+      if (scenarioDurationLaps != null) parts.push(`per ${scenarioDurationLaps} giri`);
+      if (scenarioWindow) parts.push(`(finestra: giri ${scenarioWindow.start}–${scenarioWindow.end})`);
+      return parts.join(" ");
+    })(),
     scenario_modifiers_applied: Object.fromEntries(
       Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
     ) as Record<string, number>,
     scenario_activation_lap: isSimulatedScenario(scenarioId) ? scenarioActivationLap : null,
+    scenario_duration_laps: isSimulatedScenario(scenarioId) ? scenarioDurationLaps : null,
+    scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
   };
 }

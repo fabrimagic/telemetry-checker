@@ -138,11 +138,13 @@ interface Props {
   onRiskModeChange?: (mode: RiskMode) => void;
   onScenarioChange?: (scenario: ScenarioId) => void;
   onScenarioActivationLapChange?: (lap: number | null) => void;
+  onScenarioDurationChange?: (duration: number | null) => void;
   scenarioActivationLap?: number | null;
+  scenarioDurationLaps?: number | null;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, scenarioActivationLap }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_activation_warning } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning } = result;
   
 
   // Use risk_mode from result (backend-computed) as source of truth
@@ -235,9 +237,10 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {scenario_is_simulated && (
          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
-            <p className="text-[11px] text-amber-400 font-semibold">
-              What-if scenario attivo: {scenario_label}{scenario_activation_lap != null ? ` dal giro ${scenario_activation_lap}` : ""}
-            </p>
+             <p className="text-[11px] text-amber-400 font-semibold">
+               What-if scenario attivo: {scenario_label}
+               {scenario_window ? ` (giri ${scenario_window.start}–${scenario_window.end})` : scenario_activation_lap != null ? ` dal giro ${scenario_activation_lap}` : ""}
+             </p>
           </div>
         )}
       </CardHeader>
@@ -380,6 +383,29 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                       />
                       <span className="text-[9px] text-muted-foreground">(vuoto = intera gara)</span>
                     </div>
+                    {/* Duration input */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Durata (giri):</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
+                        value={scenarioDurationLaps ?? ""}
+                        placeholder="Intera gara"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onScenarioDurationChange?.(val === "" ? null : parseInt(val, 10));
+                        }}
+                        className="h-7 w-20 text-[11px] font-mono"
+                      />
+                      <span className="text-[9px] text-muted-foreground">(vuoto = fino a fine gara)</span>
+                    </div>
+                    {/* Scenario window summary */}
+                    {scenario_window && (
+                      <p className="text-[10px] text-foreground/70 font-mono mt-0.5">
+                        📌 Finestra attiva: giro {scenario_window.start} → giro {scenario_window.end}
+                      </p>
+                    )}
                     {scenario_activation_warning && (
                       <p className="text-[10px] text-amber-400 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
