@@ -573,6 +573,9 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
             </h4>
             <p className="text-[10px] text-muted-foreground mb-2">
               Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
+              {risk_mode !== "BALANCED" && (
+                <span className="font-semibold"> Pesi aggiustati per profilo {RISK_MODES[risk_mode].label}.</span>
+              )}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
