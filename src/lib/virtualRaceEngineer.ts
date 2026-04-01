@@ -989,5 +989,6 @@ export function computeVirtualRaceEngineer(
     scenario_duration_laps: isSimulatedScenario(scenarioId) ? scenarioDurationLaps : null,
     scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
+    degradation_validations: degradationValidations,
   };
 }
