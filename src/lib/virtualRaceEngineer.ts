@@ -433,7 +433,7 @@ export function computeVirtualRaceEngineer(
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
 
-  if (actualPitLaps.length > 0 && actualSimTime != null) {
+  if (actualPitLaps.length > 0 && actualSimTime != null && actualAdjustedTime != null) {
     // Undercut
     const undercutPits = actualPitLaps.map((p, i) => i === 0 ? Math.max(3, p - 3) : p);
     const undercutTime = simulateTime(undercutPits, actualCompounds);
