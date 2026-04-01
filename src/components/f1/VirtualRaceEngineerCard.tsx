@@ -686,10 +686,23 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
             </h4>
             <p className="text-[10px] text-muted-foreground mb-2">
               Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
+              Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
               {risk_mode !== "BALANCED" && (
                 <span className="font-semibold"> Pesi aggiustati per profilo {RISK_MODES[risk_mode].label}.</span>
               )}
+              {scenario_is_simulated && (
+                <span className="font-semibold text-amber-400"> Scenario: {scenario_label}.</span>
+              )}
             </p>
+            {scenario_is_simulated && Object.keys(result.scenario_modifiers_applied).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {Object.entries(result.scenario_modifiers_applied).map(([key, val]) => (
+                  <span key={key} className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {key.replace(/_/g, " ")}: {typeof val === "number" ? val.toFixed(2) : val}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
                 <thead>
