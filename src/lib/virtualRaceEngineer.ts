@@ -170,6 +170,7 @@ export function computeVirtualRaceEngineer(
   diaryEvents: DiaryEvent[] | null = null,
   cumDevResult: CumulativeDeviationResult | null = null,
   scenarioId: ScenarioId = "REAL_CONTEXT",
+  scenarioActivationLap: number | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
