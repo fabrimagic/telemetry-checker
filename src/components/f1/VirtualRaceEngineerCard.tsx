@@ -7,7 +7,7 @@ import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity } from "lucide-react";
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
