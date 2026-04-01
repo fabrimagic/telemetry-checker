@@ -5,6 +5,7 @@ import { breakdownToRows } from "@/lib/strategyBreakdown";
 import { getPhaseLabel } from "@/lib/racePhase";
 import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
