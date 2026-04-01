@@ -135,6 +135,7 @@ function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStr
 interface Props {
   result: VirtualRaceEngineerResult;
   onRiskModeChange?: (mode: RiskMode) => void;
+  onScenarioChange?: (scenario: ScenarioId) => void;
 }
 
 export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
