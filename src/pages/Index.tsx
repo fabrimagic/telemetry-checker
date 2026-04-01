@@ -316,7 +316,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED");
   }, []);
 
   // Select lap for a driver
@@ -418,7 +418,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
