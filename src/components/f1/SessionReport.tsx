@@ -594,9 +594,11 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             <LineChart data={positionChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
-                dataKey="idx"
+                dataKey="lap"
                 tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Time →", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                tickFormatter={(v) => String(Math.round(v))}
+                allowDecimals={false}
               />
               <YAxis
                 reversed
@@ -612,8 +614,9 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                 }}
                 formatter={(value: any, name: string) => {
                   const num = parseInt(name.replace("d", ""));
-                  return [value, driverName(num)];
+                  return [`P${value}`, driverName(num)];
                 }}
+                labelFormatter={(label) => `Lap ${label}`}
               />
               {filteredDrivers.map((num) => (
                 <Line
