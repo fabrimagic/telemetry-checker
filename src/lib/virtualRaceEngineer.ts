@@ -8,6 +8,7 @@ import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradat
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
+import type { RiskMode } from "./riskAppetite";
 
 /* ── Types ── */
 
