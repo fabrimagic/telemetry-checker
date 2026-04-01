@@ -901,5 +901,12 @@ export function computeVirtualRaceEngineer(
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,
+    scenario_id: scenarioId,
+    scenario_is_simulated: isSimulatedScenario(scenarioId),
+    scenario_label: scenarioDef.label,
+    scenario_description: scenarioDef.description,
+    scenario_modifiers_applied: Object.fromEntries(
+      Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
+    ) as Record<string, number>,
   };
 }
