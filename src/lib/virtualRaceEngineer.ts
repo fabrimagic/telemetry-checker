@@ -754,6 +754,18 @@ export function computeVirtualRaceEngineer(
 
   const narrativeInsights: string[] = [];
 
+  // ── 7.pre Degradation validation insights ──
+  for (const dv of degradationValidations) {
+    if (dv.status === "INVALID") {
+      narrativeInsights.push(`La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}, slope originale: ${dv.original_slope.toFixed(3)} sec/giro) è stata classificata come non attendibile e non è stata usata direttamente nel modello strategico. ${dv.fallback_description ?? ""}`);
+    } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
+      narrativeInsights.push(`Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope: ${dv.original_slope.toFixed(3)}). Usato con cautela nel modello.`);
+    }
+  }
+  if (invalidDegCount > 0 && validDegCount === 0 && neutralDegCount === 0) {
+    narrativeInsights.push("⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.");
+  }
+
   // ── 7a. Battle impact on strategies ──
   if (integratedContext.battle_context) {
     const bc = integratedContext.battle_context;
