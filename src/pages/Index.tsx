@@ -9,6 +9,7 @@ import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnalysis";
 import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
 import { calculateTyreDegradation } from "@/lib/tyreDegradation";
+import { calculateCorrectedTyreDegradation } from "@/lib/correctedDegradation";
 import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
