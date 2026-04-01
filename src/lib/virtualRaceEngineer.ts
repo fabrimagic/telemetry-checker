@@ -5,6 +5,7 @@ import type {
 import { classifyLapsWeather, type WeatherCondition } from "./weatherClassification";
 import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassification";
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
+import { calculateCorrectedTyreDegradation, type CorrectedDegradationResult } from "./correctedDegradation";
 import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
