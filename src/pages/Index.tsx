@@ -287,7 +287,7 @@ export default function Index() {
             } catch { /* optional */ }
 
             // Use diary events already computed
-            const diaryForVre = diaryEvents.length ? diaryEvents : diary;
+            const diaryForVre = diaryEvents;
 
             vreArgsRef.current = {
               driverNumber, driverAcronym: driver.name_acronym, sessionKey,
