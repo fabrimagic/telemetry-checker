@@ -137,6 +137,8 @@ interface Props {
   result: VirtualRaceEngineerResult;
   onRiskModeChange?: (mode: RiskMode) => void;
   onScenarioChange?: (scenario: ScenarioId) => void;
+  onScenarioActivationLapChange?: (lap: number | null) => void;
+  scenarioActivationLap?: number | null;
 }
 
 export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange }: Props) {
