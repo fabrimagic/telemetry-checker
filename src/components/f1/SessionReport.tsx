@@ -22,6 +22,7 @@ import {
 } from "@/lib/openf1";
 import { Watermark } from "./Watermark";
 import { CumulativeDeviationCard } from "./CumulativeDeviationCard";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -81,7 +82,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const [weather, setWeather] = useState<WeatherData[]>([]);
   const [intervals, setIntervals] = useState<IntervalData[]>([]);
   const [allLaps, setAllLaps] = useState<Lap[]>([]);
-  const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null); // null = all
+  const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null);
 
   const isRace = sessionType === "Race" || sessionType === "Sprint";
 
@@ -181,8 +182,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
 
   const weatherSummary = useMemo(() => {
     if (!weather.length) return null;
-    const last = weather[weather.length - 1];
-    return last;
+    return weather[weather.length - 1];
   }, [weather]);
 
   const tyreStrategy = useMemo(() => {
@@ -210,7 +210,6 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     if (!positions.length || !results.length || !allLaps.length) return [];
     const driverNums = results.map((r) => r.driver_number);
 
-    // Build driver laps map for timestamp-to-lap correlation
     const driverLapsMap = new Map<number, Lap[]>();
     for (const lap of allLaps) {
       if (!lap.date_start) continue;
@@ -221,10 +220,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
       laps.sort((a, b) => a.lap_number - b.lap_number);
     }
 
-    // For each position entry, find its lap number and keep last position per driver per lap
-    const lapPositions = new Map<number, Map<number, number>>(); // lap -> driver -> position
+    const lapPositions = new Map<number, Map<number, number>>();
     for (const p of positions) {
-      // Find lap for this driver at this timestamp
       const dLaps = driverLapsMap.get(p.driver_number);
       if (!dLaps?.length) continue;
       let matchedLap: number | null = null;
@@ -265,7 +262,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
       const next = new Set(current);
       if (next.has(num)) {
         next.delete(num);
-        if (next.size === 0) return null; // re-show all if none left
+        if (next.size === 0) return null;
       } else {
         next.add(num);
       }
@@ -276,11 +273,9 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const selectAllDrivers = useCallback(() => setVisibleDrivers(null), []);
   const selectNoneDrivers = useCallback(() => setVisibleDrivers(new Set()), []);
 
-  // Build position lookup: lap -> position -> driver_number (with carry-forward)
   const positionByLap = useMemo(() => {
     if (!positions.length || !allLaps.length) return new Map<number, Map<number, number>>();
 
-    // 1. Build driver laps map for timestamp-to-lap correlation
     const driverLapsMap = new Map<number, Lap[]>();
     for (const lap of allLaps) {
       if (!lap.date_start) continue;
@@ -289,8 +284,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     }
     for (const [, laps] of driverLapsMap) laps.sort((a, b) => a.lap_number - b.lap_number);
 
-    // 2. Map each position entry to a lap number, keep last per driver per lap
-    const lapDriverPos = new Map<number, Map<number, number>>(); // lap -> driver -> position
+    const lapDriverPos = new Map<number, Map<number, number>>();
     for (const p of positions) {
       const dLaps = driverLapsMap.get(p.driver_number);
       if (!dLaps?.length) continue;
@@ -299,14 +293,12 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         if (dLaps[i].date_start! <= p.date) { matchedLap = dLaps[i].lap_number; break; }
       }
       if (matchedLap == null) {
-        // If timestamp is before first lap, assign to lap 1
         matchedLap = dLaps[0].lap_number;
       }
       if (!lapDriverPos.has(matchedLap)) lapDriverPos.set(matchedLap, new Map());
       lapDriverPos.get(matchedLap)!.set(p.driver_number, p.position);
     }
 
-    // 3. Determine all laps and all drivers
     const allLapNumbers = new Set<number>();
     for (const lap of allLaps) allLapNumbers.add(lap.lap_number);
     const sortedLaps = [...allLapNumbers].sort((a, b) => a - b);
@@ -316,23 +308,19 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
       for (const dNum of dMap.keys()) allDriverNums.add(dNum);
     }
 
-    // 4. Carry-forward: for each lap, use current position or last known
-    const lastKnownPos = new Map<number, number>(); // driver -> last known position
-    const result = new Map<number, Map<number, number>>(); // lap -> position -> driver
+    const lastKnownPos = new Map<number, number>();
+    const result = new Map<number, Map<number, number>>();
 
     for (const lap of sortedLaps) {
       const currentLapData = lapDriverPos.get(lap);
-      // Update last known positions with any new data from this lap
       if (currentLapData) {
         for (const [dNum, pos] of currentLapData) {
           lastKnownPos.set(dNum, pos);
         }
       }
 
-      // Build position -> driver map from all last-known positions
       const posMap = new Map<number, number>();
       for (const [dNum, pos] of lastKnownPos) {
-        // If multiple drivers share a position, the latest update wins
         posMap.set(pos, dNum);
       }
       if (posMap.size > 0) result.set(lap, posMap);
@@ -341,7 +329,6 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return result;
   }, [positions, allLaps]);
 
-  // Build lap-based gap/interval data by correlating intervals with laps
   const gapChartData = useMemo(() => {
     if (!intervals.length || !results.length || !allLaps.length) return [];
     const driverNums = results.slice(0, 20).map((r) => r.driver_number);
@@ -377,13 +364,10 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     for (const lap of lapNumbers) {
       const point: Record<string, any> = { lap };
       const lapMap = lapGap.get(lap)!;
-      const posMap = positionByLap.get(lap); // position -> driver_number
       for (const num of driverNums) {
         const vals = lapMap.get(num);
         if (vals?.gap != null) point[`gap_${num}`] = vals.gap;
         if (vals?.ivl != null) point[`ivl_${num}`] = vals.ivl;
-        // Determine car ahead driver from position data
-        // Try current lap, then nearby laps as fallback
         let aheadFound = false;
         const lapsToTry = [lap, lap - 1, lap + 1];
         for (const tryLap of lapsToTry) {
@@ -395,7 +379,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
           }
           if (driverPos != null) {
             if (driverPos === 1) {
-              point[`ahead_${num}`] = -1; // sentinel for "Leader"
+              point[`ahead_${num}`] = -1;
             } else {
               const aheadNum = posMap.get(driverPos - 1);
               if (aheadNum != null) point[`ahead_${num}`] = aheadNum;
@@ -422,455 +406,563 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>;
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <Trophy className="h-3.5 w-3.5" />
-          Session Results
-        </h3>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">Pos</TableHead>
-                <TableHead>Driver</TableHead>
-                <TableHead>Team</TableHead>
-                <TableHead className="text-right">Time</TableHead>
-                <TableHead className="text-right">Gap</TableHead>
-                <TableHead className="text-right">Laps</TableHead>
-                <TableHead className="w-16">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {results.map((r) => (
-                <TableRow key={r.driver_number}>
-                  <TableCell className="font-mono font-bold">{r.position}</TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
-                      />
-                      <span className="font-mono font-bold">{driverName(r.driver_number)}</span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{driverTeam(r.driver_number)}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums text-xs">
-                    {formatDuration(r.duration)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono tabular-nums text-xs text-muted-foreground">
-                    {formatGap(r.gap_to_leader)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono tabular-nums text-xs">{r.number_of_laps}</TableCell>
-                  <TableCell className="text-xs">
-                    {r.dnf ? <span className="text-destructive">DNF</span> :
-                     r.dns ? <span className="text-muted-foreground">DNS</span> :
-                     r.dsq ? <span className="text-destructive">DSQ</span> :
-                     <span className="text-green-500">✓</span>}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+  /* ── Driver filter bar (shared across tabs) ── */
+  const driverFilterBar = isRace && positionDrivers.length > 0 && (
+    <div className="bg-card rounded-lg border border-border p-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter Drivers</h3>
+        <div className="flex gap-2">
+          <button onClick={selectAllDrivers} className="text-[10px] text-primary hover:underline">All</button>
+          <button onClick={selectNoneDrivers} className="text-[10px] text-primary hover:underline">None</button>
         </div>
       </div>
+      <div className="flex flex-wrap gap-1.5">
+        {positionDrivers.map((num) => {
+          const active = !visibleDrivers || visibleDrivers.has(num);
+          return (
+            <button
+              key={num}
+              onClick={() => toggleDriver(num)}
+              className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
+                active
+                  ? "border-border bg-muted/80 text-foreground"
+                  : "border-transparent bg-muted/20 text-muted-foreground opacity-40"
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: `#${driverColor(num)}` }}
+              />
+              {driverName(num)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
-      {weatherSummary && (
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Cloud className="h-3.5 w-3.5" />
-            Weather Conditions
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <span className="text-xs text-muted-foreground">Air Temp</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.air_temperature}°C</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Track Temp</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.track_temperature}°C</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Humidity</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.humidity}%</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Wind</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.wind_speed} km/h</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Pressure</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.pressure} hPa</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Rainfall</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.rainfall > 0 ? "Yes 🌧" : "No ☀️"}</p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Wind Direction</span>
-              <p className="font-mono font-bold text-sm">{weatherSummary.wind_direction}°</p>
-            </div>
-          </div>
-        </div>
-      )}
+  return (
+    <div className="space-y-4">
+      {/* Sticky driver filter */}
+      {driverFilterBar}
 
-      {isRace && startingGrid.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Flag className="h-3.5 w-3.5" />
-            Starting Grid
-          </h3>
-          <div className="grid grid-cols-2 gap-1">
-            {startingGrid.map((g) => (
-              <div
-                key={g.driver_number}
-                className={`flex items-center gap-3 text-xs py-1.5 px-3 rounded bg-muted/50 ${
-                  g.position % 2 === 1 ? "" : "ml-8"
-                }`}
-              >
-                <span className="font-mono font-bold w-5 text-right">{g.position}</span>
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: `#${driverColor(g.driver_number)}` }}
-                />
-                <span className="font-mono font-bold">{driverName(g.driver_number)}</span>
-                <span className="text-muted-foreground ml-auto tabular-nums font-mono">
-                  {formatDuration(g.lap_duration)}
-                </span>
+      {isRace ? (
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="w-full justify-start">
+            <TabsTrigger value="overview" className="text-xs">
+              <Trophy className="h-3.5 w-3.5 mr-1" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="charts" className="text-xs">
+              <ArrowUpDown className="h-3.5 w-3.5 mr-1" /> Race Charts
+            </TabsTrigger>
+            <TabsTrigger value="strategy" className="text-xs">
+              <CircleDot className="h-3.5 w-3.5 mr-1" /> Strategy
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ═══ OVERVIEW TAB ═══ */}
+          <TabsContent value="overview" className="mt-4 space-y-4">
+            {/* Results */}
+            <div className="bg-card rounded-lg border border-border p-4">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Trophy className="h-3.5 w-3.5" />
+                Session Results
+              </h3>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Pos</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Team</TableHead>
+                      <TableHead className="text-right">Time</TableHead>
+                      <TableHead className="text-right">Gap</TableHead>
+                      <TableHead className="text-right">Laps</TableHead>
+                      <TableHead className="w-16">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {results.map((r) => (
+                      <TableRow key={r.driver_number}>
+                        <TableCell className="font-mono font-bold">{r.position}</TableCell>
+                        <TableCell>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
+                            />
+                            <span className="font-mono font-bold">{driverName(r.driver_number)}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{driverTeam(r.driver_number)}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-xs">
+                          {formatDuration(r.duration)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-xs text-muted-foreground">
+                          {formatGap(r.gap_to_leader)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums text-xs">{r.number_of_laps}</TableCell>
+                        <TableCell className="text-xs">
+                          {r.dnf ? <span className="text-destructive">DNF</span> :
+                           r.dns ? <span className="text-muted-foreground">DNS</span> :
+                           r.dsq ? <span className="text-destructive">DSQ</span> :
+                           <span className="text-green-500">✓</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Driver Filter */}
-      {isRace && positionDrivers.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter Drivers</h3>
-            <div className="flex gap-2">
-              <button onClick={selectAllDrivers} className="text-[10px] text-primary hover:underline">All</button>
-              <button onClick={selectNoneDrivers} className="text-[10px] text-primary hover:underline">None</button>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {positionDrivers.map((num) => {
-              const active = !visibleDrivers || visibleDrivers.has(num);
-              return (
-                <button
-                  key={num}
-                  onClick={() => toggleDriver(num)}
-                  className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
-                    active
-                      ? "border-border bg-muted/80 text-foreground"
-                      : "border-transparent bg-muted/20 text-muted-foreground opacity-40"
-                  }`}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: `#${driverColor(num)}` }}
-                  />
-                  {driverName(num)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {isRace && tyreStrategy.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <CircleDot className="h-3.5 w-3.5" />
-            Tyre Strategy
-          </h3>
-          <div className="space-y-1">
-            {tyreStrategy.filter(({ driverNumber }) => !visibleDrivers || visibleDrivers.has(driverNumber)).map(({ driverNumber, stints: dStints }) => (
-              <div key={driverNumber} className="flex items-center gap-2 text-xs">
-                <span className="font-mono font-bold w-10 shrink-0 text-right">
-                  {driverName(driverNumber)}
-                </span>
-                <div className="flex-1 flex h-5 rounded overflow-hidden bg-muted/30 relative">
-                  {dStints.map((s) => {
-                    const left = ((s.lap_start - 1) / maxLap) * 100;
-                    const width = ((s.lap_end - s.lap_start + 1) / maxLap) * 100;
-                    return (
+            {/* Weather + Grid side by side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {weatherSummary && (
+                <div className="bg-card rounded-lg border border-border p-4">
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <Cloud className="h-3.5 w-3.5" />
+                    Weather Conditions
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-xs text-muted-foreground">Air Temp</span>
+                      <p className="font-mono font-bold text-sm">{weatherSummary.air_temperature}°C</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Track Temp</span>
+                      <p className="font-mono font-bold text-sm">{weatherSummary.track_temperature}°C</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Humidity</span>
+                      <p className="font-mono font-bold text-sm">{weatherSummary.humidity}%</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Wind</span>
+                      <p className="font-mono font-bold text-sm">{weatherSummary.wind_speed} km/h</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Rainfall</span>
+                      <p className="font-mono font-bold text-sm">{weatherSummary.rainfall > 0 ? "Yes 🌧" : "No ☀️"}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Pressure</span>
+                      <p className="font-mono font-bold text-sm">{weatherSummary.pressure} hPa</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {startingGrid.length > 0 && (
+                <div className="bg-card rounded-lg border border-border p-4">
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <Flag className="h-3.5 w-3.5" />
+                    Starting Grid
+                  </h3>
+                  <div className="grid grid-cols-2 gap-1 max-h-64 overflow-y-auto">
+                    {startingGrid.map((g) => (
                       <div
-                        key={s.stint_number}
-                        className="absolute h-full flex items-center justify-center text-[9px] font-bold text-black/70 border-r border-background/50"
-                        style={{
-                          left: `${left}%`,
-                          width: `${width}%`,
-                          backgroundColor: compoundColors[s.compound] ?? "hsl(0,0%,50%)",
-                        }}
-                        title={`${s.compound ?? "Unknown"} L${s.lap_start}-${s.lap_end}`}
+                        key={g.driver_number}
+                        className={`flex items-center gap-3 text-xs py-1.5 px-3 rounded bg-muted/50 ${
+                          g.position % 2 === 1 ? "" : "ml-8"
+                        }`}
                       >
-                        {width > 5 ? (s.compound ?? "?").charAt(0) : ""}
+                        <span className="font-mono font-bold w-5 text-right">{g.position}</span>
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: `#${driverColor(g.driver_number)}` }}
+                        />
+                        <span className="font-mono font-bold">{driverName(g.driver_number)}</span>
+                        <span className="text-muted-foreground ml-auto tabular-nums font-mono">
+                          {formatDuration(g.lap_duration)}
+                        </span>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ═══ RACE CHARTS TAB ═══ */}
+          <TabsContent value="charts" className="mt-4 space-y-4">
+            {positionChartData.length > 0 && (
+              <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+                <Watermark />
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  Position Evolution
+                </h3>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={positionChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="lap"
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                      tickFormatter={(v) => String(Math.round(v))}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      reversed
+                      domain={[1, 20]}
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      label={{ value: "Position", angle: -90, position: "insideLeft", fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        fontSize: 11,
+                      }}
+                      formatter={(value: any, name: string) => {
+                        const num = parseInt(name.replace("d", ""));
+                        return [`P${value}`, driverName(num)];
+                      }}
+                      labelFormatter={(label) => `Lap ${label}`}
+                    />
+                    {filteredDrivers.map((num) => (
+                      <Line
+                        key={num}
+                        type="stepAfter"
+                        dataKey={`d${num}`}
+                        stroke={`#${driverColor(num)}`}
+                        dot={false}
+                        strokeWidth={1.5}
+                        connectNulls
+                        name={`d${num}`}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {filteredDrivers.map((num) => (
+                    <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
+                      {driverName(num)}
+                    </span>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="flex gap-3 mt-3">
-            {Object.entries(compoundColors).map(([compound, color]) => (
-              <span key={compound} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                {compound}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
-      {isRace && pitStops.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5" />
-            Pit Stops ({pitStops.length})
-          </h3>
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {pitStops.filter((p) => !visibleDrivers || visibleDrivers.has(p.driver_number)).map((p, i) => (
-              <div key={i} className="flex items-center gap-3 text-xs py-1.5 px-2 rounded bg-muted/50">
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: `#${driverColor(p.driver_number)}` }}
-                />
-                <span className="font-mono font-bold w-10">{driverName(p.driver_number)}</span>
-                <span className="text-muted-foreground">Lap {p.lap_number}</span>
-                <span className="font-mono tabular-nums ml-auto">
-                  {p.lane_duration.toFixed(1)}s
-                  <span className="text-muted-foreground ml-1">lane</span>
-                </span>
-                {p.stop_duration != null && (
-                  <span className="font-mono tabular-nums">
-                    {p.stop_duration.toFixed(1)}s
-                    <span className="text-muted-foreground ml-1">stop</span>
-                  </span>
-                )}
+            {gapChartData.length > 0 && (
+              <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+                <Watermark />
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Timer className="h-3.5 w-3.5" />
+                  Gap to Leader (seconds)
+                </h3>
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={gapChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="lap"
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                      tickFormatter={(v) => String(Math.round(v))}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      label={{ value: "Gap (s)", angle: -90, position: "insideLeft", fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        fontSize: 11,
+                      }}
+                      formatter={(value: any, name: string) => {
+                        const num = parseInt(name.replace("gap_", ""));
+                        return [`${Number(value).toFixed(3)}s`, driverName(num)];
+                      }}
+                      labelFormatter={(label) => `Lap ${label}`}
+                    />
+                    {filteredDrivers.map((num) => (
+                      <Line
+                        key={num}
+                        type="monotone"
+                        dataKey={`gap_${num}`}
+                        stroke={`#${driverColor(num)}`}
+                        dot={false}
+                        strokeWidth={1.5}
+                        connectNulls
+                        name={`gap_${num}`}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {filteredDrivers.map((num) => (
+                    <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
+                      {driverName(num)}
+                    </span>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
-      {isRace && positionChartData.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
-          <Watermark />
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            Position Evolution
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={positionChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                dataKey="lap"
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
-                tickFormatter={(v) => String(Math.round(v))}
-                allowDecimals={false}
-              />
-              <YAxis
-                reversed
-                domain={[1, 20]}
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Position", angle: -90, position: "insideLeft", fontSize: 10 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  fontSize: 11,
-                }}
-                formatter={(value: any, name: string) => {
-                  const num = parseInt(name.replace("d", ""));
-                  return [`P${value}`, driverName(num)];
-                }}
-                labelFormatter={(label) => `Lap ${label}`}
-              />
-              {filteredDrivers.map((num) => (
-                <Line
-                  key={num}
-                  type="stepAfter"
-                  dataKey={`d${num}`}
-                  stroke={`#${driverColor(num)}`}
-                  dot={false}
-                  strokeWidth={1.5}
-                  connectNulls
-                  name={`d${num}`}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {filteredDrivers.map((num) => (
-              <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
-                {driverName(num)}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Gap to Leader */}
-      {isRace && gapChartData.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
-          <Watermark />
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Timer className="h-3.5 w-3.5" />
-            Gap to Leader (seconds)
-          </h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={gapChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                dataKey="lap"
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
-                tickFormatter={(v) => String(Math.round(v))}
-                allowDecimals={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Gap (s)", angle: -90, position: "insideLeft", fontSize: 10 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  fontSize: 11,
-                }}
-                formatter={(value: any, name: string) => {
-                  const num = parseInt(name.replace("gap_", ""));
-                  return [`${Number(value).toFixed(3)}s`, driverName(num)];
-                }}
-                labelFormatter={(label) => `Lap ${label}`}
-              />
-              {filteredDrivers.map((num) => (
-                <Line
-                  key={num}
-                  type="monotone"
-                  dataKey={`gap_${num}`}
-                  stroke={`#${driverColor(num)}`}
-                  dot={false}
-                  strokeWidth={1.5}
-                  connectNulls
-                  name={`gap_${num}`}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {filteredDrivers.map((num) => (
-              <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
-                {driverName(num)}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Interval to Car Ahead */}
-      {isRace && gapChartData.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
-          <Watermark />
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Timer className="h-3.5 w-3.5" />
-            Interval to Car Ahead (seconds)
-          </h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={gapChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                dataKey="lap"
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
-                tickFormatter={(v) => String(Math.round(v))}
-                allowDecimals={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Interval (s)", angle: -90, position: "insideLeft", fontSize: 10 }}
-                domain={[0, 10]}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  fontSize: 11,
-                }}
-                content={({ active, payload, label }) => {
-                  if (!active || !payload?.length) return null;
-                  return (
-                    <div style={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      fontSize: 11,
-                      padding: "8px 12px",
-                      borderRadius: 4,
-                    }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Lap {label}</div>
-                      {payload.map((entry: any) => {
-                        const num = parseInt(entry.dataKey.replace("ivl_", ""));
-                        const lapData = gapChartData.find((d: any) => d.lap === label);
-                        const aheadNum = lapData?.[`ahead_${num}`];
-                        const isLeader = aheadNum === -1;
-                        const aheadLabel = isLeader ? "Leader" : aheadNum != null ? driverName(aheadNum) : "N/A";
+            {gapChartData.length > 0 && (
+              <div className="bg-card rounded-lg border border-border p-4 relative overflow-hidden">
+                <Watermark />
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Timer className="h-3.5 w-3.5" />
+                  Interval to Car Ahead (seconds)
+                </h3>
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={gapChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="lap"
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                      tickFormatter={(v) => String(Math.round(v))}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      label={{ value: "Interval (s)", angle: -90, position: "insideLeft", fontSize: 10 }}
+                      domain={[0, 10]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        fontSize: 11,
+                      }}
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
                         return (
-                          <div key={entry.dataKey} style={{ display: "flex", flexDirection: "column", marginBottom: 3 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: entry.color, display: "inline-block" }} />
-                              <span style={{ fontWeight: 500 }}>{driverName(num)}</span>
-                              <span style={{ marginLeft: "auto", fontFamily: "monospace" }}>{Number(entry.value).toFixed(3)}s</span>
-                            </div>
-                            <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", marginLeft: 14 }}>
-                              Ahead: {aheadLabel}
-                            </div>
+                          <div style={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            fontSize: 11,
+                            padding: "8px 12px",
+                            borderRadius: 4,
+                          }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>Lap {label}</div>
+                            {payload.map((entry: any) => {
+                              const num = parseInt(entry.dataKey.replace("ivl_", ""));
+                              const lapData = gapChartData.find((d: any) => d.lap === label);
+                              const aheadNum = lapData?.[`ahead_${num}`];
+                              const isLeader = aheadNum === -1;
+                              const aheadLabel = isLeader ? "Leader" : aheadNum != null ? driverName(aheadNum) : "N/A";
+                              return (
+                                <div key={entry.dataKey} style={{ display: "flex", flexDirection: "column", marginBottom: 3 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: entry.color, display: "inline-block" }} />
+                                    <span style={{ fontWeight: 500 }}>{driverName(num)}</span>
+                                    <span style={{ marginLeft: "auto", fontFamily: "monospace" }}>{Number(entry.value).toFixed(3)}s</span>
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", marginLeft: 14 }}>
+                                    Ahead: {aheadLabel}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
-                      })}
-                    </div>
-                  );
-                }}
-              />
-              {filteredDrivers.map((num) => (
-                <Line
-                  key={num}
-                  type="monotone"
-                  dataKey={`ivl_${num}`}
-                  stroke={`#${driverColor(num)}`}
-                  dot={false}
-                  strokeWidth={1.5}
-                  connectNulls
-                  name={`ivl_${num}`}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {filteredDrivers.map((num) => (
-              <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
-                {driverName(num)}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+                      }}
+                    />
+                    {filteredDrivers.map((num) => (
+                      <Line
+                        key={num}
+                        type="monotone"
+                        dataKey={`ivl_${num}`}
+                        stroke={`#${driverColor(num)}`}
+                        dot={false}
+                        strokeWidth={1.5}
+                        connectNulls
+                        name={`ivl_${num}`}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {filteredDrivers.map((num) => (
+                    <span key={num} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${driverColor(num)}` }} />
+                      {driverName(num)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      {/* Cumulative Deviation */}
-      {isRace && results.length > 0 && (
-        <CumulativeDeviationCard
-          sessionKey={sessionKey}
-          results={results}
-          drivers={drivers}
-          visibleDrivers={visibleDrivers}
-        />
+            {/* Cumulative Deviation */}
+            {results.length > 0 && (
+              <CumulativeDeviationCard
+                sessionKey={sessionKey}
+                results={results}
+                drivers={drivers}
+                visibleDrivers={visibleDrivers}
+              />
+            )}
+          </TabsContent>
+
+          {/* ═══ STRATEGY TAB ═══ */}
+          <TabsContent value="strategy" className="mt-4 space-y-4">
+            {tyreStrategy.length > 0 && (
+              <div className="bg-card rounded-lg border border-border p-4">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <CircleDot className="h-3.5 w-3.5" />
+                  Tyre Strategy
+                </h3>
+                <div className="space-y-1">
+                  {tyreStrategy.filter(({ driverNumber }) => !visibleDrivers || visibleDrivers.has(driverNumber)).map(({ driverNumber, stints: dStints }) => (
+                    <div key={driverNumber} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono font-bold w-10 shrink-0 text-right">
+                        {driverName(driverNumber)}
+                      </span>
+                      <div className="flex-1 flex h-5 rounded overflow-hidden bg-muted/30 relative">
+                        {dStints.map((s) => {
+                          const left = ((s.lap_start - 1) / maxLap) * 100;
+                          const width = ((s.lap_end - s.lap_start + 1) / maxLap) * 100;
+                          return (
+                            <div
+                              key={s.stint_number}
+                              className="absolute h-full flex items-center justify-center text-[9px] font-bold text-black/70 border-r border-background/50"
+                              style={{
+                                left: `${left}%`,
+                                width: `${width}%`,
+                                backgroundColor: compoundColors[s.compound] ?? "hsl(0,0%,50%)",
+                              }}
+                              title={`${s.compound ?? "Unknown"} L${s.lap_start}-${s.lap_end}`}
+                            >
+                              {width > 5 ? (s.compound ?? "?").charAt(0) : ""}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3 mt-3">
+                  {Object.entries(compoundColors).map(([compound, color]) => (
+                    <span key={compound} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                      {compound}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {pitStops.length > 0 && (
+              <div className="bg-card rounded-lg border border-border p-4">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Pit Stops ({pitStops.length})
+                </h3>
+                <div className="space-y-1 max-h-64 overflow-y-auto">
+                  {pitStops.filter((p) => !visibleDrivers || visibleDrivers.has(p.driver_number)).map((p, i) => (
+                    <div key={i} className="flex items-center gap-3 text-xs py-1.5 px-2 rounded bg-muted/50">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: `#${driverColor(p.driver_number)}` }}
+                      />
+                      <span className="font-mono font-bold w-10">{driverName(p.driver_number)}</span>
+                      <span className="text-muted-foreground">Lap {p.lap_number}</span>
+                      <span className="font-mono tabular-nums ml-auto">
+                        {p.lane_duration.toFixed(1)}s
+                        <span className="text-muted-foreground ml-1">lane</span>
+                      </span>
+                      {p.stop_duration != null && (
+                        <span className="font-mono tabular-nums">
+                          {p.stop_duration.toFixed(1)}s
+                          <span className="text-muted-foreground ml-1">stop</span>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        /* Non-race sessions: just show results + weather */
+        <div className="space-y-4">
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Trophy className="h-3.5 w-3.5" />
+              Session Results
+            </h3>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Pos</TableHead>
+                    <TableHead>Driver</TableHead>
+                    <TableHead>Team</TableHead>
+                    <TableHead className="text-right">Time</TableHead>
+                    <TableHead className="text-right">Gap</TableHead>
+                    <TableHead className="text-right">Laps</TableHead>
+                    <TableHead className="w-16">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {results.map((r) => (
+                    <TableRow key={r.driver_number}>
+                      <TableCell className="font-mono font-bold">{r.position}</TableCell>
+                      <TableCell>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
+                          />
+                          <span className="font-mono font-bold">{driverName(r.driver_number)}</span>
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{driverTeam(r.driver_number)}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums text-xs">
+                        {formatDuration(r.duration)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums text-xs text-muted-foreground">
+                        {formatGap(r.gap_to_leader)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums text-xs">{r.number_of_laps}</TableCell>
+                      <TableCell className="text-xs">
+                        {r.dnf ? <span className="text-destructive">DNF</span> :
+                         r.dns ? <span className="text-muted-foreground">DNS</span> :
+                         r.dsq ? <span className="text-destructive">DSQ</span> :
+                         <span className="text-green-500">✓</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {weatherSummary && (
+            <div className="bg-card rounded-lg border border-border p-4">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Cloud className="h-3.5 w-3.5" />
+                Weather Conditions
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <span className="text-xs text-muted-foreground">Air Temp</span>
+                  <p className="font-mono font-bold text-sm">{weatherSummary.air_temperature}°C</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Track Temp</span>
+                  <p className="font-mono font-bold text-sm">{weatherSummary.track_temperature}°C</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Humidity</span>
+                  <p className="font-mono font-bold text-sm">{weatherSummary.humidity}%</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Wind</span>
+                  <p className="font-mono font-bold text-sm">{weatherSummary.wind_speed} km/h</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
