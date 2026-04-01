@@ -286,7 +286,8 @@ export function computeVirtualRaceEngineer(
   }
 
   const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
-  const scenarioMods = scenarioDef.modifiers;
+  const scenarioMods = buildTimedScenarioModifiers(scenarioId, scenarioActivationLap, totalLaps);
+  const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps);
 
   // Risk mode weight multipliers for strategy scoring, combined with scenario modifiers
   const riskWeights = {
