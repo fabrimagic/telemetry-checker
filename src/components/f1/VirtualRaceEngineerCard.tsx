@@ -140,9 +140,44 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
 
   // Use risk_mode from result (backend-computed) as source of truth
 
-  // Determine which breakdown to show (recommended if available, otherwise actual)
+  // Determine which breakdown to show, adjusted for risk mode
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
-  const breakdownRows = primaryBreakdown ? breakdownToRows(primaryBreakdown) : [];
+  const adjustedBreakdown = useMemo(() => {
+    if (!primaryBreakdown) return null;
+    if (risk_mode === "BALANCED" && !race_phase) return primaryBreakdown;
+
+    const riskWeights: Record<RiskMode, { degradation: number; traffic: number }> = {
+      CONSERVATIVE: { degradation: 1.15, traffic: 1.3 },
+      BALANCED: { degradation: 1.0, traffic: 1.0 },
+      AGGRESSIVE: { degradation: 0.85, traffic: 0.7 },
+    };
+    const rw = riskWeights[risk_mode];
+    const phaseAdj = race_phase?.phase_adjustments;
+
+    const degMult = (phaseAdj?.degradation_weight ?? 1) * rw.degradation;
+    const trafficMult = (phaseAdj?.traffic_weight ?? 1) * rw.traffic;
+
+    return {
+      ...primaryBreakdown,
+      tyre_degradation_cost: primaryBreakdown.tyre_degradation_cost != null
+        ? Math.round(primaryBreakdown.tyre_degradation_cost * degMult * 10) / 10
+        : null,
+      traffic_loss: primaryBreakdown.traffic_loss != null
+        ? Math.round(primaryBreakdown.traffic_loss * trafficMult * 10) / 10
+        : null,
+      total_estimated: primaryBreakdown.total_estimated != null
+        ? Math.round((
+            (primaryBreakdown.base_stint_time ?? 0) +
+            (primaryBreakdown.tyre_degradation_cost ?? 0) * degMult +
+            (primaryBreakdown.pit_loss ?? 0) +
+            (primaryBreakdown.traffic_loss ?? 0) * trafficMult +
+            (primaryBreakdown.weather_adjustment ?? 0) +
+            (primaryBreakdown.neutralization_adjustment ?? 0)
+          ) * 10) / 10
+        : null,
+    };
+  }, [primaryBreakdown, risk_mode, race_phase]);
+  const breakdownRows = adjustedBreakdown ? breakdownToRows(adjustedBreakdown) : [];
 
   // Score strategies with phase + risk
   const scoredStrategies = useMemo(() => {
@@ -538,6 +573,9 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
             </h4>
             <p className="text-[10px] text-muted-foreground mb-2">
               Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
+              {risk_mode !== "BALANCED" && (
+                <span className="font-semibold"> Pesi aggiustati per profilo {RISK_MODES[risk_mode].label}.</span>
+              )}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
@@ -576,11 +614,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
                       </tr>
                     );
                   })}
-                  {primaryBreakdown?.total_estimated != null && (
+                  {adjustedBreakdown?.total_estimated != null && (
                     <tr className="border-t border-border font-semibold">
                       <td className="py-1.5 pr-2 text-foreground">Totale stimato</td>
                       <td className="py-1.5 pr-2 text-right font-mono text-foreground">
-                        {primaryBreakdown.total_estimated.toFixed(1)}s
+                        {adjustedBreakdown.total_estimated.toFixed(1)}s
                       </td>
                       <td colSpan={2} />
                     </tr>
