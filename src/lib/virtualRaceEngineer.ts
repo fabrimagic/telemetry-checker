@@ -570,7 +570,38 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // ── 5. Confidence ──
+  // ── 4c. Strategy Breakdowns ──
+  const actualTraffic = predictTrafficForPitLaps(
+    driverNumber, actualPitLaps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
+  );
+  const actualBreakdown = computeStrategyBreakdown(
+    actualPitLaps, actualCompounds, totalLaps, compoundModels, pitLoss,
+    actualTraffic, weatherMap, trackStatusMap, pitStopAnalyses,
+  );
+
+  // Recommended breakdown
+  if (bestPitLaps.length > 0) {
+    const recTrafficForBreakdown = predictTrafficForPitLaps(
+      driverNumber, bestPitLaps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
+    );
+    recommendedStrategy.breakdown = computeStrategyBreakdown(
+      bestPitLaps, bestCompounds, totalLaps, compoundModels, pitLoss,
+      recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses,
+    );
+  }
+
+  // Alternative breakdowns
+  for (const alt of alternatives) {
+    const altTrafficForBreakdown = alt.traffic_predictions ?? predictTrafficForPitLaps(
+      driverNumber, alt.pit_laps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
+    );
+    alt.breakdown = computeStrategyBreakdown(
+      alt.pit_laps, alt.compounds, totalLaps, compoundModels, pitLoss,
+      altTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses,
+    );
+  }
+
+
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
