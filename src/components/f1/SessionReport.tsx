@@ -276,66 +276,99 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const selectAllDrivers = useCallback(() => setVisibleDrivers(null), []);
   const selectNoneDrivers = useCallback(() => setVisibleDrivers(new Set()), []);
 
-  // Build lap-based gap/interval data by correlating intervals with laps
-  const gapChartData = useMemo(() => {
-    if (!intervals.length || !results.length || !allLaps.length) return [];
-    const driverNums = results.slice(0, 20).map((r) => r.driver_number);
-
-    // Build a map: driver_number -> sorted laps with date_start
+  // Build position lookup: lap -> position -> driver_number
+  const positionByLap = useMemo(() => {
+    if (!positions.length || !allLaps.length) return new Map<number, Map<number, number>>();
     const driverLapsMap = new Map<number, Lap[]>();
     for (const lap of allLaps) {
       if (!lap.date_start) continue;
       if (!driverLapsMap.has(lap.driver_number)) driverLapsMap.set(lap.driver_number, []);
       driverLapsMap.get(lap.driver_number)!.push(lap);
     }
-    for (const [, laps] of driverLapsMap) {
-      laps.sort((a, b) => a.lap_number - b.lap_number);
+    for (const [, laps] of driverLapsMap) laps.sort((a, b) => a.lap_number - b.lap_number);
+
+    // lap -> driver -> position (keep last per lap)
+    const lapDriverPos = new Map<number, Map<number, number>>();
+    for (const p of positions) {
+      const dLaps = driverLapsMap.get(p.driver_number);
+      if (!dLaps?.length) continue;
+      let matchedLap: number | null = null;
+      for (let i = dLaps.length - 1; i >= 0; i--) {
+        if (dLaps[i].date_start! <= p.date) { matchedLap = dLaps[i].lap_number; break; }
+      }
+      if (matchedLap == null) continue;
+      if (!lapDriverPos.has(matchedLap)) lapDriverPos.set(matchedLap, new Map());
+      lapDriverPos.get(matchedLap)!.set(p.driver_number, p.position);
     }
 
-    // For each interval, find the lap it belongs to
+    // Invert to lap -> position -> driver
+    const result = new Map<number, Map<number, number>>();
+    for (const [lap, driverMap] of lapDriverPos) {
+      const posMap = new Map<number, number>();
+      for (const [dNum, pos] of driverMap) posMap.set(pos, dNum);
+      result.set(lap, posMap);
+    }
+    return result;
+  }, [positions, allLaps]);
+
+  // Build lap-based gap/interval data by correlating intervals with laps
+  const gapChartData = useMemo(() => {
+    if (!intervals.length || !results.length || !allLaps.length) return [];
+    const driverNums = results.slice(0, 20).map((r) => r.driver_number);
+
+    const driverLapsMap = new Map<number, Lap[]>();
+    for (const lap of allLaps) {
+      if (!lap.date_start) continue;
+      if (!driverLapsMap.has(lap.driver_number)) driverLapsMap.set(lap.driver_number, []);
+      driverLapsMap.get(lap.driver_number)!.push(lap);
+    }
+    for (const [, laps] of driverLapsMap) laps.sort((a, b) => a.lap_number - b.lap_number);
+
     const lapGap = new Map<number, Map<number, { gap: number | null; ivl: number | null }>>();
-    // key: lap_number -> driver_number -> values
 
     for (const item of intervals) {
       if (!driverNums.includes(item.driver_number)) continue;
       const dLaps = driverLapsMap.get(item.driver_number);
       if (!dLaps || !dLaps.length) continue;
-
-      // Find which lap this interval belongs to (last lap whose date_start <= item.date)
       let matchedLap: number | null = null;
       for (let i = dLaps.length - 1; i >= 0; i--) {
-        if (dLaps[i].date_start! <= item.date) {
-          matchedLap = dLaps[i].lap_number;
-          break;
-        }
+        if (dLaps[i].date_start! <= item.date) { matchedLap = dLaps[i].lap_number; break; }
       }
       if (matchedLap == null) continue;
-
       if (!lapGap.has(matchedLap)) lapGap.set(matchedLap, new Map());
       const lapMap = lapGap.get(matchedLap)!;
-
       const gap = typeof item.gap_to_leader === "number" ? item.gap_to_leader : null;
       const ivl = typeof item.interval === "number" ? item.interval : null;
-
-      // Keep last value per lap per driver
       lapMap.set(item.driver_number, { gap, ivl });
     }
 
-    // Build chart data sorted by lap number
     const lapNumbers = [...lapGap.keys()].sort((a, b) => a - b);
     const data: Record<string, any>[] = [];
     for (const lap of lapNumbers) {
       const point: Record<string, any> = { lap };
       const lapMap = lapGap.get(lap)!;
+      const posMap = positionByLap.get(lap); // position -> driver_number
       for (const num of driverNums) {
         const vals = lapMap.get(num);
         if (vals?.gap != null) point[`gap_${num}`] = vals.gap;
         if (vals?.ivl != null) point[`ivl_${num}`] = vals.ivl;
+        // Determine car ahead driver from position data
+        if (posMap) {
+          // Find this driver's position on this lap
+          let driverPos: number | null = null;
+          for (const [pos, dNum] of posMap) {
+            if (dNum === num) { driverPos = pos; break; }
+          }
+          if (driverPos != null && driverPos > 1) {
+            const aheadNum = posMap.get(driverPos - 1);
+            if (aheadNum != null) point[`ahead_${num}`] = aheadNum;
+          }
+        }
       }
       if (Object.keys(point).length > 1) data.push(point);
     }
     return data;
-  }, [intervals, results, allLaps]);
+  }, [intervals, results, allLaps, positionByLap]);
 
   if (loading) {
     return (
@@ -731,11 +764,49 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   border: "1px solid hsl(var(--border))",
                   fontSize: 11,
                 }}
-                formatter={(value: any, name: string) => {
-                  const num = parseInt(name.replace("ivl_", ""));
-                  return [`${Number(value).toFixed(3)}s`, driverName(num)];
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div style={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      fontSize: 11,
+                      padding: "8px 12px",
+                      borderRadius: 4,
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Lap {label}</div>
+                      {payload.map((entry: any) => {
+                        const num = parseInt(entry.dataKey.replace("ivl_", ""));
+                        const lapData = gapChartData.find((d: any) => d.lap === label);
+                        const aheadNum = lapData?.[`ahead_${num}`];
+                        const aheadLabel = aheadNum != null ? driverName(aheadNum) : (
+                          // Check if driver is P1 (no car ahead)
+                          lapData?.[`ivl_${num}`] != null ? "N/A" : "N/A"
+                        );
+                        // If interval exists but is the leader, show "Leader"
+                        const posMap = positionByLap.get(label as number);
+                        let isLeader = false;
+                        if (posMap) {
+                          for (const [pos, dNum] of posMap) {
+                            if (dNum === num && pos === 1) { isLeader = true; break; }
+                          }
+                        }
+                        return (
+                          <div key={entry.dataKey} style={{ display: "flex", flexDirection: "column", marginBottom: 3 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: entry.color, display: "inline-block" }} />
+                              <span style={{ fontWeight: 500 }}>{driverName(num)}</span>
+                              <span style={{ marginLeft: "auto", fontFamily: "monospace" }}>{Number(entry.value).toFixed(3)}s</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", marginLeft: 14 }}>
+                              Ahead: {isLeader ? "Leader" : aheadNum != null ? aheadLabel : "N/A"}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
                 }}
-                labelFormatter={(label) => `Lap ${label}`}
               />
               {filteredDrivers.map((num) => (
                 <Line
