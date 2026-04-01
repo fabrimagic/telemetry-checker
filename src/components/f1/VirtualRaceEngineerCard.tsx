@@ -423,8 +423,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
             <div className="flex items-start gap-2">
               <span className="text-[11px] text-muted-foreground shrink-0 w-20">Race phase:</span>
               <div>
-                <span className="text-[11px] font-semibold text-foreground">{getPhaseLabel(race_phase.current_phase)}</span>
+              <span className="text-[11px] font-semibold text-foreground">{getPhaseLabel(race_phase.current_phase)}</span>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{race_phase.phase_reason}</p>
+                <p className="text-[10px] text-muted-foreground/70 mt-1 leading-relaxed italic">
+                  ℹ️ La <strong className="text-muted-foreground">Race Phase</strong> identifica automaticamente in quale momento della gara si trova il pilota (partenza, stint iniziale, finestra pit, gestione centrale, attacco finale, ultimi giri, neutralizzazione o transizione meteo). Ogni fase modifica i pesi del modello strategico: ad esempio, negli ultimi giri il peso della posizione in pista aumenta e quello del degrado diminuisce, mentre durante una neutralizzazione il pit opportunistico diventa più conveniente. La fase viene rilevata dai dati reali della sessione e non può essere modificata manualmente.
+                </p>
               </div>
             </div>
 
