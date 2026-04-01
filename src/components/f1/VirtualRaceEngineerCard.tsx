@@ -614,11 +614,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
                       </tr>
                     );
                   })}
-                  {primaryBreakdown?.total_estimated != null && (
+                  {adjustedBreakdown?.total_estimated != null && (
                     <tr className="border-t border-border font-semibold">
                       <td className="py-1.5 pr-2 text-foreground">Totale stimato</td>
                       <td className="py-1.5 pr-2 text-right font-mono text-foreground">
-                        {primaryBreakdown.total_estimated.toFixed(1)}s
+                        {adjustedBreakdown.total_estimated.toFixed(1)}s
                       </td>
                       <td colSpan={2} />
                     </tr>
