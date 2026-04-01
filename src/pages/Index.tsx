@@ -734,16 +734,6 @@ export default function Index() {
                 <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
               )}
             </div>
-            {hasLapsSelected && (
-              <Button
-                onClick={handleLoadTelemetry}
-                disabled={loadingTelemetry}
-                className="gap-2"
-              >
-                {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Load Telemetry
-              </Button>
-            )}
           </>
         )}
 
