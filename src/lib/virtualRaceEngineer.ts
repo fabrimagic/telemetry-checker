@@ -269,9 +269,15 @@ export function computeVirtualRaceEngineer(
     return new Set(compounds).size >= 2;
   }
 
-  // Estimate total time for a given strategy
+  // Risk mode weight multipliers for strategy scoring
+  const riskWeights = {
+    CONSERVATIVE: { degradation: 1.15, traffic: 1.3, pitLoss: 1.0 },
+    BALANCED: { degradation: 1.0, traffic: 1.0, pitLoss: 1.0 },
+    AGGRESSIVE: { degradation: 0.85, traffic: 0.7, pitLoss: 1.0 },
+  }[riskMode];
+
+  // Estimate total time for a given strategy (raw, no risk adjustment)
   function simulateTime(pitLaps: number[], compounds: string[]): number | null {
-    // Enforce mandatory 2-compound rule
     if (!hasMinTwoCompounds(compounds)) return null;
     let total = 0;
     const stintBounds: { start: number; end: number; compound: string }[] = [];
@@ -292,6 +298,32 @@ export function computeVirtualRaceEngineer(
     }
     total += pitLaps.length * pitLoss;
     return total;
+  }
+
+  // Risk-adjusted time: applies risk weights to degradation component
+  function simulateTimeRiskAdjusted(pitLaps: number[], compounds: string[]): number | null {
+    if (!hasMinTwoCompounds(compounds)) return null;
+    let baseTime = 0;
+    let degCost = 0;
+    const stintBounds: { start: number; end: number; compound: string }[] = [];
+    let start = 1;
+    for (let i = 0; i < pitLaps.length; i++) {
+      stintBounds.push({ start, end: pitLaps[i], compound: compounds[i] || compounds[0] });
+      start = pitLaps[i] + 1;
+    }
+    stintBounds.push({ start, end: totalLaps, compound: compounds[compounds.length - 1] || compounds[0] });
+
+    for (const sb of stintBounds) {
+      const model = compoundModels.get(sb.compound);
+      if (!model) return null;
+      for (let lap = sb.start; lap <= sb.end; lap++) {
+        const tyreLife = lap - sb.start;
+        baseTime += model.intercept;
+        degCost += model.slope * tyreLife;
+      }
+    }
+    // Apply risk weights: conservative penalizes degradation more, aggressive less
+    return baseTime + (degCost * riskWeights.degradation) + (pitLaps.length * pitLoss * riskWeights.pitLoss);
   }
 
   const actualCompounds = stints.map(s => s.compound);
