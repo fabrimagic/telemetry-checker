@@ -12,7 +12,7 @@ import type { RiskMode } from "./riskAppetite";
 import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult } from "./cumulativeDeviation";
-import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments } from "./scenarioContext";
+import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap } from "./scenarioContext";
 
 /* ── Types ── */
 
