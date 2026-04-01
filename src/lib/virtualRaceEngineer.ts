@@ -169,6 +169,7 @@ export function computeVirtualRaceEngineer(
   riskMode: RiskMode = "BALANCED",
   diaryEvents: DiaryEvent[] | null = null,
   cumDevResult: CumulativeDeviationResult | null = null,
+  scenarioId: ScenarioId = "REAL_CONTEXT",
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
