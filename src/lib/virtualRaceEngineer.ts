@@ -822,8 +822,12 @@ export function computeVirtualRaceEngineer(
 
   // Add scenario note if simulated
   if (isSimulatedScenario(scenarioId)) {
-    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label} — ${scenarioDef.description}`);
-    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}". I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+    const lapNote = scenarioActivationLap != null ? ` dal giro ${scenarioActivationLap}` : "";
+    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote} — ${scenarioDef.description}`);
+    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+    if (scenarioActivationWarning) {
+      narrativeInsights.push(`⚠️ ${scenarioActivationWarning}`);
+    }
   }
 
   // ── 8. Verdict ──
