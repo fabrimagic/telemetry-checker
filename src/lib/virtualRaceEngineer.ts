@@ -491,14 +491,14 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateTime(actualPitLaps, altCompounds);
+        const altTime = simulateTimeRiskAdjusted(actualPitLaps, altCompounds);
         if (altTime != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
             description: `Ultimo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[actualCompounds.length - 1]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
             cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
           });
