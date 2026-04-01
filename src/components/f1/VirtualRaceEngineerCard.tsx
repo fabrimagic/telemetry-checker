@@ -362,9 +362,33 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 </Select>
                 <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
                 {scenario_is_simulated && (
-                  <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
-                    <FlaskConical className="h-3 w-3" /> Scenario simulato — i risultati riflettono modificatori ipottetici, non dati reali alterati
-                  </p>
+                  <>
+                    {/* Activation lap input */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Giro attivazione:</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
+                        value={scenarioActivationLap ?? ""}
+                        placeholder="Tutti"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onScenarioActivationLapChange?.(val === "" ? null : parseInt(val, 10));
+                        }}
+                        className="h-7 w-20 text-[11px] font-mono"
+                      />
+                      <span className="text-[9px] text-muted-foreground">(vuoto = intera gara)</span>
+                    </div>
+                    {scenario_activation_warning && (
+                      <p className="text-[10px] text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                      <FlaskConical className="h-3 w-3" /> Scenario simulato — i risultati riflettono modificatori ipotetici, non dati reali alterati
+                    </p>
+                  </>
                 )}
               </div>
             </div>
