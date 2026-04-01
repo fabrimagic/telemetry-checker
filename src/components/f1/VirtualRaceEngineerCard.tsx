@@ -197,6 +197,66 @@ export function VirtualRaceEngineerCard({ result }: Props) {
           </div>
         </div>
 
+        {/* ── Race Context: Phase + Risk Appetite ── */}
+        {race_phase && (
+          <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" /> Race Context
+            </h4>
+
+            {/* Phase indicator */}
+            <div className="flex items-start gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0 w-20">Race phase:</span>
+              <div>
+                <span className="text-[11px] font-semibold text-foreground">{getPhaseLabel(race_phase.current_phase)}</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{race_phase.phase_reason}</p>
+              </div>
+            </div>
+
+            {/* Risk appetite selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0 w-20">Risk mode:</span>
+              <div className="flex rounded-md border border-border overflow-hidden">
+                {(["CONSERVATIVE", "BALANCED", "AGGRESSIVE"] as RiskMode[]).map((mode) => {
+                  const info = RISK_MODES[mode];
+                  const isActive = riskMode === mode;
+                  const icons: Record<RiskMode, React.ReactNode> = {
+                    CONSERVATIVE: <Shield className="h-3 w-3" />,
+                    BALANCED: <Scale className="h-3 w-3" />,
+                    AGGRESSIVE: <Zap className="h-3 w-3" />,
+                  };
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setRiskMode(mode)}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold transition-colors ${
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                      }`}
+                      title={info.description}
+                    >
+                      {icons[mode]}
+                      {info.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Impact note */}
+            {topScoredName && riskMode !== "BALANCED" && (
+              <p className="text-[10px] text-muted-foreground italic">
+                💡 Con profilo <strong className="text-foreground">{RISK_MODES[riskMode].label}</strong> in fase <strong className="text-foreground">{getPhaseLabel(race_phase.current_phase)}</strong>:
+                strategia favorita → <strong className="text-foreground">{topScoredName}</strong>
+                {topScoredReason && topScoredReason !== "Nessun aggiustamento" && (
+                  <span> ({topScoredReason})</span>
+                )}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ── Visual Timeline ── */}
         <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} />
 
