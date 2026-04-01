@@ -220,6 +220,7 @@ export function computeVirtualRaceEngineer(
     const avgTime = validDurations.length ? validDurations.reduce((a, b) => a + b, 0) / validDurations.length : null;
 
     const model = degradationModels.get(stint.stint_number);
+    const validation = degradationValidations.find(v => v.original.stint === stint.stint_number);
 
     stintAnalyses.push({
       stint_number: stint.stint_number,
@@ -230,7 +231,7 @@ export function computeVirtualRaceEngineer(
       tyre_age_at_start: stint.tyre_age_at_start ?? 0,
       avg_lap_time: avgTime ? Math.round(avgTime * 1000) / 1000 : null,
       degradation_slope: model ? model.slope : null,
-      r_squared: degResults.find(d => d.stint === stint.stint_number)?.rSquared ?? null,
+      r_squared: validation?.original.rSquared ?? degResults.find(d => d.stint === stint.stint_number)?.rSquared ?? null,
       excluded_laps: allStintLaps.length - cleanLaps.length,
     });
   }
