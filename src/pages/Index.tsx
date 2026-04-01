@@ -34,6 +34,9 @@ import {
   getRaceControl,
   getIntervals,
   getPositions,
+  getSessionsByMeetingKey,
+  getSessionResult,
+  getAllLaps,
   type Driver,
   type Lap,
   type CarData,
@@ -45,13 +48,13 @@ import {
   type RaceControlMessage,
   type IntervalData,
   type PositionData,
+  type SessionInfo,
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
-import { getSessionsByMeetingKey, getSessionResult, getAllLaps, type SessionInfo } from "@/lib/openf1";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DriverState {
