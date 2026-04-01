@@ -122,11 +122,38 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase } = result;
+
+  const [riskMode, setRiskMode] = useState<RiskMode>("BALANCED");
 
   // Determine which breakdown to show (recommended if available, otherwise actual)
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
   const breakdownRows = primaryBreakdown ? breakdownToRows(primaryBreakdown) : [];
+
+  // Score strategies with phase + risk
+  const scoredStrategies = useMemo(() => {
+    if (!race_phase) return null;
+    const allStrats = [
+      ...alternative_strategies.map(alt => ({
+        name: alt.name,
+        delta: alt.estimated_delta_vs_actual,
+        breakdown: alt.breakdown,
+      })),
+    ];
+    if (recommended_strategy.estimated_gain_seconds > 0.1) {
+      allStrats.push({
+        name: "Strategia ottimale",
+        delta: recommended_strategy.estimated_gain_seconds,
+        breakdown: recommended_strategy.breakdown,
+        isRecommended: true,
+      } as any);
+    }
+    if (allStrats.length === 0) return null;
+    return scoreStrategies(allStrats, race_phase.phase_adjustments, riskMode);
+  }, [race_phase, alternative_strategies, recommended_strategy, riskMode]);
+
+  const topScoredName = scoredStrategies?.[0]?.name ?? null;
+  const topScoredReason = scoredStrategies?.[0]?.adjustment_reason ?? null;
 
   return (
     <Card className="border-border">
