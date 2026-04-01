@@ -56,7 +56,7 @@ function DeltaBadge({ delta }: { delta: number }) {
 }
 
 /* ── Strategy Timeline Chart ── */
-function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; recommended: RecommendedStrategy }) {
+function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStrategy; recommended: RecommendedStrategy; riskMode?: RiskMode }) {
   const totalLaps = actual.stints.length > 0
     ? Math.max(...actual.stints.map((s) => s.lap_end))
     : 0;
@@ -113,6 +113,19 @@ function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; rec
           <span>L{totalLaps}</span>
         </div>
       </div>
+      {recommended.estimated_gain_seconds > 0.1 && (
+        <div className="flex items-center gap-2 mt-1">
+          <span className="w-24 shrink-0" />
+          <p className="text-[10px] text-muted-foreground">
+            Guadagno stimato: <span className="font-mono font-bold text-emerald-400">{recommended.estimated_gain_seconds.toFixed(1)}s</span>
+            {riskMode && riskMode !== "BALANCED" && (
+              <span className="ml-1.5">
+                (profilo <strong className="text-foreground">{RISK_MODES[riskMode].label}</strong>)
+              </span>
+            )}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -259,7 +272,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
         )}
 
         {/* ── Visual Timeline ── */}
-        <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} />
+        <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} riskMode={risk_mode} />
 
         {/* ── Actual Strategy ── */}
         <div>
