@@ -314,7 +314,7 @@ export function VirtualRaceEngineerCard({ result }: Props) {
         )}
 
         {/* ── Traffic Release Analysis ── */}
-        {traffic_analysis.length > 0 && traffic_analysis.some(t => t.traffic_level !== "UNKNOWN") && (
+        {traffic_analysis.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
               <Navigation className="h-3.5 w-3.5" /> Traffic Release Analysis
