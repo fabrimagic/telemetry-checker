@@ -322,11 +322,12 @@ export function buildTimedScenarioModifiers(
   scenarioId: ScenarioId,
   activationLap: number | null,
   totalLaps: number,
+  durationLaps?: number | null,
 ): ScenarioModifiers {
   if (scenarioId === "REAL_CONTEXT") return { ...DEFAULT_MODIFIERS };
   
   const mods = SCENARIO_DEFINITIONS[scenarioId].modifiers;
-  const scale = computeTimedScenarioScale(activationLap, totalLaps);
+  const scale = computeTimedScenarioScale(activationLap, totalLaps, undefined, durationLaps);
 
   return {
     pit_loss_multiplier: blendModifier(mods.pit_loss_multiplier, scale, 1.0),
@@ -342,18 +343,27 @@ export function buildTimedScenarioModifiers(
 }
 
 /**
- * Validate scenario activation lap.
+ * Validate scenario activation lap and duration.
  * Returns null if valid, or an error message string.
  */
 export function validateScenarioActivationLap(
   scenarioId: ScenarioId,
   activationLap: number | null,
   totalLaps: number,
+  durationLaps?: number | null,
 ): string | null {
-  if (scenarioId === "REAL_CONTEXT") return null; // no validation needed
-  if (activationLap == null) return null; // no lap set, use full effect
-  if (!Number.isInteger(activationLap) || activationLap < 1) return "Il giro deve essere un intero ≥ 1";
-  if (activationLap > totalLaps) return `Il giro deve essere ≤ ${totalLaps} (giri totali della gara)`;
-  if (totalLaps - activationLap < 3) return "Scenario con impatto limitato negli ultimi giri";
+  if (scenarioId === "REAL_CONTEXT") return null;
+  if (activationLap != null) {
+    if (!Number.isInteger(activationLap) || activationLap < 1) return "Il giro deve essere un intero ≥ 1";
+    if (activationLap > totalLaps) return `Il giro deve essere ≤ ${totalLaps} (giri totali della gara)`;
+    if (totalLaps - activationLap < 3 && (durationLaps == null || durationLaps <= 0)) return "Scenario con impatto limitato negli ultimi giri";
+  }
+  if (durationLaps != null) {
+    if (!Number.isInteger(durationLaps) || durationLaps < 1) return "La durata deve essere un intero ≥ 1";
+    const startLap = activationLap ?? 1;
+    const endLap = startLap + durationLaps - 1;
+    if (endLap > totalLaps) return `Finestra scenario troncata al giro ${totalLaps} (fine gara)`;
+    if (durationLaps <= 1) return "Durata molto breve — impatto limitato";
+  }
   return null;
 }
