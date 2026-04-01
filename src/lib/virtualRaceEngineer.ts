@@ -45,6 +45,7 @@ export interface RecommendedStrategy {
   compounds: string[]; // full compound sequence per stint
   estimated_gain_seconds: number;
   reason: string;
+  breakdown?: StrategyBreakdown;
 }
 
 export interface AlternativeStrategy {
