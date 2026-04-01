@@ -120,7 +120,11 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown } = result;
+
+  // Determine which breakdown to show (recommended if available, otherwise actual)
+  const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
+  const breakdownRows = primaryBreakdown ? breakdownToRows(primaryBreakdown) : [];
 
   return (
     <Card className="border-border">
