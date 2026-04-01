@@ -143,8 +143,8 @@ export function computeVirtualRaceEngineer(
   pitStops: PitData[],
   weather: WeatherData[],
   raceControl: RaceControlMessage[],
-  _intervals: IntervalData[],
-  _positions: PositionData[],
+  intervals: IntervalData[],
+  positions: PositionData[],
   allDrivers: Driver[],
   practiceModels: PracticeCompoundModel[] = [],
 ): VirtualRaceEngineerResult | null {
