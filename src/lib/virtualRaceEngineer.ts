@@ -386,12 +386,12 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateTime(candidatePits, compounds);
+          const t = simulateTimeRiskAdjusted(candidatePits, compounds);
           if (t != null && t < bestTime) {
             bestTime = t;
             bestPitLaps = candidatePits;
             bestCompounds = compounds;
-            bestDelta = actualSimTime - t;
+            bestDelta = actualAdjustedTime! - t;
           }
         }
       }
