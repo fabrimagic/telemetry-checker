@@ -451,14 +451,14 @@ export function computeVirtualRaceEngineer(
 
     // Overcut
     const overcutPits = actualPitLaps.map((p, i) => i === 0 ? Math.min(totalLaps - 3, p + 3) : p);
-    const overcutTime = simulateTime(overcutPits, actualCompounds);
+    const overcutTime = simulateTimeRiskAdjusted(overcutPits, actualCompounds);
     if (overcutTime != null) {
       alternatives.push({
         name: "Overcut / estensione stint",
         description: `Pit al giro ${overcutPits[0]} invece di ${actualPitLaps[0]}`,
         pit_laps: overcutPits,
         compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualSimTime - overcutTime) * 10) / 10,
+        estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
         pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
         cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
       });
