@@ -6,6 +6,7 @@ import { classifyLapsWeather, type WeatherCondition } from "./weatherClassificat
 import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassification";
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
+import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 
 /* ── Types ── */
 
@@ -44,6 +45,7 @@ export interface RecommendedStrategy {
   compounds: string[]; // full compound sequence per stint
   estimated_gain_seconds: number;
   reason: string;
+  breakdown?: StrategyBreakdown;
 }
 
 export interface AlternativeStrategy {
@@ -55,6 +57,7 @@ export interface AlternativeStrategy {
   pros: string[];
   cons: string[];
   traffic_predictions?: TrafficPrediction[];
+  breakdown?: StrategyBreakdown;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -88,6 +91,7 @@ export interface VirtualRaceEngineerResult {
   neutralisation_impact: string | null;
   practice_compounds_used: string[];
   traffic_analysis: TrafficPrediction[];
+  actual_breakdown?: StrategyBreakdown;
 }
 
 /* ── Helpers ── */
@@ -566,7 +570,38 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // ── 5. Confidence ──
+  // ── 4c. Strategy Breakdowns ──
+  const actualTraffic = predictTrafficForPitLaps(
+    driverNumber, actualPitLaps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
+  );
+  const actualBreakdown = computeStrategyBreakdown(
+    actualPitLaps, actualCompounds, totalLaps, compoundModels, pitLoss,
+    actualTraffic, weatherMap, trackStatusMap, pitStopAnalyses,
+  );
+
+  // Recommended breakdown
+  if (bestPitLaps.length > 0) {
+    const recTrafficForBreakdown = predictTrafficForPitLaps(
+      driverNumber, bestPitLaps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
+    );
+    recommendedStrategy.breakdown = computeStrategyBreakdown(
+      bestPitLaps, bestCompounds, totalLaps, compoundModels, pitLoss,
+      recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses,
+    );
+  }
+
+  // Alternative breakdowns
+  for (const alt of alternatives) {
+    const altTrafficForBreakdown = alt.traffic_predictions ?? predictTrafficForPitLaps(
+      driverNumber, alt.pit_laps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
+    );
+    alt.breakdown = computeStrategyBreakdown(
+      alt.pit_laps, alt.compounds, totalLaps, compoundModels, pitLoss,
+      altTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses,
+    );
+  }
+
+
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
@@ -660,5 +695,6 @@ export function computeVirtualRaceEngineer(
     neutralisation_impact: neutralisationImpact,
     practice_compounds_used: practiceCompoundsUsed,
     traffic_analysis: trafficAnalysis,
+    actual_breakdown: actualBreakdown,
   };
 }

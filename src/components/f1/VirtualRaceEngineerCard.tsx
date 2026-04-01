@@ -1,8 +1,10 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
+import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
+import { breakdownToRows } from "@/lib/strategyBreakdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation } from "lucide-react";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3 } from "lucide-react";
 import React from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
@@ -118,7 +120,11 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown } = result;
+
+  // Determine which breakdown to show (recommended if available, otherwise actual)
+  const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
+  const breakdownRows = primaryBreakdown ? breakdownToRows(primaryBreakdown) : [];
 
   return (
     <Card className="border-border">
@@ -382,6 +388,67 @@ export function VirtualRaceEngineerCard({ result }: Props) {
                 <span>🏴</span> {neutralisation_impact}
               </p>
             )}
+          </div>
+        )}
+
+        {/* ── Scomposizione del giudizio ── */}
+        {breakdownRows.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" /> Scomposizione del giudizio
+            </h4>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Questa scomposizione mostra come il modello ha costruito il giudizio strategico. Valori positivi = costi stimati, valori negativi = vantaggi stimati.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left py-1.5 pr-2">Componente</th>
+                    <th className="text-right py-1.5 pr-2">Valore stimato</th>
+                    <th className="text-center py-1.5 pr-2">Impatto</th>
+                    <th className="text-left py-1.5">Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakdownRows.map((row, i) => {
+                    const impactStyles: Record<string, { badge: string; label: string }> = {
+                      favorable: { badge: "bg-emerald-500/20 text-emerald-400", label: "Favorevole" },
+                      neutral: { badge: "bg-muted text-muted-foreground", label: "Neutro" },
+                      penalizing: { badge: "bg-red-500/20 text-red-400", label: "Penalizzante" },
+                    };
+                    const style = impactStyles[row.impact] || impactStyles.neutral;
+                    return (
+                      <tr key={i} className="border-b border-border/50">
+                        <td className="py-1.5 pr-2 font-medium text-foreground">{row.label}</td>
+                        <td className="py-1.5 pr-2 text-right font-mono">
+                          {row.value != null ? (
+                            <span className={row.value < 0 ? "text-emerald-400" : row.value > 0 ? "text-foreground" : "text-muted-foreground"}>
+                              {row.value > 0 ? "+" : ""}{row.value.toFixed(1)}s
+                            </span>
+                          ) : "N/A"}
+                        </td>
+                        <td className="py-1.5 pr-2 text-center">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${style.badge}`}>
+                            {style.label}
+                          </span>
+                        </td>
+                        <td className="py-1.5 text-muted-foreground text-[10px]">{row.note}</td>
+                      </tr>
+                    );
+                  })}
+                  {primaryBreakdown?.total_estimated != null && (
+                    <tr className="border-t border-border font-semibold">
+                      <td className="py-1.5 pr-2 text-foreground">Totale stimato</td>
+                      <td className="py-1.5 pr-2 text-right font-mono text-foreground">
+                        {primaryBreakdown.total_estimated.toFixed(1)}s
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
