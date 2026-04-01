@@ -758,7 +758,20 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult,
+                        args.diaryEvents, args.cumDevResult, vreScenario,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} onScenarioChange={(scenario) => {
+                    setVreScenario(scenario);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                        args.diaryEvents, args.cumDevResult, scenario,
                       );
                       setVreResult(newVre);
                     }
