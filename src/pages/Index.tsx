@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { SessionPicker } from "@/components/f1/SessionPicker";
 import { LapTimesChart } from "@/components/f1/LapTimesChart";
 import { DriverPicker } from "@/components/f1/DriverPicker";
