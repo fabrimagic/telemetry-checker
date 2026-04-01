@@ -99,6 +99,8 @@ export interface VirtualRaceEngineerResult {
   actual_breakdown?: StrategyBreakdown;
   race_phase?: RacePhaseResult;
   risk_mode: RiskMode;
+  integrated_context?: IntegratedStrategyContext;
+  narrative_insights: string[];
 }
 
 /* ── Helpers ── */
