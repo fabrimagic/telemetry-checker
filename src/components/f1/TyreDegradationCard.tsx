@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { type DegradationResult } from "@/lib/tyreDegradation";
+import { type CorrectedDegradationResult } from "@/lib/correctedDegradation";
 import { validateAllDegradationEstimates, type DegradationValidationResult } from "@/lib/degradationValidation";
 import { type LongRunResult } from "@/lib/longRunDetector";
 import { Watermark } from "./Watermark";
@@ -39,6 +40,10 @@ function fmtTime(sec: number) {
   return `${m}:${s.toFixed(3).padStart(6, "0")}`;
 }
 
+function isCorrected(r: DegradationResult): r is CorrectedDegradationResult {
+  return "model_type" in r && "slope_raw" in r && "slope_corrected" in r;
+}
+
 interface Props {
   results: DegradationResult[];
   longRuns?: LongRunResult[];
@@ -50,6 +55,7 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
   const validations = useMemo(() => validateAllDegradationEstimates(results), [results]);
 
   const selected = selectedIdx != null ? results[selectedIdx] : null;
+  const hasCorrected = results.some(r => isCorrected(r));
 
   // Build chart data with regression line
   const chartData = useMemo(() => {
@@ -81,6 +87,9 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
         <TrendingDown className="h-3.5 w-3.5" />
         Tyre Degradation
+        {hasCorrected && (
+          <span className="text-[9px] font-normal bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">Fuel & Temp corrected</span>
+        )}
       </h3>
 
       {/* Long-run detection info for Practice */}
@@ -130,13 +139,10 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
             </table>
             <ul className="text-[10px] text-muted-foreground mt-2 space-y-1 pl-4 list-disc">
               <li><span className="font-mono font-bold text-foreground/80">Media</span> — Tempo medio sul giro nella sequenza long run identificata.</li>
-              <li><span className="font-mono font-bold text-foreground/80">Std</span> — Deviazione standard dei tempi sul giro: misura la regolarità del passo. Valori bassi (&lt; 0.5 s) indicano un passo costante.</li>
-              <li><span className="font-mono font-bold text-foreground/80">Slope</span> — Pendenza della regressione lineare (sec/giro): indica il degrado. Un valore positivo significa che il tempo peggiora ad ogni giro.</li>
-              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Punteggio complessivo basato su lunghezza, regolarità, trend e penalità. ≥ 60: probabile long run • 40–59: possibile • &lt; 40: non long run.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Std</span> — Deviazione standard dei tempi sul giro: misura la regolarità del passo.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Slope</span> — Pendenza della regressione lineare (sec/giro).</li>
+              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Punteggio complessivo. ≥ 60: probabile long run • 40–59: possibile • &lt; 40: non long run.</li>
             </ul>
-            <p className="text-[10px] text-muted-foreground mt-1.5 italic">
-              Solo i long run identificati (score ≥ 40) vengono usati per il calcolo del degrado.
-            </p>
           </div>
         </details>
       )}
@@ -150,12 +156,11 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
         </summary>
         <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
           <ul className="space-y-1.5 pl-5 list-disc">
-            <li><span className="font-mono font-bold text-foreground/80">Degrado (sec/giro)</span> — Pendenza della regressione lineare: indica quanti secondi si perdono mediamente ad ogni giro con l'invecchiamento della gomma. Un valore positivo più alto indica un degrado più rapido.</li>
-            <li><span className="font-mono font-bold text-foreground/80">R²</span> — Coefficiente di determinazione: misura quanto il modello lineare si adatta ai dati. Valori vicini a 1 indicano un degrado costante e prevedibile; valori bassi indicano alta variabilità.</li>
-            <li><span className="font-mono font-bold text-foreground/80">Giri analizzati</span> — Numero di giri validi utilizzati per il calcolo, esclusi out lap, in lap e giri anomali (&gt;7% dal tempo mediano).</li>
-            <li><span className="font-mono font-bold text-foreground/80">Stint</span> — Periodo di guida con lo stesso set di pneumatici, dall'uscita dai box fino al pit stop successivo.</li>
-            <li><span className="font-mono font-bold text-foreground/80">Compound</span> — Mescola di pneumatico utilizzata nello stint (Soft, Medium, Hard, Intermediate, Wet).</li>
-            <li><span className="font-mono font-bold text-foreground/80">Status</span> — Validazione della stima di degrado: <span className="text-emerald-400 font-semibold">VALID</span> = stima attendibile, <span className="text-amber-400 font-semibold">NEUTRAL</span> = segnale troppo debole, <span className="text-red-400 font-semibold">INVALID</span> = stima non attendibile (esclusa dal Virtual Race Engineer). Una slope negativa non indica "gomma che migliora" ma una stima contaminata da fattori esterni.</li>
+            <li><span className="font-mono font-bold text-foreground/80">Degrado grezzo (sec/giro)</span> — Pendenza della regressione semplice lap_time ~ tyre_life, senza correzioni. Include l'effetto del carburante e della temperatura.</li>
+            <li><span className="font-mono font-bold text-foreground/80">Degrado corretto (sec/giro)</span> — Coefficiente della variabile tyre_life in un modello multivariato corretto per fuel proxy e temperatura. Rappresenta il degrado gomme isolato dagli effetti confondenti.</li>
+            <li><span className="font-mono font-bold text-foreground/80">Fuel proxy</span> — Proxy dell'alleggerimento progressivo della vettura (giri rimanenti). NON è il fuel load reale — OpenF1 non lo fornisce.</li>
+            <li><span className="font-mono font-bold text-foreground/80">R²</span> — Coefficiente di determinazione del modello corretto. Valori vicini a 1 indicano un fit affidabile.</li>
+            <li><span className="font-mono font-bold text-foreground/80">Status</span> — Validazione basata sulla slope corretta: <span className="text-emerald-400 font-semibold">VALID</span> = stima attendibile, <span className="text-amber-400 font-semibold">NEUTRAL</span> = segnale troppo debole, <span className="text-red-400 font-semibold">INVALID</span> = stima non attendibile (esclusa dal VRE).</li>
           </ul>
           <p className="pt-1 italic">Clicca su una riga della tabella per visualizzare il grafico di regressione dello stint selezionato.</p>
         </div>
@@ -169,15 +174,18 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
               <TableHead className="text-xs">Pilota</TableHead>
               <TableHead className="text-xs">Stint</TableHead>
               <TableHead className="text-xs">Compound</TableHead>
-              <TableHead className="text-xs text-right">Giri analizzati</TableHead>
-              <TableHead className="text-xs text-right">Degrado (sec/giro)</TableHead>
+              <TableHead className="text-xs text-right">Giri</TableHead>
+              <TableHead className="text-xs text-right">Grezzo</TableHead>
+              <TableHead className="text-xs text-right">Corretto</TableHead>
               <TableHead className="text-xs text-right">R²</TableHead>
+              <TableHead className="text-xs text-center">Modello</TableHead>
               <TableHead className="text-xs text-center">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {results.map((r, i) => {
               const v = validations[i];
+              const cr = isCorrected(r) ? r : null;
               const statusStyles: Record<string, string> = {
                 VALID: "bg-emerald-500/20 text-emerald-400",
                 NEUTRAL: "bg-amber-500/20 text-amber-400",
@@ -209,11 +217,43 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                   </span>
                 </TableCell>
                 <TableCell className="text-xs text-right font-mono">{r.lapsUsed}</TableCell>
+                {/* Raw slope */}
+                <TableCell className="text-xs text-right font-mono text-muted-foreground">
+                  {cr ? (
+                    <span className={cr.slope_raw < 0 ? "text-red-400/60" : ""}>
+                      {cr.slope_raw > 0 ? "+" : ""}{cr.slope_raw.toFixed(3)}
+                    </span>
+                  ) : (
+                    <span>{r.slopeSecPerLap > 0 ? "+" : ""}{r.slopeSecPerLap.toFixed(3)}</span>
+                  )}
+                </TableCell>
+                {/* Corrected slope */}
                 <TableCell className="text-xs text-right font-mono font-bold">
-                  {r.slopeSecPerLap > 0 ? "+" : ""}
-                  {r.slopeSecPerLap.toFixed(3)}
+                  {cr ? (
+                    <span className={cr.slope_corrected > 0.08 ? "text-red-400" : cr.slope_corrected > 0.04 ? "text-amber-400" : cr.slope_corrected > 0 ? "text-emerald-400" : "text-red-400"}>
+                      {cr.slope_corrected > 0 ? "+" : ""}{cr.slope_corrected.toFixed(3)}
+                    </span>
+                  ) : (
+                    <span>{r.slopeSecPerLap > 0 ? "+" : ""}{r.slopeSecPerLap.toFixed(3)}</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-xs text-right font-mono">{r.rSquared.toFixed(3)}</TableCell>
+                {/* Model type */}
+                <TableCell className="text-xs text-center">
+                  {cr ? (
+                    <span className="inline-flex items-center gap-0.5" title={`${cr.model_type}${cr.weather_correction_used ? " (temp)" : ""} — fuel: ${cr.fuel_proxy_type}`}>
+                      {cr.model_type === "corrected_multivariate" ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">
+                          MV{cr.weather_correction_used ? "+T" : ""}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground">Simple</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-muted-foreground">Simple</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-xs text-center">
                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[v?.status ?? "VALID"]}`} title={v?.reason ?? ""}>
                     {v?.status ?? "—"}
@@ -234,11 +274,16 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
         <div className="relative">
           <Watermark />
           <p className="text-[11px] text-muted-foreground mb-2">
-            {selected.acronym} — Stint {selected.stint} ({selected.compound}) — Degrado:{" "}
+            {selected.acronym} — Stint {selected.stint} ({selected.compound}) — Degrado{isCorrected(selected) ? " corretto" : ""}:{" "}
             <span className="font-bold font-mono">
               {selected.slopeSecPerLap > 0 ? "+" : ""}
               {selected.slopeSecPerLap.toFixed(3)} sec/giro
             </span>
+            {isCorrected(selected) && (
+              <span className="text-muted-foreground/60 ml-2">
+                (grezzo: {(selected as CorrectedDegradationResult).slope_raw > 0 ? "+" : ""}{(selected as CorrectedDegradationResult).slope_raw.toFixed(3)})
+              </span>
+            )}
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
