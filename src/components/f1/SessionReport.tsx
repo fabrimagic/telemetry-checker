@@ -19,6 +19,7 @@ import {
   type IntervalData,
 } from "@/lib/openf1";
 import { Watermark } from "./Watermark";
+import { CumulativeDeviationCard } from "./CumulativeDeviationCard";
 import {
   Table,
   TableBody,
@@ -703,6 +704,16 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Cumulative Deviation */}
+      {isRace && results.length > 0 && (
+        <CumulativeDeviationCard
+          sessionKey={sessionKey}
+          results={results}
+          drivers={drivers}
+          visibleDrivers={visibleDrivers}
+        />
       )}
     </div>
   );

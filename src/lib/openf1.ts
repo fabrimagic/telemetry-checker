@@ -252,3 +252,7 @@ export interface SessionInfo {
 export function getSessionsByMeetingKey(meetingKey: number) {
   return fetchApi<SessionInfo[]>(`/sessions?meeting_key=${meetingKey}`);
 }
+
+export function getAllLaps(sessionKey: number) {
+  return fetchApi<Lap[]>(`/laps?session_key=${sessionKey}`);
+}
