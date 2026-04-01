@@ -606,7 +606,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                         }}
                         title={`${s.compound} L${s.lap_start}-${s.lap_end}`}
                       >
-                        {width > 5 ? s.compound.charAt(0) : ""}
+                        {width > 5 ? (s.compound ?? "?").charAt(0) : ""}
                       </div>
                     );
                   })}
