@@ -140,7 +140,7 @@ interface Props {
 
 export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange }: Props) {
   const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description } = result;
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights } = result;
+  
 
   // Use risk_mode from result (backend-computed) as source of truth
 
