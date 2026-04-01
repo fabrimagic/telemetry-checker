@@ -764,11 +764,49 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   border: "1px solid hsl(var(--border))",
                   fontSize: 11,
                 }}
-                formatter={(value: any, name: string) => {
-                  const num = parseInt(name.replace("ivl_", ""));
-                  return [`${Number(value).toFixed(3)}s`, driverName(num)];
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div style={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      fontSize: 11,
+                      padding: "8px 12px",
+                      borderRadius: 4,
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Lap {label}</div>
+                      {payload.map((entry: any) => {
+                        const num = parseInt(entry.dataKey.replace("ivl_", ""));
+                        const lapData = gapChartData.find((d: any) => d.lap === label);
+                        const aheadNum = lapData?.[`ahead_${num}`];
+                        const aheadLabel = aheadNum != null ? driverName(aheadNum) : (
+                          // Check if driver is P1 (no car ahead)
+                          lapData?.[`ivl_${num}`] != null ? "N/A" : "N/A"
+                        );
+                        // If interval exists but is the leader, show "Leader"
+                        const posMap = positionByLap.get(label as number);
+                        let isLeader = false;
+                        if (posMap) {
+                          for (const [pos, dNum] of posMap) {
+                            if (dNum === num && pos === 1) { isLeader = true; break; }
+                          }
+                        }
+                        return (
+                          <div key={entry.dataKey} style={{ display: "flex", flexDirection: "column", marginBottom: 3 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: entry.color, display: "inline-block" }} />
+                              <span style={{ fontWeight: 500 }}>{driverName(num)}</span>
+                              <span style={{ marginLeft: "auto", fontFamily: "monospace" }}>{Number(entry.value).toFixed(3)}s</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", marginLeft: 14 }}>
+                              Ahead: {isLeader ? "Leader" : aheadNum != null ? aheadLabel : "N/A"}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
                 }}
-                labelFormatter={(label) => `Lap ${label}`}
               />
               {filteredDrivers.map((num) => (
                 <Line
