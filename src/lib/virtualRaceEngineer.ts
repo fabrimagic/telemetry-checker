@@ -923,13 +923,20 @@ export function computeVirtualRaceEngineer(
     scenario_id: scenarioId,
     scenario_is_simulated: isSimulatedScenario(scenarioId),
     scenario_label: scenarioDef.label,
-    scenario_description: scenarioActivationLap != null && isSimulatedScenario(scenarioId)
-      ? `${scenarioDef.description} (dal giro ${scenarioActivationLap})`
-      : scenarioDef.description,
+    scenario_description: (() => {
+      if (!isSimulatedScenario(scenarioId)) return scenarioDef.description;
+      const parts = [scenarioDef.description];
+      if (scenarioActivationLap != null) parts.push(`dal giro ${scenarioActivationLap}`);
+      if (scenarioDurationLaps != null) parts.push(`per ${scenarioDurationLaps} giri`);
+      if (scenarioWindow) parts.push(`(finestra: giri ${scenarioWindow.start}–${scenarioWindow.end})`);
+      return parts.join(" ");
+    })(),
     scenario_modifiers_applied: Object.fromEntries(
       Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
     ) as Record<string, number>,
     scenario_activation_lap: isSimulatedScenario(scenarioId) ? scenarioActivationLap : null,
+    scenario_duration_laps: isSimulatedScenario(scenarioId) ? scenarioDurationLaps : null,
+    scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
   };
 }
