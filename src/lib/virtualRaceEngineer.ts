@@ -161,6 +161,8 @@ export function computeVirtualRaceEngineer(
   allDrivers: Driver[],
   practiceModels: PracticeCompoundModel[] = [],
   riskMode: RiskMode = "BALANCED",
+  diaryEvents: DiaryEvent[] | null = null,
+  cumDevResult: CumulativeDeviationResult | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
