@@ -7,6 +7,7 @@ import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassifi
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
+import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
 
 /* ── Types ── */
 
