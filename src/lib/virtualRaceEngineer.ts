@@ -87,6 +87,7 @@ export interface VirtualRaceEngineerResult {
   weather_impact: string | null;
   neutralisation_impact: string | null;
   practice_compounds_used: string[];
+  traffic_analysis: TrafficPrediction[];
 }
 
 /* ── Helpers ── */
