@@ -2,10 +2,12 @@ import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } f
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
+import { getPhaseLabel } from "@/lib/racePhase";
+import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3 } from "lucide-react";
-import React from "react";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity } from "lucide-react";
+import React, { useState, useMemo } from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -120,11 +122,38 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase } = result;
+
+  const [riskMode, setRiskMode] = useState<RiskMode>("BALANCED");
 
   // Determine which breakdown to show (recommended if available, otherwise actual)
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
   const breakdownRows = primaryBreakdown ? breakdownToRows(primaryBreakdown) : [];
+
+  // Score strategies with phase + risk
+  const scoredStrategies = useMemo(() => {
+    if (!race_phase) return null;
+    const allStrats = [
+      ...alternative_strategies.map(alt => ({
+        name: alt.name,
+        delta: alt.estimated_delta_vs_actual,
+        breakdown: alt.breakdown,
+      })),
+    ];
+    if (recommended_strategy.estimated_gain_seconds > 0.1) {
+      allStrats.push({
+        name: "Strategia ottimale",
+        delta: recommended_strategy.estimated_gain_seconds,
+        breakdown: recommended_strategy.breakdown,
+        isRecommended: true,
+      } as any);
+    }
+    if (allStrats.length === 0) return null;
+    return scoreStrategies(allStrats, race_phase.phase_adjustments, riskMode);
+  }, [race_phase, alternative_strategies, recommended_strategy, riskMode]);
+
+  const topScoredName = scoredStrategies?.[0]?.name ?? null;
+  const topScoredReason = scoredStrategies?.[0]?.adjustment_reason ?? null;
 
   return (
     <Card className="border-border">
@@ -167,6 +196,66 @@ export function VirtualRaceEngineerCard({ result }: Props) {
             </div>
           </div>
         </div>
+
+        {/* ── Race Context: Phase + Risk Appetite ── */}
+        {race_phase && (
+          <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" /> Race Context
+            </h4>
+
+            {/* Phase indicator */}
+            <div className="flex items-start gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0 w-20">Race phase:</span>
+              <div>
+                <span className="text-[11px] font-semibold text-foreground">{getPhaseLabel(race_phase.current_phase)}</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{race_phase.phase_reason}</p>
+              </div>
+            </div>
+
+            {/* Risk appetite selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0 w-20">Risk mode:</span>
+              <div className="flex rounded-md border border-border overflow-hidden">
+                {(["CONSERVATIVE", "BALANCED", "AGGRESSIVE"] as RiskMode[]).map((mode) => {
+                  const info = RISK_MODES[mode];
+                  const isActive = riskMode === mode;
+                  const icons: Record<RiskMode, React.ReactNode> = {
+                    CONSERVATIVE: <Shield className="h-3 w-3" />,
+                    BALANCED: <Scale className="h-3 w-3" />,
+                    AGGRESSIVE: <Zap className="h-3 w-3" />,
+                  };
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setRiskMode(mode)}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold transition-colors ${
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                      }`}
+                      title={info.description}
+                    >
+                      {icons[mode]}
+                      {info.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Impact note */}
+            {topScoredName && riskMode !== "BALANCED" && (
+              <p className="text-[10px] text-muted-foreground italic">
+                💡 Con profilo <strong className="text-foreground">{RISK_MODES[riskMode].label}</strong> in fase <strong className="text-foreground">{getPhaseLabel(race_phase.current_phase)}</strong>:
+                strategia favorita → <strong className="text-foreground">{topScoredName}</strong>
+                {topScoredReason && topScoredReason !== "Nessun aggiustamento" && (
+                  <span> ({topScoredReason})</span>
+                )}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Visual Timeline ── */}
         <StrategyTimeline actual={actual_strategy} recommended={recommended_strategy} />
