@@ -150,8 +150,8 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
       } as any);
     }
     if (allStrats.length === 0) return null;
-    return scoreStrategies(allStrats, race_phase.phase_adjustments, riskMode);
-  }, [race_phase, alternative_strategies, recommended_strategy, riskMode]);
+    return scoreStrategies(allStrats, race_phase.phase_adjustments, risk_mode);
+  }, [race_phase, alternative_strategies, recommended_strategy, risk_mode]);
 
   const topScoredName = scoredStrategies?.[0]?.name ?? null;
   const topScoredReason = scoredStrategies?.[0]?.adjustment_reason ?? null;
@@ -220,7 +220,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
               <div className="flex rounded-md border border-border overflow-hidden">
                 {(["CONSERVATIVE", "BALANCED", "AGGRESSIVE"] as RiskMode[]).map((mode) => {
                   const info = RISK_MODES[mode];
-                  const isActive = riskMode === mode;
+                  const isActive = risk_mode === mode;
                   const icons: Record<RiskMode, React.ReactNode> = {
                     CONSERVATIVE: <Shield className="h-3 w-3" />,
                     BALANCED: <Scale className="h-3 w-3" />,
@@ -229,7 +229,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
                   return (
                     <button
                       key={mode}
-                      onClick={() => setRiskMode(mode)}
+                      onClick={() => onRiskModeChange?.(mode)}
                       className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold transition-colors ${
                         isActive
                           ? "bg-primary text-primary-foreground"
@@ -246,9 +246,9 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
             </div>
 
             {/* Impact note */}
-            {topScoredName && riskMode !== "BALANCED" && (
+            {topScoredName && risk_mode !== "BALANCED" && (
               <p className="text-[10px] text-muted-foreground italic">
-                💡 Con profilo <strong className="text-foreground">{RISK_MODES[riskMode].label}</strong> in fase <strong className="text-foreground">{getPhaseLabel(race_phase.current_phase)}</strong>:
+                💡 Con profilo <strong className="text-foreground">{RISK_MODES[risk_mode].label}</strong> in fase <strong className="text-foreground">{getPhaseLabel(race_phase.current_phase)}</strong>:
                 strategia favorita → <strong className="text-foreground">{topScoredName}</strong>
                 {topScoredReason && topScoredReason !== "Nessun aggiustamento" && (
                   <span> ({topScoredReason})</span>
