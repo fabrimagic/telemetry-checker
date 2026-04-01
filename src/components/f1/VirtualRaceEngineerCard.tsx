@@ -144,7 +144,7 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations } = result;
   
 
   // Use risk_mode from result (backend-computed) as source of truth
@@ -526,11 +526,19 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                   <th className="text-right py-1.5 pr-2">Giri</th>
                   <th className="text-right py-1.5 pr-2">Media</th>
                   <th className="text-right py-1.5 pr-2">Degrado</th>
-                  <th className="text-right py-1.5">R²</th>
+                  <th className="text-right py-1.5 pr-2">R²</th>
+                  <th className="text-center py-1.5">Validazione</th>
                 </tr>
               </thead>
               <tbody>
-                {actual_strategy.stints.map((s) => (
+                {actual_strategy.stints.map((s) => {
+                  const dv = degradation_validations?.find(v => v.original.stint === s.stint_number);
+                  const statusStyles: Record<string, string> = {
+                    VALID: "bg-emerald-500/20 text-emerald-400",
+                    NEUTRAL: "bg-amber-500/20 text-amber-400",
+                    INVALID: "bg-red-500/20 text-red-400",
+                  };
+                  return (
                   <tr key={s.stint_number} className="border-b border-border/50">
                     <td className="py-1.5 pr-2 font-mono">{s.stint_number}</td>
                     <td className="py-1.5 pr-2"><CompoundBadge compound={s.compound} /></td>
@@ -539,13 +547,24 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                     <td className="py-1.5 pr-2 text-right font-mono">
                       {s.degradation_slope != null ? (
                         <span className={s.degradation_slope > 0.08 ? "text-red-400" : s.degradation_slope > 0.04 ? "text-amber-400" : "text-emerald-400"}>
-                          +{s.degradation_slope.toFixed(3)}s/giro
+                          {s.degradation_slope > 0 ? "+" : ""}{s.degradation_slope.toFixed(3)}s/giro
+                        </span>
+                      ) : "—"}
+                      {dv && dv.status === "INVALID" && dv.original_slope !== dv.effective_slope && (
+                        <span className="block text-[9px] text-red-400/60 line-through">{dv.original_slope > 0 ? "+" : ""}{dv.original_slope.toFixed(3)}</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right font-mono">{s.r_squared != null ? s.r_squared.toFixed(3) : "—"}</td>
+                    <td className="py-1.5 text-center">
+                      {dv ? (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[dv.status]}`} title={dv.reason}>
+                          {dv.status}
                         </span>
                       ) : "—"}
                     </td>
-                    <td className="py-1.5 text-right font-mono">{s.r_squared != null ? s.r_squared.toFixed(3) : "—"}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -5,6 +5,7 @@ import type {
 import { classifyLapsWeather, type WeatherCondition } from "./weatherClassification";
 import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassification";
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
+import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
@@ -111,6 +112,7 @@ export interface VirtualRaceEngineerResult {
   scenario_duration_laps: number | null;
   scenario_window: { start: number; end: number } | null;
   scenario_activation_warning: string | null;
+  degradation_validations: DegradationValidationResult[];
 }
 
 /* ── Helpers ── */
@@ -192,8 +194,17 @@ export function computeVirtualRaceEngineer(
   const degResults = calculateTyreDegradation(
     driverNumber, driverAcronym, "ffffff", laps, stints
   );
-  for (const dr of degResults) {
-    degradationModels.set(dr.stint, { slope: dr.slopeSecPerLap, intercept: dr.intercept });
+
+  // ── Degradation validation ──
+  const rawValidated = validateAllDegradationEstimates(degResults);
+  const degradationValidations = resolveDegradationForStrategy(rawValidated);
+
+  for (const dv of degradationValidations) {
+    // Use effective_slope (validated/fallback) instead of raw slope
+    degradationModels.set(dv.original.stint, {
+      slope: dv.effective_slope,
+      intercept: dv.original.intercept,
+    });
   }
 
   for (let i = 0; i < stints.length; i++) {
@@ -209,6 +220,7 @@ export function computeVirtualRaceEngineer(
     const avgTime = validDurations.length ? validDurations.reduce((a, b) => a + b, 0) / validDurations.length : null;
 
     const model = degradationModels.get(stint.stint_number);
+    const validation = degradationValidations.find(v => v.original.stint === stint.stint_number);
 
     stintAnalyses.push({
       stint_number: stint.stint_number,
@@ -219,7 +231,7 @@ export function computeVirtualRaceEngineer(
       tyre_age_at_start: stint.tyre_age_at_start ?? 0,
       avg_lap_time: avgTime ? Math.round(avgTime * 1000) / 1000 : null,
       degradation_slope: model ? model.slope : null,
-      r_squared: degResults.find(d => d.stint === stint.stint_number)?.rSquared ?? null,
+      r_squared: validation?.original.rSquared ?? degResults.find(d => d.stint === stint.stint_number)?.rSquared ?? null,
       excluded_laps: allStintLaps.length - cleanLaps.length,
     });
   }
@@ -668,10 +680,32 @@ export function computeVirtualRaceEngineer(
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
-  const validStints = stintAnalyses.filter(s => s.degradation_slope != null);
-  if (validStints.length === stints.length) { confScore += 3; confidenceFactors.push("Modello di degrado disponibile per tutti gli stint"); }
-  else if (validStints.length > 0) { confScore += 1; confidenceFactors.push(`Modello di degrado disponibile per ${validStints.length}/${stints.length} stint`); }
-  else { confidenceFactors.push("Modello di degrado non disponibile"); }
+  // Degradation validation impact on confidence
+  const validDegCount = degradationValidations.filter(v => v.status === "VALID").length;
+  const neutralDegCount = degradationValidations.filter(v => v.status === "NEUTRAL").length;
+  const invalidDegCount = degradationValidations.filter(v => v.status === "INVALID").length;
+
+  if (invalidDegCount === 0 && validDegCount > 0) {
+    confScore += 3;
+    confidenceFactors.push(`Degrado gomme validato per tutti gli stint (${validDegCount} VALID${neutralDegCount > 0 ? `, ${neutralDegCount} NEUTRAL` : ""})`);
+  } else if (validDegCount > 0) {
+    confScore += 1;
+    confidenceFactors.push(`Degrado gomme: ${validDegCount} VALID, ${neutralDegCount} NEUTRAL, ${invalidDegCount} INVALID — confidenza ridotta`);
+  } else if (neutralDegCount > 0) {
+    confScore += 0;
+    confidenceFactors.push(`Degrado gomme: nessuna stima VALID (${neutralDegCount} NEUTRAL, ${invalidDegCount} INVALID) — stime deboli usate con cautela`);
+  } else {
+    confidenceFactors.push("Modello di degrado non disponibile o completamente non attendibile");
+  }
+
+  // Add specific degradation validation notes
+  for (const dv of degradationValidations) {
+    if (dv.status === "INVALID") {
+      confidenceFactors.push(`⚠️ Stint ${dv.original.stint} (${dv.original.compound}): degrado INVALID — ${dv.reason}${dv.fallback_description ? `. ${dv.fallback_description}` : ""}`);
+    } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
+      confidenceFactors.push(`ℹ️ Stint ${dv.original.stint} (${dv.original.compound}): degrado NEUTRAL — ${dv.reason}`);
+    }
+  }
 
   if (pitStops.length > 0) { confScore += 2; confidenceFactors.push("Dati pit stop disponibili"); }
   else { confidenceFactors.push("Dati pit stop non disponibili"); }
@@ -719,6 +753,18 @@ export function computeVirtualRaceEngineer(
   );
 
   const narrativeInsights: string[] = [];
+
+  // ── 7.pre Degradation validation insights ──
+  for (const dv of degradationValidations) {
+    if (dv.status === "INVALID") {
+      narrativeInsights.push(`La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}, slope originale: ${dv.original_slope.toFixed(3)} sec/giro) è stata classificata come non attendibile e non è stata usata direttamente nel modello strategico. ${dv.fallback_description ?? ""}`);
+    } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
+      narrativeInsights.push(`Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope: ${dv.original_slope.toFixed(3)}). Usato con cautela nel modello.`);
+    }
+  }
+  if (invalidDegCount > 0 && validDegCount === 0 && neutralDegCount === 0) {
+    narrativeInsights.push("⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.");
+  }
 
   // ── 7a. Battle impact on strategies ──
   if (integratedContext.battle_context) {
@@ -901,6 +947,11 @@ export function computeVirtualRaceEngineer(
     phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
   };
 
+  // Reduce confidence if degradation is unreliable
+  if (invalidDegCount > 0) {
+    confScore -= invalidDegCount;
+  }
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
@@ -938,5 +989,6 @@ export function computeVirtualRaceEngineer(
     scenario_duration_laps: isSimulatedScenario(scenarioId) ? scenarioDurationLaps : null,
     scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
+    degradation_validations: degradationValidations,
   };
 }

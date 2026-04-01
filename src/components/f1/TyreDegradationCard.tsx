@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { type DegradationResult } from "@/lib/tyreDegradation";
+import { validateAllDegradationEstimates, type DegradationValidationResult } from "@/lib/degradationValidation";
 import { type LongRunResult } from "@/lib/longRunDetector";
 import { Watermark } from "./Watermark";
 import {
@@ -45,6 +46,8 @@ interface Props {
 
 export function TyreDegradationCard({ results, longRuns }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  const validations = useMemo(() => validateAllDegradationEstimates(results), [results]);
 
   const selected = selectedIdx != null ? results[selectedIdx] : null;
 
@@ -152,6 +155,7 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
             <li><span className="font-mono font-bold text-foreground/80">Giri analizzati</span> — Numero di giri validi utilizzati per il calcolo, esclusi out lap, in lap e giri anomali (&gt;7% dal tempo mediano).</li>
             <li><span className="font-mono font-bold text-foreground/80">Stint</span> — Periodo di guida con lo stesso set di pneumatici, dall'uscita dai box fino al pit stop successivo.</li>
             <li><span className="font-mono font-bold text-foreground/80">Compound</span> — Mescola di pneumatico utilizzata nello stint (Soft, Medium, Hard, Intermediate, Wet).</li>
+            <li><span className="font-mono font-bold text-foreground/80">Status</span> — Validazione della stima di degrado: <span className="text-emerald-400 font-semibold">VALID</span> = stima attendibile, <span className="text-amber-400 font-semibold">NEUTRAL</span> = segnale troppo debole, <span className="text-red-400 font-semibold">INVALID</span> = stima non attendibile (esclusa dal Virtual Race Engineer). Una slope negativa non indica "gomma che migliora" ma una stima contaminata da fattori esterni.</li>
           </ul>
           <p className="pt-1 italic">Clicca su una riga della tabella per visualizzare il grafico di regressione dello stint selezionato.</p>
         </div>
@@ -168,10 +172,18 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
               <TableHead className="text-xs text-right">Giri analizzati</TableHead>
               <TableHead className="text-xs text-right">Degrado (sec/giro)</TableHead>
               <TableHead className="text-xs text-right">R²</TableHead>
+              <TableHead className="text-xs text-center">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {results.map((r, i) => (
+            {results.map((r, i) => {
+              const v = validations[i];
+              const statusStyles: Record<string, string> = {
+                VALID: "bg-emerald-500/20 text-emerald-400",
+                NEUTRAL: "bg-amber-500/20 text-amber-400",
+                INVALID: "bg-red-500/20 text-red-400",
+              };
+              return (
               <TableRow
                 key={`${r.driverNumber}-${r.stint}`}
                 className={`cursor-pointer ${selectedIdx === i ? "bg-muted" : ""}`}
@@ -202,8 +214,17 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                   {r.slopeSecPerLap.toFixed(3)}
                 </TableCell>
                 <TableCell className="text-xs text-right font-mono">{r.rSquared.toFixed(3)}</TableCell>
+                <TableCell className="text-xs text-center">
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[v?.status ?? "VALID"]}`} title={v?.reason ?? ""}>
+                    {v?.status ?? "—"}
+                  </span>
+                  {v?.status === "INVALID" && (
+                    <p className="text-[8px] text-red-400/70 mt-0.5">Non usato nel VRE</p>
+                  )}
+                </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
