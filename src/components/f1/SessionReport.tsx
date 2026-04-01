@@ -19,6 +19,7 @@ import {
   type IntervalData,
 } from "@/lib/openf1";
 import { Watermark } from "./Watermark";
+import { CumulativeDeviationCard } from "./CumulativeDeviationCard";
 import {
   Table,
   TableBody,
