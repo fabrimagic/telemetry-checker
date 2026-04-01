@@ -155,6 +155,7 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
             <li><span className="font-mono font-bold text-foreground/80">Giri analizzati</span> — Numero di giri validi utilizzati per il calcolo, esclusi out lap, in lap e giri anomali (&gt;7% dal tempo mediano).</li>
             <li><span className="font-mono font-bold text-foreground/80">Stint</span> — Periodo di guida con lo stesso set di pneumatici, dall'uscita dai box fino al pit stop successivo.</li>
             <li><span className="font-mono font-bold text-foreground/80">Compound</span> — Mescola di pneumatico utilizzata nello stint (Soft, Medium, Hard, Intermediate, Wet).</li>
+            <li><span className="font-mono font-bold text-foreground/80">Status</span> — Validazione della stima di degrado: <span className="text-emerald-400 font-semibold">VALID</span> = stima attendibile, <span className="text-amber-400 font-semibold">NEUTRAL</span> = segnale troppo debole, <span className="text-red-400 font-semibold">INVALID</span> = stima non attendibile (esclusa dal Virtual Race Engineer). Una slope negativa non indica "gomma che migliora" ma una stima contaminata da fattori esterni.</li>
           </ul>
           <p className="pt-1 italic">Clicca su una riga della tabella per visualizzare il grafico di regressione dello stint selezionato.</p>
         </div>
