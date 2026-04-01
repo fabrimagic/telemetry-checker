@@ -91,6 +91,7 @@ export interface VirtualRaceEngineerResult {
   neutralisation_impact: string | null;
   practice_compounds_used: string[];
   traffic_analysis: TrafficPrediction[];
+  actual_breakdown?: StrategyBreakdown;
 }
 
 /* ── Helpers ── */
