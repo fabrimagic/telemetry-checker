@@ -468,14 +468,14 @@ export function computeVirtualRaceEngineer(
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
-      const reversedTime = simulateTime(actualPitLaps, reversed);
+      const reversedTime = simulateTimeRiskAdjusted(actualPitLaps, reversed);
       if (reversedTime != null) {
         alternatives.push({
           name: "Strategia compound invertiti",
           description: `Ordine mescole invertito: ${reversed.join(" → ")}`,
           pit_laps: actualPitLaps,
           compounds: reversed,
-          estimated_delta_vs_actual: Math.round((actualSimTime - reversedTime) * 10) / 10,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
           pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
           cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
         });
