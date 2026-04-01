@@ -877,10 +877,15 @@ export function computeVirtualRaceEngineer(
     ? recommendedWindows[recommendedWindows.length - 1].range[1]
     : actualPitLaps.length > 0 ? actualPitLaps[actualPitLaps.length - 1] + 3 : null;
 
-  const racePhase = detectRacePhase(
+  const rawRacePhase = detectRacePhase(
     lastLap, totalLaps, pitWindowStartLap, pitWindowEndLap,
     actualPitLaps.length > 0, weatherMap, trackStatusMap,
   );
+  // Apply scenario modifiers to phase adjustments
+  const racePhase: RacePhaseResult = {
+    ...rawRacePhase,
+    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments),
+  };
 
   return {
     driver_number: driverNumber,
