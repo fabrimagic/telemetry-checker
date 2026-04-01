@@ -696,9 +696,11 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             <LineChart data={gapChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
-                dataKey="idx"
+                dataKey="lap"
                 tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                label={{ value: "Time →", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                label={{ value: "Lap", position: "insideBottomRight", offset: -5, fontSize: 10 }}
+                tickFormatter={(v) => String(Math.round(v))}
+                allowDecimals={false}
               />
               <YAxis
                 tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
@@ -715,6 +717,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   const num = parseInt(name.replace("ivl_", ""));
                   return [`${Number(value).toFixed(3)}s`, driverName(num)];
                 }}
+                labelFormatter={(label) => `Lap ${label}`}
               />
               {filteredDrivers.map((num) => (
                 <Line
