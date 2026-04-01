@@ -54,6 +54,7 @@ export interface AlternativeStrategy {
   estimated_delta_vs_actual: number;
   pros: string[];
   cons: string[];
+  traffic_predictions?: TrafficPrediction[];
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
