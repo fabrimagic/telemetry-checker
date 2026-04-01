@@ -749,5 +749,6 @@ export function computeVirtualRaceEngineer(
     traffic_analysis: trafficAnalysis,
     actual_breakdown: actualBreakdown,
     race_phase: racePhase,
+    risk_mode: riskMode,
   };
 }
