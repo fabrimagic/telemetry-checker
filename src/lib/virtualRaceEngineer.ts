@@ -680,10 +680,32 @@ export function computeVirtualRaceEngineer(
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
-  const validStints = stintAnalyses.filter(s => s.degradation_slope != null);
-  if (validStints.length === stints.length) { confScore += 3; confidenceFactors.push("Modello di degrado disponibile per tutti gli stint"); }
-  else if (validStints.length > 0) { confScore += 1; confidenceFactors.push(`Modello di degrado disponibile per ${validStints.length}/${stints.length} stint`); }
-  else { confidenceFactors.push("Modello di degrado non disponibile"); }
+  // Degradation validation impact on confidence
+  const validDegCount = degradationValidations.filter(v => v.status === "VALID").length;
+  const neutralDegCount = degradationValidations.filter(v => v.status === "NEUTRAL").length;
+  const invalidDegCount = degradationValidations.filter(v => v.status === "INVALID").length;
+
+  if (invalidDegCount === 0 && validDegCount > 0) {
+    confScore += 3;
+    confidenceFactors.push(`Degrado gomme validato per tutti gli stint (${validDegCount} VALID${neutralDegCount > 0 ? `, ${neutralDegCount} NEUTRAL` : ""})`);
+  } else if (validDegCount > 0) {
+    confScore += 1;
+    confidenceFactors.push(`Degrado gomme: ${validDegCount} VALID, ${neutralDegCount} NEUTRAL, ${invalidDegCount} INVALID — confidenza ridotta`);
+  } else if (neutralDegCount > 0) {
+    confScore += 0;
+    confidenceFactors.push(`Degrado gomme: nessuna stima VALID (${neutralDegCount} NEUTRAL, ${invalidDegCount} INVALID) — stime deboli usate con cautela`);
+  } else {
+    confidenceFactors.push("Modello di degrado non disponibile o completamente non attendibile");
+  }
+
+  // Add specific degradation validation notes
+  for (const dv of degradationValidations) {
+    if (dv.status === "INVALID") {
+      confidenceFactors.push(`⚠️ Stint ${dv.original.stint} (${dv.original.compound}): degrado INVALID — ${dv.reason}${dv.fallback_description ? `. ${dv.fallback_description}` : ""}`);
+    } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
+      confidenceFactors.push(`ℹ️ Stint ${dv.original.stint} (${dv.original.compound}): degrado NEUTRAL — ${dv.reason}`);
+    }
+  }
 
   if (pitStops.length > 0) { confScore += 2; confidenceFactors.push("Dati pit stop disponibili"); }
   else { confidenceFactors.push("Dati pit stop non disponibili"); }
