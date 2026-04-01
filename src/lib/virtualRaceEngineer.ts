@@ -192,11 +192,13 @@ export function computeVirtualRaceEngineer(
   const stintAnalyses: StintAnalysis[] = [];
   const degradationModels = new Map<number, { slope: number; intercept: number }>();
 
-  const degResults = calculateTyreDegradation(
-    driverNumber, driverAcronym, "ffffff", laps, stints
+  // Use corrected multivariate model (fuel proxy + temperature)
+  const degResults: DegradationResult[] = calculateCorrectedTyreDegradation(
+    driverNumber, driverAcronym, "ffffff", laps, stints,
+    weather, totalLaps, weatherMap, trackStatusMap,
   );
 
-  // ── Degradation validation ──
+  // ── Degradation validation (based on corrected slope) ──
   const rawValidated = validateAllDegradationEstimates(degResults);
   const degradationValidations = resolveDegradationForStrategy(rawValidated);
 
