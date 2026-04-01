@@ -1,7 +1,8 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
+import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge } from "lucide-react";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation } from "lucide-react";
 import React from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
@@ -117,7 +118,7 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis } = result;
 
   return (
     <Card className="border-border">
@@ -312,7 +313,63 @@ export function VirtualRaceEngineerCard({ result }: Props) {
           </div>
         )}
 
-        {/* ── Context: Weather & Neutralisations ── */}
+        {/* ── Traffic Release Analysis ── */}
+        {traffic_analysis.length > 0 && traffic_analysis.some(t => t.traffic_level !== "UNKNOWN") && (
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Navigation className="h-3.5 w-3.5" /> Traffic Release Analysis
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left py-1.5 pr-2">Pit Lap</th>
+                    <th className="text-right py-1.5 pr-2">Pos. rientro</th>
+                    <th className="text-left py-1.5 pr-2">Tra</th>
+                    <th className="text-center py-1.5 pr-2">Traffico</th>
+                    <th className="text-right py-1.5">Tempo perso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {traffic_analysis.filter(t => t.traffic_level !== "UNKNOWN").map((t) => {
+                    const trafficColors: Record<string, string> = {
+                      CLEAN: "bg-emerald-500/20 text-emerald-400",
+                      LIGHT: "bg-amber-500/20 text-amber-400",
+                      HEAVY: "bg-red-500/20 text-red-400",
+                    };
+                    const trafficLabels: Record<string, string> = {
+                      CLEAN: "Clean air",
+                      LIGHT: "Leggero",
+                      HEAVY: "Pesante",
+                    };
+                    return (
+                      <tr key={t.pit_lap} className="border-b border-border/50">
+                        <td className="py-1.5 pr-2 font-mono font-bold">L{t.pit_lap}</td>
+                        <td className="py-1.5 pr-2 text-right font-mono">P{t.rejoin_position_estimated}</td>
+                        <td className="py-1.5 pr-2 text-muted-foreground">
+                          {t.rejoin_between[0] && t.rejoin_between[1]
+                            ? `${t.rejoin_between[0]} – ${t.rejoin_between[1]}`
+                            : t.rejoin_between[0] ? `dietro ${t.rejoin_between[0]}` : t.rejoin_between[1] ? `davanti ${t.rejoin_between[1]}` : "—"}
+                        </td>
+                        <td className="py-1.5 pr-2 text-center">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${trafficColors[t.traffic_level] || ""}`}>
+                            {trafficLabels[t.traffic_level] || t.traffic_level}
+                          </span>
+                        </td>
+                        <td className="py-1.5 text-right font-mono">
+                          {t.estimated_traffic_time_loss > 0
+                            ? <span className="text-red-400">+{t.estimated_traffic_time_loss.toFixed(1)}s</span>
+                            : <span className="text-emerald-400">+0.0s</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {(weather_impact || neutralisation_impact) && (
           <div className="space-y-1.5">
             {weather_impact && (
