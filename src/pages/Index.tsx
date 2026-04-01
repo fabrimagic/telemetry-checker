@@ -92,6 +92,7 @@ export default function Index() {
   const [loadingVre, setLoadingVre] = useState(false);
   const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
   const [vreScenario, setVreScenario] = useState<import("@/lib/scenarioContext").ScenarioId>("REAL_CONTEXT");
+  const [vreScenarioLap, setVreScenarioLap] = useState<number | null>(null);
   const vreArgsRef = useRef<{
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
@@ -306,7 +307,7 @@ export default function Index() {
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
-              diaryForVre, cumDevForVre, vreScenario,
+              diaryForVre, cumDevForVre, vreScenario, vreScenarioLap,
             );
             setVreResult(vre);
           } catch { /* optional */ }
@@ -340,7 +341,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT");
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null);
   }, []);
 
   // Select lap for a driver
@@ -442,7 +443,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT");
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null);
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -749,7 +750,7 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} onRiskModeChange={(mode) => {
+                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} onRiskModeChange={(mode) => {
                     setVreRiskMode(mode);
                     const args = vreArgsRef.current;
                     if (args) {
@@ -758,12 +759,13 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult, vreScenario,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap,
                       );
                       setVreResult(newVre);
                     }
                   }} onScenarioChange={(scenario) => {
                     setVreScenario(scenario);
+                    if (scenario === "REAL_CONTEXT") setVreScenarioLap(null);
                     const args = vreArgsRef.current;
                     if (args) {
                       const newVre = computeVirtualRaceEngineer(
@@ -771,7 +773,20 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, scenario,
+                        args.diaryEvents, args.cumDevResult, scenario, scenario === "REAL_CONTEXT" ? null : vreScenarioLap,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} onScenarioActivationLapChange={(lap) => {
+                    setVreScenarioLap(lap);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                        args.diaryEvents, args.cumDevResult, vreScenario, lap,
                       );
                       setVreResult(newVre);
                     }

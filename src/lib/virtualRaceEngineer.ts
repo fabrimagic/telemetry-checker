@@ -12,7 +12,7 @@ import type { RiskMode } from "./riskAppetite";
 import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult } from "./cumulativeDeviation";
-import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments } from "./scenarioContext";
+import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap } from "./scenarioContext";
 
 /* ── Types ── */
 
@@ -107,6 +107,8 @@ export interface VirtualRaceEngineerResult {
   scenario_label: string;
   scenario_description: string;
   scenario_modifiers_applied: Record<string, number>;
+  scenario_activation_lap: number | null;
+  scenario_activation_warning: string | null;
 }
 
 /* ── Helpers ── */
@@ -170,6 +172,7 @@ export function computeVirtualRaceEngineer(
   diaryEvents: DiaryEvent[] | null = null,
   cumDevResult: CumulativeDeviationResult | null = null,
   scenarioId: ScenarioId = "REAL_CONTEXT",
+  scenarioActivationLap: number | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -285,7 +288,8 @@ export function computeVirtualRaceEngineer(
   }
 
   const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
-  const scenarioMods = scenarioDef.modifiers;
+  const scenarioMods = buildTimedScenarioModifiers(scenarioId, scenarioActivationLap, totalLaps);
+  const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps);
 
   // Risk mode weight multipliers for strategy scoring, combined with scenario modifiers
   const riskWeights = {
@@ -820,8 +824,12 @@ export function computeVirtualRaceEngineer(
 
   // Add scenario note if simulated
   if (isSimulatedScenario(scenarioId)) {
-    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label} — ${scenarioDef.description}`);
-    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}". I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+    const lapNote = scenarioActivationLap != null ? ` dal giro ${scenarioActivationLap}` : "";
+    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote} — ${scenarioDef.description}`);
+    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+    if (scenarioActivationWarning) {
+      narrativeInsights.push(`⚠️ ${scenarioActivationWarning}`);
+    }
   }
 
   // ── 8. Verdict ──
@@ -881,10 +889,10 @@ export function computeVirtualRaceEngineer(
     lastLap, totalLaps, pitWindowStartLap, pitWindowEndLap,
     actualPitLaps.length > 0, weatherMap, trackStatusMap,
   );
-  // Apply scenario modifiers to phase adjustments
+  // Apply scenario modifiers to phase adjustments (with timed scaling)
   const racePhase: RacePhaseResult = {
     ...rawRacePhase,
-    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments),
+    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps),
   };
 
   return {
@@ -909,9 +917,13 @@ export function computeVirtualRaceEngineer(
     scenario_id: scenarioId,
     scenario_is_simulated: isSimulatedScenario(scenarioId),
     scenario_label: scenarioDef.label,
-    scenario_description: scenarioDef.description,
+    scenario_description: scenarioActivationLap != null && isSimulatedScenario(scenarioId)
+      ? `${scenarioDef.description} (dal giro ${scenarioActivationLap})`
+      : scenarioDef.description,
     scenario_modifiers_applied: Object.fromEntries(
       Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
     ) as Record<string, number>,
+    scenario_activation_lap: isSimulatedScenario(scenarioId) ? scenarioActivationLap : null,
+    scenario_activation_warning: scenarioActivationWarning,
   };
 }

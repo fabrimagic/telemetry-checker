@@ -227,18 +227,99 @@ export function isSimulatedScenario(id: ScenarioId): boolean {
  * Build effective modifiers combining scenario + existing phase adjustments.
  * Scenario modifiers multiply on top of phase adjustments.
  */
+/**
+ * Compute a scaling factor for timed scenarios.
+ * Before activation_lap: modifiers are NOT applied (factor = 0).
+ * From activation_lap onward: modifiers apply proportionally to remaining race fraction.
+ * Returns a value between 0 and 1 that blends the modifier toward full strength.
+ */
+export function computeTimedScenarioScale(
+  activationLap: number | null,
+  totalLaps: number,
+  currentContextLap?: number,
+): number {
+  if (activationLap == null || activationLap <= 1) return 1.0; // full effect
+  if (totalLaps <= 0) return 1.0;
+  if (activationLap > totalLaps) return 0.0; // beyond race end, no effect
+
+  // Fraction of race remaining from activation lap
+  const remainingFraction = (totalLaps - activationLap + 1) / totalLaps;
+  // Scale: at lap 1 → full, at last lap → minimal, proportional to remaining race
+  return Math.max(0.1, Math.min(1.0, remainingFraction));
+}
+
+/**
+ * Blend a single modifier value with timing scale.
+ * default_value is the neutral value (1.0 for multipliers, 0 for penalties).
+ */
+function blendModifier(value: number, scale: number, neutral: number): number {
+  return neutral + (value - neutral) * scale;
+}
+
+/**
+ * Build effective modifiers combining scenario + existing phase adjustments.
+ * Scenario modifiers multiply on top of phase adjustments.
+ * When activationLap is set, modifiers are scaled by the timed scenario factor.
+ */
 export function applyScenarioToPhaseAdjustments(
   scenarioId: ScenarioId,
   phaseAdjustments: { degradation_weight: number; traffic_weight: number; track_position_weight: number; risk_penalty_weight: number; neutralization_opportunity_weight: number },
+  activationLap?: number | null,
+  totalLaps?: number,
 ): typeof phaseAdjustments {
   if (scenarioId === "REAL_CONTEXT") return phaseAdjustments;
   
   const mods = SCENARIO_DEFINITIONS[scenarioId].modifiers;
+  const scale = computeTimedScenarioScale(activationLap ?? null, totalLaps ?? 0);
+
   return {
-    degradation_weight: phaseAdjustments.degradation_weight * mods.degradation_weight,
-    traffic_weight: phaseAdjustments.traffic_weight * mods.traffic_weight,
-    track_position_weight: phaseAdjustments.track_position_weight * mods.track_position_weight,
-    risk_penalty_weight: phaseAdjustments.risk_penalty_weight * mods.risk_penalty_weight,
-    neutralization_opportunity_weight: phaseAdjustments.neutralization_opportunity_weight * mods.neutralization_weight,
+    degradation_weight: phaseAdjustments.degradation_weight * blendModifier(mods.degradation_weight, scale, 1.0),
+    traffic_weight: phaseAdjustments.traffic_weight * blendModifier(mods.traffic_weight, scale, 1.0),
+    track_position_weight: phaseAdjustments.track_position_weight * blendModifier(mods.track_position_weight, scale, 1.0),
+    risk_penalty_weight: phaseAdjustments.risk_penalty_weight * blendModifier(mods.risk_penalty_weight, scale, 1.0),
+    neutralization_opportunity_weight: phaseAdjustments.neutralization_opportunity_weight * blendModifier(mods.neutralization_weight, scale, 1.0),
   };
+}
+
+/**
+ * Build timed scenario modifiers: scale each modifier based on activation lap timing.
+ */
+export function buildTimedScenarioModifiers(
+  scenarioId: ScenarioId,
+  activationLap: number | null,
+  totalLaps: number,
+): ScenarioModifiers {
+  if (scenarioId === "REAL_CONTEXT") return { ...DEFAULT_MODIFIERS };
+  
+  const mods = SCENARIO_DEFINITIONS[scenarioId].modifiers;
+  const scale = computeTimedScenarioScale(activationLap, totalLaps);
+
+  return {
+    pit_loss_multiplier: blendModifier(mods.pit_loss_multiplier, scale, 1.0),
+    traffic_weight: blendModifier(mods.traffic_weight, scale, 1.0),
+    degradation_weight: blendModifier(mods.degradation_weight, scale, 1.0),
+    opportunity_weight: blendModifier(mods.opportunity_weight, scale, 1.0),
+    confidence_penalty: Math.round(mods.confidence_penalty * scale),
+    weather_weight: blendModifier(mods.weather_weight, scale, 1.0),
+    neutralization_weight: blendModifier(mods.neutralization_weight, scale, 1.0),
+    risk_penalty_weight: blendModifier(mods.risk_penalty_weight, scale, 1.0),
+    track_position_weight: blendModifier(mods.track_position_weight, scale, 1.0),
+  };
+}
+
+/**
+ * Validate scenario activation lap.
+ * Returns null if valid, or an error message string.
+ */
+export function validateScenarioActivationLap(
+  scenarioId: ScenarioId,
+  activationLap: number | null,
+  totalLaps: number,
+): string | null {
+  if (scenarioId === "REAL_CONTEXT") return null; // no validation needed
+  if (activationLap == null) return null; // no lap set, use full effect
+  if (!Number.isInteger(activationLap) || activationLap < 1) return "Il giro deve essere un intero ≥ 1";
+  if (activationLap > totalLaps) return `Il giro deve essere ≤ ${totalLaps} (giri totali della gara)`;
+  if (totalLaps - activationLap < 3) return "Scenario con impatto limitato negli ultimi giri";
+  return null;
 }

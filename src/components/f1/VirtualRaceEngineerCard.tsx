@@ -5,6 +5,7 @@ import { breakdownToRows } from "@/lib/strategyBreakdown";
 import { getPhaseLabel } from "@/lib/racePhase";
 import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -136,10 +137,12 @@ interface Props {
   result: VirtualRaceEngineerResult;
   onRiskModeChange?: (mode: RiskMode) => void;
   onScenarioChange?: (scenario: ScenarioId) => void;
+  onScenarioActivationLapChange?: (lap: number | null) => void;
+  scenarioActivationLap?: number | null;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, scenarioActivationLap }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_activation_warning } = result;
   
 
   // Use risk_mode from result (backend-computed) as source of truth
@@ -230,10 +233,10 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         )}
         {/* Simulated scenario banner */}
         {scenario_is_simulated && (
-          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
+         <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
             <p className="text-[11px] text-amber-400 font-semibold">
-              What-if scenario attivo: {scenario_label}
+              What-if scenario attivo: {scenario_label}{scenario_activation_lap != null ? ` dal giro ${scenario_activation_lap}` : ""}
             </p>
           </div>
         )}
@@ -359,9 +362,33 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 </Select>
                 <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
                 {scenario_is_simulated && (
-                  <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
-                    <FlaskConical className="h-3 w-3" /> Scenario simulato — i risultati riflettono modificatori ipottetici, non dati reali alterati
-                  </p>
+                  <>
+                    {/* Activation lap input */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground shrink-0">Giro attivazione:</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
+                        value={scenarioActivationLap ?? ""}
+                        placeholder="Tutti"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onScenarioActivationLapChange?.(val === "" ? null : parseInt(val, 10));
+                        }}
+                        className="h-7 w-20 text-[11px] font-mono"
+                      />
+                      <span className="text-[9px] text-muted-foreground">(vuoto = intera gara)</span>
+                    </div>
+                    {scenario_activation_warning && (
+                      <p className="text-[10px] text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                      <FlaskConical className="h-3 w-3" /> Scenario simulato — i risultati riflettono modificatori ipotetici, non dati reali alterati
+                    </p>
+                  </>
                 )}
               </div>
             </div>
