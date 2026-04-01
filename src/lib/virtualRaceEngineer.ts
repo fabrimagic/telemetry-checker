@@ -9,6 +9,9 @@ import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } f
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
 import type { RiskMode } from "./riskAppetite";
+import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
+import type { DiaryEvent } from "./raceDiary";
+import type { CumulativeDeviationResult } from "./cumulativeDeviation";
 
 /* ── Types ── */
 
@@ -96,6 +99,8 @@ export interface VirtualRaceEngineerResult {
   actual_breakdown?: StrategyBreakdown;
   race_phase?: RacePhaseResult;
   risk_mode: RiskMode;
+  integrated_context?: IntegratedStrategyContext;
+  narrative_insights: string[];
 }
 
 /* ── Helpers ── */
@@ -156,6 +161,8 @@ export function computeVirtualRaceEngineer(
   allDrivers: Driver[],
   practiceModels: PracticeCompoundModel[] = [],
   riskMode: RiskMode = "BALANCED",
+  diaryEvents: DiaryEvent[] | null = null,
+  cumDevResult: CumulativeDeviationResult | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -688,7 +695,117 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // ── 7. Verdict ──
+  // ── 7. Integrated Strategy Context ──
+  const integratedContext = buildIntegratedContext(
+    diaryEvents, weatherMap, trackStatusMap, cumDevResult, driverNumber, actualPitLaps,
+  );
+
+  const narrativeInsights: string[] = [];
+
+  // ── 7a. Battle impact on strategies ──
+  if (integratedContext.battle_context) {
+    const bc = integratedContext.battle_context;
+    if (bc.total_battle_laps > 3) {
+      confidenceFactors.push(`${bc.total_episodes} episodi di battaglia rilevati (${bc.total_battle_laps} giri)`);
+      
+      // Check if battles overlapped with recommended pit window
+      if (recommendedWindows.length > 0) {
+        const recPitLap = recommendedWindows[0].ideal_lap;
+        const battleNearPit = bc.episodes.some(ep =>
+          Math.abs(ep.startLap - recPitLap) <= 3 || Math.abs(ep.endLap - recPitLap) <= 3
+        );
+        if (battleNearPit) {
+          narrativeInsights.push(`Battaglia in corso vicino alla finestra pit consigliata (giro ${recPitLap}): il pit potrebbe essere stato condizionato dalla posizione in pista.`);
+        }
+      }
+
+      if (bc.defending_episodes > 0 && bc.longest_episode) {
+        narrativeInsights.push(`Fase difensiva rilevata (${bc.defending_episodes} episodi, il più lungo: ${Math.round(bc.longest_episode.durationSeconds)}s vs ${bc.longest_episode.opponent}). La strategia potrebbe aver risentito della pressione.`);
+      }
+
+      // Penalize alternatives that pit during battle laps
+      for (const alt of alternatives) {
+        const pitDuringBattle = alt.pit_laps.some(pl => bc.battle_laps.has(pl));
+        if (pitDuringBattle) {
+          alt.cons.push("Pit durante fase di battaglia — rischio di perdere posizione");
+          alt.estimated_delta_vs_actual -= 0.5; // Small penalty
+        }
+      }
+    }
+  }
+
+  // ── 7b. Cumulative deviation insights ──
+  if (integratedContext.cumulative_deviation_context?.available) {
+    const cd = integratedContext.cumulative_deviation_context;
+    confScore += 1;
+    confidenceFactors.push("Deviazione cumulativa disponibile come metrica di supporto");
+
+    if (cd.loss_trend_start_lap != null) {
+      narrativeInsights.push(`La strategia reale ha iniziato a perdere terreno in modo cumulativo dal giro ${cd.loss_trend_start_lap} rispetto al benchmark del vincitore (${cd.winner_code ?? "P1"}).`);
+      
+      // Check if pit was before or after the loss trend started
+      if (actualPitLaps.length > 0 && actualPitLaps[0] > cd.loss_trend_start_lap) {
+        narrativeInsights.push(`Il pit reale (giro ${actualPitLaps[0]}) è avvenuto dopo l'inizio della perdita cumulativa (giro ${cd.loss_trend_start_lap}): un pit anticipato avrebbe potuto mitigare la perdita.`);
+      }
+    }
+
+    if (cd.max_deviation != null && cd.max_deviation > 5) {
+      narrativeInsights.push(`Deviazione cumulativa massima osservata: +${cd.max_deviation.toFixed(1)}s al giro ${cd.max_deviation_lap}.`);
+    }
+
+    if (cd.driver_final_delta != null && cd.driver_final_delta > 10) {
+      narrativeInsights.push(`Al termine della gara, il pilota ha accumulato +${cd.driver_final_delta.toFixed(1)}s rispetto al benchmark del vincitore.`);
+    }
+  }
+
+  // ── 7c. Diary context insights ──
+  if (integratedContext.diary_context) {
+    const dc = integratedContext.diary_context;
+    if (dc.strategy_relevant_events.length > 0) {
+      for (const ev of dc.strategy_relevant_events.slice(0, 3)) {
+        narrativeInsights.push(`Giro ${ev.lap}: ${ev.description}`);
+      }
+    }
+    if (dc.overtakes_received > dc.overtakes_done && dc.overtakes_received >= 3) {
+      narrativeInsights.push(`Il pilota ha subito più sorpassi (${dc.overtakes_received}) di quanti ne ha effettuati (${dc.overtakes_done}), indicando una possibile strategia difensiva o ritmo insufficiente.`);
+    }
+  }
+
+  // ── 7d. Weather context enrichment ──
+  if (integratedContext.weather_context?.had_weather_change) {
+    const wc = integratedContext.weather_context;
+    confScore -= 1; // Weather change reduces confidence
+    if (wc.first_non_dry_lap != null) {
+      narrativeInsights.push(`Condizioni meteo variabili rilevate dal giro ${wc.first_non_dry_lap} (${wc.wet_laps} giri bagnati, ${wc.mixed_laps} misti). Il modello di degrado esclude questi giri.`);
+    }
+  }
+
+  // ── 7e. Track status enrichment ──
+  if (integratedContext.track_status_context) {
+    const ts = integratedContext.track_status_context;
+    if (ts.had_safety_car) {
+      // Check if actual pit was during SC (advantage)
+      const pitUnderSC = pitStopAnalyses.some(p => p.neutralisation_type === "SC");
+      if (pitUnderSC) {
+        narrativeInsights.push("Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.");
+      } else if (ts.neutralized_laps.some(nl => {
+        // Check if SC was near recommended window
+        return recommendedWindows.some(w => Math.abs(nl - w.ideal_lap) <= 3);
+      })) {
+        narrativeInsights.push("Una Safety Car è apparsa vicino alla finestra pit consigliata: un pit sotto neutralizzazione avrebbe offerto un vantaggio di ~10s.");
+      }
+    }
+  }
+
+  // ── 7f. Data gaps impact on confidence ──
+  for (const gap of integratedContext.data_gaps) {
+    confidenceFactors.push(`⚠️ ${gap}`);
+  }
+
+  // Recalculate confidence after all adjustments
+  const finalConfidence: Confidence = confScore >= 6 ? "HIGH" : confScore >= 3 ? "MEDIUM" : "LOW";
+
+  // ── 8. Verdict ──
   let verdictLabel: string;
   let verdictSummary: string;
 
@@ -713,13 +830,26 @@ export function computeVirtualRaceEngineer(
     verdictSummary = "Il pit stop effettuato durante una neutralizzazione ha reso la strategia reale competitiva.";
   }
 
+  // Adjust verdict with battle context
+  if (integratedContext.battle_context && integratedContext.battle_context.total_battle_laps > 5) {
+    verdictSummary += ` La strategia è stata condizionata da ${integratedContext.battle_context.total_episodes} episodi di battaglia (${integratedContext.battle_context.total_battle_laps} giri).`;
+  }
+
+  // Adjust verdict with cumulative deviation
+  if (integratedContext.cumulative_deviation_context?.available && integratedContext.cumulative_deviation_context.driver_final_delta != null) {
+    const cd = integratedContext.cumulative_deviation_context;
+    if (cd.driver_final_delta > 15) {
+      verdictSummary += ` Deviazione cumulativa elevata (+${cd.driver_final_delta.toFixed(1)}s vs vincitore).`;
+    }
+  }
+
   // Adjust confidence for practice data
   if (practiceCompoundsUsed.length > 0) {
     confScore += 1;
     confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
   }
 
-  // ── 8. Race Phase Detection ──
+  // ── 9. Race Phase Detection ──
   const lastLap = Math.max(...laps.map(l => l.lap_number));
   const pitWindowStartLap = recommendedWindows.length > 0
     ? recommendedWindows[0].range[0]
@@ -740,8 +870,8 @@ export function computeVirtualRaceEngineer(
     actual_strategy: actualStrategy,
     recommended_strategy: recommendedStrategy,
     alternative_strategies: alternatives,
-    verdict: { label: verdictLabel, summary: verdictSummary, delta_seconds: bestDelta > 0.1 ? Math.round(bestDelta * 10) / 10 : null, confidence },
-    confidence,
+    verdict: { label: verdictLabel, summary: verdictSummary, delta_seconds: bestDelta > 0.1 ? Math.round(bestDelta * 10) / 10 : null, confidence: finalConfidence },
+    confidence: finalConfidence,
     confidence_factors: confidenceFactors,
     weather_impact: weatherImpact,
     neutralisation_impact: neutralisationImpact,
@@ -750,5 +880,7 @@ export function computeVirtualRaceEngineer(
     actual_breakdown: actualBreakdown,
     race_phase: racePhase,
     risk_mode: riskMode,
+    integrated_context: integratedContext,
+    narrative_insights: narrativeInsights,
   };
 }

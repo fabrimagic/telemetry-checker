@@ -34,6 +34,9 @@ import {
   getRaceControl,
   getIntervals,
   getPositions,
+  getSessionsByMeetingKey,
+  getSessionResult,
+  getAllLaps,
   type Driver,
   type Lap,
   type CarData,
@@ -45,13 +48,14 @@ import {
   type RaceControlMessage,
   type IntervalData,
   type PositionData,
+  type SessionInfo,
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
-import { getSessionsByMeetingKey, type SessionInfo } from "@/lib/openf1";
+import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DriverState {
   driver: Driver;
@@ -91,6 +95,7 @@ export default function Index() {
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
     intervals: any; positions: any; allDrivers: any; practiceModels: any;
+    diaryEvents: DiaryEvent[] | null; cumDevResult: CumulativeDeviationResult | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,6 +183,7 @@ export default function Index() {
           let ivls: IntervalData[] = [];
           let pos: PositionData[] = [];
 
+          let diaryForVre: DiaryEvent[] = [];
           setLoadingDiary(true);
           try {
             try { ivls = await getIntervals(sessionKey); setDiaryIntervals(ivls); } catch {}
@@ -192,6 +198,7 @@ export default function Index() {
               driverStints, ivls, pos, allDrivers, laps,
             );
             setDiaryEvents(diary);
+            diaryForVre = diary;
           } catch { /* optional */ }
           setLoadingDiary(false);
 
@@ -272,17 +279,33 @@ export default function Index() {
               } catch { /* optional */ }
             }
 
+            // Compute cumulative deviation for VRE integration
+            let cumDevForVre: CumulativeDeviationResult | null = null;
+            try {
+              const [sessionAllLaps, sessionResults] = await Promise.all([
+                getAllLaps(sessionKey),
+                getSessionResult(sessionKey),
+              ]);
+              if (sessionAllLaps.length && sessionResults.length) {
+                cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
+              }
+            } catch { /* optional */ }
+
+            // diaryForVre captured from diary build above
+
             vreArgsRef.current = {
               driverNumber, driverAcronym: driver.name_acronym, sessionKey,
               laps, stints: driverStints, pits: pitsForVre,
               weather: sessionWeather, raceControl: raceControlMessages,
               intervals: ivls, positions: pos, allDrivers, practiceModels,
+              diaryEvents: diaryForVre, cumDevResult: cumDevForVre,
             };
             const vre = computeVirtualRaceEngineer(
               driverNumber, driver.name_acronym, sessionKey,
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
+              diaryForVre, cumDevForVre,
             );
             setVreResult(vre);
           } catch { /* optional */ }
@@ -734,6 +757,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
+                        args.diaryEvents, args.cumDevResult,
                       );
                       setVreResult(newVre);
                     }
