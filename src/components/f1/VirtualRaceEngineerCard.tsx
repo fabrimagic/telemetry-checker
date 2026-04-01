@@ -7,7 +7,7 @@ import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity } from "lucide-react";
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -119,12 +119,13 @@ function StrategyTimeline({ actual, recommended }: { actual: ActualStrategy; rec
 
 interface Props {
   result: VirtualRaceEngineerResult;
+  onRiskModeChange?: (mode: RiskMode) => void;
 }
 
-export function VirtualRaceEngineerCard({ result }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode } = result;
 
-  const [riskMode, setRiskMode] = useState<RiskMode>("BALANCED");
+  // Use risk_mode from result (backend-computed) as source of truth
 
   // Determine which breakdown to show (recommended if available, otherwise actual)
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
@@ -149,8 +150,8 @@ export function VirtualRaceEngineerCard({ result }: Props) {
       } as any);
     }
     if (allStrats.length === 0) return null;
-    return scoreStrategies(allStrats, race_phase.phase_adjustments, riskMode);
-  }, [race_phase, alternative_strategies, recommended_strategy, riskMode]);
+    return scoreStrategies(allStrats, race_phase.phase_adjustments, risk_mode);
+  }, [race_phase, alternative_strategies, recommended_strategy, risk_mode]);
 
   const topScoredName = scoredStrategies?.[0]?.name ?? null;
   const topScoredReason = scoredStrategies?.[0]?.adjustment_reason ?? null;
@@ -219,7 +220,7 @@ export function VirtualRaceEngineerCard({ result }: Props) {
               <div className="flex rounded-md border border-border overflow-hidden">
                 {(["CONSERVATIVE", "BALANCED", "AGGRESSIVE"] as RiskMode[]).map((mode) => {
                   const info = RISK_MODES[mode];
-                  const isActive = riskMode === mode;
+                  const isActive = risk_mode === mode;
                   const icons: Record<RiskMode, React.ReactNode> = {
                     CONSERVATIVE: <Shield className="h-3 w-3" />,
                     BALANCED: <Scale className="h-3 w-3" />,
@@ -228,7 +229,7 @@ export function VirtualRaceEngineerCard({ result }: Props) {
                   return (
                     <button
                       key={mode}
-                      onClick={() => setRiskMode(mode)}
+                      onClick={() => onRiskModeChange?.(mode)}
                       className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold transition-colors ${
                         isActive
                           ? "bg-primary text-primary-foreground"
@@ -245,9 +246,9 @@ export function VirtualRaceEngineerCard({ result }: Props) {
             </div>
 
             {/* Impact note */}
-            {topScoredName && riskMode !== "BALANCED" && (
+            {topScoredName && risk_mode !== "BALANCED" && (
               <p className="text-[10px] text-muted-foreground italic">
-                💡 Con profilo <strong className="text-foreground">{RISK_MODES[riskMode].label}</strong> in fase <strong className="text-foreground">{getPhaseLabel(race_phase.current_phase)}</strong>:
+                💡 Con profilo <strong className="text-foreground">{RISK_MODES[risk_mode].label}</strong> in fase <strong className="text-foreground">{getPhaseLabel(race_phase.current_phase)}</strong>:
                 strategia favorita → <strong className="text-foreground">{topScoredName}</strong>
                 {topScoredReason && topScoredReason !== "Nessun aggiustamento" && (
                   <span> ({topScoredReason})</span>

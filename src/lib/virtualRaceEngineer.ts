@@ -8,6 +8,7 @@ import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradat
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
+import type { RiskMode } from "./riskAppetite";
 
 /* ── Types ── */
 
@@ -94,6 +95,7 @@ export interface VirtualRaceEngineerResult {
   traffic_analysis: TrafficPrediction[];
   actual_breakdown?: StrategyBreakdown;
   race_phase?: RacePhaseResult;
+  risk_mode: RiskMode;
 }
 
 /* ── Helpers ── */
@@ -153,6 +155,7 @@ export function computeVirtualRaceEngineer(
   positions: PositionData[],
   allDrivers: Driver[],
   practiceModels: PracticeCompoundModel[] = [],
+  riskMode: RiskMode = "BALANCED",
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -267,9 +270,15 @@ export function computeVirtualRaceEngineer(
     return new Set(compounds).size >= 2;
   }
 
-  // Estimate total time for a given strategy
+  // Risk mode weight multipliers for strategy scoring
+  const riskWeights = {
+    CONSERVATIVE: { degradation: 1.15, traffic: 1.3, pitLoss: 1.0 },
+    BALANCED: { degradation: 1.0, traffic: 1.0, pitLoss: 1.0 },
+    AGGRESSIVE: { degradation: 0.85, traffic: 0.7, pitLoss: 1.0 },
+  }[riskMode];
+
+  // Estimate total time for a given strategy (raw, no risk adjustment)
   function simulateTime(pitLaps: number[], compounds: string[]): number | null {
-    // Enforce mandatory 2-compound rule
     if (!hasMinTwoCompounds(compounds)) return null;
     let total = 0;
     const stintBounds: { start: number; end: number; compound: string }[] = [];
@@ -292,11 +301,38 @@ export function computeVirtualRaceEngineer(
     return total;
   }
 
+  // Risk-adjusted time: applies risk weights to degradation component
+  function simulateTimeRiskAdjusted(pitLaps: number[], compounds: string[]): number | null {
+    if (!hasMinTwoCompounds(compounds)) return null;
+    let baseTime = 0;
+    let degCost = 0;
+    const stintBounds: { start: number; end: number; compound: string }[] = [];
+    let start = 1;
+    for (let i = 0; i < pitLaps.length; i++) {
+      stintBounds.push({ start, end: pitLaps[i], compound: compounds[i] || compounds[0] });
+      start = pitLaps[i] + 1;
+    }
+    stintBounds.push({ start, end: totalLaps, compound: compounds[compounds.length - 1] || compounds[0] });
+
+    for (const sb of stintBounds) {
+      const model = compoundModels.get(sb.compound);
+      if (!model) return null;
+      for (let lap = sb.start; lap <= sb.end; lap++) {
+        const tyreLife = lap - sb.start;
+        baseTime += model.intercept;
+        degCost += model.slope * tyreLife;
+      }
+    }
+    // Apply risk weights: conservative penalizes degradation more, aggressive less
+    return baseTime + (degCost * riskWeights.degradation) + (pitLaps.length * pitLoss * riskWeights.pitLoss);
+  }
+
   const actualCompounds = stints.map(s => s.compound);
   const actualPitLaps = pitStops.map(p => p.lap_number);
   const actualSimTime = simulateTime(actualPitLaps, actualCompounds);
+  const actualAdjustedTime = simulateTimeRiskAdjusted(actualPitLaps, actualCompounds);
 
-  // ── 3. Find optimal pit window ──
+  // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
   const recommendedWindows: RecommendedStrategy["pit_windows"] = [];
   let bestDelta = 0;
   let bestPitLaps = actualPitLaps;
@@ -304,8 +340,8 @@ export function computeVirtualRaceEngineer(
   let bestReason = "Strategia reale già vicina all'ottimale";
 
   // Try shifts of ±5 laps for each pit stop AND different compound combinations
-  if (actualPitLaps.length > 0 && actualSimTime != null) {
-    let bestTime = actualSimTime;
+  if (actualPitLaps.length > 0 && actualAdjustedTime != null && actualSimTime != null) {
+    let bestTime = actualAdjustedTime;
 
     // Generate compound combos: actual + all permutations using available compounds
     const allAvailableCompounds = [...compoundModels.keys()];
@@ -351,12 +387,12 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateTime(candidatePits, compounds);
+          const t = simulateTimeRiskAdjusted(candidatePits, compounds);
           if (t != null && t < bestTime) {
             bestTime = t;
             bestPitLaps = candidatePits;
             bestCompounds = compounds;
-            bestDelta = actualSimTime - t;
+            bestDelta = actualAdjustedTime! - t;
           }
         }
       }
@@ -398,17 +434,17 @@ export function computeVirtualRaceEngineer(
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
 
-  if (actualPitLaps.length > 0 && actualSimTime != null) {
+  if (actualPitLaps.length > 0 && actualSimTime != null && actualAdjustedTime != null) {
     // Undercut
     const undercutPits = actualPitLaps.map((p, i) => i === 0 ? Math.max(3, p - 3) : p);
-    const undercutTime = simulateTime(undercutPits, actualCompounds);
+    const undercutTime = simulateTimeRiskAdjusted(undercutPits, actualCompounds);
     if (undercutTime != null) {
       alternatives.push({
         name: "Undercut anticipato",
         description: `Pit al giro ${undercutPits[0]} invece di ${actualPitLaps[0]}`,
         pit_laps: undercutPits,
         compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualSimTime - undercutTime) * 10) / 10,
+        estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
         pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
         cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
       });
@@ -416,14 +452,14 @@ export function computeVirtualRaceEngineer(
 
     // Overcut
     const overcutPits = actualPitLaps.map((p, i) => i === 0 ? Math.min(totalLaps - 3, p + 3) : p);
-    const overcutTime = simulateTime(overcutPits, actualCompounds);
+    const overcutTime = simulateTimeRiskAdjusted(overcutPits, actualCompounds);
     if (overcutTime != null) {
       alternatives.push({
         name: "Overcut / estensione stint",
         description: `Pit al giro ${overcutPits[0]} invece di ${actualPitLaps[0]}`,
         pit_laps: overcutPits,
         compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualSimTime - overcutTime) * 10) / 10,
+        estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
         pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
         cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
       });
@@ -433,14 +469,14 @@ export function computeVirtualRaceEngineer(
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
-      const reversedTime = simulateTime(actualPitLaps, reversed);
+      const reversedTime = simulateTimeRiskAdjusted(actualPitLaps, reversed);
       if (reversedTime != null) {
         alternatives.push({
           name: "Strategia compound invertiti",
           description: `Ordine mescole invertito: ${reversed.join(" → ")}`,
           pit_laps: actualPitLaps,
           compounds: reversed,
-          estimated_delta_vs_actual: Math.round((actualSimTime - reversedTime) * 10) / 10,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
           pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
           cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
         });
@@ -456,14 +492,14 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateTime(actualPitLaps, altCompounds);
+        const altTime = simulateTimeRiskAdjusted(actualPitLaps, altCompounds);
         if (altTime != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
             description: `Ultimo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[actualCompounds.length - 1]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
             cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
           });
@@ -474,14 +510,14 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[0] = practiceCompound;
-        const altTime = simulateTime(actualPitLaps, altCompounds);
-        if (altTime != null) {
+        const altTime2 = simulateTimeRiskAdjusted(actualPitLaps, altCompounds);
+        if (altTime2 != null) {
           alternatives.push({
             name: `Stint iniziale su ${practiceCompound}`,
             description: `Primo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[0]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualSimTime - altTime) * 10) / 10,
+            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
             cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
           });
@@ -713,5 +749,6 @@ export function computeVirtualRaceEngineer(
     traffic_analysis: trafficAnalysis,
     actual_breakdown: actualBreakdown,
     race_phase: racePhase,
+    risk_mode: riskMode,
   };
 }

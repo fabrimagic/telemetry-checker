@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { SessionPicker } from "@/components/f1/SessionPicker";
 import { LapTimesChart } from "@/components/f1/LapTimesChart";
 import { DriverPicker } from "@/components/f1/DriverPicker";
@@ -50,6 +50,7 @@ import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
+import type { RiskMode } from "@/lib/riskAppetite";
 import { getSessionsByMeetingKey, type SessionInfo } from "@/lib/openf1";
 
 interface DriverState {
@@ -85,6 +86,12 @@ export default function Index() {
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [loadingVre, setLoadingVre] = useState(false);
+  const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
+  const vreArgsRef = useRef<{
+    driverNumber: number; driverAcronym: string; sessionKey: number;
+    laps: any; stints: any; pits: any; weather: any; raceControl: any;
+    intervals: any; positions: any; allDrivers: any; practiceModels: any;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [cursorTime, setCursorTime] = useState<number | null>(null);
@@ -265,11 +272,17 @@ export default function Index() {
               } catch { /* optional */ }
             }
 
+            vreArgsRef.current = {
+              driverNumber, driverAcronym: driver.name_acronym, sessionKey,
+              laps, stints: driverStints, pits: pitsForVre,
+              weather: sessionWeather, raceControl: raceControlMessages,
+              intervals: ivls, positions: pos, allDrivers, practiceModels,
+            };
             const vre = computeVirtualRaceEngineer(
               driverNumber, driver.name_acronym, sessionKey,
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
-              ivls, pos, allDrivers, practiceModels,
+              ivls, pos, allDrivers, practiceModels, vreRiskMode,
             );
             setVreResult(vre);
           } catch { /* optional */ }
@@ -303,7 +316,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED");
   }, []);
 
   // Select lap for a driver
@@ -405,7 +418,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -712,7 +725,19 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} />
+                  <VirtualRaceEngineerCard result={vreResult} onRiskModeChange={(mode) => {
+                    setVreRiskMode(mode);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} />
                 ) : null
               )}
             {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
