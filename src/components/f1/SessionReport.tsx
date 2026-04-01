@@ -705,6 +705,16 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
           </div>
         </div>
       )}
+
+      {/* Cumulative Deviation */}
+      {isRace && results.length > 0 && (
+        <CumulativeDeviationCard
+          sessionKey={sessionKey}
+          results={results}
+          drivers={drivers}
+          visibleDrivers={visibleDrivers}
+        />
+      )}
     </div>
   );
 }
