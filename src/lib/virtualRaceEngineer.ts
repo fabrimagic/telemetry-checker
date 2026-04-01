@@ -935,6 +935,11 @@ export function computeVirtualRaceEngineer(
     phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
   };
 
+  // Reduce confidence if degradation is unreliable
+  if (invalidDegCount > 0) {
+    confScore -= invalidDegCount;
+  }
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
