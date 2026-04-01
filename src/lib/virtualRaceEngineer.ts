@@ -898,7 +898,7 @@ export function computeVirtualRaceEngineer(
   // Apply scenario modifiers to phase adjustments (with timed scaling)
   const racePhase: RacePhaseResult = {
     ...rawRacePhase,
-    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps),
+    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
   };
 
   return {
