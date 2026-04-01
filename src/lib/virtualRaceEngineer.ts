@@ -5,6 +5,7 @@ import type {
 import { classifyLapsWeather, type WeatherCondition } from "./weatherClassification";
 import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassification";
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
+import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 
 /* ── Types ── */
 
