@@ -695,5 +695,5 @@ export function computeVirtualRaceEngineer(
     neutralisation_impact: neutralisationImpact,
     practice_compounds_used: practiceCompoundsUsed,
     traffic_analysis: trafficAnalysis,
-  };
+    actual_breakdown: actualBreakdown,
 }
