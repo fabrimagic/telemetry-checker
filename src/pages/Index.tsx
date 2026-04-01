@@ -753,6 +753,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
+                        args.diaryEvents, args.cumDevResult,
                       );
                       setVreResult(newVre);
                     }
