@@ -78,28 +78,15 @@ function buildDriverDeviation(
   teamColour: string,
   referenceAvg: number
 ): DriverCumulativeDeviation {
-  const driverLaps = allLaps
-    .filter(
-      (l) =>
-        l.driver_number === driverNumber &&
-        l.lap_duration != null &&
-        l.lap_duration > 0 &&
-        l.lap_number >= 1
-    )
-    .sort((a, b) => a.lap_number - b.lap_number);
-
-  // Filter out extreme outliers for deviation calc (e.g. pit in-laps, SC restarts)
-  const times = driverLaps.map((l) => l.lap_duration!).sort((a, b) => a - b);
-  const median = times.length > 0 ? times[Math.floor(times.length / 2)] : referenceAvg;
-  const outlierThreshold = median * 1.5;
+  const driverLaps = allLaps.filter((l) => l.driver_number === driverNumber);
+  // Use the SAME filtering as the benchmark to ensure the winner ends at ~0
+  const validLaps = getValidLaps(driverLaps).sort((a, b) => a.lap_number - b.lap_number);
 
   let cumulative = 0;
   const laps: LapDeviation[] = [];
 
-  for (const lap of driverLaps) {
+  for (const lap of validLaps) {
     const lt = lap.lap_duration!;
-    // Skip extreme outliers (pit laps, etc.) - don't accumulate them
-    if (lt > outlierThreshold || lap.is_pit_out_lap) continue;
 
     const delta = lt - referenceAvg;
     cumulative += delta;
