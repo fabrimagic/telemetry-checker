@@ -248,7 +248,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     }
     return data;
   }, [positions, results, allLaps]);
-  }, [positions, results]);
+  
 
   const positionDrivers = useMemo(() => {
     return results.slice(0, 20).map((r) => r.driver_number);
