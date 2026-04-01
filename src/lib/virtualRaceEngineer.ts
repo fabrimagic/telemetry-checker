@@ -5,6 +5,7 @@ import type {
 import { classifyLapsWeather, type WeatherCondition } from "./weatherClassification";
 import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassification";
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
+import { calculateCorrectedTyreDegradation, type CorrectedDegradationResult } from "./correctedDegradation";
 import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
@@ -191,11 +192,13 @@ export function computeVirtualRaceEngineer(
   const stintAnalyses: StintAnalysis[] = [];
   const degradationModels = new Map<number, { slope: number; intercept: number }>();
 
-  const degResults = calculateTyreDegradation(
-    driverNumber, driverAcronym, "ffffff", laps, stints
+  // Use corrected multivariate model (fuel proxy + temperature)
+  const degResults: DegradationResult[] = calculateCorrectedTyreDegradation(
+    driverNumber, driverAcronym, "ffffff", laps, stints,
+    weather, totalLaps, weatherMap, trackStatusMap,
   );
 
-  // ── Degradation validation ──
+  // ── Degradation validation (based on corrected slope) ──
   const rawValidated = validateAllDegradationEstimates(degResults);
   const degradationValidations = resolveDegradationForStrategy(rawValidated);
 
@@ -757,9 +760,14 @@ export function computeVirtualRaceEngineer(
   // ── 7.pre Degradation validation insights ──
   for (const dv of degradationValidations) {
     if (dv.status === "INVALID") {
-      narrativeInsights.push(`La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}, slope originale: ${dv.original_slope.toFixed(3)} sec/giro) è stata classificata come non attendibile e non è stata usata direttamente nel modello strategico. ${dv.fallback_description ?? ""}`);
+      const corrNote = dv.model_corrected
+        ? ` Il modello ha corretto per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} (slope grezza: ${dv.slope_raw.toFixed(3)}, corretta: ${dv.slope_corrected.toFixed(3)}), ma la stima resta non attendibile.`
+        : "";
+      narrativeInsights.push(`La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}) è stata classificata come non attendibile e non è stata usata nel modello strategico.${corrNote} ${dv.fallback_description ?? ""}`);
+    } else if (dv.model_corrected && dv.slope_raw < 0 && dv.slope_corrected > 0 && dv.status === "VALID") {
+      narrativeInsights.push(`Stint ${dv.original.stint} (${dv.original.compound}): la slope grezza era negativa (${dv.slope_raw.toFixed(3)}) ma dopo correzione per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} il degrado stimato è diventato positivo (${dv.slope_corrected.toFixed(3)} sec/giro). Il modello usa il valore corretto.`);
     } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
-      narrativeInsights.push(`Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope: ${dv.original_slope.toFixed(3)}). Usato con cautela nel modello.`);
+      narrativeInsights.push(`Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope${dv.model_corrected ? " corretta" : ""}: ${dv.slope_corrected.toFixed(3)}). Usato con cautela nel modello.`);
     }
   }
   if (invalidDegCount > 0 && validDegCount === 0 && neutralDegCount === 0) {

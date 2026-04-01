@@ -5,12 +5,16 @@
  * Prevents unreliable estimates (especially negative slopes) from being
  * used as strategic input in the Virtual Race Engineer.
  * 
+ * Supports both simple DegradationResult and CorrectedDegradationResult.
+ * When a corrected model is available, validation is based on slope_corrected.
+ * 
  * Anti-hallucination: A negative slope does NOT mean "tyre gaining performance".
  * It means the estimate is contaminated by fuel effect, warm-up, traffic,
  * track evolution, weather, short stint, or statistical noise.
  */
 
 import type { DegradationResult } from "./tyreDegradation";
+import type { CorrectedDegradationResult } from "./correctedDegradation";
 
 /* ── Configuration ── */
 
@@ -60,6 +64,24 @@ export interface DegradationValidationResult {
   fit_quality: "GOOD" | "ACCEPTABLE" | "POOR" | "INSUFFICIENT";
   /** Confidence in this specific estimate */
   confidence: "HIGH" | "MEDIUM" | "LOW";
+  /** Whether corrected model was used */
+  model_corrected: boolean;
+  /** Raw slope (simple regression) */
+  slope_raw: number;
+  /** Corrected slope (multivariate, if available) */
+  slope_corrected: number;
+  /** Fuel proxy type used (if corrected) */
+  fuel_proxy_type: string | null;
+  /** Whether weather correction was applied */
+  weather_correction_used: boolean;
+  /** Model type identifier */
+  model_type: string;
+}
+
+/* ── Helpers ── */
+
+function isCorrectedResult(r: DegradationResult): r is CorrectedDegradationResult {
+  return "model_type" in r && "slope_raw" in r && "slope_corrected" in r;
 }
 
 /* ── Validation ── */
@@ -68,9 +90,15 @@ export function validateDegradationEstimate(
   result: DegradationResult,
   config: DegradationValidationConfig = DEFAULT_VALIDATION_CONFIG,
 ): DegradationValidationResult {
-  const slope = result.slopeSecPerLap;
+  const corrected = isCorrectedResult(result);
+  const slopeRaw = corrected ? (result as CorrectedDegradationResult).slope_raw : result.slopeSecPerLap;
+  const slopeCorrected = corrected ? (result as CorrectedDegradationResult).slope_corrected : result.slopeSecPerLap;
+  const rSqCorrected = corrected ? (result as CorrectedDegradationResult).r_squared_corrected : result.rSquared;
+  
+  // Validation is based on the corrected slope (which IS the raw slope when no correction available)
+  const slope = slopeCorrected;
   const laps = result.lapsUsed;
-  const rSq = result.rSquared;
+  const rSq = rSqCorrected;
 
   // Assess fit quality
   const fitQuality: DegradationValidationResult["fit_quality"] =
@@ -93,26 +121,32 @@ export function validateDegradationEstimate(
     reasons.push(`Qualità del fit insufficiente (R²=${rSq.toFixed(3)} < ${config.min_r_squared})`);
   }
 
-  // 3. Check slope
+  // 3. Check slope (corrected)
   if (status !== "INVALID") {
     if (slope < config.negative_tolerance) {
       status = "INVALID";
-      reasons.push(`Slope negativa oltre la tolleranza (${slope.toFixed(3)} < ${config.negative_tolerance})`);
+      reasons.push(`Slope ${corrected ? "corretta" : ""} negativa oltre la tolleranza (${slope.toFixed(3)} < ${config.negative_tolerance})`);
+      if (corrected && slopeRaw < 0 && slopeCorrected < 0) {
+        reasons.push("Anche dopo correzione per fuel proxy e temperatura, la slope resta negativa");
+      }
     } else if (Math.abs(slope) <= config.neutral_tolerance) {
       status = "NEUTRAL";
-      reasons.push(`Slope vicina a zero (|${slope.toFixed(3)}| ≤ ${config.neutral_tolerance}): segnale di degrado troppo debole`);
+      reasons.push(`Slope ${corrected ? "corretta " : ""}vicina a zero (|${slope.toFixed(3)}| ≤ ${config.neutral_tolerance}): segnale di degrado troppo debole`);
     } else if (slope > config.neutral_tolerance) {
-      // Positive slope but check if fit is poor
       if (fitQuality === "POOR") {
         status = "NEUTRAL";
-        reasons.push(`Slope positiva ma fit di bassa qualità (R²=${rSq.toFixed(3)})`);
+        reasons.push(`Slope ${corrected ? "corretta " : ""}positiva ma fit di bassa qualità (R²=${rSq.toFixed(3)})`);
       } else {
-        reasons.push("Slope positiva con fit accettabile");
+        reasons.push(`Slope ${corrected ? "corretta " : ""}positiva con fit accettabile`);
       }
     }
   }
 
-  // Build reason string
+  // Add info about raw vs corrected when model corrected
+  if (corrected && slopeRaw < 0 && slopeCorrected > 0 && status === "VALID") {
+    reasons.push(`Slope grezza negativa (${slopeRaw.toFixed(3)}) corretta a positiva (${slopeCorrected.toFixed(3)}) dopo rimozione effetto fuel/temperatura`);
+  }
+
   const reason = reasons.length > 0 ? reasons.join("; ") : "Stima valida";
 
   // Determine effective slope and fallback
@@ -123,24 +157,23 @@ export function validateDegradationEstimate(
 
   if (status === "INVALID") {
     usedForStrategy = false;
-    // Will be resolved by selectDegradationFallback later
     effectiveSlope = config.neutral_fallback_slope;
     fallbackApplied = true;
     fallbackDescription = `Fallback conservativo applicato (${config.neutral_fallback_slope} sec/giro) — stima originale esclusa`;
   } else if (status === "NEUTRAL") {
-    // Use slope but cap at a minimum to avoid strategic distortion
     effectiveSlope = Math.max(slope, 0);
     if (effectiveSlope !== slope) {
       fallbackApplied = true;
       fallbackDescription = "Slope negativa lieve portata a zero per uso strategico prudente";
     }
-    usedForStrategy = true; // Used but with reduced confidence
+    usedForStrategy = true;
   }
 
-  // Confidence for this estimate
   const confidence: DegradationValidationResult["confidence"] =
     status === "VALID" && fitQuality !== "POOR" ? "HIGH" :
     status === "NEUTRAL" ? "MEDIUM" : "LOW";
+
+  const cr = corrected ? result as CorrectedDegradationResult : null;
 
   return {
     original: result,
@@ -150,9 +183,15 @@ export function validateDegradationEstimate(
     effective_slope: effectiveSlope,
     fallback_applied: fallbackApplied,
     fallback_description: fallbackDescription,
-    original_slope: slope,
+    original_slope: slopeRaw,
     fit_quality: fitQuality,
     confidence,
+    model_corrected: corrected,
+    slope_raw: slopeRaw,
+    slope_corrected: slopeCorrected,
+    fuel_proxy_type: cr?.fuel_proxy_type ?? null,
+    weather_correction_used: cr?.weather_correction_used ?? false,
+    model_type: cr?.model_type ?? "simple",
   };
 }
 
@@ -167,15 +206,6 @@ export function validateAllDegradationEstimates(
 
 /* ── Fallback selection ── */
 
-/**
- * Select the best fallback for an INVALID degradation estimate.
- * Priority:
- * 1. Same compound from another valid stint of the same driver
- * 2. Same compound from any validated result in session
- * 3. Neutral conservative fallback
- * 
- * Never invents data. If no credible fallback exists, uses neutral_fallback_slope.
- */
 export function selectDegradationFallback(
   invalidResult: DegradationValidationResult,
   allValidated: DegradationValidationResult[],
@@ -217,10 +247,6 @@ export function selectDegradationFallback(
   };
 }
 
-/**
- * Resolve the effective degradation input for the VRE.
- * Applies fallback selection for INVALID results.
- */
 export function resolveDegradationForStrategy(
   validated: DegradationValidationResult[],
   config: DegradationValidationConfig = DEFAULT_VALIDATION_CONFIG,
