@@ -30,10 +30,8 @@ export interface CumulativeDeviationResult {
  */
 function getSessionWinner(results: SessionResult[]): number | null {
   if (!results.length) return null;
-  const sorted = [...results].sort((a, b) => a.position - b.position);
-  const p1 = sorted[0];
-  if (p1 && !p1.dnf && !p1.dns && !p1.dsq) return p1.driver_number;
-  return null;
+  const p1 = results.find((r) => r.position === 1 && !r.dnf && !r.dns && !r.dsq);
+  return p1 ? p1.driver_number : null;
 }
 
 /**
