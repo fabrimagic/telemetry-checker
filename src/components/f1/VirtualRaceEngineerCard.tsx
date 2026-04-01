@@ -329,8 +329,42 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
               <Activity className="h-3.5 w-3.5" /> Race Context
             </h4>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Questa sezione identifica automaticamente la fase della gara in base ai giri rimanenti e permette di selezionare un profilo di rischio. La fase gara e il profilo di rischio influenzano il ranking delle strategie alternative, la scomposizione del giudizio e il verdetto finale del Virtual Race Engineer.
+              Questa sezione identifica automaticamente la fase della gara e permette di selezionare un profilo di rischio e uno scenario what-if. Fase gara, profilo di rischio e scenario influenzano il ranking delle strategie, la scomposizione del giudizio e il verdetto finale.
             </p>
+
+            {/* Scenario selector */}
+            <div className="flex items-start gap-2">
+              <span className="text-[11px] text-muted-foreground shrink-0 w-20 pt-2">Scenario:</span>
+              <div className="flex-1 space-y-1">
+                <Select
+                  value={scenario_id}
+                  onValueChange={(val) => onScenarioChange?.(val as ScenarioId)}
+                >
+                  <SelectTrigger className="h-8 text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_SCENARIO_IDS.map((sid) => {
+                      const def = SCENARIO_DEFINITIONS[sid];
+                      return (
+                        <SelectItem key={sid} value={sid} className="text-[11px]">
+                          <span className="flex items-center gap-1.5">
+                            {isSimulatedScenario(sid) && <FlaskConical className="h-3 w-3 text-amber-400" />}
+                            {def.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
+                {scenario_is_simulated && (
+                  <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                    <FlaskConical className="h-3 w-3" /> Scenario simulato — i risultati riflettono modificatori ipottetici, non dati reali alterati
+                  </p>
+                )}
+              </div>
+            </div>
 
             {/* Phase indicator */}
             <div className="flex items-start gap-2">
