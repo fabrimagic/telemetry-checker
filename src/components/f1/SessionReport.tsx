@@ -604,9 +604,9 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                           width: `${width}%`,
                           backgroundColor: compoundColors[s.compound] ?? "hsl(0,0%,50%)",
                         }}
-                        title={`${s.compound} L${s.lap_start}-${s.lap_end}`}
+                        title={`${s.compound ?? "Unknown"} L${s.lap_start}-${s.lap_end}`}
                       >
-                        {width > 5 ? s.compound.charAt(0) : ""}
+                        {width > 5 ? (s.compound ?? "?").charAt(0) : ""}
                       </div>
                     );
                   })}
