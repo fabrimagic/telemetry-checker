@@ -915,9 +915,13 @@ export function computeVirtualRaceEngineer(
     scenario_id: scenarioId,
     scenario_is_simulated: isSimulatedScenario(scenarioId),
     scenario_label: scenarioDef.label,
-    scenario_description: scenarioDef.description,
+    scenario_description: scenarioActivationLap != null && isSimulatedScenario(scenarioId)
+      ? `${scenarioDef.description} (dal giro ${scenarioActivationLap})`
+      : scenarioDef.description,
     scenario_modifiers_applied: Object.fromEntries(
       Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
     ) as Record<string, number>,
+    scenario_activation_lap: isSimulatedScenario(scenarioId) ? scenarioActivationLap : null,
+    scenario_activation_warning: scenarioActivationWarning,
   };
 }
