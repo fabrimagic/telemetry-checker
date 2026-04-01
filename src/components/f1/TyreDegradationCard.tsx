@@ -47,6 +47,8 @@ interface Props {
 export function TyreDegradationCard({ results, longRuns }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
+  const validations = useMemo(() => validateAllDegradationEstimates(results), [results]);
+
   const selected = selectedIdx != null ? results[selectedIdx] : null;
 
   // Build chart data with regression line
