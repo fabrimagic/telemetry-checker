@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { type DegradationResult } from "@/lib/tyreDegradation";
+import { validateAllDegradationEstimates, type DegradationValidationResult } from "@/lib/degradationValidation";
 import { type LongRunResult } from "@/lib/longRunDetector";
 import { Watermark } from "./Watermark";
 import {
