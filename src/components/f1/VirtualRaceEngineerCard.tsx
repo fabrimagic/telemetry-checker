@@ -315,6 +315,9 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Activity className="h-3.5 w-3.5" /> Race Context
             </h4>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              Questa sezione identifica automaticamente la fase della gara in base ai giri rimanenti e permette di selezionare un profilo di rischio. La fase gara e il profilo di rischio influenzano il ranking delle strategie alternative, la scomposizione del giudizio e il verdetto finale del Virtual Race Engineer.
+            </p>
 
             {/* Phase indicator */}
             <div className="flex items-start gap-2">
