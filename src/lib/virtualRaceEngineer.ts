@@ -95,6 +95,7 @@ export interface VirtualRaceEngineerResult {
   traffic_analysis: TrafficPrediction[];
   actual_breakdown?: StrategyBreakdown;
   race_phase?: RacePhaseResult;
+  risk_mode: RiskMode;
 }
 
 /* ── Helpers ── */
