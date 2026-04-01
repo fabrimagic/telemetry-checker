@@ -819,18 +819,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                         const num = parseInt(entry.dataKey.replace("ivl_", ""));
                         const lapData = gapChartData.find((d: any) => d.lap === label);
                         const aheadNum = lapData?.[`ahead_${num}`];
-                        const aheadLabel = aheadNum != null ? driverName(aheadNum) : (
-                          // Check if driver is P1 (no car ahead)
-                          lapData?.[`ivl_${num}`] != null ? "N/A" : "N/A"
-                        );
-                        // If interval exists but is the leader, show "Leader"
-                        const posMap = positionByLap.get(label as number);
-                        let isLeader = false;
-                        if (posMap) {
-                          for (const [pos, dNum] of posMap) {
-                            if (dNum === num && pos === 1) { isLeader = true; break; }
-                          }
-                        }
+                        const isLeader = aheadNum === -1;
+                        const aheadLabel = isLeader ? "Leader" : aheadNum != null ? driverName(aheadNum) : "N/A";
                         return (
                           <div key={entry.dataKey} style={{ display: "flex", flexDirection: "column", marginBottom: 3 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -839,7 +829,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                               <span style={{ marginLeft: "auto", fontFamily: "monospace" }}>{Number(entry.value).toFixed(3)}s</span>
                             </div>
                             <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", marginLeft: 14 }}>
-                              Ahead: {isLeader ? "Leader" : aheadNum != null ? aheadLabel : "N/A"}
+                              Ahead: {aheadLabel}
                             </div>
                           </div>
                         );
