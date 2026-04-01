@@ -284,11 +284,14 @@ export function computeVirtualRaceEngineer(
     return new Set(compounds).size >= 2;
   }
 
-  // Risk mode weight multipliers for strategy scoring
+  const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
+  const scenarioMods = scenarioDef.modifiers;
+
+  // Risk mode weight multipliers for strategy scoring, combined with scenario modifiers
   const riskWeights = {
-    CONSERVATIVE: { degradation: 1.15, traffic: 1.3, pitLoss: 1.0 },
-    BALANCED: { degradation: 1.0, traffic: 1.0, pitLoss: 1.0 },
-    AGGRESSIVE: { degradation: 0.85, traffic: 0.7, pitLoss: 1.0 },
+    CONSERVATIVE: { degradation: 1.15 * scenarioMods.degradation_weight, traffic: 1.3 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
+    BALANCED: { degradation: 1.0 * scenarioMods.degradation_weight, traffic: 1.0 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
+    AGGRESSIVE: { degradation: 0.85 * scenarioMods.degradation_weight, traffic: 0.7 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
   }[riskMode];
 
   // Estimate total time for a given strategy (raw, no risk adjustment)
