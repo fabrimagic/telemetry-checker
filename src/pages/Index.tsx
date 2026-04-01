@@ -670,7 +670,7 @@ export default function Index() {
               {sessionKey && <SessionReport sessionKey={sessionKey} sessionType={sessionType} />}
             </TabsContent>
 
-            <TabsContent value="drivers" className="mt-4 space-y-6">
+             <TabsContent value="drivers" className="mt-4 space-y-5">
               <DriverPicker
                 drivers={allDrivers}
                 selected={selectedDriverNumbers}
@@ -688,7 +688,29 @@ export default function Index() {
           </div>
         )}
 
-        {/* Lap Tables */}
+        {/* ── Summary cards (Stints, Pits, Overtakes, Weather) ── */}
+        {driversLaps.length > 0 && loadingLaps.size === 0 && (stintsData.length > 0 || pitStopsData.length > 0 || overtakesData.length > 0 || (sessionWeather.length > 0 && selectedDriverNumbers.length === 1)) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stintsData.length > 0 && (
+              <StintsCard stints={stintsData} />
+            )}
+            {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
+              <PitStopsCard
+                pitStops={pitStopsData}
+                allDrivers={allDrivers}
+                multiDriver={selectedDriverNumbers.length > 1}
+              />
+            )}
+            {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+              <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+            )}
+            {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
+              <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
+            )}
+          </div>
+        )}
+
+        {/* ── Lap Times & Table ── */}
         {driversLaps.length > 0 && loadingLaps.size === 0 && (
           <>
             <LapTimesChart
@@ -708,6 +730,8 @@ export default function Index() {
               onSelectLap={handleSelectLap}
             />
             <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
+
+            {/* Telemetry load button */}
             {hasLapsSelected && (
               <Button
                 onClick={handleLoadTelemetry}
@@ -718,6 +742,73 @@ export default function Index() {
                 Load Telemetry
               </Button>
             )}
+
+            {/* ── Telemetry + Map ── */}
+            {loadingTelemetry && (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading telemetry…
+              </div>
+            )}
+
+            {chartDrivers.length > 0 && !loadingTelemetry && (
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+                <section className="bg-card rounded-lg border border-border p-4 overflow-hidden">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telemetry</h3>
+                    <div className="flex gap-3">
+                      {chartDrivers.map((d) => (
+                        <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${d.color}` }} />
+                          <span className="font-mono font-bold">{d.acronym}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <TelemetryCharts
+                    drivers={chartDrivers}
+                    cursorTime={clickedTime ?? cursorTime}
+                    onCursorChange={setCursorTime}
+                    onCursorClick={setClickedTime}
+                  />
+                  <SectorMiniSectors
+                    drivers={[...driverStates.values()]
+                      .filter((s) => s.selectedLap != null && s.carData.length > 0)
+                      .map((s) => {
+                        const lap = s.laps.find((l) => l.lap_number === s.selectedLap)!;
+                        return {
+                          driver: s.driver,
+                          lap,
+                          color: getColor(s.driver.driver_number),
+                        };
+                      })}
+                  />
+                  <DrivingAnalysis
+                    drivers={[...driverStates.values()]
+                      .filter((s) => s.carData.length > 0)
+                      .map((s) => ({
+                        driverNumber: s.driver.driver_number,
+                        acronym: s.driver.name_acronym,
+                        color: getColor(s.driver.driver_number),
+                        carData: s.carData,
+                      }))}
+                  />
+                </section>
+                <div className="space-y-6">
+                  <TrackMap
+                    drivers={mapDrivers}
+                    activeDate={activeDate}
+                    driverZones={[...driverStates.values()]
+                      .filter((s) => s.carData.length > 0)
+                      .map((s) => computeDriverZones(s.carData, s.driver.driver_number, getColor(s.driver.driver_number)))}
+                  />
+                  {weatherData && selectedDriverNumbers.length === 1 && (
+                    <WeatherCard weather={weatherData} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Tyre Degradation ── */}
             {degradationResults.length > 0 ? (
               <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
             ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
@@ -727,7 +818,7 @@ export default function Index() {
                   Tyre Degradation
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Dati insufficienti per calcolare il degrado gomme. Non sono state rilevate simulazioni passo gara (long run) con un numero sufficiente di giri validi per i piloti selezionati.
+                  Dati insufficienti per calcolare il degrado gomme. Non sono state rilevate simulazioni passo gara (long run) con un numero sufficiente di giri validi.
                 </p>
                 <details className="group">
                   <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -737,18 +828,17 @@ export default function Index() {
                   </summary>
                   <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
                     <ul className="space-y-1.5 pl-5 list-disc">
-                      <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint, che simula il passo gara in una sessione di prove libere.</li>
-                      <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Vengono esclusi out lap, in lap e giri anomali (tempo &lt; 99% o &gt; 107% della mediana dello stint).</li>
-                      <li><span className="font-mono font-bold text-foreground/80">Score</span> — Ogni sequenza riceve un punteggio basato su: lunghezza (max +30), regolarità del passo (max +25), trend di degrado positivo (max +20), con penalità per giri push (-25) o alta variabilità (-15).</li>
-                      <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile long run • Score 40–59: possibile long run • Score &lt; 40: non long run.</li>
-                      <li><span className="font-mono font-bold text-foreground/80">Soglia minima</span> — Solo le sequenze con score ≥ 40 vengono utilizzate per il calcolo del degrado gomme.</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint.</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri anomali.</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Score</span> — Basato su lunghezza, regolarità, trend di degrado.</li>
+                      <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile • 40–59: possibile • &lt;40: non long run.</li>
                     </ul>
-                    <p className="pt-1 italic">Se nessuna sequenza raggiunge lo score minimo, il degrado non viene calcolato per quel pilota.</p>
                   </div>
                 </details>
               </div>
             )}
-            {/* Race Diary - single driver, Race/Sprint only */}
+
+            {/* ── Race Diary ── */}
             {selectedDriverNumbers.length === 1 &&
               (sessionType === "Race" || sessionType === "Sprint") && (() => {
                 const state = driverStates.get(selectedDriverNumbers[0]);
@@ -765,7 +855,8 @@ export default function Index() {
                   />
                 );
               })()}
-            {/* Virtual Race Engineer - single driver, Race/Sprint only */}
+
+            {/* ── Virtual Race Engineer ── */}
             {selectedDriverNumbers.length === 1 &&
               (sessionType === "Race" || sessionType === "Sprint") && (
                 loadingVre ? (
@@ -830,91 +921,7 @@ export default function Index() {
                   }} />
                 ) : null
               )}
-            {/* Stints, Pit Stops, Overtakes, Weather - loaded on driver select */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {stintsData.length > 0 && (
-                <StintsCard stints={stintsData} />
-              )}
-              {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
-                <PitStopsCard
-                  pitStops={pitStopsData}
-                  allDrivers={allDrivers}
-                  multiDriver={selectedDriverNumbers.length > 1}
-                />
-              )}
-              {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
-                <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
-              )}
-              {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
-                <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
-              )}
-            </div>
           </>
-        )}
-
-        {loadingTelemetry && (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading telemetry…
-          </div>
-        )}
-
-        {/* Telemetry + Map */}
-        {chartDrivers.length > 0 && !loadingTelemetry && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-            <section className="bg-card rounded-lg border border-border p-4 overflow-hidden">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telemetry</h3>
-                <div className="flex gap-3">
-                  {chartDrivers.map((d) => (
-                    <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${d.color}` }} />
-                      <span className="font-mono font-bold">{d.acronym}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <TelemetryCharts
-                drivers={chartDrivers}
-                cursorTime={clickedTime ?? cursorTime}
-                onCursorChange={setCursorTime}
-                onCursorClick={setClickedTime}
-              />
-              <SectorMiniSectors
-                drivers={[...driverStates.values()]
-                  .filter((s) => s.selectedLap != null && s.carData.length > 0)
-                  .map((s) => {
-                    const lap = s.laps.find((l) => l.lap_number === s.selectedLap)!;
-                    return {
-                      driver: s.driver,
-                      lap,
-                      color: getColor(s.driver.driver_number),
-                    };
-                  })}
-              />
-              <DrivingAnalysis
-                drivers={[...driverStates.values()]
-                  .filter((s) => s.carData.length > 0)
-                  .map((s) => ({
-                    driverNumber: s.driver.driver_number,
-                    acronym: s.driver.name_acronym,
-                    color: getColor(s.driver.driver_number),
-                    carData: s.carData,
-                  }))}
-              />
-            </section>
-            <div className="space-y-6">
-              <TrackMap
-                drivers={mapDrivers}
-                activeDate={activeDate}
-                driverZones={[...driverStates.values()]
-                  .filter((s) => s.carData.length > 0)
-                  .map((s) => computeDriverZones(s.carData, s.driver.driver_number, getColor(s.driver.driver_number)))}
-              />
-              {weatherData && selectedDriverNumbers.length === 1 && (
-                <WeatherCard weather={weatherData} />
-              )}
-            </div>
-          </div>
         )}
             </TabsContent>
           </Tabs>
