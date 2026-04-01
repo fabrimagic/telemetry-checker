@@ -175,6 +175,7 @@ export function computeVirtualRaceEngineer(
   cumDevResult: CumulativeDeviationResult | null = null,
   scenarioId: ScenarioId = "REAL_CONTEXT",
   scenarioActivationLap: number | null = null,
+  scenarioDurationLaps: number | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
