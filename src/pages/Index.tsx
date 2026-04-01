@@ -274,17 +274,34 @@ export default function Index() {
               } catch { /* optional */ }
             }
 
+            // Compute cumulative deviation for VRE integration
+            let cumDevForVre: CumulativeDeviationResult | null = null;
+            try {
+              const [sessionAllLaps, sessionResults] = await Promise.all([
+                getAllLaps(sessionKey),
+                getSessionResult(sessionKey),
+              ]);
+              if (sessionAllLaps.length && sessionResults.length) {
+                cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
+              }
+            } catch { /* optional */ }
+
+            // Use diary events already computed
+            const diaryForVre = diaryEvents.length ? diaryEvents : diary;
+
             vreArgsRef.current = {
               driverNumber, driverAcronym: driver.name_acronym, sessionKey,
               laps, stints: driverStints, pits: pitsForVre,
               weather: sessionWeather, raceControl: raceControlMessages,
               intervals: ivls, positions: pos, allDrivers, practiceModels,
+              diaryEvents: diaryForVre, cumDevResult: cumDevForVre,
             };
             const vre = computeVirtualRaceEngineer(
               driverNumber, driver.name_acronym, sessionKey,
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
+              diaryForVre, cumDevForVre,
             );
             setVreResult(vre);
           } catch { /* optional */ }
