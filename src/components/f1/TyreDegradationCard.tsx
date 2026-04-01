@@ -171,10 +171,18 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
               <TableHead className="text-xs text-right">Giri analizzati</TableHead>
               <TableHead className="text-xs text-right">Degrado (sec/giro)</TableHead>
               <TableHead className="text-xs text-right">R²</TableHead>
+              <TableHead className="text-xs text-center">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {results.map((r, i) => (
+            {results.map((r, i) => {
+              const v = validations[i];
+              const statusStyles: Record<string, string> = {
+                VALID: "bg-emerald-500/20 text-emerald-400",
+                NEUTRAL: "bg-amber-500/20 text-amber-400",
+                INVALID: "bg-red-500/20 text-red-400",
+              };
+              return (
               <TableRow
                 key={`${r.driverNumber}-${r.stint}`}
                 className={`cursor-pointer ${selectedIdx === i ? "bg-muted" : ""}`}
@@ -205,8 +213,17 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                   {r.slopeSecPerLap.toFixed(3)}
                 </TableCell>
                 <TableCell className="text-xs text-right font-mono">{r.rSquared.toFixed(3)}</TableCell>
+                <TableCell className="text-xs text-center">
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[v?.status ?? "VALID"]}`} title={v?.reason ?? ""}>
+                    {v?.status ?? "—"}
+                  </span>
+                  {v?.status === "INVALID" && (
+                    <p className="text-[8px] text-red-400/70 mt-0.5">Non usato nel VRE</p>
+                  )}
+                </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
