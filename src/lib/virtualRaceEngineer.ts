@@ -108,6 +108,8 @@ export interface VirtualRaceEngineerResult {
   scenario_description: string;
   scenario_modifiers_applied: Record<string, number>;
   scenario_activation_lap: number | null;
+  scenario_duration_laps: number | null;
+  scenario_window: { start: number; end: number } | null;
   scenario_activation_warning: string | null;
 }
 
