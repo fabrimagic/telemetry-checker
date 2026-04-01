@@ -307,7 +307,7 @@ export default function Index() {
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
-              diaryForVre, cumDevForVre, vreScenario,
+              diaryForVre, cumDevForVre, vreScenario, vreScenarioLap,
             );
             setVreResult(vre);
           } catch { /* optional */ }
