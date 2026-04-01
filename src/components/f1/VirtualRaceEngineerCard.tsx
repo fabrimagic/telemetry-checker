@@ -397,27 +397,63 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
               🔄 Strategie alternative
+              {risk_mode !== "BALANCED" && (
+                <span className="text-[9px] font-normal text-muted-foreground ml-1">(ordinate per profilo {RISK_MODES[risk_mode].label})</span>
+              )}
             </h4>
             <div className="space-y-2">
-              {alternative_strategies.map((alt, i) => (
-                <div key={i} className="rounded-lg bg-muted/30 border border-border p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-semibold text-foreground">{alt.name}</span>
-                    <DeltaBadge delta={alt.estimated_delta_vs_actual} />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mb-1.5">{alt.description}</p>
-                  <div className="flex gap-4 text-[10px]">
-                    <div>
-                      <span className="text-emerald-400 font-semibold">Pro: </span>
-                      <span className="text-muted-foreground">{alt.pros.join("; ")}</span>
+              {(() => {
+                // Build display list: if scored strategies available, use their order and adjusted scores
+                const displayAlts = scoredStrategies
+                  ? scoredStrategies
+                      .filter(s => s.index >= 0) // exclude recommended (index -2)
+                      .map(s => {
+                        const alt = alternative_strategies[s.index];
+                        if (!alt) return null;
+                        return { ...alt, adjusted_score: s.adjusted_score, adjustment_reason: s.adjustment_reason };
+                      })
+                      .filter(Boolean) as (typeof alternative_strategies[number] & { adjusted_score: number; adjustment_reason: string })[]
+                  : alternative_strategies.map(alt => ({ ...alt, adjusted_score: alt.estimated_delta_vs_actual, adjustment_reason: "" }));
+
+                return displayAlts.map((alt, i) => (
+                  <div key={i} className={`rounded-lg bg-muted/30 border p-3 ${scoredStrategies && i === 0 && risk_mode !== "BALANCED" ? "border-primary/40" : "border-border"}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-semibold text-foreground">{alt.name}</span>
+                        {scoredStrategies && i === 0 && risk_mode !== "BALANCED" && (
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-primary/30 text-primary">
+                            Top {RISK_MODES[risk_mode].label}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {risk_mode !== "BALANCED" && Math.abs(alt.adjusted_score - alt.estimated_delta_vs_actual) > 0.05 && (
+                          <span className="text-[9px] text-muted-foreground font-mono">
+                            adj: {alt.adjusted_score > 0 ? "+" : ""}{alt.adjusted_score.toFixed(1)}s
+                          </span>
+                        )}
+                        <DeltaBadge delta={alt.estimated_delta_vs_actual} />
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-red-400 font-semibold">Contro: </span>
-                      <span className="text-muted-foreground">{alt.cons.join("; ")}</span>
+                    <p className="text-[10px] text-muted-foreground mb-1.5">{alt.description}</p>
+                    {risk_mode !== "BALANCED" && alt.adjustment_reason && alt.adjustment_reason !== "Nessun aggiustamento" && (
+                      <p className="text-[9px] text-muted-foreground italic mb-1.5">
+                        ⚖️ {alt.adjustment_reason}
+                      </p>
+                    )}
+                    <div className="flex gap-4 text-[10px]">
+                      <div>
+                        <span className="text-emerald-400 font-semibold">Pro: </span>
+                        <span className="text-muted-foreground">{alt.pros.join("; ")}</span>
+                      </div>
+                      <div>
+                        <span className="text-red-400 font-semibold">Contro: </span>
+                        <span className="text-muted-foreground">{alt.cons.join("; ")}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
         )}
