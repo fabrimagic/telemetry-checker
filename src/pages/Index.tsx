@@ -92,6 +92,7 @@ export default function Index() {
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
     intervals: any; positions: any; allDrivers: any; practiceModels: any;
+    diaryEvents: DiaryEvent[] | null; cumDevResult: CumulativeDeviationResult | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
