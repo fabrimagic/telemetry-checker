@@ -51,7 +51,8 @@ import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
-import { getSessionsByMeetingKey, type SessionInfo } from "@/lib/openf1";
+import { getSessionsByMeetingKey, getSessionResult, getAllLaps, type SessionInfo } from "@/lib/openf1";
+import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DriverState {
   driver: Driver;
