@@ -829,8 +829,10 @@ export function computeVirtualRaceEngineer(
   // Add scenario note if simulated
   if (isSimulatedScenario(scenarioId)) {
     const lapNote = scenarioActivationLap != null ? ` dal giro ${scenarioActivationLap}` : "";
-    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote} — ${scenarioDef.description}`);
-    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+    const durNote = scenarioDurationLaps != null ? ` per ${scenarioDurationLaps} giri` : "";
+    const windowNote = scenarioWindow ? ` (giri ${scenarioWindow.start}–${scenarioWindow.end})` : "";
+    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote}${durNote}${windowNote} — ${scenarioDef.description}`);
+    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}${durNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
     if (scenarioActivationWarning) {
       narrativeInsights.push(`⚠️ ${scenarioActivationWarning}`);
     }
