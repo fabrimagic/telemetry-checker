@@ -246,7 +246,70 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange }: Props) {
           </div>
         </div>
 
-        {/* ── Race Context: Phase + Risk Appetite ── */}
+        {/* ── Narrative Insights (from integrated context) ── */}
+        {narrative_insights && narrative_insights.length > 0 && (
+          <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              💡 Analisi contestuale integrata
+            </h4>
+            <ul className="space-y-1.5">
+              {narrative_insights.map((insight, i) => (
+                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                  <span className="text-foreground/60 mt-0.5 shrink-0">•</span>
+                  <span>{insight}</span>
+                </li>
+              ))}
+            </ul>
+            {integrated_context?.data_gaps && integrated_context.data_gaps.length > 0 && (
+              <p className="text-[10px] text-muted-foreground italic mt-1">
+                ⚠️ Dati parziali: {integrated_context.data_gaps.join("; ")}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Integrated Context Summary (battle, deviation, weather, track) ── */}
+        {integrated_context && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {integrated_context.battle_context && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Battaglie</p>
+                <p className="text-sm font-bold text-foreground">{integrated_context.battle_context.total_episodes}</p>
+                <p className="text-[9px] text-muted-foreground">{integrated_context.battle_context.total_battle_laps} giri</p>
+              </div>
+            )}
+            {integrated_context.weather_context?.had_weather_change && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Meteo</p>
+                <p className="text-sm font-bold text-foreground">🌧️ Variabile</p>
+                <p className="text-[9px] text-muted-foreground">{integrated_context.weather_context.wet_laps + integrated_context.weather_context.mixed_laps} giri non-dry</p>
+              </div>
+            )}
+            {integrated_context.track_status_context && integrated_context.track_status_context.total_neutralized_laps > 0 && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Neutralizzazioni</p>
+                <p className="text-sm font-bold text-foreground">{integrated_context.track_status_context.total_neutralized_laps}</p>
+                <p className="text-[9px] text-muted-foreground">
+                  {[
+                    integrated_context.track_status_context.had_safety_car && "SC",
+                    integrated_context.track_status_context.had_vsc && "VSC",
+                    integrated_context.track_status_context.had_red_flag && "Red",
+                  ].filter(Boolean).join(", ") || "giri"}
+                </p>
+              </div>
+            )}
+            {integrated_context.cumulative_deviation_context?.available && integrated_context.cumulative_deviation_context.driver_final_delta != null && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Dev. Cumulativa</p>
+                <p className={`text-sm font-bold font-mono ${integrated_context.cumulative_deviation_context.driver_final_delta > 5 ? "text-red-400" : integrated_context.cumulative_deviation_context.driver_final_delta > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                  {integrated_context.cumulative_deviation_context.driver_final_delta > 0 ? "+" : ""}{integrated_context.cumulative_deviation_context.driver_final_delta.toFixed(1)}s
+                </p>
+                <p className="text-[9px] text-muted-foreground">vs {integrated_context.cumulative_deviation_context.winner_code ?? "P1"}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {race_phase && (
           <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
