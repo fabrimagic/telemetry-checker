@@ -812,8 +812,17 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`⚠️ ${gap}`);
   }
 
+  // Apply scenario confidence penalty
+  confScore += scenarioMods.confidence_penalty;
+
   // Recalculate confidence after all adjustments
   const finalConfidence: Confidence = confScore >= 6 ? "HIGH" : confScore >= 3 ? "MEDIUM" : "LOW";
+
+  // Add scenario note if simulated
+  if (isSimulatedScenario(scenarioId)) {
+    confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label} — ${scenarioDef.description}`);
+    narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}". I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
+  }
 
   // ── 8. Verdict ──
   let verdictLabel: string;
