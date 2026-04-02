@@ -272,7 +272,7 @@ export function computeVirtualRaceEngineer(
   // ── 1b. Pace Loss from Cumulative Deviation (auxiliary) ──
   const driverCumDev: DriverCumulativeDeviation | null = cumDevResult?.drivers.find(d => d.driver_number === driverNumber) ?? null;
   // Battle context built early just for pace loss contamination check
-  const earlyBattleCtx = diaryEvents ? (await import("./vreContext")).buildBattleContext(diaryEvents) : null;
+  const earlyBattleCtx = diaryEvents ? buildBattleContext(diaryEvents) : null;
   const paceLossResults = computeAllStintPaceLoss(driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap);
   const plDegAdj = paceLossDegradationAdjustment(paceLossResults);
   const plCliffMult = paceLossCliffMultiplier(paceLossResults);
