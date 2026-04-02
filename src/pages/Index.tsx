@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import { SessionPicker } from "@/components/f1/SessionPicker";
 import { LapTimesChart } from "@/components/f1/LapTimesChart";
 import { DriverPicker } from "@/components/f1/DriverPicker";
@@ -643,12 +644,17 @@ export default function Index() {
             <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
             <h1 className="text-lg font-bold tracking-tight">Formula Insights</h1>
           </div>
-          {sessionKey && (
-            <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-xs text-muted-foreground">
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <Link to="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted/50">
+              📖 Docs
+            </Link>
+            {sessionKey && (
+              <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-xs text-muted-foreground">
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
