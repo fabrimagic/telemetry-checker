@@ -653,42 +653,58 @@ export function computeVirtualRaceEngineer(
         }
       }
     }
+
+
+    // ── 4a-extra. N+1 stop strategy (SC makes extra stop cheaper) ──
+    if (actualPitLaps.length <= 2 && actualAdjustedTime != null) {
+      const longestStintIdx = stintAnalyses.reduce((best, s, i) =>
+        s.laps_count > (stintAnalyses[best]?.laps_count ?? 0) ? i : best, 0);
+      const longestStint = stintAnalyses[longestStintIdx];
+      if (longestStint && longestStint.laps_count > 10) {
+        const splitLap = Math.round(longestStint.lap_start + longestStint.laps_count / 2);
+        const extraPits = [...actualPitLaps, splitLap].sort((a, b) => a - b);
+        for (const extraCompound of [...compoundModels.keys()]) {
+          const extraCompounds: string[] = [];
+          for (let si = 0; si <= extraPits.length; si++) {
+            if (si < actualCompounds.length) extraCompounds.push(actualCompounds[si]);
+            else extraCompounds.push(extraCompound);
+          }
+          while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
+          if (!hasMinTwoCompounds(extraCompounds)) continue;
+          const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+          if (extraTime != null) {
+            alternatives.push({
+              name: `${extraPits.length}-stop`,
+              description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
+              pit_laps: extraPits,
+              compounds: extraCompounds,
+              estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+              pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
+              cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
+            });
+          }
+        }
+      }
+    }
   }
 
   // ── 4b. Traffic Release Predictor ──
-  // allLapsMap reuse from early computation
   const allLapsMap = allLapsMapEarly;
 
-  // trafficAnalysis already computed earlier for cost function
-
-  // Add traffic predictions to each alternative strategy
+  // Attach traffic predictions to alternatives (display only, NOT for delta - already in cost)
   for (const alt of alternatives) {
     if (alt.pit_laps.length > 0) {
       const altTraffic = predictTrafficForPitLaps(
-        driverNumber,
-        alt.pit_laps,
-        pitLoss,
-        totalLaps,
-        allLapsMap,
-        positions,
-        intervals,
-        allDrivers,
+        driverNumber, alt.pit_laps, pitLoss, totalLaps,
+        allLapsMap, positions, intervals, allDrivers,
       );
       alt.traffic_predictions = altTraffic;
-
-      // Adjust estimated delta with traffic loss
       const trafficLoss = altTraffic.reduce((sum, t) => sum + t.estimated_traffic_time_loss, 0);
-      if (trafficLoss > 0) {
-        alt.estimated_delta_vs_actual = Math.round((alt.estimated_delta_vs_actual - trafficLoss) * 10) / 10;
-      }
-
-      // Enrich pros/cons based on traffic
       const worstTraffic = altTraffic.reduce((worst, t) => {
         if (t.traffic_level === "HEAVY") return "HEAVY";
         if (t.traffic_level === "LIGHT" && worst !== "HEAVY") return "LIGHT";
         return worst;
       }, "CLEAN" as TrafficLevel);
-
       if (worstTraffic === "HEAVY") {
         alt.cons.push(`Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`);
       } else if (worstTraffic === "LIGHT") {
