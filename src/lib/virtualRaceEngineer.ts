@@ -656,16 +656,8 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  const trafficAnalysis = predictTrafficForPitLaps(
-    driverNumber,
-    candidatePitLaps,
-    pitLoss,
-    totalLaps,
-    allLapsMap,
-    positions,
-    intervals,
-    allDrivers,
-  );
+  // Use already-computed trafficAnalysis from cost function setup
+  // (trafficAnalysis was computed earlier for the cost function)
 
   // Add traffic predictions to each alternative strategy
   for (const alt of alternatives) {
