@@ -11,10 +11,11 @@ import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } f
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
 import type { RiskMode } from "./riskAppetite";
-import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
+import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
-import type { CumulativeDeviationResult } from "./cumulativeDeviation";
+import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
+import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 
 /* ── Types ── */
 
@@ -114,6 +115,7 @@ export interface VirtualRaceEngineerResult {
   scenario_window: { start: number; end: number } | null;
   scenario_activation_warning: string | null;
   degradation_validations: DegradationValidationResult[];
+  pace_loss_results: StintPaceLossResult[];
 }
 
 /* ── Helpers ── */
@@ -267,6 +269,15 @@ export function computeVirtualRaceEngineer(
     total_race_time: totalTime > 0 ? Math.round(totalTime * 1000) / 1000 : null,
   };
 
+  // ── 1b. Pace Loss from Cumulative Deviation (auxiliary) ──
+  const driverCumDev: DriverCumulativeDeviation | null = cumDevResult?.drivers.find(d => d.driver_number === driverNumber) ?? null;
+  // Battle context built early just for pace loss contamination check
+  const earlyBattleCtx = diaryEvents ? buildBattleContext(diaryEvents) : null;
+  const paceLossResults = computeAllStintPaceLoss(driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap);
+  const plDegAdj = paceLossDegradationAdjustment(paceLossResults);
+  const plCliffMult = paceLossCliffMultiplier(paceLossResults);
+  const plPitShift = paceLossPitUrgencyShift(paceLossResults);
+
   // ── 2. Simulate strategies ──
 
   // Build a simple lap time predictor per compound (race data first)
@@ -326,9 +337,10 @@ export function computeVirtualRaceEngineer(
 
   // Per-lap modifier for degradation based on scenario
   function lapDegradationMult(lap: number): number {
-    if (!isSimulatedScenario(scenarioId)) return riskBase.degradation;
-    if (!isInScenarioWindow(lap)) return riskBase.degradation;
-    return riskBase.degradation * scenarioMods.degradation_weight;
+    const base = isSimulatedScenario(scenarioId) && isInScenarioWindow(lap)
+      ? riskBase.degradation * scenarioMods.degradation_weight
+      : riskBase.degradation;
+    return base * plDegAdj; // pace loss adjustment
   }
 
   // Effective pit loss for a pit at a given lap
@@ -361,7 +373,7 @@ export function computeVirtualRaceEngineer(
   function cliffPenalty(stintLength: number): number {
     if (stintLength <= CLIFF_THRESHOLD) return 0;
     const excessLaps = stintLength - CLIFF_THRESHOLD;
-    return excessLaps * excessLaps * riskBase.cliff_penalty;
+    return excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
   }
 
   // Driver position lookup for traffic estimation
@@ -498,7 +510,12 @@ export function computeVirtualRaceEngineer(
       }
     }
 
-    const shifts = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+    // Extend search range with pace loss pit urgency shift
+    const baseShifts = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+    const urgencyShifts = plPitShift !== 0
+      ? [...new Set([...baseShifts, ...baseShifts.map(s => s + plPitShift)])].sort((a, b) => a - b)
+      : baseShifts;
+    const shifts = urgencyShifts;
     const shift2Range = actualPitLaps.length >= 2 ? shifts : [0];
 
     for (const compounds of compoundCombos) {
@@ -922,6 +939,50 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 7b2. Pace Loss insights (from cumulative deviation) ──
+  {
+    const usablePL = paceLossResults.filter(r => r.pace_loss_used_for_strategy);
+    const worstPL = usablePL.reduce((w, r) => (r.stint_pace_loss_rate ?? 0) > (w?.stint_pace_loss_rate ?? 0) ? r : w, null as StintPaceLossResult | null);
+
+    if (worstPL && worstPL.stint_pace_loss_rate != null) {
+      if (worstPL.pace_loss_status === "CLIFF_RISK") {
+        narrativeInsights.push(`⚠️ Perdita di passo critica nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): possibile segnale di tyre cliff. Il modello ha aumentato l'urgenza del pit e la penalità per stint lunghi.`);
+      } else if (worstPL.pace_loss_status === "HIGH_LOSS") {
+        narrativeInsights.push(`Perdita di passo significativa nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): il modello ha aumentato il peso del degrado nella simulazione strategica.`);
+      } else if (worstPL.pace_loss_status === "NORMAL_LOSS") {
+        narrativeInsights.push(`Perdita di passo moderata nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro), coerente con un degrado normale.`);
+      }
+    }
+
+    // Check coherence between degradation model and pace loss
+    for (const pl of usablePL) {
+      const dv = degradationValidations.find(v => v.original.stint === pl.stint_number);
+      if (dv && pl.stint_pace_loss_rate != null) {
+        if (dv.effective_slope < 0.02 && pl.pace_loss_status === "HIGH_LOSS") {
+          narrativeInsights.push(`Stint ${pl.stint_number}: il degrado stimato è basso (${dv.effective_slope.toFixed(3)} s/giro) ma la perdita di passo osservata è alta (${pl.stint_pace_loss_rate.toFixed(3)}). Possibile incoerenza — il verdetto è stato reso più prudente.`);
+          confScore -= 1;
+        } else if (dv.effective_slope > 0.06 && pl.pace_loss_status === "STABLE") {
+          narrativeInsights.push(`Stint ${pl.stint_number}: il degrado stimato è elevato (${dv.effective_slope.toFixed(3)} s/giro) ma il passo osservato è stabile. Il degrado potrebbe essere sovrastimato.`);
+        }
+      }
+    }
+
+    // Unreliable pace loss: note for transparency
+    const unreliablePL = paceLossResults.filter(r => r.pace_loss_status === "UNRELIABLE" && r.pace_loss_contamination_flags.battle);
+    if (unreliablePL.length > 0) {
+      narrativeInsights.push(`La metrica di pace loss per ${unreliablePL.length} stint è stata ridimensionata a causa di traffico e battaglie ravvicinate. Non è stata usata come driver strategico.`);
+    }
+
+    // Confidence impact
+    if (usablePL.length > 0) {
+      confScore += 1;
+      confidenceFactors.push(`Pace loss da deviazione cumulativa disponibile per ${usablePL.length} stint (metrica ausiliaria)`);
+    }
+    if (worstPL?.pace_loss_status === "CLIFF_RISK") {
+      confidenceFactors.push(`⚠️ Segnale di tyre cliff risk da pace loss (stint ${worstPL.stint_number})`);
+    }
+  }
+
   // ── 7c. Diary context insights ──
   if (integratedContext.diary_context) {
     const dc = integratedContext.diary_context;
@@ -1022,6 +1083,17 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // Adjust verdict with pace loss
+  {
+    const worstUsable = paceLossResults.filter(r => r.pace_loss_used_for_strategy);
+    const hasCliff = worstUsable.some(r => r.pace_loss_status === "CLIFF_RISK");
+    const hasHighLoss = worstUsable.some(r => r.pace_loss_status === "HIGH_LOSS");
+    if (hasCliff) {
+      verdictSummary += " Segnale di tyre cliff risk rilevato dalla perdita di passo nello stint — pit anticipato consigliato.";
+    } else if (hasHighLoss && bestDelta > 1) {
+      verdictSummary += " La perdita di passo progressiva supporta la raccomandazione di anticipare il pit.";
+    }
+  }
   // Adjust confidence for practice data
   if (practiceCompoundsUsed.length > 0) {
     confScore += 1;
@@ -1090,5 +1162,6 @@ export function computeVirtualRaceEngineer(
     scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
     degradation_validations: degradationValidations,
+    pace_loss_results: paceLossResults,
   };
 }
