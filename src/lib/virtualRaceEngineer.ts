@@ -502,7 +502,7 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateTimeRiskAdjusted(candidatePits, compounds);
+          const t = simulateStrategyCost(candidatePits, compounds);
           if (t != null && t < bestTime) {
             bestTime = t;
             bestPitLaps = candidatePits;
@@ -552,7 +552,7 @@ export function computeVirtualRaceEngineer(
   if (actualPitLaps.length > 0 && actualSimTime != null && actualAdjustedTime != null) {
     // Undercut
     const undercutPits = actualPitLaps.map((p, i) => i === 0 ? Math.max(3, p - 3) : p);
-    const undercutTime = simulateTimeRiskAdjusted(undercutPits, actualCompounds);
+    const undercutTime = simulateStrategyCost(undercutPits, actualCompounds);
     if (undercutTime != null) {
       alternatives.push({
         name: "Undercut anticipato",
@@ -567,7 +567,7 @@ export function computeVirtualRaceEngineer(
 
     // Overcut
     const overcutPits = actualPitLaps.map((p, i) => i === 0 ? Math.min(totalLaps - 3, p + 3) : p);
-    const overcutTime = simulateTimeRiskAdjusted(overcutPits, actualCompounds);
+    const overcutTime = simulateStrategyCost(overcutPits, actualCompounds);
     if (overcutTime != null) {
       alternatives.push({
         name: "Overcut / estensione stint",
@@ -584,7 +584,7 @@ export function computeVirtualRaceEngineer(
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
-      const reversedTime = simulateTimeRiskAdjusted(actualPitLaps, reversed);
+      const reversedTime = simulateStrategyCost(actualPitLaps, reversed);
       if (reversedTime != null) {
         alternatives.push({
           name: "Strategia compound invertiti",
@@ -607,7 +607,7 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateTimeRiskAdjusted(actualPitLaps, altCompounds);
+        const altTime = simulateStrategyCost(actualPitLaps, altCompounds);
         if (altTime != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
@@ -625,7 +625,7 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[0] = practiceCompound;
-        const altTime2 = simulateTimeRiskAdjusted(actualPitLaps, altCompounds);
+        const altTime2 = simulateStrategyCost(actualPitLaps, altCompounds);
         if (altTime2 != null) {
           alternatives.push({
             name: `Stint iniziale su ${practiceCompound}`,
