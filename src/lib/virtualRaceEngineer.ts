@@ -373,7 +373,7 @@ export function computeVirtualRaceEngineer(
   function cliffPenalty(stintLength: number): number {
     if (stintLength <= CLIFF_THRESHOLD) return 0;
     const excessLaps = stintLength - CLIFF_THRESHOLD;
-    return excessLaps * excessLaps * riskBase.cliff_penalty;
+    return excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
   }
 
   // Driver position lookup for traffic estimation
