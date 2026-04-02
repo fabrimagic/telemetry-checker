@@ -442,29 +442,10 @@ export function computeVirtualRaceEngineer(
     return total;
   }
 
-  // Pre-compute traffic analysis for use in cost function
-  const candidatePitLapsForTraffic: number[] = [];
-  const actualFirstPitForTraffic = actualPitLaps[0] ?? Math.floor(totalLaps / 2);
-  for (let offset = -6; offset <= 6; offset++) {
-    const c = actualFirstPitForTraffic + offset;
-    if (c >= 2 && c <= totalLaps - 2) candidatePitLapsForTraffic.push(c);
-  }
-  const allLapsMapPre = new Map<number, Lap[]>();
-  allLapsMapPre.set(driverNumber, laps);
-  const trafficAnalysis = predictTrafficForPitLaps(
-    driverNumber, candidatePitLapsForTraffic, pitLoss, totalLaps,
-    allLapsMapPre, positions, intervals, allDrivers,
-  );
-  // Build traffic lookup for cost function
-  const trafficLookup = new Map<number, number>();
-  for (const tp of trafficAnalysis) {
-    trafficLookup.set(tp.pit_lap, tp.estimated_traffic_time_loss);
-  }
-
   const actualCompounds = stints.map(s => s.compound);
   const actualPitLaps = pitStops.map(p => p.lap_number);
-  const actualSimTime = simulateTime(actualPitLaps, actualCompounds);
-  const actualAdjustedTime = simulateTimeRiskAdjusted(actualPitLaps, actualCompounds);
+  const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds);
+  const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
 
   // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
   const recommendedWindows: RecommendedStrategy["pit_windows"] = [];
