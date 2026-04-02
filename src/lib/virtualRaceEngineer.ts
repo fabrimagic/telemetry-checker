@@ -717,13 +717,20 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // ── 4c. Strategy Breakdowns ──
+  // ── 4c. Strategy Breakdowns (with scenario/risk modifiers) ──
+  const breakdownMods: import("./strategyBreakdown").BreakdownModifiers = {
+    degradation_mult: isSimulatedScenario(scenarioId) ? riskBase.degradation * scenarioMods.degradation_weight : riskBase.degradation,
+    pit_loss_mult: isSimulatedScenario(scenarioId) ? riskBase.pitLoss * scenarioMods.pit_loss_multiplier : riskBase.pitLoss,
+    traffic_mult: isSimulatedScenario(scenarioId) ? riskBase.traffic * scenarioMods.traffic_weight : riskBase.traffic,
+    neutralization_mult: isSimulatedScenario(scenarioId) ? scenarioMods.neutralization_weight : 1.0,
+  };
+
   const actualTraffic = predictTrafficForPitLaps(
     driverNumber, actualPitLaps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
   );
   const actualBreakdown = computeStrategyBreakdown(
     actualPitLaps, actualCompounds, totalLaps, compoundModels, pitLoss,
-    actualTraffic, weatherMap, trackStatusMap, pitStopAnalyses,
+    actualTraffic, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
   );
 
   // Recommended breakdown
@@ -733,7 +740,7 @@ export function computeVirtualRaceEngineer(
     );
     recommendedStrategy.breakdown = computeStrategyBreakdown(
       bestPitLaps, bestCompounds, totalLaps, compoundModels, pitLoss,
-      recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses,
+      recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
     );
   }
 
@@ -744,7 +751,7 @@ export function computeVirtualRaceEngineer(
     );
     alt.breakdown = computeStrategyBreakdown(
       alt.pit_laps, alt.compounds, totalLaps, compoundModels, pitLoss,
-      altTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses,
+      altTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
     );
   }
 
