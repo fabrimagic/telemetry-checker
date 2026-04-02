@@ -339,21 +339,35 @@ export function computeVirtualRaceEngineer(
     return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
   }
 
+  // Pre-compute traffic analysis for cost function
+  const allLapsMapEarly = new Map<number, Lap[]>();
+  allLapsMapEarly.set(driverNumber, laps);
+  const earlyPitCandidates: number[] = [];
+  const earlyFirstPit = pitStops.length > 0 ? pitStops[0].lap_number : Math.floor(totalLaps / 2);
+  for (let offset = -6; offset <= 6; offset++) {
+    const c = earlyFirstPit + offset;
+    if (c >= 2 && c <= totalLaps - 2) earlyPitCandidates.push(c);
+  }
+  const trafficAnalysis = predictTrafficForPitLaps(
+    driverNumber, earlyPitCandidates, pitLoss, totalLaps,
+    allLapsMapEarly, positions, intervals, allDrivers,
+  );
+  const trafficAvgBaseline = trafficAnalysis.length > 0
+    ? trafficAnalysis.reduce((s, t) => s + t.estimated_traffic_time_loss, 0) / trafficAnalysis.length
+    : 1.0;
+
   // Tyre cliff risk penalty: penalizes stint length beyond a threshold
-  // Conservative fears cliffs more, aggressive accepts them
-  const CLIFF_THRESHOLD = 18; // laps on same tyre before cliff risk grows
+  const CLIFF_THRESHOLD = 18;
   function cliffPenalty(stintLength: number): number {
     if (stintLength <= CLIFF_THRESHOLD) return 0;
     const excessLaps = stintLength - CLIFF_THRESHOLD;
     return excessLaps * excessLaps * riskBase.cliff_penalty;
   }
 
-  // Lightweight traffic cost estimator for pit search
-  // Uses a simple heuristic: mid-pack pits have more traffic
+  // Driver position lookup for traffic estimation
   const driverPositionAtLap = new Map<number, number>();
   for (const pos of positions) {
     if (pos.driver_number === driverNumber) {
-      // Use the latest position per lap (positions are time-ordered)
       const lapMatch = laps.find(l =>
         l.date_start && pos.date &&
         Math.abs(new Date(l.date_start).getTime() - new Date(pos.date).getTime()) < 120000
@@ -361,22 +375,22 @@ export function computeVirtualRaceEngineer(
       if (lapMatch) driverPositionAtLap.set(lapMatch.lap_number, pos.position);
     }
   }
+
   // Estimate traffic cost for a pit at given lap
   function estimateTrafficCost(pitLap: number): number {
-    // Base: average traffic loss from actual traffic analysis if available
-    const actualTrafficAvg = trafficAnalysis.length > 0
-      ? trafficAnalysis.reduce((s, t) => s + t.estimated_traffic_time_loss, 0) / trafficAnalysis.length
-      : 1.0; // default 1s baseline
+    // Check if we have a precise prediction for this lap
+    const precise = trafficAnalysis.find(t => t.pit_lap === pitLap);
+    const baseCost = precise ? precise.estimated_traffic_time_loss : trafficAvgBaseline;
 
     // Adjust by position: mid-pack = more traffic, front/back = less
     const pos = driverPositionAtLap.get(pitLap) ?? driverPositionAtLap.get(pitLap - 1) ?? 10;
-    const positionFactor = pos <= 3 ? 0.3 : pos <= 6 ? 0.7 : pos <= 14 ? 1.0 : 0.5;
+    const positionFactor = precise ? 1.0 : (pos <= 3 ? 0.3 : pos <= 6 ? 0.7 : pos <= 14 ? 1.0 : 0.5);
 
     const trafficMult = isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)
       ? riskBase.traffic * scenarioMods.traffic_weight
       : riskBase.traffic;
 
-    return actualTrafficAvg * positionFactor * trafficMult;
+    return baseCost * positionFactor * trafficMult;
   }
 
   // Build stint bounds helper
