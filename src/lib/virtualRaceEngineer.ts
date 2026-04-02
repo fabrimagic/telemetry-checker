@@ -269,6 +269,15 @@ export function computeVirtualRaceEngineer(
     total_race_time: totalTime > 0 ? Math.round(totalTime * 1000) / 1000 : null,
   };
 
+  // ── 1b. Pace Loss from Cumulative Deviation (auxiliary) ──
+  const driverCumDev: DriverCumulativeDeviation | null = cumDevResult?.drivers.find(d => d.driver_number === driverNumber) ?? null;
+  // Battle context built early just for pace loss contamination check
+  const earlyBattleCtx = diaryEvents ? (await import("./vreContext")).buildBattleContext(diaryEvents) : null;
+  const paceLossResults = computeAllStintPaceLoss(driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap);
+  const plDegAdj = paceLossDegradationAdjustment(paceLossResults);
+  const plCliffMult = paceLossCliffMultiplier(paceLossResults);
+  const plPitShift = paceLossPitUrgencyShift(paceLossResults);
+
   // ── 2. Simulate strategies ──
 
   // Build a simple lap time predictor per compound (race data first)
