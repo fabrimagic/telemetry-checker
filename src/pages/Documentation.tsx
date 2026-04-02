@@ -254,9 +254,9 @@ export default function Documentation() {
             Ogni stima di degrado viene classificata prima di essere usata dal VRE:
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground text-green-400">VALID</strong> — slope positiva, fit accettabile, giri sufficienti</li>
-            <li><strong className="text-foreground text-yellow-400">NEUTRAL</strong> — slope vicina a zero o fit di bassa qualità</li>
-            <li><strong className="text-foreground text-red-400">INVALID</strong> — slope negativa oltre tolleranza, giri insufficienti, o fit insufficiente</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(142, 70%, 45%)" }}>VALID</strong> — slope positiva, fit accettabile, giri sufficienti</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong> — slope vicina a zero o fit di bassa qualità</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong> — slope negativa oltre tolleranza, giri insufficienti, o fit insufficiente</li>
           </ul>
 
           <h4 className="font-semibold text-foreground mt-3">Regole di classificazione</h4>
