@@ -510,7 +510,12 @@ export function computeVirtualRaceEngineer(
       }
     }
 
-    const shifts = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+    // Extend search range with pace loss pit urgency shift
+    const baseShifts = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+    const urgencyShifts = plPitShift !== 0
+      ? [...new Set([...baseShifts, ...baseShifts.map(s => s + plPitShift)])].sort((a, b) => a - b)
+      : baseShifts;
+    const shifts = urgencyShifts;
     const shift2Range = actualPitLaps.length >= 2 ? shifts : [0];
 
     for (const compounds of compoundCombos) {
