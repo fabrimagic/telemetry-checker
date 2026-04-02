@@ -1083,6 +1083,17 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // Adjust verdict with pace loss
+  {
+    const worstUsable = paceLossResults.filter(r => r.pace_loss_used_for_strategy);
+    const hasCliff = worstUsable.some(r => r.pace_loss_status === "CLIFF_RISK");
+    const hasHighLoss = worstUsable.some(r => r.pace_loss_status === "HIGH_LOSS");
+    if (hasCliff) {
+      verdictSummary += " Segnale di tyre cliff risk rilevato dalla perdita di passo nello stint — pit anticipato consigliato.";
+    } else if (hasHighLoss && bestDelta > 1) {
+      verdictSummary += " La perdita di passo progressiva supporta la raccomandazione di anticipare il pit.";
+    }
+  }
   // Adjust confidence for practice data
   if (practiceCompoundsUsed.length > 0) {
     confScore += 1;
