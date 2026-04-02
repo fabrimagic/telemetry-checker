@@ -337,9 +337,10 @@ export function computeVirtualRaceEngineer(
 
   // Per-lap modifier for degradation based on scenario
   function lapDegradationMult(lap: number): number {
-    if (!isSimulatedScenario(scenarioId)) return riskBase.degradation;
-    if (!isInScenarioWindow(lap)) return riskBase.degradation;
-    return riskBase.degradation * scenarioMods.degradation_weight;
+    const base = isSimulatedScenario(scenarioId) && isInScenarioWindow(lap)
+      ? riskBase.degradation * scenarioMods.degradation_weight
+      : riskBase.degradation;
+    return base * plDegAdj; // pace loss adjustment
   }
 
   // Effective pit loss for a pit at a given lap
