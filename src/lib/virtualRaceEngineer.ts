@@ -13,8 +13,9 @@ import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePha
 import type { RiskMode } from "./riskAppetite";
 import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
-import type { CumulativeDeviationResult } from "./cumulativeDeviation";
+import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
+import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 
 /* ── Types ── */
 
