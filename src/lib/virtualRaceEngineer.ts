@@ -310,61 +310,155 @@ export function computeVirtualRaceEngineer(
   const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
   const scenarioWindow = isSimulatedScenario(scenarioId) ? computeScenarioWindow(scenarioActivationLap, scenarioDurationLaps, totalLaps) : null;
 
-  // Risk mode weight multipliers for strategy scoring, combined with scenario modifiers
-  const riskWeights = {
-    CONSERVATIVE: { degradation: 1.15 * scenarioMods.degradation_weight, traffic: 1.3 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
-    BALANCED: { degradation: 1.0 * scenarioMods.degradation_weight, traffic: 1.0 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
-    AGGRESSIVE: { degradation: 0.85 * scenarioMods.degradation_weight, traffic: 0.7 * scenarioMods.traffic_weight, pitLoss: 1.0 * scenarioMods.pit_loss_multiplier },
-  }[riskMode];
+  // ── Risk mode base weights ──
+  const RISK_BASE = {
+    CONSERVATIVE: { degradation: 1.15, traffic: 1.3, pitLoss: 1.0, cliff_penalty: 0.12, opportunity: 0.8 },
+    BALANCED:     { degradation: 1.0,  traffic: 1.0, pitLoss: 1.0, cliff_penalty: 0.06, opportunity: 1.0 },
+    AGGRESSIVE:   { degradation: 0.85, traffic: 0.7, pitLoss: 1.0, cliff_penalty: 0.02, opportunity: 1.3 },
+  } as const;
+  const riskBase = RISK_BASE[riskMode];
 
-  // Estimate total time for a given strategy (raw, no risk adjustment)
-  function simulateTime(pitLaps: number[], compounds: string[]): number | null {
-    if (!hasMinTwoCompounds(compounds)) return null;
-    let total = 0;
-    const stintBounds: { start: number; end: number; compound: string }[] = [];
-    let start = 1;
-    for (let i = 0; i < pitLaps.length; i++) {
-      stintBounds.push({ start, end: pitLaps[i], compound: compounds[i] || compounds[0] });
-      start = pitLaps[i] + 1;
+  // Helper: check if a lap is inside the scenario window
+  function isInScenarioWindow(lap: number): boolean {
+    if (!scenarioWindow) return isSimulatedScenario(scenarioId); // no window = full race
+    return lap >= scenarioWindow.start && lap <= scenarioWindow.end;
+  }
+
+  // Per-lap modifier for degradation based on scenario
+  function lapDegradationMult(lap: number): number {
+    if (!isSimulatedScenario(scenarioId)) return riskBase.degradation;
+    if (!isInScenarioWindow(lap)) return riskBase.degradation;
+    return riskBase.degradation * scenarioMods.degradation_weight;
+  }
+
+  // Effective pit loss for a pit at a given lap
+  function effectivePitLoss(pitLap: number): number {
+    const baseMult = riskBase.pitLoss;
+    if (!isSimulatedScenario(scenarioId)) return pitLoss * baseMult;
+    if (!isInScenarioWindow(pitLap)) return pitLoss * baseMult;
+    return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
+  }
+
+  // Tyre cliff risk penalty: penalizes stint length beyond a threshold
+  // Conservative fears cliffs more, aggressive accepts them
+  const CLIFF_THRESHOLD = 18; // laps on same tyre before cliff risk grows
+  function cliffPenalty(stintLength: number): number {
+    if (stintLength <= CLIFF_THRESHOLD) return 0;
+    const excessLaps = stintLength - CLIFF_THRESHOLD;
+    return excessLaps * excessLaps * riskBase.cliff_penalty;
+  }
+
+  // Lightweight traffic cost estimator for pit search
+  // Uses a simple heuristic: mid-pack pits have more traffic
+  const driverPositionAtLap = new Map<number, number>();
+  for (const pos of positions) {
+    if (pos.driver_number === driverNumber) {
+      // Use the latest position per lap (positions are time-ordered)
+      const lapMatch = laps.find(l =>
+        l.date_start && pos.date &&
+        Math.abs(new Date(l.date_start).getTime() - new Date(pos.date).getTime()) < 120000
+      );
+      if (lapMatch) driverPositionAtLap.set(lapMatch.lap_number, pos.position);
     }
-    stintBounds.push({ start, end: totalLaps, compound: compounds[compounds.length - 1] || compounds[0] });
+  }
+  // Estimate traffic cost for a pit at given lap
+  function estimateTrafficCost(pitLap: number): number {
+    // Base: average traffic loss from actual traffic analysis if available
+    const actualTrafficAvg = trafficAnalysis.length > 0
+      ? trafficAnalysis.reduce((s, t) => s + t.estimated_traffic_time_loss, 0) / trafficAnalysis.length
+      : 1.0; // default 1s baseline
+
+    // Adjust by position: mid-pack = more traffic, front/back = less
+    const pos = driverPositionAtLap.get(pitLap) ?? driverPositionAtLap.get(pitLap - 1) ?? 10;
+    const positionFactor = pos <= 3 ? 0.3 : pos <= 6 ? 0.7 : pos <= 14 ? 1.0 : 0.5;
+
+    const trafficMult = isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)
+      ? riskBase.traffic * scenarioMods.traffic_weight
+      : riskBase.traffic;
+
+    return actualTrafficAvg * positionFactor * trafficMult;
+  }
+
+  // Build stint bounds helper
+  function buildStintBounds(pitLapsArr: number[], compoundsArr: string[]) {
+    const bounds: { start: number; end: number; compound: string }[] = [];
+    let s = 1;
+    for (let i = 0; i < pitLapsArr.length; i++) {
+      bounds.push({ start: s, end: pitLapsArr[i], compound: compoundsArr[i] || compoundsArr[0] });
+      s = pitLapsArr[i] + 1;
+    }
+    bounds.push({ start: s, end: totalLaps, compound: compoundsArr[compoundsArr.length - 1] || compoundsArr[0] });
+    return bounds;
+  }
+
+  // Full cost function: simulates total adjusted race time
+  function simulateStrategyCost(pitLapsArr: number[], compoundsArr: string[]): number | null {
+    if (!hasMinTwoCompounds(compoundsArr)) return null;
+    const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
+
+    let totalCost = 0;
 
     for (const sb of stintBounds) {
       const model = compoundModels.get(sb.compound);
       if (!model) return null;
+      const stintLength = sb.end - sb.start + 1;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
-        total += predictLapTime(model.slope, model.intercept, tyreLife);
+        const baseLap = model.intercept;
+        const degLap = model.slope * tyreLife * lapDegradationMult(lap);
+        totalCost += baseLap + degLap;
+      }
+      // Cliff risk for this stint
+      totalCost += cliffPenalty(stintLength);
+    }
+
+    // Pit costs with per-lap scenario modifier
+    for (const pl of pitLapsArr) {
+      totalCost += effectivePitLoss(pl);
+      totalCost += estimateTrafficCost(pl);
+    }
+
+    // Opportunity modifier for aggressive mode: bonus for fewer pit stops
+    if (riskBase.opportunity > 1.0 && pitLapsArr.length < actualPitLaps.length) {
+      totalCost -= (actualPitLaps.length - pitLapsArr.length) * 2.0 * (riskBase.opportunity - 1.0);
+    }
+
+    return totalCost;
+  }
+
+  // Simple raw time (no adjustments) for delta calculation baseline
+  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[]): number | null {
+    if (!hasMinTwoCompounds(compoundsArr)) return null;
+    const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
+    let total = 0;
+    for (const sb of stintBounds) {
+      const model = compoundModels.get(sb.compound);
+      if (!model) return null;
+      for (let lap = sb.start; lap <= sb.end; lap++) {
+        total += predictLapTime(model.slope, model.intercept, lap - sb.start);
       }
     }
-    total += pitLaps.length * pitLoss;
+    total += pitLapsArr.length * pitLoss;
     return total;
   }
 
-  // Risk-adjusted time: applies risk weights to degradation component
-  function simulateTimeRiskAdjusted(pitLaps: number[], compounds: string[]): number | null {
-    if (!hasMinTwoCompounds(compounds)) return null;
-    let baseTime = 0;
-    let degCost = 0;
-    const stintBounds: { start: number; end: number; compound: string }[] = [];
-    let start = 1;
-    for (let i = 0; i < pitLaps.length; i++) {
-      stintBounds.push({ start, end: pitLaps[i], compound: compounds[i] || compounds[0] });
-      start = pitLaps[i] + 1;
-    }
-    stintBounds.push({ start, end: totalLaps, compound: compounds[compounds.length - 1] || compounds[0] });
-
-    for (const sb of stintBounds) {
-      const model = compoundModels.get(sb.compound);
-      if (!model) return null;
-      for (let lap = sb.start; lap <= sb.end; lap++) {
-        const tyreLife = lap - sb.start;
-        baseTime += model.intercept;
-        degCost += model.slope * tyreLife;
-      }
-    }
-    // Apply risk weights: conservative penalizes degradation more, aggressive less
-    return baseTime + (degCost * riskWeights.degradation) + (pitLaps.length * pitLoss * riskWeights.pitLoss);
+  // Pre-compute traffic analysis for use in cost function
+  const candidatePitLapsForTraffic: number[] = [];
+  const actualFirstPitForTraffic = actualPitLaps[0] ?? Math.floor(totalLaps / 2);
+  for (let offset = -6; offset <= 6; offset++) {
+    const c = actualFirstPitForTraffic + offset;
+    if (c >= 2 && c <= totalLaps - 2) candidatePitLapsForTraffic.push(c);
+  }
+  const allLapsMapPre = new Map<number, Lap[]>();
+  allLapsMapPre.set(driverNumber, laps);
+  const trafficAnalysis = predictTrafficForPitLaps(
+    driverNumber, candidatePitLapsForTraffic, pitLoss, totalLaps,
+    allLapsMapPre, positions, intervals, allDrivers,
+  );
+  // Build traffic lookup for cost function
+  const trafficLookup = new Map<number, number>();
+  for (const tp of trafficAnalysis) {
+    trafficLookup.set(tp.pit_lap, tp.estimated_traffic_time_loss);
   }
 
   const actualCompounds = stints.map(s => s.compound);
