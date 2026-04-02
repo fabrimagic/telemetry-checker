@@ -1162,5 +1162,6 @@ export function computeVirtualRaceEngineer(
     scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
     degradation_validations: degradationValidations,
+    pace_loss_results: paceLossResults,
   };
 }
