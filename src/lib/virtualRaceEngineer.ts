@@ -115,6 +115,7 @@ export interface VirtualRaceEngineerResult {
   scenario_window: { start: number; end: number } | null;
   scenario_activation_warning: string | null;
   degradation_validations: DegradationValidationResult[];
+  pace_loss_results: StintPaceLossResult[];
 }
 
 /* ── Helpers ── */
