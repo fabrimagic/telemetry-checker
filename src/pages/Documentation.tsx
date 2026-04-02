@@ -142,9 +142,9 @@ export default function Documentation() {
             I colori indicano la performance relativa:
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground text-purple-400">Viola</strong> — miglior tempo assoluto della sessione (overall best)</li>
-            <li><strong className="text-foreground text-green-400">Verde</strong> — miglior tempo personale del pilota</li>
-            <li><strong className="text-foreground text-yellow-400">Giallo</strong> — tempo nella norma</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(270, 70%, 60%)" }}>Viola</strong> — miglior tempo assoluto della sessione (overall best)</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(142, 70%, 45%)" }}>Verde</strong> — miglior tempo personale del pilota</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(45, 93%, 58%)" }}>Giallo</strong> — tempo nella norma</li>
           </ul>
         </DocSection>
 
