@@ -939,6 +939,50 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 7b2. Pace Loss insights (from cumulative deviation) ──
+  {
+    const usablePL = paceLossResults.filter(r => r.pace_loss_used_for_strategy);
+    const worstPL = usablePL.reduce((w, r) => (r.stint_pace_loss_rate ?? 0) > (w?.stint_pace_loss_rate ?? 0) ? r : w, null as StintPaceLossResult | null);
+
+    if (worstPL && worstPL.stint_pace_loss_rate != null) {
+      if (worstPL.pace_loss_status === "CLIFF_RISK") {
+        narrativeInsights.push(`⚠️ Perdita di passo critica nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): possibile segnale di tyre cliff. Il modello ha aumentato l'urgenza del pit e la penalità per stint lunghi.`);
+      } else if (worstPL.pace_loss_status === "HIGH_LOSS") {
+        narrativeInsights.push(`Perdita di passo significativa nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): il modello ha aumentato il peso del degrado nella simulazione strategica.`);
+      } else if (worstPL.pace_loss_status === "NORMAL_LOSS") {
+        narrativeInsights.push(`Perdita di passo moderata nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro), coerente con un degrado normale.`);
+      }
+    }
+
+    // Check coherence between degradation model and pace loss
+    for (const pl of usablePL) {
+      const dv = degradationValidations.find(v => v.original.stint === pl.stint_number);
+      if (dv && pl.stint_pace_loss_rate != null) {
+        if (dv.effective_slope < 0.02 && pl.pace_loss_status === "HIGH_LOSS") {
+          narrativeInsights.push(`Stint ${pl.stint_number}: il degrado stimato è basso (${dv.effective_slope.toFixed(3)} s/giro) ma la perdita di passo osservata è alta (${pl.stint_pace_loss_rate.toFixed(3)}). Possibile incoerenza — il verdetto è stato reso più prudente.`);
+          confScore -= 1;
+        } else if (dv.effective_slope > 0.06 && pl.pace_loss_status === "STABLE") {
+          narrativeInsights.push(`Stint ${pl.stint_number}: il degrado stimato è elevato (${dv.effective_slope.toFixed(3)} s/giro) ma il passo osservato è stabile. Il degrado potrebbe essere sovrastimato.`);
+        }
+      }
+    }
+
+    // Unreliable pace loss: note for transparency
+    const unreliablePL = paceLossResults.filter(r => r.pace_loss_status === "UNRELIABLE" && r.pace_loss_contamination_flags.battle);
+    if (unreliablePL.length > 0) {
+      narrativeInsights.push(`La metrica di pace loss per ${unreliablePL.length} stint è stata ridimensionata a causa di traffico e battaglie ravvicinate. Non è stata usata come driver strategico.`);
+    }
+
+    // Confidence impact
+    if (usablePL.length > 0) {
+      confScore += 1;
+      confidenceFactors.push(`Pace loss da deviazione cumulativa disponibile per ${usablePL.length} stint (metrica ausiliaria)`);
+    }
+    if (worstPL?.pace_loss_status === "CLIFF_RISK") {
+      confidenceFactors.push(`⚠️ Segnale di tyre cliff risk da pace loss (stint ${worstPL.stint_number})`);
+    }
+  }
+
   // ── 7c. Diary context insights ──
   if (integratedContext.diary_context) {
     const dc = integratedContext.diary_context;
