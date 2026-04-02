@@ -24,18 +24,27 @@ export interface BreakdownRow {
   note: string;
 }
 
+/* ── Modifiers for scenario/risk ── */
+
+export interface BreakdownModifiers {
+  degradation_mult: number;   // multiplier on tyre degradation cost
+  pit_loss_mult: number;      // multiplier on pit loss
+  traffic_mult: number;       // multiplier on traffic loss
+  neutralization_mult: number; // multiplier on neutralization benefit
+}
+
+export const DEFAULT_BREAKDOWN_MODIFIERS: BreakdownModifiers = {
+  degradation_mult: 1.0,
+  pit_loss_mult: 1.0,
+  traffic_mult: 1.0,
+  neutralization_mult: 1.0,
+};
+
 /* ── Computation ── */
 
 /**
  * Compute strategy breakdown for a simulated strategy.
- *
- * Avoids double counting:
- * - base_stint_time = sum of intercept (base pace) per lap across all stints
- * - tyre_degradation_cost = sum of (slope * tyreLife) per lap across all stints
- * - pit_loss = number of pit stops * pit loss duration
- * - traffic_loss = sum from traffic predictions
- * - weather_adjustment = estimated from excluded wet/mixed laps (null if none)
- * - neutralization_adjustment = estimated from SC/VSC laps and pit-under-neutralization benefit
+ * Modifiers allow scenario/risk mode to influence the breakdown values.
  */
 export function computeStrategyBreakdown(
   pitLaps: number[],
@@ -47,6 +56,7 @@ export function computeStrategyBreakdown(
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
   pitStopAnalyses: PitStopAnalysis[],
+  modifiers: BreakdownModifiers = DEFAULT_BREAKDOWN_MODIFIERS,
 ): StrategyBreakdown {
   // Build stint bounds
   const stintBounds: { start: number; end: number; compound: string }[] = [];
@@ -75,7 +85,7 @@ export function computeStrategyBreakdown(
     return {
       base_stint_time: null,
       tyre_degradation_cost: null,
-      pit_loss: pitLaps.length > 0 ? round1(pitLaps.length * pitLossPerStop) : null,
+      pit_loss: pitLaps.length > 0 ? round1(pitLaps.length * pitLossPerStop * modifiers.pit_loss_mult) : null,
       traffic_loss: null,
       weather_adjustment: null,
       neutralization_adjustment: null,
@@ -83,34 +93,33 @@ export function computeStrategyBreakdown(
     };
   }
 
-  const pitLossTotal = pitLaps.length * pitLossPerStop;
+  // Apply modifier to degradation
+  const adjustedDegCost = degCost * modifiers.degradation_mult;
+  const pitLossTotal = pitLaps.length * pitLossPerStop * modifiers.pit_loss_mult;
 
-  // Traffic loss
-  const trafficLoss = trafficPredictions.length > 0
+  // Traffic loss with modifier
+  const rawTrafficLoss = trafficPredictions.length > 0
     ? trafficPredictions.reduce((sum, t) => sum + t.estimated_traffic_time_loss, 0)
     : null;
+  const trafficLoss = rawTrafficLoss != null ? rawTrafficLoss * modifiers.traffic_mult : null;
 
-  // Weather adjustment: count wet/mixed laps — these are excluded from the model,
-  // so we can't compute precise cost. Estimate based on typical wet lap penalty.
+  // Weather adjustment
   const wetLapCount = [...weatherMap.values()].filter(w => w === "WET" || w === "MIXED").length;
-  const weatherAdj = wetLapCount > 0 ? round1(wetLapCount * 2.0) : null; // ~2s average wet penalty estimate
+  const weatherAdj = wetLapCount > 0 ? round1(wetLapCount * 2.0) : null;
 
-  // Neutralization: SC laps are ~15-20s slower, VSC ~8-10s slower.
-  // If pit was done under neutralization, estimate a benefit of ~10-15s saved pit loss.
+  // Neutralization
   const scLaps = [...trackStatusMap.entries()].filter(([, s]) => s === "SC").length;
   const vscLaps = [...trackStatusMap.entries()].filter(([, s]) => s === "VSC").length;
   const pitsUnderNeutral = pitStopAnalyses.filter(p => p.under_neutralisation).length;
 
   let neutralAdj: number | null = null;
   if (scLaps > 0 || vscLaps > 0 || pitsUnderNeutral > 0) {
-    // Benefit from pitting under neutralization: reduced relative pit loss
-    // Under SC the field is bunched, effective pit loss is reduced by ~10-12s
-    const pitBenefit = pitsUnderNeutral * -10;
+    const pitBenefit = pitsUnderNeutral * -10 * modifiers.neutralization_mult;
     neutralAdj = round1(pitBenefit);
   }
 
   const totalEstimated = round1(
-    baseTime + degCost + pitLossTotal +
+    baseTime + adjustedDegCost + pitLossTotal +
     (trafficLoss ?? 0) +
     (weatherAdj ?? 0) +
     (neutralAdj ?? 0)
@@ -118,7 +127,7 @@ export function computeStrategyBreakdown(
 
   return {
     base_stint_time: round1(baseTime),
-    tyre_degradation_cost: round1(degCost),
+    tyre_degradation_cost: round1(adjustedDegCost),
     pit_loss: round1(pitLossTotal),
     traffic_loss: trafficLoss != null ? round1(trafficLoss) : null,
     weather_adjustment: weatherAdj,
