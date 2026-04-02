@@ -11,7 +11,7 @@ import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } f
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
 import type { RiskMode } from "./riskAppetite";
-import { buildIntegratedContext, type IntegratedStrategyContext } from "./vreContext";
+import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
