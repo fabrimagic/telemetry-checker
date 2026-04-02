@@ -739,6 +739,82 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           defaultOpen={false}
         >
           <div className="space-y-4">
+            {/* Pace Loss Analysis (from cumulative deviation) */}
+            {pace_loss_results && pace_loss_results.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5" /> Pace Loss per Stint
+                  <span className="text-[9px] font-normal text-muted-foreground ml-1">(da deviazione cumulativa)</span>
+                </h4>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Indicatore ausiliario di perdita di passo nello stint. Non è una misura diretta del degrado gomme.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="text-left py-1.5 pr-2">Stint</th>
+                        <th className="text-right py-1.5 pr-2">Rate</th>
+                        <th className="text-center py-1.5 pr-2">Status</th>
+                        <th className="text-center py-1.5 pr-2">Conf.</th>
+                        <th className="text-center py-1.5 pr-2">Usato</th>
+                        <th className="text-left py-1.5">Nota</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pace_loss_results.map((pl) => {
+                        const statusStyles: Record<string, string> = {
+                          STABLE: "bg-emerald-500/20 text-emerald-400",
+                          NORMAL_LOSS: "bg-muted text-muted-foreground",
+                          HIGH_LOSS: "bg-amber-500/20 text-amber-400",
+                          CLIFF_RISK: "bg-red-500/20 text-red-400",
+                          UNRELIABLE: "bg-muted text-muted-foreground/50",
+                        };
+                        const confStyles: Record<string, string> = {
+                          HIGH: "text-emerald-400",
+                          MEDIUM: "text-amber-400",
+                          LOW: "text-red-400",
+                        };
+                        return (
+                          <tr key={pl.stint_number} className="border-b border-border/50">
+                            <td className="py-1.5 pr-2 font-mono">{pl.stint_number}</td>
+                            <td className="py-1.5 pr-2 text-right font-mono">
+                              {pl.stint_pace_loss_rate != null
+                                ? <span className={pl.stint_pace_loss_rate > 0.1 ? "text-amber-400" : pl.stint_pace_loss_rate > 0.2 ? "text-red-400" : ""}>{pl.stint_pace_loss_rate > 0 ? "+" : ""}{pl.stint_pace_loss_rate.toFixed(3)}</span>
+                                : "—"}
+                            </td>
+                            <td className="py-1.5 pr-2 text-center">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[pl.pace_loss_status]}`}>
+                                {pl.pace_loss_status}
+                              </span>
+                            </td>
+                            <td className={`py-1.5 pr-2 text-center text-[10px] font-semibold ${confStyles[pl.pace_loss_confidence] || ""}`}>
+                              {pl.pace_loss_confidence}
+                            </td>
+                            <td className="py-1.5 pr-2 text-center">
+                              {pl.pace_loss_used_for_strategy ? "✓" : "—"}
+                            </td>
+                            <td className="py-1.5 text-[10px] text-muted-foreground max-w-[200px] truncate" title={pl.pace_loss_reason}>
+                              {pl.pace_loss_reason}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {pace_loss_results.some(r => r.pace_loss_contamination_flags.battle || r.pace_loss_contamination_flags.weather || r.pace_loss_contamination_flags.neutralization) && (
+                  <p className="text-[9px] text-muted-foreground italic mt-1.5">
+                    ⚠️ Giri contaminati da {[
+                      pace_loss_results.some(r => r.pace_loss_contamination_flags.battle) && "battaglie",
+                      pace_loss_results.some(r => r.pace_loss_contamination_flags.weather) && "meteo",
+                      pace_loss_results.some(r => r.pace_loss_contamination_flags.neutralization) && "neutralizzazioni",
+                    ].filter(Boolean).join(", ")} esclusi o ridimensionati nell'analisi.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Traffic Release Analysis */}
             {traffic_analysis.length > 0 && (
               <div>
