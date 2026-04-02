@@ -656,22 +656,10 @@ export function computeVirtualRaceEngineer(
   }
 
   // ── 4b. Traffic Release Predictor ──
-  // Build allLaps map (only selected driver's laps available; predictor handles missing data)
-  const allLapsMap = new Map<number, Lap[]>();
-  allLapsMap.set(driverNumber, laps);
+  // allLapsMap reuse from early computation
+  const allLapsMap = allLapsMapEarly;
 
-  // Generate candidate pit laps for traffic analysis (around actual pit laps ± 4)
-  const candidatePitLaps: number[] = [];
-  const actualFirstPit = actualPitLaps[0] ?? Math.floor(totalLaps / 2);
-  for (let offset = -4; offset <= 4; offset += 2) {
-    const candidate = actualFirstPit + offset;
-    if (candidate >= 2 && candidate <= totalLaps - 2) {
-      candidatePitLaps.push(candidate);
-    }
-  }
-
-  // Use already-computed trafficAnalysis from cost function setup
-  // (trafficAnalysis was computed earlier for the cost function)
+  // trafficAnalysis already computed earlier for cost function
 
   // Add traffic predictions to each alternative strategy
   for (const alt of alternatives) {
