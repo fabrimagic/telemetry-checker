@@ -661,6 +661,9 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                                 Top {RISK_MODES[risk_mode].label}
                               </Badge>
                             )}
+                            {alt.analysis?.robustness && (
+                              <RobustnessBadge label={alt.analysis.robustness.robustness_label} />
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             {risk_mode !== "BALANCED" && Math.abs(alt.adjusted_score - alt.estimated_delta_vs_actual) > 0.05 && (
@@ -677,6 +680,26 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                             ⚖️ {alt.adjustment_reason}
                           </p>
                         )}
+
+                        {/* Pit Window */}
+                        {alt.analysis?.pit_window && (
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
+                            <span className="font-semibold">Pit window:</span>
+                            <span className="font-mono">L{alt.analysis.pit_window.pit_window_start}–L{alt.analysis.pit_window.pit_window_end}</span>
+                            <span className="text-[9px]">(best: L{alt.analysis.pit_window.best_lap_in_window}, spread: {alt.analysis.pit_window.window_time_spread}s)</span>
+                          </div>
+                        )}
+
+                        {/* Multi-objective mini-bar */}
+                        {alt.analysis?.multi_objective && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground mb-1.5">
+                            <span>⏱ Tempo: <strong className="text-foreground">{alt.analysis.multi_objective.race_time_objective > 0 ? "+" : ""}{alt.analysis.multi_objective.race_time_objective}s</strong></span>
+                            <span>📍 Posiz.: <strong className="text-foreground">{alt.analysis.multi_objective.track_position_objective > 0 ? "-" : ""}{alt.analysis.multi_objective.track_position_objective}</strong></span>
+                            <span>⚠️ Rischio: <strong className="text-foreground">{Math.round(alt.analysis.multi_objective.risk_objective * 100)}%</strong></span>
+                            <span>🛡️ Robustezza: <strong className="text-foreground">{Math.round(alt.analysis.multi_objective.robustness_objective * 100)}%</strong></span>
+                          </div>
+                        )}
+
                         <div className="flex gap-4 text-[10px]">
                           <div>
                             <span className="text-emerald-400 font-semibold">Pro: </span>
@@ -687,6 +710,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                             <span className="text-muted-foreground">{alt.cons.join("; ")}</span>
                           </div>
                         </div>
+
+                        {/* Collapsible advanced details */}
+                        {alt.analysis && (
+                          <StrategyAdvancedDetails analysis={alt.analysis} />
+                        )}
                       </div>
                     ));
                   })()}
