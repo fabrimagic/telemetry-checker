@@ -5,12 +5,13 @@ import { breakdownToRows } from "@/lib/strategyBreakdown";
 import { getPhaseLabel } from "@/lib/racePhase";
 import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
+import type { EnrichedStrategyAnalysis, RobustnessLabel } from "@/lib/strategyAnalysis";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical } from "lucide-react";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
@@ -56,6 +57,75 @@ function DeltaBadge({ delta }: { delta: number }) {
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${positive ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
       {positive ? "+" : ""}{delta.toFixed(1)}s
     </span>
+  );
+}
+
+/* ── Robustness Badge ── */
+function RobustnessBadge({ label }: { label: RobustnessLabel }) {
+  const styles: Record<RobustnessLabel, string> = {
+    ROBUST: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    MEDIUM: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    FRAGILE: "bg-red-500/20 text-red-400 border-red-500/30",
+  };
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0 rounded border text-[9px] font-semibold ${styles[label]}`}>
+      {label}
+    </span>
+  );
+}
+
+/* ── Strategy Advanced Details (collapsible per-strategy) ── */
+function StrategyAdvancedDetails({ analysis }: { analysis: EnrichedStrategyAnalysis }) {
+  const [open, setOpen] = useState(false);
+  const hasContent = analysis.competitor_context || analysis.overtake_difficulty || analysis.stint_extension || analysis.sensitivity;
+  if (!hasContent) return null;
+
+  return (
+    <details className="mt-1.5 group" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <Layers className="h-3 w-3 shrink-0" />
+        <span>Dettagli avanzati</span>
+        <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${open ? "rotate-180" : ""}`} />
+      </summary>
+      <div className="mt-1.5 space-y-1.5 pl-4 text-[10px] text-muted-foreground border-l border-border/50">
+        {/* Sensitivity */}
+        {analysis.sensitivity && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Sens. degrado: <strong className="font-mono text-foreground">{analysis.sensitivity.sensitivity_to_degradation > 0 ? "+" : ""}{analysis.sensitivity.sensitivity_to_degradation}s</strong></span>
+            <span>Sens. traffico: <strong className="font-mono text-foreground">{analysis.sensitivity.sensitivity_to_traffic > 0 ? "+" : ""}{analysis.sensitivity.sensitivity_to_traffic}s</strong></span>
+            <span>Sens. pit loss: <strong className="font-mono text-foreground">+{analysis.sensitivity.sensitivity_to_pit_loss}s</strong></span>
+          </div>
+        )}
+
+        {/* Competitor Context */}
+        {analysis.competitor_context && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Rientro: <strong className="font-mono text-foreground">P{analysis.competitor_context.expected_rejoin_position}</strong></span>
+            <span>Undercut risk: <strong className="font-mono text-foreground">{Math.round(analysis.competitor_context.undercut_risk * 100)}%</strong></span>
+            <span>Undercut opp.: <strong className="font-mono text-foreground">{Math.round(analysis.competitor_context.undercut_opportunity * 100)}%</strong></span>
+            <span>Traffic risk: <strong className="font-mono text-foreground">{Math.round(analysis.competitor_context.traffic_risk_after_pit * 100)}%</strong></span>
+          </div>
+        )}
+
+        {/* Overtake Difficulty */}
+        {analysis.overtake_difficulty && analysis.overtake_difficulty.expected_laps_stuck > 0 && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Difficoltà sorpasso: <strong className="font-mono text-foreground">{Math.round(analysis.overtake_difficulty.overtake_difficulty_score * 100)}%</strong></span>
+            <span>Giri bloccato: <strong className="font-mono text-foreground">~{analysis.overtake_difficulty.expected_laps_stuck}</strong></span>
+            <span>Dirty air: <strong className="font-mono text-foreground">+{analysis.overtake_difficulty.dirty_air_penalty}s</strong></span>
+          </div>
+        )}
+
+        {/* Stint Extension */}
+        {analysis.stint_extension && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Costo estensione: <strong className="font-mono text-foreground">{analysis.stint_extension.extension_cost_per_lap}s/g</strong></span>
+            <span>Penalità totale: <strong className="font-mono text-foreground">+{analysis.stint_extension.total_extension_penalty}s</strong></span>
+            <span>Cliff risk: <strong className="font-mono text-foreground">{Math.round(analysis.stint_extension.cliff_risk_if_extend * 100)}%</strong></span>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -660,6 +730,9 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                                 Top {RISK_MODES[risk_mode].label}
                               </Badge>
                             )}
+                            {alt.analysis?.robustness && (
+                              <RobustnessBadge label={alt.analysis.robustness.robustness_label} />
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             {risk_mode !== "BALANCED" && Math.abs(alt.adjusted_score - alt.estimated_delta_vs_actual) > 0.05 && (
@@ -676,6 +749,26 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                             ⚖️ {alt.adjustment_reason}
                           </p>
                         )}
+
+                        {/* Pit Window */}
+                        {alt.analysis?.pit_window && (
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
+                            <span className="font-semibold">Pit window:</span>
+                            <span className="font-mono">L{alt.analysis.pit_window.pit_window_start}–L{alt.analysis.pit_window.pit_window_end}</span>
+                            <span className="text-[9px]">(best: L{alt.analysis.pit_window.best_lap_in_window}, spread: {alt.analysis.pit_window.window_time_spread}s)</span>
+                          </div>
+                        )}
+
+                        {/* Multi-objective mini-bar */}
+                        {alt.analysis?.multi_objective && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground mb-1.5">
+                            <span>⏱ Tempo: <strong className="text-foreground">{alt.analysis.multi_objective.race_time_objective > 0 ? "+" : ""}{alt.analysis.multi_objective.race_time_objective}s</strong></span>
+                            <span>📍 Posiz.: <strong className="text-foreground">{alt.analysis.multi_objective.track_position_objective > 0 ? "-" : ""}{alt.analysis.multi_objective.track_position_objective}</strong></span>
+                            <span>⚠️ Rischio: <strong className="text-foreground">{Math.round(alt.analysis.multi_objective.risk_objective * 100)}%</strong></span>
+                            <span>🛡️ Robustezza: <strong className="text-foreground">{Math.round(alt.analysis.multi_objective.robustness_objective * 100)}%</strong></span>
+                          </div>
+                        )}
+
                         <div className="flex gap-4 text-[10px]">
                           <div>
                             <span className="text-emerald-400 font-semibold">Pro: </span>
@@ -686,6 +779,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                             <span className="text-muted-foreground">{alt.cons.join("; ")}</span>
                           </div>
                         </div>
+
+                        {/* Collapsible advanced details */}
+                        {alt.analysis && (
+                          <StrategyAdvancedDetails analysis={alt.analysis} />
+                        )}
                       </div>
                     ));
                   })()}
