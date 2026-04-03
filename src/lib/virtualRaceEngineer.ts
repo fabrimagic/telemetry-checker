@@ -791,6 +791,53 @@ export function computeVirtualRaceEngineer(
   }
 
 
+  // ── 4d. Enrich alternatives with advanced analysis ──
+  const driverAvgPace = (() => {
+    const validLaps = laps.filter(l => l.lap_duration != null && l.lap_duration > 0 && !l.is_pit_out_lap);
+    if (validLaps.length === 0) return null;
+    return validLaps.reduce((s, l) => s + l.lap_duration!, 0) / validLaps.length;
+  })();
+
+  for (const alt of alternatives) {
+    const altTraffic = alt.traffic_predictions ?? [];
+    alt.analysis = enrichStrategyAnalysis(
+      alt.pit_laps, alt.compounds, alt.estimated_delta_vs_actual,
+      totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
+      pitLoss, trafficAvgBaseline, altTraffic,
+      riskMode, scenarioId,
+      intervals, positions, stints, allDrivers, driverNumber,
+      simulateStrategyCost, driverAvgPace, actualPitLaps,
+    );
+
+    // Enrich pros/cons based on analysis
+    if (alt.analysis.robustness.robustness_label === "FRAGILE") {
+      alt.cons.push("Strategia fragile — sensibile a variazioni di degrado/traffico");
+    } else if (alt.analysis.robustness.robustness_label === "ROBUST") {
+      alt.pros.push("Strategia robusta — poco sensibile a variazioni");
+    }
+
+    if (alt.analysis.competitor_context) {
+      if (alt.analysis.competitor_context.undercut_opportunity > 0.5) {
+        alt.pros.push("Opportunità undercut significativa");
+      }
+      if (alt.analysis.competitor_context.undercut_risk > 0.5) {
+        alt.cons.push("Rischio undercut da rivali");
+      }
+    }
+
+    if (alt.analysis.overtake_difficulty && alt.analysis.overtake_difficulty.expected_laps_stuck > 3) {
+      alt.cons.push(`Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato (no DRS)`);
+    }
+
+    if (alt.analysis.stint_extension && alt.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
+      alt.cons.push(`Rischio cliff se si estende lo stint (${Math.round(alt.analysis.stint_extension.cliff_risk_if_extend * 100)}%)`);
+    }
+
+    if (alt.analysis.pit_window && alt.analysis.pit_window.window_robustness === "FRAGILE") {
+      alt.cons.push("Finestra pit fragile — il giro esatto è critico");
+    }
+  }
+
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
