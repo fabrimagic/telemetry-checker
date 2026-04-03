@@ -865,7 +865,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                       <span className="font-mono font-bold w-10">{driverName(p.driver_number)}</span>
                       <span className="text-muted-foreground">Lap {p.lap_number}</span>
                       <span className="font-mono tabular-nums ml-auto">
-                        {p.lane_duration.toFixed(1)}s
+                        {typeof p.lane_duration === "number" ? p.lane_duration.toFixed(1) : p.lane_duration ?? "—"}s
                         <span className="text-muted-foreground ml-1">lane</span>
                       </span>
                       {p.stop_duration != null && (
