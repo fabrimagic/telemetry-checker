@@ -580,7 +580,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                           <CompoundBadge compound={p.compound_after} />
                         </span>
                       )}
-                      <span className="text-muted-foreground">{p.lane_duration.toFixed(1)}s</span>
+                      <span className="text-muted-foreground">{typeof p.lane_duration === "number" ? p.lane_duration.toFixed(1) : p.lane_duration ?? "—"}s</span>
                       {p.under_neutralisation && (
                         <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-400 border-amber-500/30">
                           {p.neutralisation_type}

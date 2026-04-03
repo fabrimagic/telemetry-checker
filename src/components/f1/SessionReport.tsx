@@ -870,7 +870,7 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                       </span>
                       {p.stop_duration != null && (
                         <span className="font-mono tabular-nums">
-                          {p.stop_duration.toFixed(1)}s
+                          {typeof p.stop_duration === "number" ? p.stop_duration.toFixed(1) : p.stop_duration ?? "—"}s
                           <span className="text-muted-foreground ml-1">stop</span>
                         </span>
                       )}
