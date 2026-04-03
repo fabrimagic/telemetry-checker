@@ -60,6 +60,75 @@ function DeltaBadge({ delta }: { delta: number }) {
   );
 }
 
+/* ── Robustness Badge ── */
+function RobustnessBadge({ label }: { label: RobustnessLabel }) {
+  const styles: Record<RobustnessLabel, string> = {
+    ROBUST: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    MEDIUM: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    FRAGILE: "bg-red-500/20 text-red-400 border-red-500/30",
+  };
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0 rounded border text-[9px] font-semibold ${styles[label]}`}>
+      {label}
+    </span>
+  );
+}
+
+/* ── Strategy Advanced Details (collapsible per-strategy) ── */
+function StrategyAdvancedDetails({ analysis }: { analysis: EnrichedStrategyAnalysis }) {
+  const [open, setOpen] = useState(false);
+  const hasContent = analysis.competitor_context || analysis.overtake_difficulty || analysis.stint_extension || analysis.sensitivity;
+  if (!hasContent) return null;
+
+  return (
+    <details className="mt-1.5 group" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <Layers className="h-3 w-3 shrink-0" />
+        <span>Dettagli avanzati</span>
+        <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${open ? "rotate-180" : ""}`} />
+      </summary>
+      <div className="mt-1.5 space-y-1.5 pl-4 text-[10px] text-muted-foreground border-l border-border/50">
+        {/* Sensitivity */}
+        {analysis.sensitivity && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Sens. degrado: <strong className="font-mono text-foreground">{analysis.sensitivity.sensitivity_to_degradation > 0 ? "+" : ""}{analysis.sensitivity.sensitivity_to_degradation}s</strong></span>
+            <span>Sens. traffico: <strong className="font-mono text-foreground">{analysis.sensitivity.sensitivity_to_traffic > 0 ? "+" : ""}{analysis.sensitivity.sensitivity_to_traffic}s</strong></span>
+            <span>Sens. pit loss: <strong className="font-mono text-foreground">+{analysis.sensitivity.sensitivity_to_pit_loss}s</strong></span>
+          </div>
+        )}
+
+        {/* Competitor Context */}
+        {analysis.competitor_context && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Rientro: <strong className="font-mono text-foreground">P{analysis.competitor_context.expected_rejoin_position}</strong></span>
+            <span>Undercut risk: <strong className="font-mono text-foreground">{Math.round(analysis.competitor_context.undercut_risk * 100)}%</strong></span>
+            <span>Undercut opp.: <strong className="font-mono text-foreground">{Math.round(analysis.competitor_context.undercut_opportunity * 100)}%</strong></span>
+            <span>Traffic risk: <strong className="font-mono text-foreground">{Math.round(analysis.competitor_context.traffic_risk_after_pit * 100)}%</strong></span>
+          </div>
+        )}
+
+        {/* Overtake Difficulty */}
+        {analysis.overtake_difficulty && analysis.overtake_difficulty.expected_laps_stuck > 0 && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Difficoltà sorpasso: <strong className="font-mono text-foreground">{Math.round(analysis.overtake_difficulty.overtake_difficulty_score * 100)}%</strong></span>
+            <span>Giri bloccato: <strong className="font-mono text-foreground">~{analysis.overtake_difficulty.expected_laps_stuck}</strong></span>
+            <span>Dirty air: <strong className="font-mono text-foreground">+{analysis.overtake_difficulty.dirty_air_penalty}s</strong></span>
+          </div>
+        )}
+
+        {/* Stint Extension */}
+        {analysis.stint_extension && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <span>Costo estensione: <strong className="font-mono text-foreground">{analysis.stint_extension.extension_cost_per_lap}s/g</strong></span>
+            <span>Penalità totale: <strong className="font-mono text-foreground">+{analysis.stint_extension.total_extension_penalty}s</strong></span>
+            <span>Cliff risk: <strong className="font-mono text-foreground">{Math.round(analysis.stint_extension.cliff_risk_if_extend * 100)}%</strong></span>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
 /* ── Collapsible Section ── */
 function VRESection({ title, icon, defaultOpen = false, badge, children }: {
   title: string; icon: React.ReactNode; defaultOpen?: boolean; badge?: React.ReactNode; children: React.ReactNode;
