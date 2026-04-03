@@ -5,12 +5,13 @@ import { breakdownToRows } from "@/lib/strategyBreakdown";
 import { getPhaseLabel } from "@/lib/racePhase";
 import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
+import type { EnrichedStrategyAnalysis, RobustnessLabel } from "@/lib/strategyAnalysis";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical } from "lucide-react";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 const COMPOUND_COLORS: Record<string, string> = {
