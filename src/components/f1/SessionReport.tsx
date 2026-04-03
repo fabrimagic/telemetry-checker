@@ -64,9 +64,10 @@ function formatDuration(seconds: number | number[] | null): string {
   return secs.toFixed(3);
 }
 
-function formatGap(gap: number | string | null): string {
+function formatGap(gap: number | string | null | undefined): string {
   if (gap == null || gap === 0) return "—";
   if (typeof gap === "string") return gap;
+  if (typeof gap !== "number" || isNaN(gap)) return "—";
   return `+${gap.toFixed(3)}`;
 }
 
