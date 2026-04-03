@@ -43,12 +43,12 @@ export function PitStopsCard({ pitStops, allDrivers, multiDriver }: Props) {
             )}
             <span className="text-muted-foreground">Lap {p.lap_number}</span>
             <span className="font-mono tabular-nums ml-auto">
-              {p.lane_duration.toFixed(1)}s
+              {typeof p.lane_duration === "number" ? p.lane_duration.toFixed(1) : p.lane_duration ?? "—"}s
               <span className="text-muted-foreground ml-1">lane</span>
             </span>
             {p.stop_duration != null && (
               <span className="font-mono tabular-nums">
-                {p.stop_duration.toFixed(1)}s
+                {typeof p.stop_duration === "number" ? p.stop_duration.toFixed(1) : p.stop_duration ?? "—"}s
                 <span className="text-muted-foreground ml-1">stop</span>
               </span>
             )}
