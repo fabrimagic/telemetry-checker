@@ -96,6 +96,7 @@ export default function Index() {
   const [vreScenario, setVreScenario] = useState<import("@/lib/scenarioContext").ScenarioId>("REAL_CONTEXT");
   const [vreScenarioLap, setVreScenarioLap] = useState<number | null>(null);
   const [vreScenarioDuration, setVreScenarioDuration] = useState<number | null>(null);
+  const [vreCustomDeg, setVreCustomDeg] = useState<number | null>(null);
   const vreArgsRef = useRef<{
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
@@ -310,7 +311,7 @@ export default function Index() {
               laps, driverStints, pitsForVre,
               sessionWeather, raceControlMessages,
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
-              diaryForVre, cumDevForVre, vreScenario, vreScenarioLap, vreScenarioDuration,
+              diaryForVre, cumDevForVre, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
             );
             setVreResult(vre);
           } catch { /* optional */ }
@@ -879,7 +880,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
                       );
                       setVreResult(newVre);
                     }
@@ -894,7 +895,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration,
+                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration, vreCustomDeg,
                       );
                       setVreResult(newVre);
                     }
@@ -907,7 +908,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration,
+                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration, vreCustomDeg,
                       );
                       setVreResult(newVre);
                     }
@@ -920,7 +921,20 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration, vreCustomDeg,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} onCustomDegradationChange={(deg) => {
+                    setVreCustomDeg(deg);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, deg,
                       );
                       setVreResult(newVre);
                     }

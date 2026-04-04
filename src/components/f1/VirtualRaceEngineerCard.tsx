@@ -225,12 +225,13 @@ interface Props {
   onScenarioChange?: (scenario: ScenarioId) => void;
   onScenarioActivationLapChange?: (lap: number | null) => void;
   onScenarioDurationChange?: (duration: number | null) => void;
+  onCustomDegradationChange?: (deg: number | null) => void;
   scenarioActivationLap?: number | null;
   scenarioDurationLaps?: number | null;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
   const adjustedBreakdown = useMemo(() => {
@@ -635,7 +636,61 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
               </div>
             </div>
 
-            {/* Pit stops */}
+            {/* Custom degradation override for INVALID stints */}
+            {degradation_validations?.some(dv => dv.status === "INVALID") && (
+              <div className="bg-muted/30 border border-border rounded-md p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <p className="text-[11px] font-semibold text-foreground">Degrado personalizzato (opzionale)</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Uno o più stint hanno degrado classificato come <strong className="text-red-400">INVALID</strong>. 
+                  Puoi inserire un valore di degrado personalizzato (in secondi al giro) che verrà usato al posto del fallback automatico per il calcolo delle strategie.
+                  Sono supportate frazioni fino ai millesimi di secondo (es. 0.045).
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    max="0.300"
+                    placeholder="es. 0.045"
+                    className="w-28 h-7 text-xs font-mono bg-background"
+                    value={custom_degradation_override != null ? custom_degradation_override : ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || val === null) {
+                        onCustomDegradationChange?.(null);
+                        return;
+                      }
+                      const num = parseFloat(val);
+                      if (!isNaN(num) && num >= 0.001 && num <= 0.300) {
+                        onCustomDegradationChange?.(num);
+                      } else if (!isNaN(num) && num === 0) {
+                        // Allow typing "0." as intermediate
+                      }
+                    }}
+                  />
+                  <span className="text-[10px] text-muted-foreground">s/giro</span>
+                  {custom_degradation_override != null && (
+                    <button
+                      onClick={() => onCustomDegradationChange?.(null)}
+                      className="text-[10px] text-red-400 hover:text-red-300 underline"
+                    >
+                      Rimuovi
+                    </button>
+                  )}
+                </div>
+                {custom_degradation_override != null && (
+                  <p className="text-[9px] text-amber-400/80 flex items-center gap-1">
+                    <Gauge className="h-3 w-3" />
+                    Override attivo: {custom_degradation_override.toFixed(3)} s/giro applicato agli stint INVALID
+                  </p>
+                )}
+              </div>
+            )}
+
+
             {actual_strategy.pit_stops.length > 0 && (
               <div>
                 <p className="text-[11px] font-semibold text-muted-foreground mb-1">Pit Stop</p>

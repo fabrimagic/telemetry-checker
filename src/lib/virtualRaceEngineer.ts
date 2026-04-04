@@ -118,6 +118,7 @@ export interface VirtualRaceEngineerResult {
   scenario_activation_warning: string | null;
   degradation_validations: DegradationValidationResult[];
   pace_loss_results: StintPaceLossResult[];
+  custom_degradation_override: number | null;
 }
 
 /* ── Helpers ── */
@@ -183,6 +184,7 @@ export function computeVirtualRaceEngineer(
   scenarioId: ScenarioId = "REAL_CONTEXT",
   scenarioActivationLap: number | null = null,
   scenarioDurationLaps: number | null = null,
+  customDegradationOverride: number | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -207,9 +209,19 @@ export function computeVirtualRaceEngineer(
   const degradationValidations = resolveDegradationForStrategy(rawValidated);
 
   for (const dv of degradationValidations) {
-    // Use effective_slope (validated/fallback) instead of raw slope
+    // If user provided a custom override and this stint is INVALID, use it
+    const useCustomOverride = customDegradationOverride != null && dv.status === "INVALID";
+    const effectiveSlope = useCustomOverride ? customDegradationOverride : dv.effective_slope;
+    
+    if (useCustomOverride) {
+      // Update the validation result to reflect user override
+      dv.effective_slope = customDegradationOverride;
+      dv.fallback_applied = true;
+      dv.fallback_description = `Override utente applicato (${customDegradationOverride.toFixed(3)} s/giro)`;
+    }
+    
     degradationModels.set(dv.original.stint, {
-      slope: dv.effective_slope,
+      slope: effectiveSlope,
       intercept: dv.original.intercept,
     });
   }
@@ -1212,5 +1224,6 @@ export function computeVirtualRaceEngineer(
     scenario_activation_warning: scenarioActivationWarning,
     degradation_validations: degradationValidations,
     pace_loss_results: paceLossResults,
+    custom_degradation_override: customDegradationOverride,
   };
 }
