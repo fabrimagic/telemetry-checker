@@ -880,7 +880,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
                       );
                       setVreResult(newVre);
                     }
@@ -895,7 +895,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration,
+                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration, vreCustomDeg,
                       );
                       setVreResult(newVre);
                     }
@@ -908,7 +908,7 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration,
+                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration, vreCustomDeg,
                       );
                       setVreResult(newVre);
                     }
@@ -921,7 +921,20 @@ export default function Index() {
                         args.laps, args.stints, args.pits,
                         args.weather, args.raceControl,
                         args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration, vreCustomDeg,
+                      );
+                      setVreResult(newVre);
+                    }
+                  }} onCustomDegradationChange={(deg) => {
+                    setVreCustomDeg(deg);
+                    const args = vreArgsRef.current;
+                    if (args) {
+                      const newVre = computeVirtualRaceEngineer(
+                        args.driverNumber, args.driverAcronym, args.sessionKey,
+                        args.laps, args.stints, args.pits,
+                        args.weather, args.raceControl,
+                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, deg,
                       );
                       setVreResult(newVre);
                     }
