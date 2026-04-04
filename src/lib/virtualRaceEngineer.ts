@@ -208,9 +208,19 @@ export function computeVirtualRaceEngineer(
   const degradationValidations = resolveDegradationForStrategy(rawValidated);
 
   for (const dv of degradationValidations) {
-    // Use effective_slope (validated/fallback) instead of raw slope
+    // If user provided a custom override and this stint is INVALID, use it
+    const useCustomOverride = customDegradationOverride != null && dv.status === "INVALID";
+    const effectiveSlope = useCustomOverride ? customDegradationOverride : dv.effective_slope;
+    
+    if (useCustomOverride) {
+      // Update the validation result to reflect user override
+      dv.effective_slope = customDegradationOverride;
+      dv.fallback_applied = true;
+      dv.fallback_description = `Override utente applicato (${customDegradationOverride.toFixed(3)} s/giro)`;
+    }
+    
     degradationModels.set(dv.original.stint, {
-      slope: dv.effective_slope,
+      slope: effectiveSlope,
       intercept: dv.original.intercept,
     });
   }
