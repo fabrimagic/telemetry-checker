@@ -230,8 +230,8 @@ interface Props {
   scenarioDurationLaps?: number | null;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results } = result;
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const primaryBreakdown = recommended_strategy.breakdown ?? actual_breakdown ?? null;
   const adjustedBreakdown = useMemo(() => {
