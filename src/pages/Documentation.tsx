@@ -275,9 +275,25 @@ export default function Documentation() {
             <li>Qualsiasi pilota, stesso compound, VALID → usa quella slope</li>
             <li>Nessun riferimento → fallback conservativo neutro a <strong className="text-foreground">0.03 s/giro</strong></li>
           </ol>
+
+          <h4 className="font-semibold text-foreground mt-3">Override degrado personalizzato</h4>
+          <p>
+            Quando almeno uno stint ha degrado classificato come <strong style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong>, 
+            l'utente può inserire un valore di degrado personalizzato (in secondi al giro, con precisione ai millesimi).
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Range ammesso: <strong className="text-foreground">0.001 — 0.300 s/giro</strong></li>
+            <li>Il valore viene applicato <strong className="text-foreground">solo agli stint INVALID</strong>, senza modificare stint VALID o NEUTRAL</li>
+            <li>Sostituisce il fallback automatico (stesso compound o 0.03 s/giro neutro)</li>
+            <li>Il ricalcolo è immediato: strategie, ranking, pit consigliato, confidence e breakdown si aggiornano</li>
+            <li>L'override è opzionale e può essere rimosso in qualsiasi momento, ripristinando il fallback automatico</li>
+            <li>È segnalato nell'interfaccia con un badge dedicato per distinguere il dato personalizzato dal calcolo automatico</li>
+          </ul>
           <p className="text-xs italic">
             Anti-allucinazione: una slope negativa NON significa che la gomma migliora. 
             Indica contaminazione da fuel effect, warm-up, traffico, evoluzione pista o rumore statistico.
+            L'override consente all'utente esperto di inserire un valore basato sulla propria conoscenza del degrado atteso, 
+            senza che il sistema inventi o interpreti dati non attendibili.
           </p>
         </DocSection>
 
