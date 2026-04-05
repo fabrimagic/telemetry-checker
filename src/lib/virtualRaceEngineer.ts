@@ -205,11 +205,34 @@ export function computeVirtualRaceEngineer(
   const stintAnalyses: StintAnalysis[] = [];
   const degradationModels = new Map<number, { slope: number; intercept: number }>();
 
-  // Use corrected multivariate model (fuel proxy + temperature)
+  // Raw baseline degradation (simple linear regression, no corrections)
+  const rawDegResults: DegradationResult[] = calculateTyreDegradation(
+    driverNumber, driverAcronym, "ffffff", laps, stints,
+  );
+
+  // Corrected multivariate model (fuel proxy + temperature)
   const degResults: DegradationResult[] = calculateCorrectedTyreDegradation(
     driverNumber, driverAcronym, "ffffff", laps, stints,
     weather, totalLaps, weatherMap, trackStatusMap,
   );
+
+  // ── Raw vs Corrected comparison (used for confidence/narrative) ──
+  const rawVsCorrected: { stint: number; compound: string; rawSlope: number; corrSlope: number; delta: number; agreement: "HIGH" | "MEDIUM" | "LOW" }[] = [];
+  for (const corrRes of degResults) {
+    const rawRes = rawDegResults.find(r => r.stint === corrRes.stint);
+    if (rawRes && rawRes.slopeSecPerLap != null && corrRes.slopeSecPerLap != null) {
+      const delta = Math.abs(corrRes.slopeSecPerLap - rawRes.slopeSecPerLap);
+      const agreement: "HIGH" | "MEDIUM" | "LOW" = delta < 0.02 ? "HIGH" : delta < 0.06 ? "MEDIUM" : "LOW";
+      rawVsCorrected.push({
+        stint: corrRes.stint,
+        compound: corrRes.compound,
+        rawSlope: rawRes.slopeSecPerLap,
+        corrSlope: corrRes.slopeSecPerLap,
+        delta,
+        agreement,
+      });
+    }
+  }
 
   // ── Degradation validation (based on corrected slope) ──
   const rawValidated = validateAllDegradationEstimates(degResults);
@@ -737,7 +760,7 @@ export function computeVirtualRaceEngineer(
   // ── 4b. Traffic Release Predictor ──
   const allLapsMap = allLapsMapEarly;
 
-  // Attach traffic predictions to alternatives (display only, NOT for delta - already in cost)
+  // Attach traffic predictions and warmup analysis to alternatives
   for (const alt of alternatives) {
     if (alt.pit_laps.length > 0) {
       const altTraffic = predictTrafficForPitLaps(
@@ -758,6 +781,33 @@ export function computeVirtualRaceEngineer(
       } else if (worstTraffic === "CLEAN") {
         alt.pros.push("Rientro in aria pulita");
       }
+
+      // Traffic metadata enrichment: release quality and pack risk
+      for (const tp of altTraffic) {
+        if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
+          alt.cons.push(`Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`);
+          break; // avoid duplicate messages
+        }
+        if (tp.rejoin_is_in_pack) {
+          alt.cons.push(`Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti)`);
+          break;
+        }
+      }
+    }
+
+    // Warmup cost analysis per alternative (simulated only)
+    const altStintBounds = buildStintBounds(alt.pit_laps, alt.compounds);
+    let altWarmupTotal = 0;
+    for (let si = 0; si < altStintBounds.length; si++) {
+      altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0);
+    }
+    if (altWarmupTotal > 2.5) {
+      alt.cons.push(`Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`);
+    }
+    // Check if Hard compound causes significant warmup handicap
+    const hasHard = alt.compounds.some(c => c.toUpperCase() === "HARD");
+    if (hasHard && altWarmupTotal > 1.5) {
+      alt.cons.push("Mescola Hard: warmup lento riduce efficacia undercut");
     }
   }
 
@@ -854,7 +904,7 @@ export function computeVirtualRaceEngineer(
     }
 
     if (alt.analysis.overtake_difficulty && alt.analysis.overtake_difficulty.expected_laps_stuck > 3) {
-      alt.cons.push(`Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato (no DRS)`);
+      alt.cons.push(`Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca`);
     }
 
     if (alt.analysis.stint_extension && alt.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
@@ -960,7 +1010,26 @@ export function computeVirtualRaceEngineer(
     narrativeInsights.push("⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.");
   }
 
-  // ── 7a. Battle impact on strategies ──
+  // ── 7.pre2 Raw vs Corrected degradation comparison ──
+  {
+    const lowAgreementStints = rawVsCorrected.filter(r => r.agreement === "LOW");
+    const highAgreementStints = rawVsCorrected.filter(r => r.agreement === "HIGH");
+
+    if (lowAgreementStints.length > 0) {
+      for (const la of lowAgreementStints) {
+        narrativeInsights.push(`Stint ${la.stint} (${la.compound}): divergenza significativa tra degrado grezzo (${la.rawSlope.toFixed(3)} s/giro) e corretto (${la.corrSlope.toFixed(3)} s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.`);
+      }
+      confScore -= lowAgreementStints.length;
+      confidenceFactors.push(`⚠️ Divergenza raw/corrected in ${lowAgreementStints.length} stint — correzione non-tyre molto ampia`);
+    } else if (highAgreementStints.length === rawVsCorrected.length && rawVsCorrected.length > 0) {
+      confScore += 1;
+      confidenceFactors.push("Convergenza alta tra degrado grezzo e corretto — stima robusta");
+    } else if (rawVsCorrected.length > 0) {
+      confidenceFactors.push("Convergenza moderata tra degrado grezzo e corretto");
+    }
+  }
+
+
   if (integratedContext.battle_context) {
     const bc = integratedContext.battle_context;
     if (bc.total_battle_laps > 3) {
@@ -1101,18 +1170,29 @@ export function computeVirtualRaceEngineer(
 
   // ── 7g. Tyre warmup narrative insights (simulated strategies only) ──
   {
-    const recWarmup = recommendedStrategy.breakdown?.warmup_cost ?? 0;
-    const actualWarmup = actualBreakdown?.warmup_cost ?? 0; // should be 0 since we don't compute it for actual
+    // Compute recommended strategy warmup using computeStintWarmupCost
+    const recStintBounds = buildStintBounds(bestPitLaps, bestCompounds);
+    let recWarmupFromModel = 0;
+    for (let si = 0; si < recStintBounds.length; si++) {
+      recWarmupFromModel += computeStintWarmupCost(recStintBounds[si].compound, si === 0);
+    }
+    // Use model-computed warmup (more precise) or breakdown warmup as fallback
+    const recWarmup = recWarmupFromModel > 0 ? recWarmupFromModel : (recommendedStrategy.breakdown?.warmup_cost ?? 0);
 
     // Check if recommended strategy has significant warmup cost
     if (recWarmup > 2.0) {
       narrativeInsights.push(`La strategia raccomandata include ${recWarmup.toFixed(1)}s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.`);
     }
 
-    // Compare warmup across alternatives to highlight when it drives the ranking
-    const altWarmups = alternatives
-      .map(a => ({ name: a.name, warmup: a.breakdown?.warmup_cost ?? 0, compounds: a.compounds }))
-      .filter(a => a.warmup > 0);
+    // Compare warmup across alternatives using computeStintWarmupCost
+    const altWarmups = alternatives.map(a => {
+      const aBounds = buildStintBounds(a.pit_laps, a.compounds);
+      let wTotal = 0;
+      for (let si = 0; si < aBounds.length; si++) {
+        wTotal += computeStintWarmupCost(aBounds[si].compound, si === 0);
+      }
+      return { name: a.name, warmup: wTotal, compounds: a.compounds };
+    }).filter(a => a.warmup > 0);
 
     if (altWarmups.length > 0) {
       const maxWarmupAlt = altWarmups.reduce((a, b) => a.warmup > b.warmup ? a : b);
