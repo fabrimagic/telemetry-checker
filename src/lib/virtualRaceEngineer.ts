@@ -57,6 +57,11 @@ export interface RecommendedStrategy {
   estimated_gain_seconds: number;
   reason: string;
   breakdown?: StrategyBreakdown;
+  description?: string;
+  pros?: string[];
+  cons?: string[];
+  traffic_predictions?: TrafficPrediction[];
+  analysis?: EnrichedStrategyAnalysis;
 }
 
 export interface AlternativeStrategy {
