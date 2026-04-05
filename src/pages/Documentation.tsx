@@ -304,6 +304,86 @@ export default function Documentation() {
         </DocSection>
 
         {/* ════════════════════════════════════════════ */}
+        {/* TYRE WARMUP MODEL */}
+        {/* ════════════════════════════════════════════ */}
+        <DocSection title="Modello Tyre Warmup" icon={<Timer className="h-4 w-4" />}>
+          <p>
+            Dopo ogni pit stop, le gomme nuove non sono ancora alla temperatura operativa ottimale.
+            Il modello di <strong className="text-foreground">Tyre Warmup</strong> simula questa 
+            penalità temporanea nei primi giri dopo il pit, influenzando il costo strategico delle soste.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Modello matematico</h4>
+          <Formula>warmup_penalty(lap) = base_penalty × exp(-lap_after_pit / decay)</Formula>
+          <ul className="list-disc pl-5 space-y-1">
+            <Param name="lap_after_pit" desc="0 = primo giro push dopo il pit (out-lap esclusa)" />
+            <Param name="base_penalty" desc="penalità in secondi sul primo giro (dipende dal compound)" />
+            <Param name="decay" desc="costante di decadimento esponenziale (più alta = warmup più lento)" />
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Parametri per compound</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="px-3 py-1.5 text-left font-semibold text-foreground">Compound</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Base penalty (s)</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Decay</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Giri interessati</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-red-400">SOFT</td>
+                  <td className="px-3 py-1.5 text-right">0.6</td>
+                  <td className="px-3 py-1.5 text-right">1.2</td>
+                  <td className="px-3 py-1.5 text-right">2</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td>
+                  <td className="px-3 py-1.5 text-right">0.9</td>
+                  <td className="px-3 py-1.5 text-right">1.6</td>
+                  <td className="px-3 py-1.5 text-right">3</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-white">HARD</td>
+                  <td className="px-3 py-1.5 text-right">1.4</td>
+                  <td className="px-3 py-1.5 text-right">2.2</td>
+                  <td className="px-3 py-1.5 text-right">4</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 className="font-semibold text-foreground mt-3">Comportamento realistico F1</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Soft</strong> — entra in temperatura rapidamente → penalità piccola e breve</li>
+            <li><strong className="text-foreground">Medium</strong> — warmup intermedio → penalità moderata</li>
+            <li><strong className="text-foreground">Hard</strong> — entra in temperatura lentamente → penalità elevata per più giri</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Effetti strategici</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Strategie a 2+ soste diventano relativamente più costose (warmup ripetuto)</li>
+            <li>Undercut con gomme Hard meno efficace (warmup lento annulla parte del vantaggio)</li>
+            <li>Stint molto corti penalizzati (warmup pesa proporzionalmente di più)</li>
+            <li>Il primo stint della gara <strong className="text-foreground">non ha warmup</strong> (gomme già calde dal giro di formazione)</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Integrazione nel VRE</h4>
+          <p>
+            Il warmup è integrato in <code className="text-primary">simulateStrategyCost()</code> e 
+            <code className="text-primary"> simulateTimeRaw()</code>. Viene sommato al tempo giro stimato 
+            per i primi giri di ogni stint (escluso il primo). Appare nella breakdown strategica come 
+            voce separata <strong className="text-foreground">"Tyre warmup"</strong>.
+          </p>
+          <p className="text-xs italic">
+            Il warmup NON è degrado: è una penalità termica temporanea che si esaurisce in pochi giri. 
+            Non modifica la slope di degrado né il pit loss.
+          </p>
+        </DocSection>
+
+        {/* ════════════════════════════════════════════ */}
         {/* CUMULATIVE DEVIATION */}
         {/* ════════════════════════════════════════════ */}
         <DocSection title="Deviazione Cumulativa" icon={<TrendingDown className="h-4 w-4" />}>
@@ -672,6 +752,7 @@ export default function Documentation() {
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Tempo base stint</strong> — tempo stimato senza degrado</li>
             <li><strong className="text-foreground">Degrado gomme</strong> — costo aggiuntivo da usura pneumatici</li>
+            <li><strong className="text-foreground">Tyre warmup</strong> — penalità termica temporanea post-pit (dipende dal compound)</li>
             <li><strong className="text-foreground">Tempo perso ai box</strong> — pit stop × pit_loss_per_stop</li>
             <li><strong className="text-foreground">Tempo perso nel traffico</strong> — da traffic predictor</li>
             <li><strong className="text-foreground">Impatto meteo</strong> — +2.0s per giro WET/MIXED</li>

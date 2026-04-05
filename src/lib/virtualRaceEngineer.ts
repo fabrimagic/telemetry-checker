@@ -16,6 +16,7 @@ import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
+import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 
 /* ── Types ── */
@@ -444,15 +445,19 @@ export function computeVirtualRaceEngineer(
 
     let totalCost = 0;
 
-    for (const sb of stintBounds) {
+    for (let si = 0; si < stintBounds.length; si++) {
+      const sb = stintBounds[si];
       const model = compoundModels.get(sb.compound);
       if (!model) return null;
       const stintLength = sb.end - sb.start + 1;
+      const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
         const baseLap = model.intercept;
         const degLap = model.slope * tyreLife * lapDegradationMult(lap);
-        totalCost += baseLap + degLap;
+        // Tyre warmup penalty: temporary time loss in first laps after pit
+        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        totalCost += baseLap + degLap + warmupPenalty;
       }
       // Cliff risk for this stint
       totalCost += cliffPenalty(stintLength);
@@ -477,11 +482,15 @@ export function computeVirtualRaceEngineer(
     if (!hasMinTwoCompounds(compoundsArr)) return null;
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
-    for (const sb of stintBounds) {
+    for (let si = 0; si < stintBounds.length; si++) {
+      const sb = stintBounds[si];
       const model = compoundModels.get(sb.compound);
       if (!model) return null;
+      const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
-        total += predictLapTime(model.slope, model.intercept, lap - sb.start);
+        const tyreLife = lap - sb.start;
+        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
       }
     }
     total += pitLapsArr.length * pitLoss;

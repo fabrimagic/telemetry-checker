@@ -2,12 +2,14 @@ import type { TrafficPrediction } from "./trafficPredictor";
 import type { TrackStatus } from "./trackStatusClassification";
 import type { WeatherCondition } from "./weatherClassification";
 import type { PitStopAnalysis, StintAnalysis } from "./virtualRaceEngineer";
+import { computeStintWarmupCost } from "./tyreWarmup";
 
 /* ── Types ── */
 
 export interface StrategyBreakdown {
   base_stint_time: number | null;
   tyre_degradation_cost: number | null;
+  warmup_cost: number | null;
   pit_loss: number | null;
   traffic_loss: number | null;
   weather_adjustment: number | null;
@@ -69,9 +71,11 @@ export function computeStrategyBreakdown(
 
   let baseTime = 0;
   let degCost = 0;
+  let warmupCost = 0;
   let hasModel = true;
 
-  for (const sb of stintBounds) {
+  for (let si = 0; si < stintBounds.length; si++) {
+    const sb = stintBounds[si];
     const model = compoundModels.get(sb.compound);
     if (!model) { hasModel = false; break; }
     for (let lap = sb.start; lap <= sb.end; lap++) {
@@ -79,12 +83,15 @@ export function computeStrategyBreakdown(
       baseTime += model.intercept;
       degCost += model.slope * tyreLife;
     }
+    // Warmup cost: first stint has no warmup (tyres warm from formation lap)
+    warmupCost += computeStintWarmupCost(sb.compound, si === 0);
   }
 
   if (!hasModel) {
     return {
       base_stint_time: null,
       tyre_degradation_cost: null,
+      warmup_cost: null,
       pit_loss: pitLaps.length > 0 ? round1(pitLaps.length * pitLossPerStop * modifiers.pit_loss_mult) : null,
       traffic_loss: null,
       weather_adjustment: null,
@@ -119,7 +126,7 @@ export function computeStrategyBreakdown(
   }
 
   const totalEstimated = round1(
-    baseTime + adjustedDegCost + pitLossTotal +
+    baseTime + adjustedDegCost + pitLossTotal + warmupCost +
     (trafficLoss ?? 0) +
     (weatherAdj ?? 0) +
     (neutralAdj ?? 0)
@@ -128,6 +135,7 @@ export function computeStrategyBreakdown(
   return {
     base_stint_time: round1(baseTime),
     tyre_degradation_cost: round1(adjustedDegCost),
+    warmup_cost: round1(warmupCost),
     pit_loss: round1(pitLossTotal),
     traffic_loss: trafficLoss != null ? round1(trafficLoss) : null,
     weather_adjustment: weatherAdj,
@@ -151,6 +159,15 @@ export function breakdownToRows(b: StrategyBreakdown): BreakdownRow[] {
       value: b.base_stint_time,
       impact: "neutral",
       note: "Tempo stimato senza degrado gomme",
+    });
+  }
+
+  if (b.warmup_cost != null && b.warmup_cost > 0) {
+    rows.push({
+      label: "Tyre warmup",
+      value: b.warmup_cost,
+      impact: b.warmup_cost > 3 ? "penalizing" : b.warmup_cost > 1.5 ? "neutral" : "favorable",
+      note: b.warmup_cost > 3 ? "Warmup lento (gomme dure)" : "Penalità termica post-pit",
     });
   }
 
