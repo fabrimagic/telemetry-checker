@@ -768,7 +768,7 @@ export function computeVirtualRaceEngineer(
         allLapsMap, positions, intervals, allDrivers,
       );
       alt.traffic_predictions = altTraffic;
-      const trafficLoss = altTraffic.reduce((sum, t) => sum + t.estimated_traffic_time_loss, 0);
+      const trafficLoss = altTraffic.reduce((sum, t) => sum + (t.traffic_time_loss_total ?? t.estimated_traffic_time_loss), 0);
       const worstTraffic = altTraffic.reduce((worst, t) => {
         if (t.traffic_level === "HEAVY") return "HEAVY";
         if (t.traffic_level === "LIGHT" && worst !== "HEAVY") return "LIGHT";
@@ -782,16 +782,36 @@ export function computeVirtualRaceEngineer(
         alt.pros.push("Rientro in aria pulita");
       }
 
-      // Traffic metadata enrichment: release quality and pack risk
+      // Traffic metadata enrichment: release classification, pack risk, persistence
       for (const tp of altTraffic) {
-        if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
-          alt.cons.push(`Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`);
-          break; // avoid duplicate messages
-        }
-        if (tp.rejoin_is_in_pack) {
-          alt.cons.push(`Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti)`);
+        // Release classification (CLEAN / TRAFFIC / PACK)
+        if (tp.release_classification === "PACK") {
+          alt.cons.push(`Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti, ${tp.pack_size_behind ?? "?"} dietro)`);
           break;
         }
+        if (tp.release_classification === "TRAFFIC") {
+          if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
+            alt.cons.push(`Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`);
+            break;
+          }
+        }
+        // Traffic persistence
+        const persistLaps = tp.traffic_persistence_laps ?? tp.estimated_traffic_laps;
+        if (persistLaps > 3) {
+          alt.cons.push(`Traffico persistente: ~${persistLaps} giri bloccato in aria sporca dopo il pit al giro ${tp.pit_lap}`);
+          break;
+        }
+        // Stuck risk
+        if ((tp.stuck_risk_score ?? 0) > 0.7) {
+          alt.cons.push(`Rischio elevato di restare bloccato dopo il pit al giro ${tp.pit_lap} (stuck score: ${((tp.stuck_risk_score ?? 0) * 100).toFixed(0)}%)`);
+          break;
+        }
+      }
+
+      // Prediction confidence warning
+      const lowConfTraffic = altTraffic.filter(tp => tp.prediction_confidence === "LOW");
+      if (lowConfTraffic.length > 0) {
+        alt.cons.push("Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti");
       }
     }
 
@@ -804,7 +824,6 @@ export function computeVirtualRaceEngineer(
     if (altWarmupTotal > 2.5) {
       alt.cons.push(`Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`);
     }
-    // Check if Hard compound causes significant warmup handicap
     const hasHard = alt.compounds.some(c => c.toUpperCase() === "HARD");
     if (hasHard && altWarmupTotal > 1.5) {
       alt.cons.push("Mescola Hard: warmup lento riduce efficacia undercut");
