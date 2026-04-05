@@ -1170,18 +1170,29 @@ export function computeVirtualRaceEngineer(
 
   // ── 7g. Tyre warmup narrative insights (simulated strategies only) ──
   {
-    const recWarmup = recommendedStrategy.breakdown?.warmup_cost ?? 0;
-    const actualWarmup = actualBreakdown?.warmup_cost ?? 0; // should be 0 since we don't compute it for actual
+    // Compute recommended strategy warmup using computeStintWarmupCost
+    const recStintBounds = buildStintBounds(bestPitLaps, bestCompounds);
+    let recWarmupFromModel = 0;
+    for (let si = 0; si < recStintBounds.length; si++) {
+      recWarmupFromModel += computeStintWarmupCost(recStintBounds[si].compound, si === 0);
+    }
+    // Use model-computed warmup (more precise) or breakdown warmup as fallback
+    const recWarmup = recWarmupFromModel > 0 ? recWarmupFromModel : (recommendedStrategy.breakdown?.warmup_cost ?? 0);
 
     // Check if recommended strategy has significant warmup cost
     if (recWarmup > 2.0) {
       narrativeInsights.push(`La strategia raccomandata include ${recWarmup.toFixed(1)}s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.`);
     }
 
-    // Compare warmup across alternatives to highlight when it drives the ranking
-    const altWarmups = alternatives
-      .map(a => ({ name: a.name, warmup: a.breakdown?.warmup_cost ?? 0, compounds: a.compounds }))
-      .filter(a => a.warmup > 0);
+    // Compare warmup across alternatives using computeStintWarmupCost
+    const altWarmups = alternatives.map(a => {
+      const aBounds = buildStintBounds(a.pit_laps, a.compounds);
+      let wTotal = 0;
+      for (let si = 0; si < aBounds.length; si++) {
+        wTotal += computeStintWarmupCost(aBounds[si].compound, si === 0);
+      }
+      return { name: a.name, warmup: wTotal, compounds: a.compounds };
+    }).filter(a => a.warmup > 0);
 
     if (altWarmups.length > 0) {
       const maxWarmupAlt = altWarmups.reduce((a, b) => a.warmup > b.warmup ? a : b);
