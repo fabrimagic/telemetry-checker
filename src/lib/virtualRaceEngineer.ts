@@ -793,6 +793,7 @@ export function computeVirtualRaceEngineer(
   const actualBreakdown = computeStrategyBreakdown(
     actualPitLaps, actualCompounds, totalLaps, compoundModels, pitLoss,
     actualTraffic, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
+    false, // includeWarmup=false: actual strategy is historical, warmup is predictive only
   );
 
   // Recommended breakdown
