@@ -482,11 +482,15 @@ export function computeVirtualRaceEngineer(
     if (!hasMinTwoCompounds(compoundsArr)) return null;
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
-    for (const sb of stintBounds) {
+    for (let si = 0; si < stintBounds.length; si++) {
+      const sb = stintBounds[si];
       const model = compoundModels.get(sb.compound);
       if (!model) return null;
+      const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
-        total += predictLapTime(model.slope, model.intercept, lap - sb.start);
+        const tyreLife = lap - sb.start;
+        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
       }
     }
     total += pitLapsArr.length * pitLoss;
