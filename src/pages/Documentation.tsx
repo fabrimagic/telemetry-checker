@@ -191,6 +191,12 @@ export default function Documentation() {
             con la finestra di ogni giro. Se più stati si sovrappongono → MIXED. 
             La priorità è: RED &gt; SC &gt; VSC &gt; DOUBLE_YELLOW &gt; YELLOW.
           </p>
+          <p className="mt-2">
+            <strong className="text-foreground">Eccezione ultimo giro:</strong> una bandiera rossa 
+            presente all'ultimo giro della gara viene trattata come fine gara normale e non come 
+            neutralizzazione. Questo evita che il Virtual Race Engineer penalizzi o alteri le stime 
+            strategiche a causa di un evento che non ha impatto sulla strategia di gara.
+          </p>
         </DocSection>
 
         {/* ════════════════════════════════════════════ */}
