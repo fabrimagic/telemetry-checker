@@ -59,6 +59,7 @@ export function computeStrategyBreakdown(
   trackStatusMap: Map<number, TrackStatus>,
   pitStopAnalyses: PitStopAnalysis[],
   modifiers: BreakdownModifiers = DEFAULT_BREAKDOWN_MODIFIERS,
+  includeWarmup: boolean = true,
 ): StrategyBreakdown {
   // Build stint bounds
   const stintBounds: { start: number; end: number; compound: string }[] = [];
