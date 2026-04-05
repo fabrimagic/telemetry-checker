@@ -205,11 +205,34 @@ export function computeVirtualRaceEngineer(
   const stintAnalyses: StintAnalysis[] = [];
   const degradationModels = new Map<number, { slope: number; intercept: number }>();
 
-  // Use corrected multivariate model (fuel proxy + temperature)
+  // Raw baseline degradation (simple linear regression, no corrections)
+  const rawDegResults: DegradationResult[] = calculateTyreDegradation(
+    driverNumber, driverAcronym, "ffffff", laps, stints,
+  );
+
+  // Corrected multivariate model (fuel proxy + temperature)
   const degResults: DegradationResult[] = calculateCorrectedTyreDegradation(
     driverNumber, driverAcronym, "ffffff", laps, stints,
     weather, totalLaps, weatherMap, trackStatusMap,
   );
+
+  // ── Raw vs Corrected comparison (used for confidence/narrative) ──
+  const rawVsCorrected: { stint: number; compound: string; rawSlope: number; corrSlope: number; delta: number; agreement: "HIGH" | "MEDIUM" | "LOW" }[] = [];
+  for (const corrRes of degResults) {
+    const rawRes = rawDegResults.find(r => r.stint === corrRes.stint);
+    if (rawRes && rawRes.slopeSecPerLap != null && corrRes.slopeSecPerLap != null) {
+      const delta = Math.abs(corrRes.slopeSecPerLap - rawRes.slopeSecPerLap);
+      const agreement: "HIGH" | "MEDIUM" | "LOW" = delta < 0.02 ? "HIGH" : delta < 0.06 ? "MEDIUM" : "LOW";
+      rawVsCorrected.push({
+        stint: corrRes.stint,
+        compound: corrRes.compound,
+        rawSlope: rawRes.slopeSecPerLap,
+        corrSlope: corrRes.slopeSecPerLap,
+        delta,
+        agreement,
+      });
+    }
+  }
 
   // ── Degradation validation (based on corrected slope) ──
   const rawValidated = validateAllDegradationEstimates(degResults);
