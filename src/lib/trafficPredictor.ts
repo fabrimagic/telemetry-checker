@@ -802,6 +802,14 @@ export function predictTrafficForPitLaps(
       notes.push("Time projection unavailable — using gap-offset fallback");
     }
 
+    // ── Release classification (simplified for strategy engine) ──
+    const releaseClassification: ReleaseClassification =
+      pack.rejoin_is_in_pack || (gapAhead != null && gapAhead < 1.0) ? "PACK" :
+      gapAhead != null && gapAhead < 3.0 ? "TRAFFIC" : "CLEAN";
+
+    // Traffic persistence: refined estimate of laps stuck
+    const trafficPersistenceLaps = trafficEst.laps;
+
     predictions.push({
       pit_lap: pitLap,
       current_position: currentPos,
@@ -818,20 +826,26 @@ export function predictTrafficForPitLaps(
 
       // Extended fields
       pack_size_ahead: pack.pack_size_ahead,
+      pack_size_behind: pack.pack_size_behind,
       pack_size_total: pack.pack_size_total,
       compressed_train_risk: pack.compressed_train_risk,
       local_density_score: pack.local_density_score,
       release_quality: release.quality,
+      release_classification: releaseClassification,
       release_risk_score: 1 - release.score,
       rejoin_is_in_pack: pack.rejoin_is_in_pack,
       estimated_clear_lap: trafficEst.clearLap != null ? pitLap + trafficEst.clearLap : null,
       stuck_risk_score: trafficEst.stuckScore,
       overtake_difficulty_score: overtakeScore,
+      traffic_persistence_laps: trafficPersistenceLaps,
+      traffic_time_loss_total: totalTrafficLoss,
       prediction_confidence: conf.confidence,
       confidence_reasons: conf.reasons,
       compound_delta_effect: Math.round(compoundDelta * 100) / 100,
       warmup_handicap_estimate: warmupHandicap,
       clear_air_advantage_estimate: clearAirAdv,
+      release_gap_ahead: gapAhead != null ? Math.round(gapAhead * 10) / 10 : null,
+      release_gap_behind: gapBehind != null ? Math.round(gapBehind * 10) / 10 : null,
       model_notes: notes.length > 0 ? notes : undefined,
     });
   }
