@@ -760,7 +760,7 @@ export function computeVirtualRaceEngineer(
   // ── 4b. Traffic Release Predictor ──
   const allLapsMap = allLapsMapEarly;
 
-  // Attach traffic predictions to alternatives (display only, NOT for delta - already in cost)
+  // Attach traffic predictions and warmup analysis to alternatives
   for (const alt of alternatives) {
     if (alt.pit_laps.length > 0) {
       const altTraffic = predictTrafficForPitLaps(
@@ -781,6 +781,33 @@ export function computeVirtualRaceEngineer(
       } else if (worstTraffic === "CLEAN") {
         alt.pros.push("Rientro in aria pulita");
       }
+
+      // Traffic metadata enrichment: release quality and pack risk
+      for (const tp of altTraffic) {
+        if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
+          alt.cons.push(`Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`);
+          break; // avoid duplicate messages
+        }
+        if (tp.rejoin_is_in_pack) {
+          alt.cons.push(`Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti)`);
+          break;
+        }
+      }
+    }
+
+    // Warmup cost analysis per alternative (simulated only)
+    const altStintBounds = buildStintBounds(alt.pit_laps, alt.compounds);
+    let altWarmupTotal = 0;
+    for (let si = 0; si < altStintBounds.length; si++) {
+      altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0);
+    }
+    if (altWarmupTotal > 2.5) {
+      alt.cons.push(`Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`);
+    }
+    // Check if Hard compound causes significant warmup handicap
+    const hasHard = alt.compounds.some(c => c.toUpperCase() === "HARD");
+    if (hasHard && altWarmupTotal > 1.5) {
+      alt.cons.push("Mescola Hard: warmup lento riduce efficacia undercut");
     }
   }
 
