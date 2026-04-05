@@ -198,7 +198,7 @@ export function computeVirtualRaceEngineer(
   }
 
   const pitLoss = estimatePitLoss(pitStops);
-  const totalLaps = Math.max(...laps.map(l => l.lap_number));
+  const totalLaps = maxLapNumber;
 
   // ── 1. Actual strategy ──
   const stintAnalyses: StintAnalysis[] = [];
