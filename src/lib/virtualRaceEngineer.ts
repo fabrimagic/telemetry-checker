@@ -10,7 +10,7 @@ import { validateAllDegradationEstimates, resolveDegradationForStrategy, type De
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
-import type { RiskMode } from "./riskAppetite";
+import { scoreStrategies, type RiskMode, type ScoredStrategy } from "./riskAppetite";
 import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
@@ -1093,6 +1093,7 @@ export function computeVirtualRaceEngineer(
     recommendedStrategy.cons = recCons;
   }
 
+
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
@@ -1489,6 +1490,54 @@ export function computeVirtualRaceEngineer(
     ...rawRacePhase,
     phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
   };
+
+  // ── 9b. Risk-aware ranking via riskAppetite.scoreStrategies ──
+  {
+    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean }[] = [];
+
+    scoringInput.push({
+      name: recommendedStrategy.description ?? "Strategia raccomandata",
+      delta: recommendedStrategy.estimated_gain_seconds,
+      breakdown: recommendedStrategy.breakdown,
+      isRecommended: true,
+    });
+
+    for (const alt of alternatives) {
+      scoringInput.push({
+        name: alt.name,
+        delta: alt.estimated_delta_vs_actual,
+        breakdown: alt.breakdown,
+      });
+    }
+
+    const riskScored = scoreStrategies(scoringInput, racePhase.phase_adjustments, riskMode);
+
+    // Reorder alternatives by risk-aware adjusted_score (descending)
+    const altScores = new Map<number, ScoredStrategy>();
+    for (const scored of riskScored) {
+      if (scored.index >= 0) altScores.set(scored.index, scored);
+    }
+    alternatives.sort((a, b) => {
+      const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
+      const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
+      const scoreA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
+      const scoreB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+      return scoreB - scoreA;
+    });
+
+    // If an alternative scores significantly higher than recommended, add narrative note
+    const recScored = riskScored.find(s => s.index === -2);
+    const bestAltScored = riskScored.find(s => s.index >= 0);
+    if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 0.5) {
+      narrativeInsights.push(
+        `Risk scoring (${riskMode}): "${bestAltScored.name}" ha un punteggio risk-adjusted migliore della raccomandata di ${(bestAltScored.adjusted_score - recScored.adjusted_score).toFixed(1)}s. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? `(${bestAltScored.adjustment_reason})` : ""}`.trim()
+      );
+    }
+
+    if (recScored && recScored.adjustment_reason !== "Nessun aggiustamento") {
+      confidenceFactors.push(`Risk scoring (${riskMode}): ${recScored.adjustment_reason}`);
+    }
+  }
 
   // Reduce confidence if degradation is unreliable
   if (invalidDegCount > 0) {
