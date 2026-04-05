@@ -793,6 +793,7 @@ export function computeVirtualRaceEngineer(
   const actualBreakdown = computeStrategyBreakdown(
     actualPitLaps, actualCompounds, totalLaps, compoundModels, pitLoss,
     actualTraffic, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
+    false, // includeWarmup=false: actual strategy is historical, warmup is predictive only
   );
 
   // Recommended breakdown
@@ -1098,7 +1099,44 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // ── 7f. Data gaps impact on confidence ──
+  // ── 7g. Tyre warmup narrative insights (simulated strategies only) ──
+  {
+    const recWarmup = recommendedStrategy.breakdown?.warmup_cost ?? 0;
+    const actualWarmup = actualBreakdown?.warmup_cost ?? 0; // should be 0 since we don't compute it for actual
+
+    // Check if recommended strategy has significant warmup cost
+    if (recWarmup > 2.0) {
+      narrativeInsights.push(`La strategia raccomandata include ${recWarmup.toFixed(1)}s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.`);
+    }
+
+    // Compare warmup across alternatives to highlight when it drives the ranking
+    const altWarmups = alternatives
+      .map(a => ({ name: a.name, warmup: a.breakdown?.warmup_cost ?? 0, compounds: a.compounds }))
+      .filter(a => a.warmup > 0);
+
+    if (altWarmups.length > 0) {
+      const maxWarmupAlt = altWarmups.reduce((a, b) => a.warmup > b.warmup ? a : b);
+      const minWarmupAlt = altWarmups.reduce((a, b) => a.warmup < b.warmup ? a : b);
+      const warmupSpread = maxWarmupAlt.warmup - minWarmupAlt.warmup;
+
+      if (warmupSpread > 1.5) {
+        narrativeInsights.push(`Differenza warmup tra strategie: ${warmupSpread.toFixed(1)}s (${maxWarmupAlt.name}: ${maxWarmupAlt.warmup.toFixed(1)}s vs ${minWarmupAlt.name}: ${minWarmupAlt.warmup.toFixed(1)}s). Strategie con meno soste o mescole morbide sono favorite dal warmup.`);
+      }
+    }
+
+    // Hard compound warmup penalty warning
+    const recHasHard = bestCompounds.some(c => c.toUpperCase() === "HARD");
+    if (recHasHard && recWarmup > 1.5) {
+      narrativeInsights.push(`La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.`);
+    }
+
+    // Multi-stop warmup accumulation
+    if (bestPitLaps.length >= 2 && recWarmup > 3.0) {
+      narrativeInsights.push(`Strategia a ${bestPitLaps.length} soste: il warmup cumulato (${recWarmup.toFixed(1)}s) è significativo. Ogni pit stop aggiuntivo introduce una fase di riscaldamento che riduce il vantaggio netto della sosta.`);
+    }
+  }
+
+
   for (const gap of integratedContext.data_gaps) {
     confidenceFactors.push(`⚠️ ${gap}`);
   }

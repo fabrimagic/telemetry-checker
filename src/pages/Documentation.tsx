@@ -377,7 +377,27 @@ export default function Documentation() {
             per i primi giri di ogni stint (escluso il primo). Appare nella breakdown strategica come 
             voce separata <strong className="text-foreground">"Tyre warmup"</strong>.
           </p>
-          <p className="text-xs italic">
+
+          <h4 className="font-semibold text-foreground mt-3">Separazione strategia reale vs simulata</h4>
+          <p>
+            Il warmup è un <strong className="text-foreground">modello predittivo, non retroattivo</strong>. 
+            Viene applicato <strong className="text-foreground">solo alle strategie simulate</strong> (raccomandata + alternative), 
+            mentre la breakdown della strategia reale non include il warmup. Questo riflette l'approccio dei team F1: 
+            il modello serve per valutare strategie future, non per riscrivere la storia della gara.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Narrative insights</h4>
+          <p>
+            Il sistema genera automaticamente insight narrativi legati al warmup quando:
+          </p>
+          <ul className="list-disc list-inside space-y-1 mt-1">
+            <li>Il costo warmup della strategia raccomandata supera 2s</li>
+            <li>La differenza di warmup tra strategie supera 1.5s</li>
+            <li>La strategia raccomandata include gomme Hard (warmup lento)</li>
+            <li>Una strategia multi-stop accumula warmup significativo (&gt;3s)</li>
+          </ul>
+
+          <p className="text-xs italic mt-2">
             Il warmup NON è degrado: è una penalità termica temporanea che si esaurisce in pochi giri. 
             Non modifica la slope di degrado né il pit loss.
           </p>
