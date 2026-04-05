@@ -1,36 +1,102 @@
 /**
- * Tyre Degradation Validation Module
+ * Tyre Degradation Validation Module — Race Engineering Grade
  * 
- * Classifies each degradation estimate as VALID, NEUTRAL, or INVALID.
- * Prevents unreliable estimates (especially negative slopes) from being
- * used as strategic input in the Virtual Race Engineer.
- * 
- * Supports both simple DegradationResult and CorrectedDegradationResult.
- * When a corrected model is available, validation is based on slope_corrected.
+ * Classifies each degradation estimate as VALID, NEUTRAL, or INVALID
+ * using compound-specific profiles, multi-criteria assessment,
+ * and contextual heuristics inspired by F1 strategy engineering.
  * 
  * Anti-hallucination: A negative slope does NOT mean "tyre gaining performance".
  * It means the estimate is contaminated by fuel effect, warm-up, traffic,
  * track evolution, weather, short stint, or statistical noise.
+ * 
+ * Backward-compatible with virtualRaceEngineer.ts — same public API.
  */
 
 import type { DegradationResult } from "./tyreDegradation";
 import type { CorrectedDegradationResult } from "./correctedDegradation";
 
-/* ── Configuration ── */
+/* ══════════════════════════════════════════════════════════════════
+ * COMPOUND-SPECIFIC VALIDATION PROFILES
+ * ══════════════════════════════════════════════════════════════════ */
 
-export interface DegradationValidationConfig {
-  /** Slope below this → INVALID (e.g. -0.02 means slopes < -0.02 are invalid) */
+export interface CompoundValidationProfile {
+  /** Slope below this → INVALID */
   negative_tolerance: number;
   /** |slope| <= this → NEUTRAL (too weak to be meaningful) */
   neutral_tolerance: number;
-  /** Minimum laps for a reliable estimate */
-  min_valid_laps: number;
-  /** Minimum R² for fit quality (if available) */
-  min_r_squared: number;
-  /** Fallback degradation slope when no valid estimate is available (sec/lap, conservative) */
-  neutral_fallback_slope: number;
-  /** Maximum plausible slope (s/lap) — above this → INVALID (physically implausible) */
+  /** Maximum plausible slope (s/lap) — above this → INVALID */
   max_plausible_slope: number;
+  /** Fallback degradation slope for this compound */
+  neutral_fallback_slope: number;
+  /** Minimum laps — below this → INVALID */
+  min_laps_invalid: number;
+  /** Laps in [min_laps_invalid, min_laps_valid) → at most NEUTRAL */
+  min_laps_valid: number;
+  /** Minimum R² for VALID */
+  min_r_squared: number;
+  /** Maximum correction magnitude ratio before cautionary flag */
+  max_correction_ratio: number;
+}
+
+/**
+ * Compound-specific profiles reflecting real F1 tyre behaviour.
+ * 
+ * SOFT: Higher expected degradation, faster emergence, shorter stints acceptable.
+ * MEDIUM: Moderate degradation, intermediate behaviour.
+ * HARD: Lower expected degradation, slower to emerge, needs longer stints for credible fit.
+ */
+export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
+  SOFT: {
+    negative_tolerance: -0.01,
+    neutral_tolerance: 0.015,
+    max_plausible_slope: 0.25,
+    neutral_fallback_slope: 0.05,
+    min_laps_invalid: 3,
+    min_laps_valid: 5,
+    min_r_squared: 0.10,
+    max_correction_ratio: 3.0,
+  },
+  MEDIUM: {
+    negative_tolerance: -0.02,
+    neutral_tolerance: 0.01,
+    max_plausible_slope: 0.20,
+    neutral_fallback_slope: 0.035,
+    min_laps_invalid: 4,
+    min_laps_valid: 6,
+    min_r_squared: 0.10,
+    max_correction_ratio: 3.0,
+  },
+  HARD: {
+    negative_tolerance: -0.025,
+    neutral_tolerance: 0.008,
+    max_plausible_slope: 0.15,
+    neutral_fallback_slope: 0.025,
+    min_laps_invalid: 5,
+    min_laps_valid: 7,
+    min_r_squared: 0.12,
+    max_correction_ratio: 2.5,
+  },
+};
+
+/* ══════════════════════════════════════════════════════════════════
+ * GLOBAL CONFIGURATION (backward-compatible)
+ * ══════════════════════════════════════════════════════════════════ */
+
+export interface DegradationValidationConfig {
+  /** Slope below this → INVALID (global fallback) */
+  negative_tolerance: number;
+  /** |slope| <= this → NEUTRAL (global fallback) */
+  neutral_tolerance: number;
+  /** Minimum laps for a reliable estimate (global fallback) */
+  min_valid_laps: number;
+  /** Minimum R² for fit quality (global fallback) */
+  min_r_squared: number;
+  /** Fallback degradation slope (global fallback) */
+  neutral_fallback_slope: number;
+  /** Maximum plausible slope (global fallback) */
+  max_plausible_slope: number;
+  /** Compound-specific profiles (optional, uses defaults if missing) */
+  compound_profiles?: Record<string, CompoundValidationProfile>;
 }
 
 export const DEFAULT_VALIDATION_CONFIG: DegradationValidationConfig = {
@@ -40,11 +106,16 @@ export const DEFAULT_VALIDATION_CONFIG: DegradationValidationConfig = {
   min_r_squared: 0.1,
   neutral_fallback_slope: 0.03,
   max_plausible_slope: 0.30,
+  compound_profiles: COMPOUND_PROFILES,
 };
 
-/* ── Types ── */
+/* ══════════════════════════════════════════════════════════════════
+ * TYPES
+ * ══════════════════════════════════════════════════════════════════ */
 
 export type DegradationStatus = "VALID" | "NEUTRAL" | "INVALID";
+
+export type ReasonCategory = "STATISTICAL" | "PHYSICAL" | "CONTEXTUAL" | "MIXED";
 
 export interface DegradationValidationResult {
   /** Original degradation result */
@@ -79,15 +150,48 @@ export interface DegradationValidationResult {
   weather_correction_used: boolean;
   /** Model type identifier */
   model_type: string;
+  /* ── New optional fields (backward-compatible) ── */
+  /** Reason category */
+  reason_category?: ReasonCategory;
+  /** Statistical quality flags */
+  statistical_flags?: string[];
+  /** Physical plausibility flags */
+  plausibility_flags?: string[];
+  /** Contextual (compound/stint) flags */
+  context_flags?: string[];
+  /** Compound profile used for validation */
+  compound_profile_used?: string;
 }
 
-/* ── Helpers ── */
+/* ══════════════════════════════════════════════════════════════════
+ * HELPERS
+ * ══════════════════════════════════════════════════════════════════ */
 
 function isCorrectedResult(r: DegradationResult): r is CorrectedDegradationResult {
   return "model_type" in r && "slope_raw" in r && "slope_corrected" in r;
 }
 
-/* ── Validation ── */
+/** Resolve compound-specific profile, falling back to global config */
+function getProfile(compound: string, config: DegradationValidationConfig): CompoundValidationProfile {
+  const profiles = config.compound_profiles ?? COMPOUND_PROFILES;
+  const key = compound?.toUpperCase();
+  if (profiles[key]) return profiles[key];
+  // Build a fallback profile from global config
+  return {
+    negative_tolerance: config.negative_tolerance,
+    neutral_tolerance: config.neutral_tolerance,
+    max_plausible_slope: config.max_plausible_slope,
+    neutral_fallback_slope: config.neutral_fallback_slope,
+    min_laps_invalid: Math.max(2, config.min_valid_laps - 1),
+    min_laps_valid: config.min_valid_laps + 2,
+    min_r_squared: config.min_r_squared,
+    max_correction_ratio: 3.0,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * VALIDATION — Multi-criteria, compound-contextual
+ * ══════════════════════════════════════════════════════════════════ */
 
 export function validateDegradationEstimate(
   result: DegradationResult,
@@ -97,65 +201,127 @@ export function validateDegradationEstimate(
   const slopeRaw = corrected ? (result as CorrectedDegradationResult).slope_raw : result.slopeSecPerLap;
   const slopeCorrected = corrected ? (result as CorrectedDegradationResult).slope_corrected : result.slopeSecPerLap;
   const rSqCorrected = corrected ? (result as CorrectedDegradationResult).r_squared_corrected : result.rSquared;
-  
-  // Validation is based on the corrected slope (which IS the raw slope when no correction available)
+
   const slope = slopeCorrected;
   const laps = result.lapsUsed;
   const rSq = rSqCorrected;
+  const compound = result.compound?.toUpperCase() ?? "UNKNOWN";
+  const profile = getProfile(compound, config);
 
-  // Assess fit quality
+  // ── Flags ──
+  const statisticalFlags: string[] = [];
+  const plausibilityFlags: string[] = [];
+  const contextFlags: string[] = [];
+
+  // ── Fit quality (same thresholds, independent of compound) ──
   const fitQuality: DegradationValidationResult["fit_quality"] =
     rSq >= 0.7 ? "GOOD" :
     rSq >= 0.3 ? "ACCEPTABLE" :
-    rSq >= config.min_r_squared ? "POOR" : "INSUFFICIENT";
+    rSq >= profile.min_r_squared ? "POOR" : "INSUFFICIENT";
 
+  // ── Correction magnitude check ──
+  const correctionMagnitude = corrected ? Math.abs(slopeCorrected - slopeRaw) : 0;
+  const correctionIsLarge = corrected && slope !== 0 &&
+    (correctionMagnitude / Math.max(Math.abs(slope), 0.001)) > profile.max_correction_ratio;
+
+  if (correctionIsLarge) {
+    statisticalFlags.push(`Correzione raw→corrected molto ampia (Δ=${correctionMagnitude.toFixed(3)})`);
+  }
+
+  // ── Raw-to-corrected sign flip caution ──
+  const signFlip = corrected && slopeRaw < 0 && slopeCorrected > 0;
+  if (signFlip) {
+    contextFlags.push(`Slope grezza negativa (${slopeRaw.toFixed(3)}) corretta a positiva (${slopeCorrected.toFixed(3)})`);
+  }
+
+  // ── Few laps flag ──
+  if (laps <= profile.min_laps_valid && laps >= profile.min_laps_invalid) {
+    statisticalFlags.push(`Stint borderline: ${laps} giri (minimo VALID: ${profile.min_laps_valid})`);
+  }
+
+  // ── Slope near thresholds ──
+  if (slope > 0 && slope < profile.neutral_tolerance * 1.5 && slope > profile.neutral_tolerance) {
+    statisticalFlags.push(`Slope molto vicina alla soglia NEUTRAL (${slope.toFixed(3)} ≈ ${profile.neutral_tolerance})`);
+  }
+
+  // ── High slope on short stint ──
+  if (slope > profile.max_plausible_slope * 0.6 && laps < profile.min_laps_valid + 2) {
+    plausibilityFlags.push(`Slope alta (${slope.toFixed(3)}) su stint breve (${laps} giri): stima poco robusta`);
+  }
+
+  // ── Classification ──
   const reasons: string[] = [];
   let status: DegradationStatus = "VALID";
+  let reasonCategory: ReasonCategory = "STATISTICAL";
 
-  // 1. Check laps
-  if (laps < config.min_valid_laps) {
+  // 1. Hard invalid: too few laps
+  if (laps < profile.min_laps_invalid) {
     status = "INVALID";
-    reasons.push(`Giri validi insufficienti (${laps} < ${config.min_valid_laps})`);
+    reasons.push(`Giri insufficienti (${laps} < ${profile.min_laps_invalid} min per ${compound})`);
+    reasonCategory = "STATISTICAL";
   }
 
-  // 2. Check fit quality
+  // 2. Fit quality insufficient
   if (fitQuality === "INSUFFICIENT") {
     status = "INVALID";
-    reasons.push(`Qualità del fit insufficiente (R²=${rSq.toFixed(3)} < ${config.min_r_squared})`);
+    reasons.push(`Fit insufficiente (R²=${rSq.toFixed(3)} < ${profile.min_r_squared})`);
+    reasonCategory = reasons.length > 1 ? "MIXED" : "STATISTICAL";
   }
 
-  // 3. Check slope (corrected) — including plausibility
+  // 3. Slope checks (only if not already INVALID)
   if (status !== "INVALID") {
-    if (slope > config.max_plausible_slope) {
+    if (slope > profile.max_plausible_slope) {
       status = "INVALID";
-      reasons.push(`Slope ${corrected ? "corretta " : ""}fisicamente implausibile (${slope.toFixed(3)} > ${config.max_plausible_slope} s/giro)`);
-    } else if (slope < config.negative_tolerance) {
+      reasons.push(`Slope fisicamente implausibile per ${compound} (${slope.toFixed(3)} > ${profile.max_plausible_slope} s/giro)`);
+      reasonCategory = "PHYSICAL";
+    } else if (slope < profile.negative_tolerance) {
       status = "INVALID";
-      reasons.push(`Slope ${corrected ? "corretta" : ""} negativa oltre la tolleranza (${slope.toFixed(3)} < ${config.negative_tolerance})`);
+      reasons.push(`Slope negativa oltre tolleranza per ${compound} (${slope.toFixed(3)} < ${profile.negative_tolerance})`);
       if (corrected && slopeRaw < 0 && slopeCorrected < 0) {
-        reasons.push("Anche dopo correzione per fuel proxy e temperatura, la slope resta negativa");
+        reasons.push("Anche dopo correzione fuel/temperatura, la slope resta negativa");
       }
-    } else if (Math.abs(slope) <= config.neutral_tolerance) {
+      reasonCategory = "PHYSICAL";
+    } else if (Math.abs(slope) <= profile.neutral_tolerance) {
       status = "NEUTRAL";
-      reasons.push(`Slope ${corrected ? "corretta " : ""}vicina a zero (|${slope.toFixed(3)}| ≤ ${config.neutral_tolerance}): segnale di degrado troppo debole`);
-    } else if (slope > config.neutral_tolerance) {
+      reasons.push(`Slope vicina a zero per ${compound} (|${slope.toFixed(3)}| ≤ ${profile.neutral_tolerance})`);
+      reasonCategory = "STATISTICAL";
+    } else if (slope > profile.neutral_tolerance) {
       if (fitQuality === "POOR") {
         status = "NEUTRAL";
-        reasons.push(`Slope ${corrected ? "corretta " : ""}positiva ma fit di bassa qualità (R²=${rSq.toFixed(3)})`);
+        reasons.push(`Slope positiva ma fit di bassa qualità (R²=${rSq.toFixed(3)})`);
+        reasonCategory = "STATISTICAL";
       } else {
-        reasons.push(`Slope ${corrected ? "corretta " : ""}positiva con fit accettabile`);
+        reasons.push(`Slope positiva con fit accettabile per ${compound}`);
       }
     }
   }
 
-  // Add info about raw vs corrected when model corrected
-  if (corrected && slopeRaw < 0 && slopeCorrected > 0 && status === "VALID") {
-    reasons.push(`Slope grezza negativa (${slopeRaw.toFixed(3)}) corretta a positiva (${slopeCorrected.toFixed(3)}) dopo rimozione effetto fuel/temperatura`);
+  // 4. Borderline laps: cap at NEUTRAL even if slope/fit look OK
+  if (status === "VALID" && laps < profile.min_laps_valid) {
+    status = "NEUTRAL";
+    reasons.push(`Stint borderline (${laps} < ${profile.min_laps_valid} giri minimi per VALID su ${compound})`);
+    reasonCategory = reasons.length > 1 ? "MIXED" : "CONTEXTUAL";
+    contextFlags.push("Giri insufficienti per piena affidabilità: VALID declassato a NEUTRAL");
+  }
+
+  // 5. Sign flip + short stint → conservative NEUTRAL
+  if (status === "VALID" && signFlip && laps < profile.min_laps_valid + 3) {
+    status = "NEUTRAL";
+    reasons.push(`Correzione inverte il segno della slope su stint non lungo (${laps} giri): prudenza`);
+    reasonCategory = "CONTEXTUAL";
+    contextFlags.push("Sign flip raw→corrected con stint non lungo: fiducia ridotta");
+  }
+
+  // 6. Large correction + borderline → downgrade to NEUTRAL
+  if (status === "VALID" && correctionIsLarge) {
+    status = "NEUTRAL";
+    reasons.push(`Correzione raw→corrected molto ampia: fiducia ridotta`);
+    reasonCategory = "MIXED";
   }
 
   const reason = reasons.length > 0 ? reasons.join("; ") : "Stima valida";
 
-  // Determine effective slope and fallback
+  // ── Effective slope & fallback ──
   let effectiveSlope = slope;
   let fallbackApplied = false;
   let fallbackDescription: string | null = null;
@@ -163,9 +329,9 @@ export function validateDegradationEstimate(
 
   if (status === "INVALID") {
     usedForStrategy = false;
-    effectiveSlope = config.neutral_fallback_slope;
+    effectiveSlope = profile.neutral_fallback_slope;
     fallbackApplied = true;
-    fallbackDescription = `Fallback conservativo applicato (${config.neutral_fallback_slope} sec/giro) — stima originale esclusa`;
+    fallbackDescription = `Fallback conservativo ${compound} (${profile.neutral_fallback_slope} s/giro)`;
   } else if (status === "NEUTRAL") {
     effectiveSlope = Math.max(slope, 0);
     if (effectiveSlope !== slope) {
@@ -175,9 +341,25 @@ export function validateDegradationEstimate(
     usedForStrategy = true;
   }
 
+  // ── Confidence — multi-factor ──
+  let confidenceScore = 0;
+  if (status === "VALID") confidenceScore += 3;
+  else if (status === "NEUTRAL") confidenceScore += 1;
+
+  if (fitQuality === "GOOD") confidenceScore += 3;
+  else if (fitQuality === "ACCEPTABLE") confidenceScore += 2;
+  else if (fitQuality === "POOR") confidenceScore += 0;
+
+  if (laps >= profile.min_laps_valid + 4) confidenceScore += 2;
+  else if (laps >= profile.min_laps_valid) confidenceScore += 1;
+
+  if (!correctionIsLarge) confidenceScore += 1;
+  if (!signFlip) confidenceScore += 1;
+
   const confidence: DegradationValidationResult["confidence"] =
-    status === "VALID" && fitQuality !== "POOR" ? "HIGH" :
-    status === "NEUTRAL" ? "MEDIUM" : "LOW";
+    status === "INVALID" ? "LOW" :
+    confidenceScore >= 8 ? "HIGH" :
+    confidenceScore >= 5 ? "MEDIUM" : "LOW";
 
   const cr = corrected ? result as CorrectedDegradationResult : null;
 
@@ -198,10 +380,18 @@ export function validateDegradationEstimate(
     fuel_proxy_type: cr?.fuel_proxy_type ?? null,
     weather_correction_used: cr?.weather_correction_used ?? false,
     model_type: cr?.model_type ?? "simple",
+    // New optional fields
+    reason_category: reasonCategory,
+    statistical_flags: statisticalFlags,
+    plausibility_flags: plausibilityFlags,
+    context_flags: contextFlags,
+    compound_profile_used: compound,
   };
 }
 
-/* ── Batch validation ── */
+/* ══════════════════════════════════════════════════════════════════
+ * BATCH VALIDATION
+ * ══════════════════════════════════════════════════════════════════ */
 
 export function validateAllDegradationEstimates(
   results: DegradationResult[],
@@ -210,48 +400,92 @@ export function validateAllDegradationEstimates(
   return results.map(r => validateDegradationEstimate(r, config));
 }
 
-/* ── Fallback selection ── */
+/* ══════════════════════════════════════════════════════════════════
+ * FALLBACK SELECTION — Ranked contextual scoring
+ * ══════════════════════════════════════════════════════════════════ */
+
+/** Score a candidate for fallback suitability (higher = better) */
+function scoreFallbackCandidate(
+  candidate: DegradationValidationResult,
+  targetCompound: string,
+  targetDriverNumber: number,
+  targetLapsUsed: number,
+): number {
+  let score = 0;
+
+  // Same driver bonus
+  if (candidate.original.driverNumber === targetDriverNumber) score += 20;
+
+  // Same compound bonus
+  if (candidate.original.compound?.toUpperCase() === targetCompound.toUpperCase()) score += 40;
+
+  // Status bonus
+  if (candidate.status === "VALID") score += 15;
+  else if (candidate.status === "NEUTRAL") score += 5;
+
+  // Confidence bonus
+  if (candidate.confidence === "HIGH") score += 10;
+  else if (candidate.confidence === "MEDIUM") score += 5;
+
+  // Fit quality bonus
+  if (candidate.fit_quality === "GOOD") score += 8;
+  else if (candidate.fit_quality === "ACCEPTABLE") score += 4;
+
+  // Stint length similarity (penalize large differences)
+  const lapsDiff = Math.abs(candidate.original.lapsUsed - targetLapsUsed);
+  score -= Math.min(lapsDiff * 1.5, 15);
+
+  return score;
+}
 
 export function selectDegradationFallback(
   invalidResult: DegradationValidationResult,
   allValidated: DegradationValidationResult[],
   config: DegradationValidationConfig = DEFAULT_VALIDATION_CONFIG,
 ): { slope: number; description: string } {
-  const compound = invalidResult.original.compound;
+  const compound = invalidResult.original.compound?.toUpperCase() ?? "UNKNOWN";
   const driverNumber = invalidResult.original.driverNumber;
+  const lapsUsed = invalidResult.original.lapsUsed;
+  const profile = getProfile(compound, config);
 
-  // 1. Same driver, same compound, VALID
-  const sameDriverSameCompound = allValidated.find(v =>
-    v.status === "VALID" &&
-    v.original.driverNumber === driverNumber &&
-    v.original.compound === compound &&
-    v.original.stint !== invalidResult.original.stint
-  );
-  if (sameDriverSameCompound) {
-    return {
-      slope: sameDriverSameCompound.effective_slope,
-      description: `Fallback da stint ${sameDriverSameCompound.original.stint} stesso pilota e compound (${sameDriverSameCompound.effective_slope.toFixed(3)} sec/giro)`,
-    };
+  // Collect all usable candidates (VALID or NEUTRAL, not the same stint)
+  const candidates = allValidated
+    .filter(v =>
+      (v.status === "VALID" || v.status === "NEUTRAL") &&
+      v.original.stint !== invalidResult.original.stint &&
+      v.effective_slope > 0
+    )
+    .map(v => ({
+      validation: v,
+      score: scoreFallbackCandidate(v, compound, driverNumber, lapsUsed),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  if (candidates.length > 0) {
+    const best = candidates[0];
+    const v = best.validation;
+    const sameDriver = v.original.driverNumber === driverNumber;
+    const sameCompound = v.original.compound?.toUpperCase() === compound;
+
+    let desc = `Fallback da ${sameDriver ? "stesso pilota" : v.original.acronym}`;
+    desc += ` stint ${v.original.stint}`;
+    desc += sameCompound ? ` stesso compound` : ` (${v.original.compound})`;
+    desc += ` — ${v.effective_slope.toFixed(3)} s/giro`;
+    desc += ` (score ${best.score.toFixed(0)}, ${v.confidence} confidence)`;
+
+    return { slope: v.effective_slope, description: desc };
   }
 
-  // 2. Any driver, same compound, VALID
-  const anyDriverSameCompound = allValidated.find(v =>
-    v.status === "VALID" &&
-    v.original.compound === compound
-  );
-  if (anyDriverSameCompound) {
-    return {
-      slope: anyDriverSameCompound.effective_slope,
-      description: `Fallback da ${anyDriverSameCompound.original.acronym} stint ${anyDriverSameCompound.original.stint} stesso compound (${anyDriverSameCompound.effective_slope.toFixed(3)} sec/giro)`,
-    };
-  }
-
-  // 3. Neutral fallback
+  // No viable candidate → compound-specific fallback
   return {
-    slope: config.neutral_fallback_slope,
-    description: `Nessun riferimento credibile disponibile — fallback conservativo neutro (${config.neutral_fallback_slope} sec/giro)`,
+    slope: profile.neutral_fallback_slope,
+    description: `Nessun riferimento credibile — fallback conservativo ${compound} (${profile.neutral_fallback_slope} s/giro)`,
   };
 }
+
+/* ══════════════════════════════════════════════════════════════════
+ * RESOLVE FOR STRATEGY
+ * ══════════════════════════════════════════════════════════════════ */
 
 export function resolveDegradationForStrategy(
   validated: DegradationValidationResult[],

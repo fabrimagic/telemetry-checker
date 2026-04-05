@@ -257,29 +257,99 @@ export default function Documentation() {
         {/* ════════════════════════════════════════════ */}
         <DocSection title="Validazione del Degrado Gomme" icon={<Shield className="h-4 w-4" />}>
           <p>
-            Ogni stima di degrado viene classificata prima di essere usata dal VRE:
+            Ogni stima di degrado viene classificata prima di essere usata dal VRE con un approccio 
+            multi-criterio e <strong className="text-foreground">contestuale per compound</strong>, 
+            ispirato ai controlli di un performance engineer F1:
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground" style={{ color: "hsl(142, 70%, 45%)" }}>VALID</strong> — slope positiva, fit accettabile, giri sufficienti</li>
-            <li><strong className="text-foreground" style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong> — slope vicina a zero o fit di bassa qualità</li>
-            <li><strong className="text-foreground" style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong> — slope negativa oltre tolleranza, giri insufficienti, o fit insufficiente</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(142, 70%, 45%)" }}>VALID</strong> — slope positiva, fit accettabile, giri sufficienti per il compound, nessun flag critico</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong> — slope vicina a zero, fit debole, stint borderline, o correzione raw→corrected troppo ampia</li>
+            <li><strong className="text-foreground" style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong> — slope negativa oltre tolleranza, giri insufficienti, fit insufficiente, o slope fisicamente implausibile</li>
           </ul>
 
-          <h4 className="font-semibold text-foreground mt-3">Regole di classificazione</h4>
+          <h4 className="font-semibold text-foreground mt-3">Profili compound-specific</h4>
+          <p>Le soglie di validazione variano per compound, riflettendo il comportamento reale delle gomme F1:</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="px-3 py-1.5 text-left font-semibold text-foreground">Compound</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Neg. tol.</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Neutral tol.</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Max slope</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Fallback</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min giri INVALID</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min giri VALID</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-red-400">SOFT</td>
+                  <td className="px-3 py-1.5 text-right">-0.01</td>
+                  <td className="px-3 py-1.5 text-right">0.015</td>
+                  <td className="px-3 py-1.5 text-right">0.25</td>
+                  <td className="px-3 py-1.5 text-right">0.05</td>
+                  <td className="px-3 py-1.5 text-right">3</td>
+                  <td className="px-3 py-1.5 text-right">5</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td>
+                  <td className="px-3 py-1.5 text-right">-0.02</td>
+                  <td className="px-3 py-1.5 text-right">0.01</td>
+                  <td className="px-3 py-1.5 text-right">0.20</td>
+                  <td className="px-3 py-1.5 text-right">0.035</td>
+                  <td className="px-3 py-1.5 text-right">4</td>
+                  <td className="px-3 py-1.5 text-right">6</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-3 py-1.5 font-mono text-white">HARD</td>
+                  <td className="px-3 py-1.5 text-right">-0.025</td>
+                  <td className="px-3 py-1.5 text-right">0.008</td>
+                  <td className="px-3 py-1.5 text-right">0.15</td>
+                  <td className="px-3 py-1.5 text-right">0.025</td>
+                  <td className="px-3 py-1.5 text-right">5</td>
+                  <td className="px-3 py-1.5 text-right">7</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 className="font-semibold text-foreground mt-3">Criteri di classificazione multi-livello</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Giri validi &lt; 4 → INVALID</li>
-            <li>R² &lt; 0.1 → INVALID (fit insufficiente)</li>
-            <li>Slope &lt; -0.02 → INVALID (slope negativa = dato contaminato)</li>
-            <li>Slope &gt; 0.30 → INVALID (fisicamente implausibile)</li>
-            <li>|slope| ≤ 0.01 → NEUTRAL</li>
-            <li>Slope positiva con R² &lt; 0.3 → NEUTRAL (fit di bassa qualità)</li>
+            <li>Giri &lt; min_laps_invalid (compound) → <strong style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong></li>
+            <li>R² &lt; min_r_squared (compound) → <strong style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong></li>
+            <li>Slope &lt; negative_tolerance (compound) → <strong style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong></li>
+            <li>Slope &gt; max_plausible_slope (compound) → <strong style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong></li>
+            <li>|slope| ≤ neutral_tolerance (compound) → <strong style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong></li>
+            <li>Slope positiva con R² &lt; 0.3 → <strong style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong></li>
+            <li>Giri in zona borderline (tra min_laps_invalid e min_laps_valid) → al massimo <strong style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong></li>
+            <li>Correzione raw→corrected con inversione di segno su stint breve → <strong style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong></li>
+            <li>Correzione raw→corrected di ampiezza eccessiva → <strong style={{ color: "hsl(45, 93%, 58%)" }}>NEUTRAL</strong></li>
           </ul>
 
-          <h4 className="font-semibold text-foreground mt-3">Fallback per stime INVALID</h4>
+          <h4 className="font-semibold text-foreground mt-3">Flag diagnostici</h4>
+          <p>Ogni stima produce tre categorie di flag opzionali per debug e trasparenza:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">statistical_flags</strong> — stint borderline, slope vicina a soglie, correzione ampia</li>
+            <li><strong className="text-foreground">plausibility_flags</strong> — slope alta su stint breve, slope ai limiti fisici</li>
+            <li><strong className="text-foreground">context_flags</strong> — sign flip raw→corrected, giri insufficienti per VALID</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Confidence multi-fattore</h4>
+          <p>La confidence deriva da una combinazione di: status, fit quality, numero giri, ampiezza correzione e flag:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">HIGH</strong> — VALID + fit GOOD/ACCEPTABLE + giri sufficienti + correzione contenuta</li>
+            <li><strong className="text-foreground">MEDIUM</strong> — NEUTRAL o VALID borderline</li>
+            <li><strong className="text-foreground">LOW</strong> — INVALID o casi con flag multipli critici</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Fallback con ranking contestuale</h4>
+          <p>Quando una stima è INVALID, il sistema seleziona il miglior fallback tramite scoring:</p>
           <ol className="list-decimal pl-5 space-y-1">
-            <li>Stesso pilota, stesso compound, stint VALID → usa quella slope</li>
-            <li>Qualsiasi pilota, stesso compound, VALID → usa quella slope</li>
-            <li>Nessun riferimento → fallback conservativo neutro a <strong className="text-foreground">0.03 s/giro</strong></li>
+            <li>Stesso pilota + stesso compound + stint simile per lunghezza (score max)</li>
+            <li>Stesso compound + miglior fit/confidence + stint simile</li>
+            <li>Qualsiasi candidato VALID/NEUTRAL ordinato per score</li>
+            <li>Fallback conservativo compound-specific (SOFT: 0.05, MEDIUM: 0.035, HARD: 0.025 s/giro)</li>
           </ol>
 
           <h4 className="font-semibold text-foreground mt-3">Override degrado personalizzato</h4>
@@ -290,16 +360,15 @@ export default function Documentation() {
           <ul className="list-disc pl-5 space-y-1">
             <li>Range ammesso: <strong className="text-foreground">0.001 — 0.300 s/giro</strong></li>
             <li>Il valore viene applicato <strong className="text-foreground">solo agli stint INVALID</strong>, senza modificare stint VALID o NEUTRAL</li>
-            <li>Sostituisce il fallback automatico (stesso compound o 0.03 s/giro neutro)</li>
+            <li>Sostituisce il fallback automatico (compound-specific o neutro)</li>
             <li>Il ricalcolo è immediato: strategie, ranking, pit consigliato, confidence e breakdown si aggiornano</li>
             <li>L'override è opzionale e può essere rimosso in qualsiasi momento, ripristinando il fallback automatico</li>
-            <li>È segnalato nell'interfaccia con un badge dedicato per distinguere il dato personalizzato dal calcolo automatico</li>
           </ul>
           <p className="text-xs italic">
             Anti-allucinazione: una slope negativa NON significa che la gomma migliora. 
             Indica contaminazione da fuel effect, warm-up, traffico, evoluzione pista o rumore statistico.
-            L'override consente all'utente esperto di inserire un valore basato sulla propria conoscenza del degrado atteso, 
-            senza che il sistema inventi o interpreti dati non attendibili.
+            L'approccio conservativo del sistema (declassare a NEUTRAL i casi borderline, usare fallback compound-specific) 
+            riflette la prudenza di un team F1: meglio sottostimare la fiducia che usare un degrado apparentemente pulito ma poco credibile.
           </p>
         </DocSection>
 
