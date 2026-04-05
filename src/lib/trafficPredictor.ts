@@ -352,6 +352,7 @@ function computeTimeLossPerLap(
 
 interface PackAnalysis {
   pack_size_ahead: number;
+  pack_size_behind: number;
   pack_size_total: number;
   compressed_train_risk: CompressedTrainRisk;
   local_density_score: number; // 0–1, higher = denser
@@ -369,8 +370,9 @@ function analyzePackStructure(
 ): PackAnalysis {
   const cfg = TRAFFIC_CONFIG.cluster;
 
-  // Count cars within cluster window ahead of rejoin
+  // Count cars within cluster window ahead/behind rejoin
   let packAhead = 0;
+  let packBehind = 0;
   let packTotal = 0;
   const gapsInWindow: number[] = [];
 
@@ -379,6 +381,7 @@ function analyzePackStructure(
     if (delta <= cfg.window_seconds) {
       packTotal++;
       if (d.gap < rejoinGap) packAhead++;
+      else packBehind++;
       gapsInWindow.push(d.gap);
     }
   }
@@ -414,6 +417,7 @@ function analyzePackStructure(
 
   return {
     pack_size_ahead: packAhead,
+    pack_size_behind: packBehind,
     pack_size_total: packTotal,
     compressed_train_risk: trainRisk,
     local_density_score: densityScore,
