@@ -752,6 +752,7 @@ export default function Documentation() {
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Tempo base stint</strong> — tempo stimato senza degrado</li>
             <li><strong className="text-foreground">Degrado gomme</strong> — costo aggiuntivo da usura pneumatici</li>
+            <li><strong className="text-foreground">Tyre warmup</strong> — penalità termica temporanea post-pit (dipende dal compound)</li>
             <li><strong className="text-foreground">Tempo perso ai box</strong> — pit stop × pit_loss_per_stop</li>
             <li><strong className="text-foreground">Tempo perso nel traffico</strong> — da traffic predictor</li>
             <li><strong className="text-foreground">Impatto meteo</strong> — +2.0s per giro WET/MIXED</li>
