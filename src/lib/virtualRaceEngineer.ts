@@ -847,6 +847,7 @@ export function computeVirtualRaceEngineer(
       intervals,
       allDrivers,
     );
+    recommendedStrategy.traffic_predictions = recTraffic;
     const recTrafficLoss = recTraffic.reduce((sum, t) => sum + (t.traffic_time_loss_total ?? t.estimated_traffic_time_loss), 0);
     if (recTrafficLoss > 0) {
       const worstRelease = recTraffic.reduce((w, t) => {
@@ -858,6 +859,8 @@ export function computeVirtualRaceEngineer(
       const releaseNote = worstRelease === "PACK" ? " (rientro in pack)" : worstRelease === "TRAFFIC" ? " (traffico)" : "";
       recommendedStrategy.reason += ` (traffico stimato: −${recTrafficLoss.toFixed(1)}s${releaseNote})`;
     }
+  } else {
+    recommendedStrategy.traffic_predictions = [];
   }
 
   // ── 4c. Strategy Breakdowns (with scenario/risk modifiers) ──
@@ -879,9 +882,7 @@ export function computeVirtualRaceEngineer(
 
   // Recommended breakdown
   if (bestPitLaps.length > 0) {
-    const recTrafficForBreakdown = predictTrafficForPitLaps(
-      driverNumber, bestPitLaps, pitLoss, totalLaps, allLapsMap, positions, intervals, allDrivers,
-    );
+    const recTrafficForBreakdown = recommendedStrategy.traffic_predictions ?? [];
     recommendedStrategy.breakdown = computeStrategyBreakdown(
       bestPitLaps, bestCompounds, totalLaps, compoundModels, pitLoss,
       recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
