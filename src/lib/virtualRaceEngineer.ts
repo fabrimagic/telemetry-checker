@@ -1010,7 +1010,26 @@ export function computeVirtualRaceEngineer(
     narrativeInsights.push("⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.");
   }
 
-  // ── 7a. Battle impact on strategies ──
+  // ── 7.pre2 Raw vs Corrected degradation comparison ──
+  {
+    const lowAgreementStints = rawVsCorrected.filter(r => r.agreement === "LOW");
+    const highAgreementStints = rawVsCorrected.filter(r => r.agreement === "HIGH");
+
+    if (lowAgreementStints.length > 0) {
+      for (const la of lowAgreementStints) {
+        narrativeInsights.push(`Stint ${la.stint} (${la.compound}): divergenza significativa tra degrado grezzo (${la.rawSlope.toFixed(3)} s/giro) e corretto (${la.corrSlope.toFixed(3)} s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.`);
+      }
+      confScore -= lowAgreementStints.length;
+      confidenceFactors.push(`⚠️ Divergenza raw/corrected in ${lowAgreementStints.length} stint — correzione non-tyre molto ampia`);
+    } else if (highAgreementStints.length === rawVsCorrected.length && rawVsCorrected.length > 0) {
+      confScore += 1;
+      confidenceFactors.push("Convergenza alta tra degrado grezzo e corretto — stima robusta");
+    } else if (rawVsCorrected.length > 0) {
+      confidenceFactors.push("Convergenza moderata tra degrado grezzo e corretto");
+    }
+  }
+
+
   if (integratedContext.battle_context) {
     const bc = integratedContext.battle_context;
     if (bc.total_battle_laps > 3) {
