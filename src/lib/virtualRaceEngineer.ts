@@ -842,9 +842,16 @@ export function computeVirtualRaceEngineer(
       intervals,
       allDrivers,
     );
-    const recTrafficLoss = recTraffic.reduce((sum, t) => sum + t.estimated_traffic_time_loss, 0);
+    const recTrafficLoss = recTraffic.reduce((sum, t) => sum + (t.traffic_time_loss_total ?? t.estimated_traffic_time_loss), 0);
     if (recTrafficLoss > 0) {
-      recommendedStrategy.reason += ` (traffico stimato: −${recTrafficLoss.toFixed(1)}s)`;
+      const worstRelease = recTraffic.reduce((w, t) => {
+        const cls = t.release_classification ?? "CLEAN";
+        if (cls === "PACK") return "PACK";
+        if (cls === "TRAFFIC" && w !== "PACK") return "TRAFFIC";
+        return w;
+      }, "CLEAN" as string);
+      const releaseNote = worstRelease === "PACK" ? " (rientro in pack)" : worstRelease === "TRAFFIC" ? " (traffico)" : "";
+      recommendedStrategy.reason += ` (traffico stimato: −${recTrafficLoss.toFixed(1)}s${releaseNote})`;
     }
   }
 
