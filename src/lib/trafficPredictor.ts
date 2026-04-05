@@ -21,6 +21,8 @@ export type TrafficLevel = "CLEAN" | "LIGHT" | "HEAVY" | "UNKNOWN";
 
 export type CompressedTrainRisk = "LOW" | "MEDIUM" | "HIGH";
 export type ReleaseQuality = "EXCELLENT" | "GOOD" | "MARGINAL" | "POOR";
+/** Simplified release classification for strategy engine consumption */
+export type ReleaseClassification = "CLEAN" | "TRAFFIC" | "PACK";
 export type PredictionConfidence = "HIGH" | "MEDIUM" | "LOW";
 
 export interface TrafficPrediction {
@@ -37,20 +39,31 @@ export interface TrafficPrediction {
   /* ── Extended fields (backward-compatible, all optional) ── */
   pack_size_ahead?: number;
   pack_size_total?: number;
+  pack_size_behind?: number;
   compressed_train_risk?: CompressedTrainRisk;
   local_density_score?: number;
   release_quality?: ReleaseQuality;
+  /** Simplified release classification: CLEAN (>3s), TRAFFIC (1-3s), PACK (<1s or in pack) */
+  release_classification?: ReleaseClassification;
   release_risk_score?: number;
   rejoin_is_in_pack?: boolean;
   estimated_clear_lap?: number | null;
   stuck_risk_score?: number;
   overtake_difficulty_score?: number;
+  /** Estimated laps stuck in traffic before clearing (alias for estimated_traffic_laps with richer logic) */
+  traffic_persistence_laps?: number;
+  /** Total time loss from traffic including dirty air, pack density, and warmup handicap */
+  traffic_time_loss_total?: number;
   prediction_confidence?: PredictionConfidence;
   confidence_reasons?: string[];
   compound_delta_effect?: number;
   warmup_handicap_estimate?: number;
   clear_air_advantage_estimate?: number;
   model_notes?: string[];
+
+  /* ── Release gap shortcuts (mirrors gap_ahead/behind but with explicit naming) ── */
+  release_gap_ahead?: number | null;
+  release_gap_behind?: number | null;
 }
 
 /* ── Centralized Configuration ── */
