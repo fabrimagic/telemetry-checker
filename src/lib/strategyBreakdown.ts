@@ -126,7 +126,7 @@ export function computeStrategyBreakdown(
   }
 
   const totalEstimated = round1(
-    baseTime + adjustedDegCost + pitLossTotal +
+    baseTime + adjustedDegCost + pitLossTotal + warmupCost +
     (trafficLoss ?? 0) +
     (weatherAdj ?? 0) +
     (neutralAdj ?? 0)
@@ -135,6 +135,7 @@ export function computeStrategyBreakdown(
   return {
     base_stint_time: round1(baseTime),
     tyre_degradation_cost: round1(adjustedDegCost),
+    warmup_cost: round1(warmupCost),
     pit_loss: round1(pitLossTotal),
     traffic_loss: trafficLoss != null ? round1(trafficLoss) : null,
     weather_adjustment: weatherAdj,
