@@ -5,11 +5,14 @@
  * robustness, competitor-aware context, overtake difficulty estimation,
  * and stint extension penalty calculation.
  *
+ * Integrates tightly with trafficPredictor.ts for pack/release/persistence
+ * metadata and with tyre modules for degradation-aware decisions.
+ *
  * Anti-hallucination: All estimates are derived from observed data (OpenF1).
  * Where data is insufficient, confidence is reduced explicitly.
  */
 
-import type { TrafficPrediction, TrafficLevel } from "./trafficPredictor";
+import type { TrafficPrediction, TrafficLevel, ReleaseClassification } from "./trafficPredictor";
 import type { IntervalData, PositionData, Driver, Lap, StintData } from "./openf1";
 import type { RiskMode } from "./riskAppetite";
 import type { ScenarioId } from "./scenarioContext";
@@ -54,6 +57,12 @@ export interface CompetitorContext {
   undercut_risk: number;       // 0–1 probability
   undercut_opportunity: number; // 0–1 probability
   traffic_risk_after_pit: number; // 0–1
+  /** Simplified release classification from traffic predictor */
+  release_classification?: ReleaseClassification;
+  /** Estimated laps stuck in traffic after pit */
+  traffic_persistence_laps?: number;
+  /** Whether rejoin is inside a compressed pack */
+  rejoin_in_pack?: boolean;
 }
 
 export interface OvertakeDifficulty {
@@ -80,6 +89,25 @@ export interface EnrichedStrategyAnalysis {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   Configuration
+   ══════════════════════════════════════════════════════════════ */
+
+const STRATEGY_CONFIG = {
+  /** Dirty air time loss per lap when following within ~1.5s */
+  dirty_air_loss_per_lap: 0.35,
+  /** Min dirty air loss (for light traffic) */
+  dirty_air_loss_light: 0.15,
+  /** Sensitivity perturbation factors */
+  deg_perturbation: 1.20,    // +20% degradation
+  traffic_perturbation: 1.50, // +50% traffic
+  pit_loss_perturbation: 2.0, // +2s per stop
+  /** Robustness normalization range */
+  robustness_max_sensitivity: 15, // seconds
+  /** Cliff threshold (laps) */
+  cliff_threshold: 18,
+} as const;
+
+/* ══════════════════════════════════════════════════════════════
    1. Pit Window Generation
    ══════════════════════════════════════════════════════════════ */
 
@@ -99,7 +127,6 @@ export function generatePitWindow(
   for (let lap = start; lap <= end; lap++) {
     const candidate = [...allPitLaps];
     candidate[pitIndex] = lap;
-    // Ensure ordering
     let valid = true;
     for (let i = 1; i < candidate.length; i++) {
       if (candidate[i] <= candidate[i - 1] + 2) { valid = false; break; }
@@ -143,15 +170,15 @@ export function computeSensitivity(
   trafficBaseline: number,
 ): SensitivityResult {
   // Degradation sensitivity: +20% slope
-  const degCost = simulateWithModifiedDeg(pitLaps, compounds, totalLaps, compoundModels, 1.2, pitLoss, trafficBaseline);
+  const degCost = simulateWithModifiedDeg(pitLaps, compounds, totalLaps, compoundModels, STRATEGY_CONFIG.deg_perturbation, pitLoss, trafficBaseline);
   const sensitivity_to_degradation = degCost != null ? Math.round((degCost - baseCost) * 10) / 10 : 0;
 
   // Traffic sensitivity: +50% traffic
-  const trafficCost = simulateWithModifiedTraffic(baseCost, pitLaps, trafficBaseline, 1.5);
+  const trafficCost = simulateWithModifiedTraffic(baseCost, pitLaps, trafficBaseline, STRATEGY_CONFIG.traffic_perturbation);
   const sensitivity_to_traffic = Math.round((trafficCost - baseCost) * 10) / 10;
 
   // Pit loss sensitivity: +2s per stop
-  const pitLossDelta = pitLaps.length * 2.0;
+  const pitLossDelta = pitLaps.length * STRATEGY_CONFIG.pit_loss_perturbation;
   const sensitivity_to_pit_loss = Math.round(pitLossDelta * 10) / 10;
 
   return { sensitivity_to_degradation, sensitivity_to_traffic, sensitivity_to_pit_loss };
@@ -183,11 +210,10 @@ function simulateWithModifiedDeg(
 
 function simulateWithModifiedTraffic(
   baseCost: number,
-  pitLaps: number[],
+  _pitLaps: number[],
   trafficBaseline: number,
   trafficMult: number,
 ): number {
-  // Traffic is additive, so we add the extra traffic on top
   return baseCost + trafficBaseline * (trafficMult - 1);
 }
 
@@ -206,15 +232,33 @@ function buildBounds(pitLaps: number[], compounds: string[], totalLaps: number) 
    3. Robustness Score
    ══════════════════════════════════════════════════════════════ */
 
-export function computeRobustness(sens: SensitivityResult): RobustnessResult {
-  // Total sensitivity = how much time the strategy could lose under adverse conditions
+/**
+ * Compute robustness from sensitivity + traffic metadata.
+ * Strategies with high traffic persistence or compressed pack rejoin
+ * are structurally less robust.
+ */
+export function computeRobustness(
+  sens: SensitivityResult,
+  trafficPredictions?: TrafficPrediction[],
+): RobustnessResult {
   const totalSens = Math.abs(sens.sensitivity_to_degradation) +
     Math.abs(sens.sensitivity_to_traffic) +
     Math.abs(sens.sensitivity_to_pit_loss);
 
-  // Normalize: 0 = very fragile, 1 = very robust
-  // Typical F1 range: 0–15s total sensitivity
-  const score = Math.max(0, Math.min(1, 1 - totalSens / 15));
+  // Base score from sensitivity
+  let score = Math.max(0, Math.min(1, 1 - totalSens / STRATEGY_CONFIG.robustness_max_sensitivity));
+
+  // Traffic structure penalty: strategies with pack rejoin are less robust
+  if (trafficPredictions && trafficPredictions.length > 0) {
+    for (const tp of trafficPredictions) {
+      if (tp.rejoin_is_in_pack) score -= 0.08;
+      if (tp.compressed_train_risk === "HIGH") score -= 0.10;
+      else if (tp.compressed_train_risk === "MEDIUM") score -= 0.04;
+      if ((tp.traffic_persistence_laps ?? tp.estimated_traffic_laps) > 4) score -= 0.06;
+    }
+    score = Math.max(0, Math.min(1, score));
+  }
+
   const roundedScore = Math.round(score * 100) / 100;
 
   let label: RobustnessLabel = "ROBUST";
@@ -242,21 +286,19 @@ const MO_WEIGHTS: Record<RiskMode, MultiObjectiveWeights> = {
 };
 
 export function computeMultiObjectiveScore(
-  raceTimeDelta: number,       // vs actual (positive = better)
-  positionDelta: number,        // positions lost after pit (0 = no change, positive = worse)
-  riskScore: number,            // 0–1 (higher = more risky)
-  robustnessScore: number,      // 0–1 (higher = more robust)
+  raceTimeDelta: number,
+  positionDelta: number,
+  riskScore: number,
+  robustnessScore: number,
   riskMode: RiskMode,
   scenarioId: ScenarioId,
 ): MultiObjectiveScores {
   const w = { ...MO_WEIGHTS[riskMode] };
 
-  // Scenario-specific weight adjustments
   if (isSimulatedScenario(scenarioId)) {
     const mods = SCENARIO_DEFINITIONS[scenarioId].modifiers;
     w.position_weight *= mods.track_position_weight;
     w.risk_weight *= mods.risk_penalty_weight;
-    // Renormalize
     const total = w.time_weight + w.position_weight + w.risk_weight + w.robustness_weight;
     w.time_weight /= total;
     w.position_weight /= total;
@@ -264,14 +306,9 @@ export function computeMultiObjectiveScore(
     w.robustness_weight /= total;
   }
 
-  // Normalize objectives to 0–1 range
-  // Time: normalize by typical delta range (0–15s)
   const timeNorm = Math.max(0, Math.min(1, (15 - raceTimeDelta) / 15));
-  // Position: 0 = perfect, 1 = lost 5+ positions
   const posNorm = Math.max(0, Math.min(1, positionDelta / 5));
-  // Risk: already 0–1
   const riskNorm = Math.max(0, Math.min(1, riskScore));
-  // Robustness: invert so lower = better
   const robNorm = Math.max(0, Math.min(1, 1 - robustnessScore));
 
   const finalScore = timeNorm * w.time_weight +
@@ -311,8 +348,7 @@ export function buildCompetitorContext(
   const rejoinPos = bestPred.rejoin_position_estimated || currentPos;
   const positionsLost = Math.max(0, rejoinPos - currentPos);
 
-  // Undercut risk: estimated based on gap to car behind
-  // If car behind is close (<2s) and could pit soon, undercut risk is high
+  // Undercut risk: use traffic predictor gap data
   const gapBehind = bestPred.gap_behind_after_pit;
   let undercutRisk = 0;
   if (gapBehind != null) {
@@ -320,8 +356,12 @@ export function buildCompetitorContext(
     else if (gapBehind < 2.0) undercutRisk = 0.5;
     else if (gapBehind < 3.0) undercutRisk = 0.2;
   }
+  // Pack behind increases undercut risk (multiple cars could pit together)
+  if ((bestPred.pack_size_behind ?? 0) >= 2 && gapBehind != null && gapBehind < 3.0) {
+    undercutRisk = Math.min(1, undercutRisk + 0.15);
+  }
 
-  // Undercut opportunity: if we pit before car ahead and gap is small
+  // Undercut opportunity: gap ahead + warmup handicap awareness
   const gapAhead = bestPred.gap_ahead_after_pit;
   let undercutOpportunity = 0;
   if (gapAhead != null) {
@@ -329,12 +369,27 @@ export function buildCompetitorContext(
     else if (gapAhead < 2.5) undercutOpportunity = 0.4;
     else if (gapAhead < 4.0) undercutOpportunity = 0.15;
   }
+  // High warmup handicap reduces undercut effectiveness
+  if ((bestPred.warmup_handicap_estimate ?? 0) > 0.6) {
+    undercutOpportunity *= 0.7;
+  }
 
-  // Traffic risk
+  // Traffic risk uses release classification and persistence
   let trafficRisk = 0;
-  if (bestPred.traffic_level === "HEAVY") trafficRisk = 0.9;
-  else if (bestPred.traffic_level === "LIGHT") trafficRisk = 0.4;
-  else if (bestPred.traffic_level === "CLEAN") trafficRisk = 0.05;
+  const releaseClass = bestPred.release_classification;
+  if (releaseClass === "PACK") trafficRisk = 0.9;
+  else if (releaseClass === "TRAFFIC") trafficRisk = 0.5;
+  else if (releaseClass === "CLEAN") trafficRisk = 0.05;
+  else {
+    // Fallback to traffic level
+    if (bestPred.traffic_level === "HEAVY") trafficRisk = 0.9;
+    else if (bestPred.traffic_level === "LIGHT") trafficRisk = 0.4;
+    else if (bestPred.traffic_level === "CLEAN") trafficRisk = 0.05;
+  }
+
+  // Traffic persistence increases risk
+  const persistLaps = bestPred.traffic_persistence_laps ?? bestPred.estimated_traffic_laps;
+  if (persistLaps > 4) trafficRisk = Math.min(1, trafficRisk + 0.1);
 
   return {
     expected_rejoin_position: rejoinPos,
@@ -342,6 +397,9 @@ export function buildCompetitorContext(
     undercut_risk: Math.round(undercutRisk * 100) / 100,
     undercut_opportunity: Math.round(undercutOpportunity * 100) / 100,
     traffic_risk_after_pit: Math.round(trafficRisk * 100) / 100,
+    release_classification: releaseClass,
+    traffic_persistence_laps: persistLaps,
+    rejoin_in_pack: bestPred.rejoin_is_in_pack,
   };
 }
 
@@ -349,13 +407,20 @@ export function buildCompetitorContext(
    6. Overtake Difficulty / Traffic Persistence
    ══════════════════════════════════════════════════════════════ */
 
+/**
+ * Estimate overtake difficulty using pace delta, pack structure,
+ * dirty air model, and traffic persistence from trafficPredictor.
+ * Does NOT use DRS — difficulty is based on aerodynamic dirty air,
+ * pack density, and pace differential.
+ */
 export function estimateOvertakeDifficulty(
-  driverPace: number | null,   // avg lap time of our driver
-  aheadPace: number | null,    // avg lap time of car ahead after pit
-  gapAfterPit: number | null,  // gap to car ahead
+  driverPace: number | null,
+  aheadPace: number | null,
+  gapAfterPit: number | null,
   trafficLevel: TrafficLevel,
   rejoinPosition: number,
   totalDrivers: number,
+  trafficPrediction?: TrafficPrediction | null,
 ): OvertakeDifficulty | null {
   if (trafficLevel === "CLEAN" || trafficLevel === "UNKNOWN") {
     return {
@@ -369,41 +434,59 @@ export function estimateOvertakeDifficulty(
   // Base difficulty from traffic level
   let difficultyBase = trafficLevel === "HEAVY" ? 0.75 : 0.4;
 
-  // Pace differential effect (no DRS makes passing harder)
+  // Dirty air loss per lap (no DRS — passing depends on pace delta and dirty air)
+  const dirtyAirPerLap = trafficLevel === "HEAVY"
+    ? STRATEGY_CONFIG.dirty_air_loss_per_lap
+    : STRATEGY_CONFIG.dirty_air_loss_light;
+
   let lapsStuck = 0;
-  const dirtyAirPerLap = 0.35; // estimated dirty air loss per lap (no DRS)
 
   if (driverPace != null && aheadPace != null) {
     const paceDiff = aheadPace - driverPace; // positive = we're faster
     if (paceDiff <= 0) {
-      // We're slower or same pace: very hard to pass
       difficultyBase = Math.min(1.0, difficultyBase + 0.2);
       lapsStuck = trafficLevel === "HEAVY" ? 6 : 4;
     } else if (paceDiff < 0.3) {
-      // Marginally faster
-      lapsStuck = Math.ceil(2.0 / paceDiff); // need ~2s advantage to pass
+      lapsStuck = Math.ceil(2.0 / paceDiff);
       lapsStuck = Math.min(lapsStuck, 8);
     } else if (paceDiff < 0.6) {
       lapsStuck = Math.ceil(1.5 / paceDiff);
       lapsStuck = Math.min(lapsStuck, 5);
     } else {
-      // Significantly faster
       lapsStuck = Math.ceil(1.0 / paceDiff);
       lapsStuck = Math.min(lapsStuck, 3);
       difficultyBase *= 0.7;
     }
   } else {
-    // No pace data: use defaults
     lapsStuck = trafficLevel === "HEAVY" ? 4 : 2;
   }
 
-  // Mid-pack is harder to pass in (more cars, less room)
+  // Pack structure from traffic predictor increases stuck time
+  if (trafficPrediction) {
+    const packAhead = trafficPrediction.pack_size_ahead ?? 0;
+    if (packAhead > 1) {
+      // Each additional car in pack adds ~40% more stuck time
+      lapsStuck = Math.ceil(lapsStuck * (1 + (packAhead - 1) * 0.4));
+    }
+    if (trafficPrediction.compressed_train_risk === "HIGH") {
+      difficultyBase = Math.min(1.0, difficultyBase + 0.15);
+      lapsStuck += 2;
+    } else if (trafficPrediction.compressed_train_risk === "MEDIUM") {
+      difficultyBase = Math.min(1.0, difficultyBase + 0.05);
+      lapsStuck += 1;
+    }
+    // Use traffic predictor's own persistence estimate if available and higher
+    const predictorPersistence = trafficPrediction.traffic_persistence_laps ?? trafficPrediction.estimated_traffic_laps;
+    if (predictorPersistence > lapsStuck) {
+      lapsStuck = predictorPersistence;
+    }
+  }
+
+  // Mid-pack harder to pass in
   const midPackFactor = rejoinPosition > 5 && rejoinPosition < totalDrivers - 3 ? 1.15 : 1.0;
   difficultyBase = Math.min(1.0, difficultyBase * midPackFactor);
 
   const dirtyAirTotal = Math.round(lapsStuck * dirtyAirPerLap * 10) / 10;
-
-  // Traffic persistence: how likely to remain stuck
   const persistence = difficultyBase * (lapsStuck > 3 ? 0.9 : lapsStuck > 1 ? 0.5 : 0.1);
 
   return {
@@ -418,18 +501,22 @@ export function estimateOvertakeDifficulty(
    7. Stint Extension Penalty
    ══════════════════════════════════════════════════════════════ */
 
+/**
+ * Estimate the cost of extending a stint by N laps.
+ * Uses degradation slope, cliff threshold, and optionally
+ * pace loss trend to detect non-linear degradation acceleration.
+ */
 export function estimateStintExtensionPenalty(
   currentStintLength: number,
   extensionLaps: number,
   degradationSlope: number,
   avgLapTime: number | null,
-  cliffThreshold: number = 18,
+  cliffThreshold: number = STRATEGY_CONFIG.cliff_threshold,
+  /** Optional pace loss rate from cumulative deviation (s/lap) */
+  paceLossRate?: number | null,
 ): StintExtensionPenalty {
-  // Marginal cost: each additional lap costs more due to non-linear degradation
-  // The slope is per-lap, but real degradation accelerates beyond cliff threshold
   const baseCostPerLap = degradationSlope;
 
-  // Acceleration factor: cost increases as we extend beyond optimal
   let totalPenalty = 0;
   let cliffRisk = 0;
 
@@ -440,17 +527,27 @@ export function estimateStintExtensionPenalty(
     // Non-linear acceleration beyond threshold
     if (extendedLife > cliffThreshold) {
       const excess = extendedLife - cliffThreshold;
-      lapCost += excess * 0.02 * baseCostPerLap; // quadratic-ish growth
+      lapCost += excess * 0.02 * baseCostPerLap;
+    }
+
+    // If pace loss rate is available and high, accelerate cost
+    if (paceLossRate != null && paceLossRate > 0.10) {
+      lapCost += (paceLossRate - 0.10) * 0.5;
     }
 
     totalPenalty += lapCost;
   }
 
-  // Cliff risk estimation
+  // Cliff risk estimation — combine stint length and pace loss signal
   const totalExtendedLength = currentStintLength + extensionLaps;
   if (totalExtendedLength > cliffThreshold + 5) cliffRisk = 0.85;
   else if (totalExtendedLength > cliffThreshold + 2) cliffRisk = 0.5;
   else if (totalExtendedLength > cliffThreshold) cliffRisk = 0.2;
+
+  // Pace loss amplifies cliff risk
+  if (paceLossRate != null && paceLossRate > 0.20) {
+    cliffRisk = Math.min(1, cliffRisk + 0.2);
+  }
 
   const extensionCostPerLap = extensionLaps > 0
     ? Math.round((totalPenalty / extensionLaps) * 1000) / 1000
@@ -503,10 +600,10 @@ export function enrichStrategyAnalysis(
     baseCost ?? 0, pitLaps, compounds, totalLaps, compoundModels, pitLoss, trafficBaseline,
   );
 
-  // 4. Robustness
-  const robustness = computeRobustness(sensitivity);
+  // 4. Robustness (now traffic-aware)
+  const robustness = computeRobustness(sensitivity, trafficPredictions);
 
-  // 5. Competitor context
+  // 5. Competitor context (now uses traffic metadata)
   let competitorCtx: CompetitorContext | null = null;
   if (pitLaps.length > 0) {
     competitorCtx = buildCompetitorContext(
@@ -515,26 +612,26 @@ export function enrichStrategyAnalysis(
     );
   }
 
-  // 6. Overtake difficulty
+  // 6. Overtake difficulty (now uses traffic predictor metadata)
   let overtakeDiff: OvertakeDifficulty | null = null;
   if (competitorCtx && trafficPredictions.length > 0) {
     const pred = trafficPredictions.find(t => t.pit_lap === pitLaps[0]) ?? trafficPredictions[0];
-    // Estimate pace of car ahead (rough: use driver pace + small delta)
-    const aheadPace = driverAvgPace != null ? driverAvgPace + 0.15 : null; // conservative estimate
+    const aheadPace = driverAvgPace != null ? driverAvgPace + 0.15 : null;
     overtakeDiff = estimateOvertakeDifficulty(
       driverAvgPace, aheadPace, pred.gap_ahead_after_pit,
       pred.traffic_level, competitorCtx.expected_rejoin_position, allDrivers.length,
+      pred, // pass full traffic prediction for pack/persistence metadata
     );
   }
 
-  // 7. Stint extension penalty (for the first stint of the strategy)
+  // 7. Stint extension penalty
   let stintExt: StintExtensionPenalty | null = null;
   if (pitLaps.length > 0 && actualPitLaps.length > 0) {
     const extensionLaps = pitLaps[0] - actualPitLaps[0];
     if (extensionLaps > 0) {
       const firstCompound = compounds[0];
       const model = compoundModels.get(firstCompound);
-      const slope = model ? model.slope : 0.05; // fallback
+      const slope = model ? model.slope : 0.05;
       stintExt = estimateStintExtensionPenalty(
         actualPitLaps[0], extensionLaps, slope, driverAvgPace,
       );
@@ -546,13 +643,15 @@ export function enrichStrategyAnalysis(
     ? Math.max(0, competitorCtx.expected_rejoin_position - (trafficPredictions[0]?.current_position ?? 10))
     : 0;
 
-  // Risk score: combine sensitivity + cliff risk + traffic risk
+  // Risk score: combine sensitivity + cliff risk + traffic risk + traffic persistence
   const cliffRisk = stintExt?.cliff_risk_if_extend ?? 0;
   const trafficRisk = competitorCtx?.traffic_risk_after_pit ?? 0;
+  const persistenceRisk = competitorCtx?.rejoin_in_pack ? 0.15 : 0;
   const riskScore = Math.min(1, (
-    (1 - robustness.robustness_score) * 0.4 +
-    cliffRisk * 0.3 +
-    trafficRisk * 0.3
+    (1 - robustness.robustness_score) * 0.35 +
+    cliffRisk * 0.25 +
+    trafficRisk * 0.25 +
+    persistenceRisk * 0.15
   ));
 
   const multiObj = computeMultiObjectiveScore(

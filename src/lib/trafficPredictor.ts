@@ -21,6 +21,8 @@ export type TrafficLevel = "CLEAN" | "LIGHT" | "HEAVY" | "UNKNOWN";
 
 export type CompressedTrainRisk = "LOW" | "MEDIUM" | "HIGH";
 export type ReleaseQuality = "EXCELLENT" | "GOOD" | "MARGINAL" | "POOR";
+/** Simplified release classification for strategy engine consumption */
+export type ReleaseClassification = "CLEAN" | "TRAFFIC" | "PACK";
 export type PredictionConfidence = "HIGH" | "MEDIUM" | "LOW";
 
 export interface TrafficPrediction {
@@ -37,20 +39,31 @@ export interface TrafficPrediction {
   /* ── Extended fields (backward-compatible, all optional) ── */
   pack_size_ahead?: number;
   pack_size_total?: number;
+  pack_size_behind?: number;
   compressed_train_risk?: CompressedTrainRisk;
   local_density_score?: number;
   release_quality?: ReleaseQuality;
+  /** Simplified release classification: CLEAN (>3s), TRAFFIC (1-3s), PACK (<1s or in pack) */
+  release_classification?: ReleaseClassification;
   release_risk_score?: number;
   rejoin_is_in_pack?: boolean;
   estimated_clear_lap?: number | null;
   stuck_risk_score?: number;
   overtake_difficulty_score?: number;
+  /** Estimated laps stuck in traffic before clearing (alias for estimated_traffic_laps with richer logic) */
+  traffic_persistence_laps?: number;
+  /** Total time loss from traffic including dirty air, pack density, and warmup handicap */
+  traffic_time_loss_total?: number;
   prediction_confidence?: PredictionConfidence;
   confidence_reasons?: string[];
   compound_delta_effect?: number;
   warmup_handicap_estimate?: number;
   clear_air_advantage_estimate?: number;
   model_notes?: string[];
+
+  /* ── Release gap shortcuts (mirrors gap_ahead/behind but with explicit naming) ── */
+  release_gap_ahead?: number | null;
+  release_gap_behind?: number | null;
 }
 
 /* ── Centralized Configuration ── */
@@ -339,6 +352,7 @@ function computeTimeLossPerLap(
 
 interface PackAnalysis {
   pack_size_ahead: number;
+  pack_size_behind: number;
   pack_size_total: number;
   compressed_train_risk: CompressedTrainRisk;
   local_density_score: number; // 0–1, higher = denser
@@ -356,8 +370,9 @@ function analyzePackStructure(
 ): PackAnalysis {
   const cfg = TRAFFIC_CONFIG.cluster;
 
-  // Count cars within cluster window ahead of rejoin
+  // Count cars within cluster window ahead/behind rejoin
   let packAhead = 0;
+  let packBehind = 0;
   let packTotal = 0;
   const gapsInWindow: number[] = [];
 
@@ -366,6 +381,7 @@ function analyzePackStructure(
     if (delta <= cfg.window_seconds) {
       packTotal++;
       if (d.gap < rejoinGap) packAhead++;
+      else packBehind++;
       gapsInWindow.push(d.gap);
     }
   }
@@ -401,6 +417,7 @@ function analyzePackStructure(
 
   return {
     pack_size_ahead: packAhead,
+    pack_size_behind: packBehind,
     pack_size_total: packTotal,
     compressed_train_risk: trainRisk,
     local_density_score: densityScore,
@@ -709,7 +726,7 @@ export function predictTrafficForPitLaps(
 
     // ── Step 6: Pack / cluster analysis ──
     let pack: PackAnalysis = {
-      pack_size_ahead: 0, pack_size_total: 0,
+      pack_size_ahead: 0, pack_size_behind: 0, pack_size_total: 0,
       compressed_train_risk: "LOW", local_density_score: 0,
       rejoin_is_in_pack: false,
     };
@@ -785,6 +802,14 @@ export function predictTrafficForPitLaps(
       notes.push("Time projection unavailable — using gap-offset fallback");
     }
 
+    // ── Release classification (simplified for strategy engine) ──
+    const releaseClassification: ReleaseClassification =
+      pack.rejoin_is_in_pack || (gapAhead != null && gapAhead < 1.0) ? "PACK" :
+      gapAhead != null && gapAhead < 3.0 ? "TRAFFIC" : "CLEAN";
+
+    // Traffic persistence: refined estimate of laps stuck
+    const trafficPersistenceLaps = trafficEst.laps;
+
     predictions.push({
       pit_lap: pitLap,
       current_position: currentPos,
@@ -801,20 +826,26 @@ export function predictTrafficForPitLaps(
 
       // Extended fields
       pack_size_ahead: pack.pack_size_ahead,
+      pack_size_behind: pack.pack_size_behind,
       pack_size_total: pack.pack_size_total,
       compressed_train_risk: pack.compressed_train_risk,
       local_density_score: pack.local_density_score,
       release_quality: release.quality,
+      release_classification: releaseClassification,
       release_risk_score: 1 - release.score,
       rejoin_is_in_pack: pack.rejoin_is_in_pack,
       estimated_clear_lap: trafficEst.clearLap != null ? pitLap + trafficEst.clearLap : null,
       stuck_risk_score: trafficEst.stuckScore,
       overtake_difficulty_score: overtakeScore,
+      traffic_persistence_laps: trafficPersistenceLaps,
+      traffic_time_loss_total: totalTrafficLoss,
       prediction_confidence: conf.confidence,
       confidence_reasons: conf.reasons,
       compound_delta_effect: Math.round(compoundDelta * 100) / 100,
       warmup_handicap_estimate: warmupHandicap,
       clear_air_advantage_estimate: clearAirAdv,
+      release_gap_ahead: gapAhead != null ? Math.round(gapAhead * 10) / 10 : null,
+      release_gap_behind: gapBehind != null ? Math.round(gapBehind * 10) / 10 : null,
       model_notes: notes.length > 0 ? notes : undefined,
     });
   }
