@@ -189,7 +189,13 @@ export function computeVirtualRaceEngineer(
   if (!stints.length || !laps.length) return null;
 
   const weatherMap = classifyLapsWeather(laps, weather);
-  const trackStatusMap = classifyLapsTrackStatus(laps, raceControl);
+  const trackStatusMapRaw = classifyLapsTrackStatus(laps, raceControl);
+  // Red flag on the very last lap = race ended, not a neutralization
+  const trackStatusMap = new Map(trackStatusMapRaw);
+  const maxLapNumber = Math.max(...laps.map(l => l.lap_number));
+  if (trackStatusMap.get(maxLapNumber) === "RED") {
+    trackStatusMap.delete(maxLapNumber);
+  }
 
   const pitLoss = estimatePitLoss(pitStops);
   const totalLaps = Math.max(...laps.map(l => l.lap_number));
