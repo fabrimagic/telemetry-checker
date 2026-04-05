@@ -162,6 +162,15 @@ export function breakdownToRows(b: StrategyBreakdown): BreakdownRow[] {
     });
   }
 
+  if (b.warmup_cost != null && b.warmup_cost > 0) {
+    rows.push({
+      label: "Tyre warmup",
+      value: b.warmup_cost,
+      impact: b.warmup_cost > 3 ? "penalizing" : b.warmup_cost > 1.5 ? "neutral" : "favorable",
+      note: b.warmup_cost > 3 ? "Warmup lento (gomme dure)" : "Penalità termica post-pit",
+    });
+  }
+
   if (b.tyre_degradation_cost != null) {
     rows.push({
       label: "Degrado gomme",
