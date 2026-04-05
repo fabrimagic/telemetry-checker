@@ -228,12 +228,41 @@ export default function Documentation() {
             dopo aver rimosso l'effetto del carburante e della temperatura.
           </p>
 
-          <h4 className="font-semibold text-foreground mt-3">Filtri pre-regressione</h4>
+          <h4 className="font-semibold text-foreground mt-3">Pipeline di Filtraggio (Baseline — tyreDegradation.ts)</h4>
+          <p>Il modulo baseline applica una pipeline professionale in 4 stadi prima della regressione:</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li><strong className="text-foreground">Esclusioni strutturali</strong> — pit-out lap, in-lap (tranne ultimo stint), durate nulle/negative</li>
+            <li><strong className="text-foreground">Filtro outlier MAD</strong> — Median Absolute Deviation con moltiplicatore compound-specific (Soft/Medium: 3.0σ, Hard: 3.5σ). Più robusto del precedente filtro 107%-mediana per distribuzioni asimmetriche</li>
+            <li><strong className="text-foreground">Esclusione warmup</strong> — i primi giri dello stint vengono esclusi se risultano più lenti della mediana dei restanti (Soft/Medium: 1 giro, Hard: 2 giri). L'esclusione avviene solo se i giri iniziali sono effettivamente più lenti e lo stint è abbastanza lungo</li>
+            <li><strong className="text-foreground">Cliff detection</strong> — gli ultimi giri consecutivi con residui positivi anomali (oltre 2.0–2.5× RMSE, compound-specific) vengono esclusi dalla regressione. Il cliff è segnalato nei metadati ma non distorce la slope media</li>
+          </ol>
+
+          <h4 className="font-semibold text-foreground mt-3">Core Degradation Window</h4>
+          <p>
+            La regressione viene eseguita solo sulla <strong className="text-foreground">finestra centrale</strong> dello stint, 
+            dopo aver rimosso warmup e cliff. Questo produce una slope che descrive il degrado utile 
+            strategicamente, non il comportamento grezzo dell'intero stint.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Profili Compound-Specific (Baseline)</h4>
+          <table className="w-full text-xs border border-border rounded mt-1">
+            <thead><tr className="bg-muted/40"><th className="px-2 py-1 text-left">Parametro</th><th className="px-2 py-1">SOFT</th><th className="px-2 py-1">MEDIUM</th><th className="px-2 py-1">HARD</th></tr></thead>
+            <tbody>
+              <tr><td className="px-2 py-1">Warmup exclusion</td><td className="px-2 py-1 text-center">1 giro</td><td className="px-2 py-1 text-center">1 giro</td><td className="px-2 py-1 text-center">2 giri</td></tr>
+              <tr><td className="px-2 py-1">MAD multiplier</td><td className="px-2 py-1 text-center">3.0</td><td className="px-2 py-1 text-center">3.0</td><td className="px-2 py-1 text-center">3.5</td></tr>
+              <tr><td className="px-2 py-1">Cliff residual threshold</td><td className="px-2 py-1 text-center">2.0× RMSE</td><td className="px-2 py-1 text-center">2.2× RMSE</td><td className="px-2 py-1 text-center">2.5× RMSE</td></tr>
+              <tr><td className="px-2 py-1">Min core laps</td><td className="px-2 py-1 text-center">3</td><td className="px-2 py-1 text-center">3</td><td className="px-2 py-1 text-center">3</td></tr>
+            </tbody>
+          </table>
+
+          <h4 className="font-semibold text-foreground mt-3">Statistiche Estese</h4>
+          <p>La regressione produce metadati opzionali per debug e validazione:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Esclusi: out lap, in lap (ultimo giro di stint non finale), giri senza durata</li>
-            <li>Esclusi: giri WET/MIXED, giri con neutralizzazione (non GREEN)</li>
-            <li>Outlier: giri con tempo &gt; mediana × 1.07 rimossi</li>
-            <li>Minimo 4 giri per modello semplice, 8 per modello corretto completo</li>
+            <Param name="rmse" desc="Root Mean Square Error della regressione" />
+            <Param name="slopeStdError" desc="Errore standard della slope (null se n < 3)" />
+            <Param name="fitPointsCount" desc="Giri nella finestra core di regressione" />
+            <Param name="cliffDetected" desc="Presenza di cliff a fine stint" />
+            <Param name="filterSummary" desc="Elenco testuale dei filtri applicati" />
           </ul>
 
           <h4 className="font-semibold text-foreground mt-3">Fallback</h4>
