@@ -726,7 +726,7 @@ export function predictTrafficForPitLaps(
 
     // ── Step 6: Pack / cluster analysis ──
     let pack: PackAnalysis = {
-      pack_size_ahead: 0, pack_size_total: 0,
+      pack_size_ahead: 0, pack_size_behind: 0, pack_size_total: 0,
       compressed_train_risk: "LOW", local_density_score: 0,
       rejoin_is_in_pack: false,
     };
