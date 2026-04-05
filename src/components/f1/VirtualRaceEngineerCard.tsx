@@ -749,7 +749,50 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                       <span className="font-semibold text-emerald-400">Guadagno stimato: {recommended_strategy.estimated_gain_seconds.toFixed(1)}s</span>
                     </p>
                   )}
+                  {recommended_strategy.description && (
+                    <p className="text-[10px] text-muted-foreground mb-1">{recommended_strategy.description}</p>
+                  )}
                   <p className="text-[11px] text-muted-foreground italic">{recommended_strategy.reason}</p>
+
+                  {/* Robustness badge */}
+                  {recommended_strategy.analysis?.robustness && (
+                    <div className="mt-1">
+                      <RobustnessBadge label={recommended_strategy.analysis.robustness.robustness_label} />
+                    </div>
+                  )}
+
+                  {/* Multi-objective mini-bar */}
+                  {recommended_strategy.analysis?.multi_objective && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground mt-1.5">
+                      <span>⏱ Tempo: <strong className="text-foreground">{recommended_strategy.analysis.multi_objective.race_time_objective > 0 ? "+" : ""}{recommended_strategy.analysis.multi_objective.race_time_objective}s</strong></span>
+                      <span>📍 Posiz.: <strong className="text-foreground">{recommended_strategy.analysis.multi_objective.track_position_objective > 0 ? "-" : ""}{recommended_strategy.analysis.multi_objective.track_position_objective}</strong></span>
+                      <span>⚠️ Rischio: <strong className="text-foreground">{Math.round(recommended_strategy.analysis.multi_objective.risk_objective * 100)}%</strong></span>
+                      <span>🛡️ Robustezza: <strong className="text-foreground">{Math.round(recommended_strategy.analysis.multi_objective.robustness_objective * 100)}%</strong></span>
+                    </div>
+                  )}
+
+                  {/* Pros / Cons */}
+                  {((recommended_strategy.pros && recommended_strategy.pros.length > 0) || (recommended_strategy.cons && recommended_strategy.cons.length > 0)) && (
+                    <div className="flex gap-4 text-[10px] mt-1.5">
+                      {recommended_strategy.pros && recommended_strategy.pros.length > 0 && (
+                        <div>
+                          <span className="text-emerald-400 font-semibold">Pro: </span>
+                          <span className="text-muted-foreground">{recommended_strategy.pros.join("; ")}</span>
+                        </div>
+                      )}
+                      {recommended_strategy.cons && recommended_strategy.cons.length > 0 && (
+                        <div>
+                          <span className="text-red-400 font-semibold">Contro: </span>
+                          <span className="text-muted-foreground">{recommended_strategy.cons.join("; ")}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Collapsible advanced details */}
+                  {recommended_strategy.analysis && (
+                    <StrategyAdvancedDetails analysis={recommended_strategy.analysis} />
+                  )}
                 </div>
               </div>
             )}
