@@ -638,22 +638,61 @@ export default function Documentation() {
         {/* ════════════════════════════════════════════ */}
         <DocSection title="Traffic Predictor" icon={<Target className="h-4 w-4" />}>
           <p>
-            Stima il traffico post-pit per diversi giri candidati:
+            Modulo professionale di predizione del traffico post-pit, progettato per avvicinarsi
+            alla logica di un team di strategy engineering F1.
           </p>
+
+          <h4 className="font-semibold text-foreground mt-3 mb-1">Pipeline di predizione</h4>
           <ol className="list-decimal pl-5 space-y-1">
-            <li>Recupera le posizioni e i gap al leader al giro di pit</li>
-            <li>Calcola il gap stimato dopo il pit: <code className="text-primary">gap_after = gap_attuale + pit_loss</code></li>
-            <li>Determina la posizione di rientro confrontando con i gap degli altri piloti</li>
-            <li>Classifica il traffico in base al gap con chi precede e chi segue:
+            <li><strong className="text-foreground">Indicizzazione per driver</strong> — posizioni, intervalli e giri vengono pre-indicizzati per pilota per lookup temporali efficienti</li>
+            <li><strong className="text-foreground">Time projection</strong> — stima il timestamp di uscita box (<code className="text-primary">pit_exit = ref_time + pit_loss</code>) e proietta i gap degli altri piloti a quel momento</li>
+            <li><strong className="text-foreground">Rejoin order</strong> — determina la posizione di rientro confrontando il gap proiettato del pilota con quelli degli altri</li>
+            <li><strong className="text-foreground">Pack / Cluster detection</strong> — analizza la densità del traffico locale attorno al punto di rientro:
+              <ul className="list-disc pl-5 mt-1">
+                <li><strong className="text-foreground">Cluster window</strong> — auto entro 2.0s formano un cluster</li>
+                <li><strong className="text-foreground">Compressed train</strong> — gap medio inter-auto &lt; 1.0s → rischio alto</li>
+                <li><strong className="text-foreground">Density score</strong> — 0–1, basato su dimensione pack e densità inter-auto</li>
+              </ul>
+            </li>
+            <li><strong className="text-foreground">Classificazione traffico</strong>:
               <ul className="list-disc pl-5 mt-1">
                 <li><strong className="text-foreground">CLEAN</strong> — gap ≥ 3.0s</li>
                 <li><strong className="text-foreground">LIGHT</strong> — gap ≥ 1.5s</li>
                 <li><strong className="text-foreground">HEAVY</strong> — gap &lt; 1.5s</li>
               </ul>
             </li>
-            <li>Stima i giri in traffico in base al differenziale di passo</li>
-            <li>Calcola il tempo totale perso: <code className="text-primary">HEAVY = 1.0s/giro, LIGHT = 0.4s/giro</code></li>
+            <li><strong className="text-foreground">Pace analysis</strong> — passo recente calcolato con mediana trimmed (esclude pit-out e outlier &gt; 107% mediana)</li>
+            <li><strong className="text-foreground">Traffic laps estimation</strong> — multi-fattore: pace delta, pack size, compressed train, warmup handicap, overtake difficulty</li>
+            <li><strong className="text-foreground">Time loss</strong> — <code className="text-primary">HEAVY = 0.8s/giro × dirty_air (1.15) × pack_factor × overtake_difficulty</code></li>
           </ol>
+
+          <h4 className="font-semibold text-foreground mt-3 mb-1">Compound & Warmup Awareness</h4>
+          <p>
+            Il predictor tiene conto dell'handicap warmup per compound (SOFT: 0.3s, MEDIUM: 0.5s, HARD: 0.8s)
+            che riduce il vantaggio di passo iniziale post-pit. Il vantaggio in aria pulita è anch'esso compound-specific
+            (SOFT: 0.6s, MEDIUM: 0.4s, HARD: 0.3s).
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3 mb-1">Release Quality & Confidence</h4>
+          <p>
+            Ogni predizione include una valutazione della qualità del rientro (EXCELLENT / GOOD / MARGINAL / POOR)
+            basata su gap davanti/dietro e struttura del pack, e un livello di confidenza (HIGH / MEDIUM / LOW)
+            derivato dalla disponibilità e qualità dei dati (timestamps, posizioni, intervalli, campione di passo).
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3 mb-1">Metadati estesi</h4>
+          <p>
+            Il modulo produce metadati opzionali e backward-compatible: <code className="text-primary">pack_size_ahead</code>,{" "}
+            <code className="text-primary">compressed_train_risk</code>, <code className="text-primary">release_quality</code>,{" "}
+            <code className="text-primary">stuck_risk_score</code>, <code className="text-primary">overtake_difficulty_score</code>,{" "}
+            <code className="text-primary">compound_delta_effect</code>, <code className="text-primary">model_notes</code>.
+          </p>
+
+          <p className="text-xs italic mt-2">
+            Anti-allucinazione: il modello non usa il DRS come variabile. Le difficoltà di sorpasso dipendono esclusivamente
+            da densità del traffico, pace delta, dirty air, tyre state e overtaking difficulty della pista.
+            Dove i dati sono insufficienti, la confidenza viene ridotta e vengono usati fallback conservativi.
+          </p>
         </DocSection>
 
         {/* ════════════════════════════════════════════ */}
