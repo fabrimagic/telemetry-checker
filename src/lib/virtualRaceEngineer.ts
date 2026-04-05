@@ -921,16 +921,24 @@ export function computeVirtualRaceEngineer(
     }
 
     if (alt.analysis.competitor_context) {
-      if (alt.analysis.competitor_context.undercut_opportunity > 0.5) {
+      const cc = alt.analysis.competitor_context;
+      if (cc.undercut_opportunity > 0.5) {
         alt.pros.push("Opportunità undercut significativa");
       }
-      if (alt.analysis.competitor_context.undercut_risk > 0.5) {
+      if (cc.undercut_risk > 0.5) {
         alt.cons.push("Rischio undercut da rivali");
+      }
+      // Release classification-based insights
+      if (cc.release_classification === "PACK" && cc.rejoin_in_pack) {
+        alt.cons.push(`Rientro strutturalmente dentro un pack — sorpasso multiplo necessario`);
+      }
+      if ((cc.traffic_persistence_laps ?? 0) > 4) {
+        alt.cons.push(`Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`);
       }
     }
 
     if (alt.analysis.overtake_difficulty && alt.analysis.overtake_difficulty.expected_laps_stuck > 3) {
-      alt.cons.push(`Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca`);
+      alt.cons.push(`Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${alt.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`);
     }
 
     if (alt.analysis.stint_extension && alt.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
