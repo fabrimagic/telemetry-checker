@@ -2,12 +2,14 @@ import type { TrafficPrediction } from "./trafficPredictor";
 import type { TrackStatus } from "./trackStatusClassification";
 import type { WeatherCondition } from "./weatherClassification";
 import type { PitStopAnalysis, StintAnalysis } from "./virtualRaceEngineer";
+import { computeStintWarmupCost } from "./tyreWarmup";
 
 /* ── Types ── */
 
 export interface StrategyBreakdown {
   base_stint_time: number | null;
   tyre_degradation_cost: number | null;
+  warmup_cost: number | null;
   pit_loss: number | null;
   traffic_loss: number | null;
   weather_adjustment: number | null;
