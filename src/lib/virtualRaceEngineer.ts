@@ -956,6 +956,143 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
+  {
+    // Description
+    if (bestPitLaps.length > 0) {
+      const pitDesc = bestPitLaps.length === 1
+        ? `Pit al giro ${bestPitLaps[0]}`
+        : `Pit ai giri ${bestPitLaps.join(", ")}`;
+      recommendedStrategy.description = `${pitDesc} con sequenza ${bestCompounds.join(" → ")}`;
+    } else {
+      recommendedStrategy.description = `Nessun pit stop — sequenza ${bestCompounds.join(" → ")}`;
+    }
+
+    // Analysis
+    const recTraffic = recommendedStrategy.traffic_predictions ?? [];
+    recommendedStrategy.analysis = enrichStrategyAnalysis(
+      bestPitLaps, bestCompounds, recommendedStrategy.estimated_gain_seconds,
+      totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
+      pitLoss, trafficAvgBaseline, recTraffic,
+      riskMode, scenarioId,
+      intervals, positions, stints, allDrivers, driverNumber,
+      simulateStrategyCost, driverAvgPace, actualPitLaps,
+    );
+
+    // Pros / Cons
+    const recPros: string[] = [];
+    const recCons: string[] = [];
+
+    // Robustness
+    if (recommendedStrategy.analysis.robustness.robustness_label === "ROBUST") {
+      recPros.push("Strategia robusta — poco sensibile a variazioni");
+    } else if (recommendedStrategy.analysis.robustness.robustness_label === "FRAGILE") {
+      recCons.push("Strategia fragile — sensibile a variazioni di degrado/traffico");
+    }
+
+    // Competitor context
+    if (recommendedStrategy.analysis.competitor_context) {
+      const cc = recommendedStrategy.analysis.competitor_context;
+      if (cc.undercut_opportunity > 0.5) recPros.push("Opportunità undercut significativa");
+      if (cc.undercut_risk > 0.5) recCons.push("Rischio undercut da rivali");
+      if (cc.release_classification === "PACK" && cc.rejoin_in_pack) {
+        recCons.push("Rientro strutturalmente dentro un pack — sorpasso multiplo necessario");
+      }
+      if ((cc.traffic_persistence_laps ?? 0) > 4) {
+        recCons.push(`Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`);
+      }
+    }
+
+    // Overtake difficulty
+    if (recommendedStrategy.analysis.overtake_difficulty && recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck > 3) {
+      recCons.push(`Difficoltà sorpasso: ~${recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${recommendedStrategy.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`);
+    }
+
+    // Stint extension / cliff
+    if (recommendedStrategy.analysis.stint_extension && recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
+      recCons.push(`Rischio cliff se si estende lo stint (${Math.round(recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend * 100)}%)`);
+    }
+
+    // Pit window robustness
+    if (recommendedStrategy.analysis.pit_window && recommendedStrategy.analysis.pit_window.window_robustness === "FRAGILE") {
+      recCons.push("Finestra pit fragile — il giro esatto è critico");
+    }
+
+    // Traffic predictions pros/cons
+    if (recTraffic.length > 0) {
+      const trafficLoss = recTraffic.reduce((sum, t) => sum + (t.traffic_time_loss_total ?? t.estimated_traffic_time_loss), 0);
+      const worstTraffic = recTraffic.reduce((worst, t) => {
+        if (t.traffic_level === "HEAVY") return "HEAVY";
+        if (t.traffic_level === "LIGHT" && worst !== "HEAVY") return "LIGHT";
+        return worst;
+      }, "CLEAN" as TrafficLevel);
+
+      if (worstTraffic === "HEAVY") {
+        recCons.push(`Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`);
+      } else if (worstTraffic === "LIGHT") {
+        recCons.push(`Rientro in traffico leggero (−${trafficLoss.toFixed(1)}s stimati)`);
+      } else if (worstTraffic === "CLEAN") {
+        recPros.push("Rientro in aria pulita");
+      }
+
+      // Traffic metadata enrichment
+      for (const tp of recTraffic) {
+        if (tp.release_classification === "PACK") {
+          recCons.push(`Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti, ${tp.pack_size_behind ?? "?"} dietro)`);
+          break;
+        }
+        if (tp.release_classification === "TRAFFIC") {
+          if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
+            recCons.push(`Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`);
+            break;
+          }
+        }
+        const persistLaps = tp.traffic_persistence_laps ?? tp.estimated_traffic_laps;
+        if (persistLaps > 3) {
+          recCons.push(`Traffico persistente: ~${persistLaps} giri bloccato in aria sporca dopo il pit al giro ${tp.pit_lap}`);
+          break;
+        }
+        if ((tp.stuck_risk_score ?? 0) > 0.7) {
+          recCons.push(`Rischio elevato di restare bloccato dopo il pit al giro ${tp.pit_lap} (stuck score: ${((tp.stuck_risk_score ?? 0) * 100).toFixed(0)}%)`);
+          break;
+        }
+      }
+
+      const lowConfTraffic = recTraffic.filter(tp => tp.prediction_confidence === "LOW");
+      if (lowConfTraffic.length > 0) {
+        recCons.push("Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti");
+      }
+    }
+
+    // Warmup pros/cons
+    const recStintBoundsForPC = buildStintBounds(bestPitLaps, bestCompounds);
+    let recWarmupForPC = 0;
+    for (let si = 0; si < recStintBoundsForPC.length; si++) {
+      recWarmupForPC += computeStintWarmupCost(recStintBoundsForPC[si].compound, si === 0);
+    }
+    if (recWarmupForPC > 2.5) {
+      recCons.push(`Warmup elevato: ${recWarmupForPC.toFixed(1)}s persi per riscaldamento gomme`);
+    }
+    const recHasHardPC = bestCompounds.some(c => c.toUpperCase() === "HARD");
+    if (recHasHardPC && recWarmupForPC > 1.5) {
+      recCons.push("Mescola Hard: warmup lento riduce efficacia undercut");
+    }
+
+    // Breakdown-derived pros
+    if (recommendedStrategy.breakdown) {
+      const bd = recommendedStrategy.breakdown;
+      if (bd.traffic_loss != null && bd.traffic_loss < 0.5) {
+        recPros.push("Impatto traffico minimo nella simulazione");
+      }
+      if (bd.warmup_cost != null && bd.warmup_cost < 1.0 && bestPitLaps.length > 0) {
+        recPros.push("Warmup contenuto");
+      }
+    }
+
+    recommendedStrategy.pros = recPros;
+    recommendedStrategy.cons = recCons;
+  }
+
   const confidenceFactors: string[] = [];
   let confScore = 0;
 
