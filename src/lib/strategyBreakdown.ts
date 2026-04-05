@@ -71,9 +71,11 @@ export function computeStrategyBreakdown(
 
   let baseTime = 0;
   let degCost = 0;
+  let warmupCost = 0;
   let hasModel = true;
 
-  for (const sb of stintBounds) {
+  for (let si = 0; si < stintBounds.length; si++) {
+    const sb = stintBounds[si];
     const model = compoundModels.get(sb.compound);
     if (!model) { hasModel = false; break; }
     for (let lap = sb.start; lap <= sb.end; lap++) {
@@ -81,12 +83,15 @@ export function computeStrategyBreakdown(
       baseTime += model.intercept;
       degCost += model.slope * tyreLife;
     }
+    // Warmup cost: first stint has no warmup (tyres warm from formation lap)
+    warmupCost += computeStintWarmupCost(sb.compound, si === 0);
   }
 
   if (!hasModel) {
     return {
       base_stint_time: null,
       tyre_degradation_cost: null,
+      warmup_cost: null,
       pit_loss: pitLaps.length > 0 ? round1(pitLaps.length * pitLossPerStop * modifiers.pit_loss_mult) : null,
       traffic_loss: null,
       weather_adjustment: null,
