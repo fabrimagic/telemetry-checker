@@ -1215,7 +1215,7 @@ export function computeVirtualRaceEngineer(
   }
 
   // ── 7. Integrated Strategy Context ──
-  const integratedContextBase = buildIntegratedContext(
+  let integratedContext = buildIntegratedContext(
     diaryEvents, weatherMap, trackStatusMap, cumDevResult, driverNumber, actualPitLaps,
   );
 
