@@ -55,6 +55,8 @@ export interface RecommendedStrategy {
   pit_windows: { stint: number; ideal_lap: number; range: [number, number]; compound_after: string }[];
   compounds: string[]; // full compound sequence per stint
   estimated_gain_seconds: number;
+  /** Motorsport convention: negative = faster than actual (mirrors estimated_gain_seconds) */
+  time_delta_vs_actual: number;
   reason: string;
   breakdown?: StrategyBreakdown;
   description?: string;
@@ -70,6 +72,8 @@ export interface AlternativeStrategy {
   pit_laps: number[];
   compounds: string[];
   estimated_delta_vs_actual: number;
+  /** Motorsport convention: negative = faster than actual (mirrors estimated_delta_vs_actual) */
+  time_delta_vs_actual: number;
   pros: string[];
   cons: string[];
   traffic_predictions?: TrafficPrediction[];
@@ -668,6 +672,7 @@ export function computeVirtualRaceEngineer(
     pit_windows: recommendedWindows,
     compounds: [...bestCompounds],
     estimated_gain_seconds: Math.round(bestDelta * 10) / 10,
+    time_delta_vs_actual: -Math.round(bestDelta * 10) / 10,
     reason: bestReason,
   };
 
@@ -685,6 +690,7 @@ export function computeVirtualRaceEngineer(
         pit_laps: undercutPits,
         compounds: actualCompounds,
         estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
+        time_delta_vs_actual: -Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
         pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
         cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
       });
@@ -700,6 +706,7 @@ export function computeVirtualRaceEngineer(
         pit_laps: overcutPits,
         compounds: actualCompounds,
         estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
+        time_delta_vs_actual: -Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
         pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
         cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
       });
@@ -717,6 +724,7 @@ export function computeVirtualRaceEngineer(
           pit_laps: actualPitLaps,
           compounds: reversed,
           estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
           pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
           cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
         });
@@ -740,6 +748,7 @@ export function computeVirtualRaceEngineer(
             pit_laps: actualPitLaps,
             compounds: altCompounds,
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
+            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
             cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
           });
@@ -758,6 +767,7 @@ export function computeVirtualRaceEngineer(
             pit_laps: actualPitLaps,
             compounds: altCompounds,
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
+            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime2) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
             cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
           });
@@ -790,6 +800,7 @@ export function computeVirtualRaceEngineer(
               pit_laps: extraPits,
               compounds: extraCompounds,
               estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+              time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
               pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
               cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
             });
@@ -1271,6 +1282,7 @@ export function computeVirtualRaceEngineer(
         if (pitDuringBattle) {
           alt.cons.push("Pit durante fase di battaglia — rischio di perdere posizione");
           alt.estimated_delta_vs_actual -= 0.5; // Small penalty
+          alt.time_delta_vs_actual += 0.5;      // Keep in sync (opposite sign)
         }
       }
     }
@@ -1570,7 +1582,9 @@ export function computeVirtualRaceEngineer(
     phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
   };
 
-  // ── 9b. Risk-aware ranking via riskAppetite.scoreStrategies ──
+  // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
+  // Uses robustness, sensitivity, cliff risk and degradation quality as tie-breakers
+  // on top of the raw simulation cost.
   {
     const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean }[] = [];
 
@@ -1591,11 +1605,66 @@ export function computeVirtualRaceEngineer(
 
     const riskScored = scoreStrategies(scoringInput, racePhase.phase_adjustments, riskMode);
 
-    // Reorder alternatives by risk-aware adjusted_score (descending)
+    // ── Multi-criteria adjustment: apply lightweight penalties/bonuses from
+    // already-computed analysis (robustness, cliff, degradation reliability).
+    // These adjustments are small (≤ 1s) and only nudge borderline cases.
+
+    /** Compute a small multi-criteria bonus/penalty for a strategy based on its analysis */
+    function multiCriteriaAdjustment(analysis: EnrichedStrategyAnalysis | undefined): number {
+      if (!analysis) return 0;
+      let adj = 0;
+
+      // Robustness: ROBUST gets a small bonus, FRAGILE a penalty
+      if (analysis.robustness.robustness_label === "ROBUST") adj += 0.3;
+      else if (analysis.robustness.robustness_label === "FRAGILE") adj -= 0.5;
+
+      // Cliff risk from stint extension
+      if (analysis.stint_extension && analysis.stint_extension.cliff_risk_if_extend > 0.6) {
+        adj -= analysis.stint_extension.cliff_risk_if_extend * 0.8; // up to -0.8s
+      }
+
+      // Heavy traffic / pack rejoin
+      if (analysis.competitor_context) {
+        const cc = analysis.competitor_context;
+        if (cc.release_classification === "PACK") adj -= 0.4;
+        if (cc.traffic_risk_after_pit > 0.7) adj -= 0.3;
+      }
+
+      // Overtake difficulty
+      if (analysis.overtake_difficulty && analysis.overtake_difficulty.expected_laps_stuck > 4) {
+        adj -= 0.3;
+      }
+
+      return adj;
+    }
+
+    // Apply multi-criteria adjustments to risk scores
+    const recScored = riskScored.find(s => s.index === -2);
+    const recMCAdj = multiCriteriaAdjustment(recommendedStrategy.analysis);
+    if (recScored) recScored.adjusted_score += recMCAdj;
+
+    // Degradation quality penalty: if recommended relies heavily on INVALID/fallback stints
+    const invalidStintCount = degradationValidations.filter(v => v.status === "INVALID").length;
+    const totalStintCount = degradationValidations.length;
+    if (recScored && totalStintCount > 0 && invalidStintCount / totalStintCount > 0.5) {
+      // Reduce confidence in the recommended's advantage — dampen its score
+      recScored.adjusted_score *= 0.85;
+    }
+
     const altScores = new Map<number, ScoredStrategy>();
     for (const scored of riskScored) {
-      if (scored.index >= 0) altScores.set(scored.index, scored);
+      if (scored.index >= 0) {
+        // Find the matching alternative's analysis
+        const altIdx = scored.index - 1; // scoringInput[0] = recommended, so alt index = scored.index - 1
+        const alt = alternatives[altIdx];
+        if (alt?.analysis) {
+          scored.adjusted_score += multiCriteriaAdjustment(alt.analysis);
+        }
+        altScores.set(scored.index, scored);
+      }
     }
+
+    // Reorder alternatives by risk-aware + multi-criteria adjusted_score (descending)
     alternatives.sort((a, b) => {
       const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
       const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
@@ -1604,10 +1673,46 @@ export function computeVirtualRaceEngineer(
       return scoreB - scoreA;
     });
 
-    // If an alternative scores significantly higher than recommended, add narrative note
-    const recScored = riskScored.find(s => s.index === -2);
-    const bestAltScored = riskScored.find(s => s.index >= 0);
-    if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 0.5) {
+    // ── Promotion check: if the top alternative is robustly better than recommended,
+    // promote it. Threshold is conservative (>1.0s advantage after all adjustments)
+    // to avoid noisy swaps.
+    const bestAltScored = riskScored
+      .filter(s => s.index >= 0)
+      .sort((a, b) => b.adjusted_score - a.adjusted_score)[0];
+
+    if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 1.0) {
+      // Find the corresponding alternative
+      const promoAltIdx = bestAltScored.index - 1;
+      const promoAlt = alternatives[promoAltIdx];
+      if (promoAlt) {
+        // Check that the promoted alternative's analysis supports promotion (not FRAGILE)
+        const promoRobust = promoAlt.analysis?.robustness.robustness_label;
+        if (promoRobust !== "FRAGILE") {
+          // Swap: update recommended fields from the promoted alternative
+          recommendedStrategy.pit_windows = promoAlt.pit_laps.map((pl, i) => ({
+            stint: i + 1,
+            ideal_lap: pl,
+            range: [Math.max(1, pl - 1), Math.min(totalLaps, pl + 1)] as [number, number],
+            compound_after: promoAlt.compounds[i + 1] || promoAlt.compounds[i],
+          }));
+          recommendedStrategy.compounds = [...promoAlt.compounds];
+          recommendedStrategy.estimated_gain_seconds = promoAlt.estimated_delta_vs_actual;
+          recommendedStrategy.time_delta_vs_actual = promoAlt.time_delta_vs_actual;
+          recommendedStrategy.reason = `Promossa da scoring multi-criterio: ${promoAlt.name}`;
+          recommendedStrategy.description = promoAlt.description;
+          recommendedStrategy.breakdown = promoAlt.breakdown;
+          recommendedStrategy.analysis = promoAlt.analysis;
+          recommendedStrategy.traffic_predictions = promoAlt.traffic_predictions;
+          recommendedStrategy.pros = promoAlt.pros;
+          recommendedStrategy.cons = promoAlt.cons;
+
+          narrativeInsights.push(
+            `Strategia raccomandata aggiornata: "${promoAlt.name}" promossa dal ranking multi-criterio (${riskMode}). Score risk-adjusted: ${bestAltScored.adjusted_score.toFixed(1)} vs ${recScored.adjusted_score.toFixed(1)} della precedente raccomandata. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? bestAltScored.adjustment_reason : ""}`
+          );
+        }
+      }
+    } else if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 0.5) {
+      // Not enough to promote, but worth noting
       narrativeInsights.push(
         `Risk scoring (${riskMode}): "${bestAltScored.name}" ha un punteggio risk-adjusted migliore della raccomandata di ${(bestAltScored.adjusted_score - recScored.adjusted_score).toFixed(1)}s. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? `(${bestAltScored.adjustment_reason})` : ""}`.trim()
       );
