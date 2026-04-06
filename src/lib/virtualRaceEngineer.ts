@@ -800,6 +800,7 @@ export function computeVirtualRaceEngineer(
               pit_laps: extraPits,
               compounds: extraCompounds,
               estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+              time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
               pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
               cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
             });
