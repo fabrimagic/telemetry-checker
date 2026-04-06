@@ -345,7 +345,6 @@ export function buildIntegratedContext(
     track_status_context: trackStatusCtx,
     cumulative_deviation_context: cumDevCtx,
     diary_context: diaryCtx,
-    race_phase_summary: null,
     traffic_summary: null,
     degradation_summary: null,
     pace_loss_summary: null,
