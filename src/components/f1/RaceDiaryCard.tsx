@@ -47,20 +47,19 @@ const relevanceColors: Record<StrategicRelevance, string> = {
   LOW: "bg-muted text-muted-foreground border-border",
 };
 
-const confidenceColors: Record<ConfidenceLevel, string> = {
-  HIGH: "bg-green-500/15 text-green-600 border-green-500/30",
-  MEDIUM: "bg-yellow-500/15 text-yellow-600 border-yellow-500/30",
-  LOW: "bg-muted text-muted-foreground border-border",
-};
+const severityLabels: Record<SeverityLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
+const relevanceLabels: Record<StrategicRelevance, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
+const confidenceLabels: Record<ConfidenceLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
 
-function MicroBadge({ label, value, colorMap }: { label: string; value: string | undefined; colorMap: Record<string, string> }) {
-  if (!value) return null;
-  return (
-    <span className={`inline-flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded border ${colorMap[value] || "bg-muted text-muted-foreground border-border"}`}>
-      {label} {value}
-    </span>
-  );
-}
+const impactTagLabels: Record<string, string> = {
+  track_position: "Posizione",
+  pit_cycle: "Ciclo pit",
+  traffic: "Traffico",
+  neutralization: "Neutralizzazione",
+  tyre_management: "Gestione gomme",
+  race_control: "Direzione gara",
+  safety: "Sicurezza",
+};
 
 export function RaceDiaryCard({ events, driverAcronym, driverColor }: Props) {
   const chronoEvents = events.filter((e) => e.type !== "BATTLE");
