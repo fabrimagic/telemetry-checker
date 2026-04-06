@@ -1282,6 +1282,7 @@ export function computeVirtualRaceEngineer(
         if (pitDuringBattle) {
           alt.cons.push("Pit durante fase di battaglia — rischio di perdere posizione");
           alt.estimated_delta_vs_actual -= 0.5; // Small penalty
+          alt.time_delta_vs_actual += 0.5;      // Keep in sync (opposite sign)
         }
       }
     }
