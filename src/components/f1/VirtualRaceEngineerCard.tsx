@@ -979,7 +979,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                         <td className="py-1.5 pr-2 text-right font-mono">
                           {dv ? (
                             <>
-                              {dv.original.slope.toFixed(4)}
+                              {dv.original.slopeSecPerLap.toFixed(4)}
                               {dv.model_corrected && (
                                 <span className="block text-[8px] text-amber-400/70">raw</span>
                               )}
