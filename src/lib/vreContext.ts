@@ -357,6 +357,33 @@ export function buildIntegratedContext(
     track_status_context: trackStatusCtx,
     cumulative_deviation_context: cumDevCtx,
     diary_context: diaryCtx,
+    race_phase_summary: null,
+    traffic_summary: null,
+    degradation_summary: null,
+    pace_loss_summary: null,
+    risk_mode: null,
     data_gaps: dataGaps,
+  };
+}
+
+/**
+ * Enrich an existing IntegratedStrategyContext with summary references
+ * from already-computed modules. No recalculation — pure aggregation.
+ */
+export function enrichIntegratedContext(
+  ctx: IntegratedStrategyContext,
+  racePhase: RacePhaseSummary | null,
+  trafficSummary: TrafficSummary | null,
+  degradationSummary: DegradationValidationSummary | null,
+  paceLossSummary: PaceLossSummary | null,
+  riskMode: RiskMode | null,
+): IntegratedStrategyContext {
+  return {
+    ...ctx,
+    race_phase_summary: racePhase,
+    traffic_summary: trafficSummary,
+    degradation_summary: degradationSummary,
+    pace_loss_summary: paceLossSummary,
+    risk_mode: riskMode,
   };
 }
