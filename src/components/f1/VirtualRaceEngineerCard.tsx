@@ -393,10 +393,9 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const scoredStrategies = useMemo(() => {
-    if (!race_phase) return null;
     const allStrats = [
       ...alternative_strategies.map(alt => ({
         name: alt.name,
@@ -413,8 +412,8 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
       } as any);
     }
     if (allStrats.length === 0) return null;
-    return scoreStrategies(allStrats, race_phase.phase_adjustments, risk_mode);
-  }, [race_phase, alternative_strategies, recommended_strategy, risk_mode]);
+    return scoreStrategies(allStrats, NEUTRAL_PHASE_ADJUSTMENTS, risk_mode);
+  }, [alternative_strategies, recommended_strategy, risk_mode]);
 
   const topScoredName = scoredStrategies?.[0]?.name ?? null;
   const topScoredReason = scoredStrategies?.[0]?.adjustment_reason ?? null;
