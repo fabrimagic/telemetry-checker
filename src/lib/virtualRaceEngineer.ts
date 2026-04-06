@@ -10,7 +10,7 @@ import { validateAllDegradationEstimates, resolveDegradationForStrategy, type De
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
-import { scoreStrategies, type RiskMode, type ScoredStrategy } from "./riskAppetite";
+import { scoreStrategies, type RiskMode, type ScoredStrategy, type StrategyRiskContext } from "./riskAppetite";
 import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
