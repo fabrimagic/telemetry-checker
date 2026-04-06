@@ -706,6 +706,7 @@ export function computeVirtualRaceEngineer(
         pit_laps: overcutPits,
         compounds: actualCompounds,
         estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
+        time_delta_vs_actual: -Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
         pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
         cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
       });
