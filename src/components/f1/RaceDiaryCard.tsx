@@ -47,7 +47,13 @@ const relevanceColors: Record<StrategicRelevance, string> = {
   LOW: "bg-muted text-muted-foreground border-border",
 };
 
-const severityLabels: Record<SeverityLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
+const confidenceColors: Record<ConfidenceLevel, string> = {
+  HIGH: "bg-primary/15 text-primary border-primary/30",
+  MEDIUM: "bg-accent text-accent-foreground border-border",
+  LOW: "bg-muted text-muted-foreground border-border",
+};
+
+
 const relevanceLabels: Record<StrategicRelevance, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
 const confidenceLabels: Record<ConfidenceLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
 
