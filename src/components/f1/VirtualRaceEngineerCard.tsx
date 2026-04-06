@@ -1291,7 +1291,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                           <BreakdownTable
                             breakdown={alt.breakdown}
                             riskMode={risk_mode}
-                            racePhaseDef={race_phase}
                             scenarioLabel={scenario_label}
                             scenarioIsSimulated={scenario_is_simulated}
                             scenarioModifiers={result.scenario_modifiers_applied}
