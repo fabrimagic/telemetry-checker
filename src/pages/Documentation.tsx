@@ -491,7 +491,6 @@ export default function Documentation() {
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">stintPaceLoss</td><td className="px-3 py-1.5">Pace loss rate + moltiplicatori degrado/cliff/urgency</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">weatherClassification</td><td className="px-3 py-1.5">DRY/WET/MIXED per giro (multi-signal, debounce)</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">trackStatusClassification</td><td className="px-3 py-1.5">GREEN/YELLOW/SC/VSC/RED per giro</td></tr>
-                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">racePhase</td><td className="px-3 py-1.5">Fase gara con moltiplicatori dinamici</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">scenarioContext</td><td className="px-3 py-1.5">Scenari what-if con modifier temporali</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">strategyAnalysis</td><td className="px-3 py-1.5">Analisi multi-obiettivo, robustezza, sensitivity</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">strategyBreakdown</td><td className="px-3 py-1.5">Scomposizione costi per componente</td></tr>
