@@ -1383,6 +1383,48 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 7f. Neutralisation-aware pit loss comparison insights ──
+  {
+    // Identify actual pits under neutralisation and quantify the benefit
+    const actualPitsUnderNeutral = pitStopAnalyses.filter(p => p.under_neutralisation);
+    if (actualPitsUnderNeutral.length > 0) {
+      const totalNeutralBenefit = actualPitsUnderNeutral.reduce((sum, p) => {
+        const mult = getObservedPitLossMultiplier(p.lap_number);
+        return sum + pitLoss * (1.0 - mult);
+      }, 0);
+
+      if (totalNeutralBenefit > 1.0) {
+        const types = actualPitsUnderNeutral.map(p => `giro ${p.lap_number} (${p.neutralisation_type})`).join(", ");
+        narrativeInsights.push(
+          `Strategia reale favorita da pit sotto neutralizzazione (${types}): pit loss ridotto di ~${totalNeutralBenefit.toFixed(1)}s rispetto a un pit in green.`
+        );
+      }
+
+      // Check each alternative: does it pit on a neutralised lap or in green?
+      for (const alt of alternatives) {
+        const altNeutralBenefit = alt.pit_laps.reduce((sum, pl) => {
+          const mult = getObservedPitLossMultiplier(pl);
+          return sum + pitLoss * (1.0 - mult);
+        }, 0);
+
+        if (altNeutralBenefit < totalNeutralBenefit * 0.5) {
+          // Alternative pits mostly in green while actual benefited from neutralisation
+          const greenPits = alt.pit_laps.filter(pl => getObservedPitLossMultiplier(pl) >= 1.0);
+          if (greenPits.length > 0) {
+            alt.cons.push(
+              `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`
+            );
+          }
+        } else if (altNeutralBenefit > totalNeutralBenefit + 1.0) {
+          // Alternative benefits MORE from neutralisation than actual
+          alt.pros.push(
+            `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`
+          );
+        }
+      }
+    }
+  }
+
   // ── 7g. Tyre warmup narrative insights (simulated strategies only) ──
   {
     // Compute recommended strategy warmup using computeStintWarmupCost
