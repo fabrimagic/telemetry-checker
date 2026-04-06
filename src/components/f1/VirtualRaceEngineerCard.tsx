@@ -208,25 +208,23 @@ function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStr
 }
 
 /* ── Breakdown Table (reusable for recommended + alternatives) ── */
-function BreakdownTable({ breakdown, riskMode, racePhaseDef, scenarioLabel, scenarioIsSimulated, scenarioModifiers }: {
+function BreakdownTable({ breakdown, riskMode, scenarioLabel, scenarioIsSimulated, scenarioModifiers }: {
   breakdown: StrategyBreakdown;
   riskMode: RiskMode;
-  racePhaseDef?: any;
   scenarioLabel?: string;
   scenarioIsSimulated?: boolean;
   scenarioModifiers?: Record<string, any>;
 }) {
   const adjustedBreakdown = useMemo(() => {
-    if (riskMode === "BALANCED" && !racePhaseDef) return breakdown;
+    if (riskMode === "BALANCED") return breakdown;
     const riskWeights: Record<RiskMode, { degradation: number; traffic: number }> = {
       CONSERVATIVE: { degradation: 1.15, traffic: 1.3 },
       BALANCED: { degradation: 1.0, traffic: 1.0 },
       AGGRESSIVE: { degradation: 0.85, traffic: 0.7 },
     };
     const rw = riskWeights[riskMode];
-    const phaseAdj = racePhaseDef?.phase_adjustments;
-    const degMult = (phaseAdj?.degradation_weight ?? 1) * rw.degradation;
-    const trafficMult = (phaseAdj?.traffic_weight ?? 1) * rw.traffic;
+    const degMult = rw.degradation;
+    const trafficMult = rw.traffic;
     return {
       ...breakdown,
       tyre_degradation_cost: breakdown.tyre_degradation_cost != null
@@ -246,7 +244,7 @@ function BreakdownTable({ breakdown, riskMode, racePhaseDef, scenarioLabel, scen
           ) * 10) / 10
         : null,
     };
-  }, [breakdown, riskMode, racePhaseDef]);
+  }, [breakdown, riskMode]);
 
   const rows = breakdownToRows(adjustedBreakdown);
   if (rows.length === 0) return null;
