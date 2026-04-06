@@ -378,6 +378,26 @@ export function computeVirtualRaceEngineer(
   } as const;
   const riskBase = RISK_BASE[riskMode];
 
+  // ── Observed neutralisation pit loss multiplier ──
+  // SC/VSC reduce effective pit loss because the field is bunched/slowed.
+  // These multipliers are applied to both actual and simulated strategies
+  // based on the REAL track status at the pit lap.
+  const SC_PIT_LOSS_MULT = 0.62;   // ~38% reduction under full SC
+  const VSC_PIT_LOSS_MULT = 0.78;  // ~22% reduction under VSC
+
+  /**
+   * Returns the pit loss multiplier based on observed (real) track status at a given lap.
+   * Only uses trackStatusMap (real data), never scenario-simulated neutralisations.
+   */
+  function getObservedPitLossMultiplier(pitLap: number): number {
+    const status = trackStatusMap.get(pitLap);
+    if (status === "SC") return SC_PIT_LOSS_MULT;
+    if (status === "VSC") return VSC_PIT_LOSS_MULT;
+    // MIXED could partially benefit, use a conservative partial discount
+    if (status === "MIXED") return 0.90;
+    return 1.0; // GREEN or no status
+  }
+
   // Helper: check if a lap is inside the scenario window
   function isInScenarioWindow(lap: number): boolean {
     if (!scenarioWindow) return isSimulatedScenario(scenarioId); // no window = full race
@@ -392,12 +412,26 @@ export function computeVirtualRaceEngineer(
     return base * plDegAdj; // pace loss adjustment
   }
 
-  // Effective pit loss for a pit at a given lap
+  /**
+   * Effective pit loss for a pit at a given lap.
+   * Hierarchy: observed neutralisation first, then scenario modifier (no double-counting).
+   */
   function effectivePitLoss(pitLap: number): number {
     const baseMult = riskBase.pitLoss;
-    if (!isSimulatedScenario(scenarioId)) return pitLoss * baseMult;
-    if (!isInScenarioWindow(pitLap)) return pitLoss * baseMult;
-    return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
+    const observedMult = getObservedPitLossMultiplier(pitLap);
+
+    // If real neutralisation applies, use it (observed data takes priority)
+    if (observedMult < 1.0) {
+      // No scenario modifier on top — observed neutralisation already accounts for the benefit
+      return pitLoss * baseMult * observedMult;
+    }
+
+    // No real neutralisation: apply scenario modifier if active
+    if (isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)) {
+      return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
+    }
+
+    return pitLoss * baseMult;
   }
 
   // Pre-compute traffic analysis for cost function
@@ -505,7 +539,7 @@ export function computeVirtualRaceEngineer(
     return totalCost;
   }
 
-  // Simple raw time (no adjustments) for delta calculation baseline
+  // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
   function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[]): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) return null;
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
@@ -521,7 +555,10 @@ export function computeVirtualRaceEngineer(
         total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
       }
     }
-    total += pitLapsArr.length * pitLoss;
+    // Use neutralisation-aware pit loss for each pit lap
+    for (const pl of pitLapsArr) {
+      total += pitLoss * getObservedPitLossMultiplier(pl);
+    }
     return total;
   }
 
@@ -1342,6 +1379,48 @@ export function computeVirtualRaceEngineer(
         return recommendedWindows.some(w => Math.abs(nl - w.ideal_lap) <= 3);
       })) {
         narrativeInsights.push("Una Safety Car è apparsa vicino alla finestra pit consigliata: un pit sotto neutralizzazione avrebbe offerto un vantaggio di ~10s.");
+      }
+    }
+  }
+
+  // ── 7f. Neutralisation-aware pit loss comparison insights ──
+  {
+    // Identify actual pits under neutralisation and quantify the benefit
+    const actualPitsUnderNeutral = pitStopAnalyses.filter(p => p.under_neutralisation);
+    if (actualPitsUnderNeutral.length > 0) {
+      const totalNeutralBenefit = actualPitsUnderNeutral.reduce((sum, p) => {
+        const mult = getObservedPitLossMultiplier(p.lap_number);
+        return sum + pitLoss * (1.0 - mult);
+      }, 0);
+
+      if (totalNeutralBenefit > 1.0) {
+        const types = actualPitsUnderNeutral.map(p => `giro ${p.lap_number} (${p.neutralisation_type})`).join(", ");
+        narrativeInsights.push(
+          `Strategia reale favorita da pit sotto neutralizzazione (${types}): pit loss ridotto di ~${totalNeutralBenefit.toFixed(1)}s rispetto a un pit in green.`
+        );
+      }
+
+      // Check each alternative: does it pit on a neutralised lap or in green?
+      for (const alt of alternatives) {
+        const altNeutralBenefit = alt.pit_laps.reduce((sum, pl) => {
+          const mult = getObservedPitLossMultiplier(pl);
+          return sum + pitLoss * (1.0 - mult);
+        }, 0);
+
+        if (altNeutralBenefit < totalNeutralBenefit * 0.5) {
+          // Alternative pits mostly in green while actual benefited from neutralisation
+          const greenPits = alt.pit_laps.filter(pl => getObservedPitLossMultiplier(pl) >= 1.0);
+          if (greenPits.length > 0) {
+            alt.cons.push(
+              `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`
+            );
+          }
+        } else if (altNeutralBenefit > totalNeutralBenefit + 1.0) {
+          // Alternative benefits MORE from neutralisation than actual
+          alt.pros.push(
+            `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`
+          );
+        }
       }
     }
   }
