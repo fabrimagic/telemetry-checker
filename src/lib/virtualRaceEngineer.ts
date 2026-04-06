@@ -128,7 +128,7 @@ export interface VirtualRaceEngineerResult {
   scenario_activation_warning: string | null;
   degradation_validations: DegradationValidationResult[];
   pace_loss_results: StintPaceLossResult[];
-  custom_degradation_override: number | null;
+  custom_degradation_override: Record<string, number> | null;
 }
 
 /* ── Helpers ── */
@@ -194,7 +194,7 @@ export function computeVirtualRaceEngineer(
   scenarioId: ScenarioId = "REAL_CONTEXT",
   scenarioActivationLap: number | null = null,
   scenarioDurationLaps: number | null = null,
-  customDegradationOverride: number | null = null,
+  customDegradationOverride: Record<string, number> | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -248,15 +248,17 @@ export function computeVirtualRaceEngineer(
   const degradationValidations = resolveDegradationForStrategy(rawValidated);
 
   for (const dv of degradationValidations) {
-    // If user provided a custom override and this stint is INVALID, use it
-    const useCustomOverride = customDegradationOverride != null && dv.status === "INVALID";
-    const effectiveSlope = useCustomOverride ? customDegradationOverride : dv.effective_slope;
+    // If user provided a per-compound custom override and this stint is INVALID, use it
+    const compoundKey = dv.original.compound;
+    const compoundOverride = customDegradationOverride != null ? customDegradationOverride[compoundKey] ?? null : null;
+    const useCustomOverride = compoundOverride != null && dv.status === "INVALID";
+    const effectiveSlope = useCustomOverride ? compoundOverride : dv.effective_slope;
     
     if (useCustomOverride) {
       // Update the validation result to reflect user override
-      dv.effective_slope = customDegradationOverride;
+      dv.effective_slope = compoundOverride;
       dv.fallback_applied = true;
-      dv.fallback_description = `Override utente applicato (${customDegradationOverride.toFixed(3)} s/giro)`;
+      dv.fallback_description = `Override utente applicato per ${compoundKey} (${compoundOverride.toFixed(3)} s/giro)`;
     }
     
     degradationModels.set(dv.original.stint, {
