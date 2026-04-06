@@ -599,28 +599,6 @@ export default function Documentation() {
           </p>
         </DocSection>
 
-        <DocSection id="vre-race-phase" title="VRE — Race Phase" icon={<Timer className="h-4 w-4" />}>
-          <p>
-            La gara viene automaticamente segmentata in fasi, ciascuna con moltiplicatori dinamici
-            sui pesi della funzione di costo:
-          </p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">START_PHASE</strong> (giri 1–3) — posizione prioritaria, rischio penalizzato</li>
-            <li><strong className="text-foreground">EARLY_STINT</strong> (&lt; 20% gara) — pesi standard</li>
-            <li><strong className="text-foreground">PRIMARY_PIT_WINDOW</strong> — degrado e traffico amplificati</li>
-            <li><strong className="text-foreground">MID_RACE_MANAGEMENT</strong> — gestione equilibrata</li>
-            <li><strong className="text-foreground">LATE_RACE_ATTACK</strong> (&gt; 75%) — posizione prioritaria, rischio ridotto</li>
-            <li><strong className="text-foreground">FINAL_LAPS</strong> (ultimi 5) — traffico e posizione massimizzati</li>
-            <li><strong className="text-foreground">NEUTRALIZATION_PHASE</strong> — pit opportunistico favorito</li>
-            <li><strong className="text-foreground">WEATHER_TRANSITION_PHASE</strong> — rischio penalizzato, cautela</li>
-          </ul>
-          <p>
-            Ogni fase applica moltiplicatori su: <code className="text-primary">degradation_weight</code>,
-            <code className="text-primary"> traffic_weight</code>, <code className="text-primary">track_position_weight</code>,
-            <code className="text-primary"> risk_penalty_weight</code>, <code className="text-primary">neutralization_opportunity_weight</code>.
-          </p>
-        </DocSection>
-
         <DocSection id="vre-risk-mode" title="VRE — Risk Mode & Decision Layer" icon={<Shield className="h-4 w-4" />}>
           <p>
             Tre profili di rischio che influenzano il ranking finale delle strategie.
