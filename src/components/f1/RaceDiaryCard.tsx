@@ -124,16 +124,23 @@ export function RaceDiaryCard({ events, driverAcronym, driverColor }: Props) {
 
                       {/* Metadata badges */}
                       {(ev.severity || ev.strategic_relevance || ev.confidence) && (
-                        <div className="flex items-center gap-1 mt-1 flex-wrap">
-                          <MicroBadge label="" value={ev.severity} colorMap={severityColors} />
-                          {ev.strategic_relevance && ev.strategic_relevance !== "LOW" && (
-                            <span className={`inline-flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded border ${relevanceColors[ev.strategic_relevance]}`}>
-                              <Target className="h-2 w-2" /> {ev.strategic_relevance}
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {ev.severity && (
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border ${severityColors[ev.severity]}`}>
+                              <ShieldAlert className="h-2.5 w-2.5" />
+                              Severità: {severityLabels[ev.severity]}
                             </span>
                           )}
-                          {ev.confidence && ev.confidence !== "HIGH" && (
-                            <span className={`inline-flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded border ${confidenceColors[ev.confidence]}`}>
-                              <Eye className="h-2 w-2" /> {ev.confidence}
+                          {ev.strategic_relevance && (
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border ${relevanceColors[ev.strategic_relevance]}`}>
+                              <Target className="h-2.5 w-2.5" />
+                              Rilevanza: {relevanceLabels[ev.strategic_relevance]}
+                            </span>
+                          )}
+                          {ev.confidence && (
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border ${confidenceColors[ev.confidence]}`}>
+                              <Eye className="h-2.5 w-2.5" />
+                              Confidenza: {confidenceLabels[ev.confidence]}
                             </span>
                           )}
                         </div>
@@ -143,8 +150,8 @@ export function RaceDiaryCard({ events, driverAcronym, driverColor }: Props) {
                       {ev.impact_tags && ev.impact_tags.length > 0 && (
                         <div className="flex items-center gap-1 mt-1 flex-wrap">
                           {ev.impact_tags.map((tag) => (
-                            <span key={tag} className="text-[9px] font-mono text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                              {tag}
+                            <span key={tag} className="text-[10px] font-mono text-muted-foreground bg-muted/60 border border-border px-1.5 py-0.5 rounded">
+                              {impactTagLabels[tag] || tag}
                             </span>
                           ))}
                         </div>
