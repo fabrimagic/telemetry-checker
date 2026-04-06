@@ -1621,7 +1621,7 @@ export function computeVirtualRaceEngineer(
       });
     }
 
-    const riskScored = scoreStrategies(scoringInput, racePhase.phase_adjustments, riskMode);
+    const riskScored = scoreStrategies(scoringInput, scenarioPhaseAdj, riskMode);
 
     const recScored = riskScored.find(s => s.index === -2);
 
