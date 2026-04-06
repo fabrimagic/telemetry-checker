@@ -2,8 +2,7 @@ import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } f
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
-import { getPhaseLabel } from "@/lib/racePhase";
-import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
+import { RISK_MODES, NEUTRAL_PHASE_ADJUSTMENTS, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
 import type { EnrichedStrategyAnalysis, RobustnessLabel } from "@/lib/strategyAnalysis";
 import { Input } from "@/components/ui/input";
