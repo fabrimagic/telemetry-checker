@@ -1036,7 +1036,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 <BreakdownTable
                   breakdown={actual_breakdown}
                   riskMode="BALANCED"
-                  racePhaseDef={undefined}
                 />
               </div>
             )}
