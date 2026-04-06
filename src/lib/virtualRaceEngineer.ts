@@ -9,9 +9,9 @@ import { calculateCorrectedTyreDegradation, type CorrectedDegradationResult } fr
 import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
-import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
+import { detectRacePhase, applyConfidenceDamping, type RacePhaseResult, type RacePhase } from "./racePhase";
 import { scoreStrategies, type RiskMode, type ScoredStrategy, type StrategyRiskContext } from "./riskAppetite";
-import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
+import { buildIntegratedContext, enrichIntegratedContext, buildBattleContext, type IntegratedStrategyContext, type RacePhaseSummary, type TrafficSummary, type DegradationValidationSummary, type PaceLossSummary } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
@@ -1215,7 +1215,7 @@ export function computeVirtualRaceEngineer(
   }
 
   // ── 7. Integrated Strategy Context ──
-  const integratedContext = buildIntegratedContext(
+  let integratedContext = buildIntegratedContext(
     diaryEvents, weatherMap, trackStatusMap, cumDevResult, driverNumber, actualPitLaps,
   );
 
@@ -1579,9 +1579,12 @@ export function computeVirtualRaceEngineer(
     actualPitLaps.length > 0, weatherMap, trackStatusMap,
   );
   // Apply scenario modifiers to phase adjustments (with timed scaling)
+  const scenarioAdjustedPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  // Dampen adjustments when phase confidence is LOW/MEDIUM to avoid uncertain phases driving decisions
+  const confidenceDampedAdj = applyConfidenceDamping(scenarioAdjustedPhaseAdj, rawRacePhase.phase_confidence);
   const racePhase: RacePhaseResult = {
     ...rawRacePhase,
-    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
+    phase_adjustments: confidenceDampedAdj,
   };
 
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
@@ -1708,6 +1711,65 @@ export function computeVirtualRaceEngineer(
   // Reduce confidence if degradation is unreliable
   if (invalidDegCount > 0) {
     confScore -= invalidDegCount;
+  }
+
+  // ── 10. Enrich IntegratedStrategyContext with summaries from computed modules ──
+  {
+    // Race phase summary (reference, not duplication)
+    const racePhaseSummary: RacePhaseSummary = {
+      current_phase: racePhase.current_phase,
+      phase_confidence: racePhase.phase_confidence ?? "MEDIUM",
+      strategy_phase: racePhase.strategy_phase ?? null,
+      execution_phase: racePhase.execution_phase ?? null,
+    };
+
+    // Traffic summary from pre-computed analysis
+    const trafficSummary: TrafficSummary | null = trafficAnalysis.length > 0 ? {
+      total_predictions: trafficAnalysis.length,
+      worst_level: trafficAnalysis.reduce((w, t) => {
+        if (t.traffic_level === "HEAVY") return "HEAVY";
+        if (t.traffic_level === "LIGHT" && w !== "HEAVY") return "LIGHT";
+        return w;
+      }, "CLEAN" as TrafficLevel),
+      avg_time_loss: trafficAvgBaseline,
+      has_pack_risk: trafficAnalysis.some(t => t.release_classification === "PACK"),
+      has_low_confidence: trafficAnalysis.some(t => t.prediction_confidence === "LOW"),
+    } : null;
+
+    // Degradation validation summary
+    const degradationSummary: DegradationValidationSummary = {
+      total_stints: degradationValidations.length,
+      valid_count: validDegCount,
+      neutral_count: neutralDegCount,
+      invalid_count: invalidDegCount,
+      overall_quality: invalidDegCount === 0 && validDegCount > 0 ? "GOOD"
+        : validDegCount > 0 ? "MIXED" : "POOR",
+      has_custom_override: customDegradationOverride != null && Object.keys(customDegradationOverride).length > 0,
+    };
+
+    // Pace loss summary
+    const usablePLForSummary = paceLossResults.filter(r => r.pace_loss_used_for_strategy);
+    const paceLossSummary: PaceLossSummary = {
+      stints_analyzed: paceLossResults.length,
+      stints_usable: usablePLForSummary.length,
+      has_cliff_risk: usablePLForSummary.some(r => r.pace_loss_status === "CLIFF_RISK"),
+      has_high_loss: usablePLForSummary.some(r => r.pace_loss_status === "HIGH_LOSS"),
+      worst_status: usablePLForSummary.length > 0
+        ? usablePLForSummary.reduce((w, r) => {
+            const order = { CLIFF_RISK: 3, HIGH_LOSS: 2, NORMAL_LOSS: 1, STABLE: 0, UNRELIABLE: -1 };
+            return (order[r.pace_loss_status as keyof typeof order] ?? -1) > (order[w as keyof typeof order] ?? -1) ? r.pace_loss_status : w;
+          }, usablePLForSummary[0].pace_loss_status)
+        : null,
+    };
+
+    integratedContext = enrichIntegratedContext(
+      integratedContext,
+      racePhaseSummary,
+      trafficSummary,
+      degradationSummary,
+      paceLossSummary,
+      riskMode,
+    );
   }
 
   return {

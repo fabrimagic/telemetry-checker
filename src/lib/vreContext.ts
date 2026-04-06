@@ -23,6 +23,10 @@ import type { DiaryEvent, BattleType } from "./raceDiary";
 import type { DriverCumulativeDeviation, CumulativeDeviationResult } from "./cumulativeDeviation";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
+import type { RacePhase, PhaseConfidence, StrategyPhase, ExecutionPhase } from "./racePhase";
+import type { RiskMode } from "./riskAppetite";
+import type { DegradationStatus } from "./degradationValidation";
+import type { TrafficLevel } from "./trafficPredictor";
 
 /* ── Battle Context ── */
 
@@ -98,6 +102,46 @@ export interface DiaryContext {
   strategy_relevant_events: { lap: number; description: string }[];
 }
 
+/* ── Race Phase Summary ── */
+
+export interface RacePhaseSummary {
+  current_phase: RacePhase;
+  phase_confidence: PhaseConfidence;
+  strategy_phase: StrategyPhase;
+  execution_phase: ExecutionPhase;
+}
+
+/* ── Traffic Summary ── */
+
+export interface TrafficSummary {
+  total_predictions: number;
+  worst_level: TrafficLevel;
+  avg_time_loss: number;
+  has_pack_risk: boolean;
+  has_low_confidence: boolean;
+}
+
+/* ── Degradation Validation Summary ── */
+
+export interface DegradationValidationSummary {
+  total_stints: number;
+  valid_count: number;
+  neutral_count: number;
+  invalid_count: number;
+  overall_quality: "GOOD" | "MIXED" | "POOR";
+  has_custom_override: boolean;
+}
+
+/* ── Pace Loss Summary ── */
+
+export interface PaceLossSummary {
+  stints_analyzed: number;
+  stints_usable: number;
+  has_cliff_risk: boolean;
+  has_high_loss: boolean;
+  worst_status: string | null;
+}
+
 /* ── Unified Strategy Context ── */
 
 export interface IntegratedStrategyContext {
@@ -106,6 +150,16 @@ export interface IntegratedStrategyContext {
   track_status_context: TrackStatusContext | null;
   cumulative_deviation_context: CumulativeDeviationContext | null;
   diary_context: DiaryContext | null;
+  /** Race phase at last lap — reference, not recalculated */
+  race_phase_summary: RacePhaseSummary | null;
+  /** Traffic prediction summary for candidate pit laps */
+  traffic_summary: TrafficSummary | null;
+  /** Degradation validation quality summary */
+  degradation_summary: DegradationValidationSummary | null;
+  /** Pace loss from cumulative deviation summary */
+  pace_loss_summary: PaceLossSummary | null;
+  /** Active risk mode */
+  risk_mode: RiskMode | null;
   /** Factors that reduce confidence due to missing data */
   data_gaps: string[];
 }
@@ -303,6 +357,33 @@ export function buildIntegratedContext(
     track_status_context: trackStatusCtx,
     cumulative_deviation_context: cumDevCtx,
     diary_context: diaryCtx,
+    race_phase_summary: null,
+    traffic_summary: null,
+    degradation_summary: null,
+    pace_loss_summary: null,
+    risk_mode: null,
     data_gaps: dataGaps,
+  };
+}
+
+/**
+ * Enrich an existing IntegratedStrategyContext with summary references
+ * from already-computed modules. No recalculation — pure aggregation.
+ */
+export function enrichIntegratedContext(
+  ctx: IntegratedStrategyContext,
+  racePhase: RacePhaseSummary | null,
+  trafficSummary: TrafficSummary | null,
+  degradationSummary: DegradationValidationSummary | null,
+  paceLossSummary: PaceLossSummary | null,
+  riskMode: RiskMode | null,
+): IntegratedStrategyContext {
+  return {
+    ...ctx,
+    race_phase_summary: racePhase,
+    traffic_summary: trafficSummary,
+    degradation_summary: degradationSummary,
+    pace_loss_summary: paceLossSummary,
+    risk_mode: riskMode,
   };
 }
