@@ -690,6 +690,7 @@ export function computeVirtualRaceEngineer(
         pit_laps: undercutPits,
         compounds: actualCompounds,
         estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
+        time_delta_vs_actual: -Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
         pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
         cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
       });
