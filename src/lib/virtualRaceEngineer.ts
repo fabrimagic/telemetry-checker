@@ -378,6 +378,26 @@ export function computeVirtualRaceEngineer(
   } as const;
   const riskBase = RISK_BASE[riskMode];
 
+  // ── Observed neutralisation pit loss multiplier ──
+  // SC/VSC reduce effective pit loss because the field is bunched/slowed.
+  // These multipliers are applied to both actual and simulated strategies
+  // based on the REAL track status at the pit lap.
+  const SC_PIT_LOSS_MULT = 0.62;   // ~38% reduction under full SC
+  const VSC_PIT_LOSS_MULT = 0.78;  // ~22% reduction under VSC
+
+  /**
+   * Returns the pit loss multiplier based on observed (real) track status at a given lap.
+   * Only uses trackStatusMap (real data), never scenario-simulated neutralisations.
+   */
+  function getObservedPitLossMultiplier(pitLap: number): number {
+    const status = trackStatusMap.get(pitLap);
+    if (status === "SC") return SC_PIT_LOSS_MULT;
+    if (status === "VSC") return VSC_PIT_LOSS_MULT;
+    // MIXED could partially benefit, use a conservative partial discount
+    if (status === "MIXED") return 0.90;
+    return 1.0; // GREEN or no status
+  }
+
   // Helper: check if a lap is inside the scenario window
   function isInScenarioWindow(lap: number): boolean {
     if (!scenarioWindow) return isSimulatedScenario(scenarioId); // no window = full race
@@ -392,12 +412,26 @@ export function computeVirtualRaceEngineer(
     return base * plDegAdj; // pace loss adjustment
   }
 
-  // Effective pit loss for a pit at a given lap
+  /**
+   * Effective pit loss for a pit at a given lap.
+   * Hierarchy: observed neutralisation first, then scenario modifier (no double-counting).
+   */
   function effectivePitLoss(pitLap: number): number {
     const baseMult = riskBase.pitLoss;
-    if (!isSimulatedScenario(scenarioId)) return pitLoss * baseMult;
-    if (!isInScenarioWindow(pitLap)) return pitLoss * baseMult;
-    return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
+    const observedMult = getObservedPitLossMultiplier(pitLap);
+
+    // If real neutralisation applies, use it (observed data takes priority)
+    if (observedMult < 1.0) {
+      // No scenario modifier on top — observed neutralisation already accounts for the benefit
+      return pitLoss * baseMult * observedMult;
+    }
+
+    // No real neutralisation: apply scenario modifier if active
+    if (isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)) {
+      return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
+    }
+
+    return pitLoss * baseMult;
   }
 
   // Pre-compute traffic analysis for cost function
