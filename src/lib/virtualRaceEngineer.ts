@@ -767,6 +767,7 @@ export function computeVirtualRaceEngineer(
             pit_laps: actualPitLaps,
             compounds: altCompounds,
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
+            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime2) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
             cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
           });
