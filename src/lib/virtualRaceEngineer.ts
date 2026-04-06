@@ -1757,7 +1757,6 @@ export function computeVirtualRaceEngineer(
     practice_compounds_used: practiceCompoundsUsed,
     traffic_analysis: trafficAnalysis,
     actual_breakdown: actualBreakdown,
-    race_phase: racePhase,
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,
