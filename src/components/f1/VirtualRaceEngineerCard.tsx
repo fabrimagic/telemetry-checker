@@ -2,8 +2,7 @@ import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } f
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
-import { getPhaseLabel } from "@/lib/racePhase";
-import { RISK_MODES, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
+import { RISK_MODES, NEUTRAL_PHASE_ADJUSTMENTS, scoreStrategies, type RiskMode } from "@/lib/riskAppetite";
 import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type ScenarioId } from "@/lib/scenarioContext";
 import type { EnrichedStrategyAnalysis, RobustnessLabel } from "@/lib/strategyAnalysis";
 import { Input } from "@/components/ui/input";
@@ -209,25 +208,23 @@ function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStr
 }
 
 /* ── Breakdown Table (reusable for recommended + alternatives) ── */
-function BreakdownTable({ breakdown, riskMode, racePhaseDef, scenarioLabel, scenarioIsSimulated, scenarioModifiers }: {
+function BreakdownTable({ breakdown, riskMode, scenarioLabel, scenarioIsSimulated, scenarioModifiers }: {
   breakdown: StrategyBreakdown;
   riskMode: RiskMode;
-  racePhaseDef?: any;
   scenarioLabel?: string;
   scenarioIsSimulated?: boolean;
   scenarioModifiers?: Record<string, any>;
 }) {
   const adjustedBreakdown = useMemo(() => {
-    if (riskMode === "BALANCED" && !racePhaseDef) return breakdown;
+    if (riskMode === "BALANCED") return breakdown;
     const riskWeights: Record<RiskMode, { degradation: number; traffic: number }> = {
       CONSERVATIVE: { degradation: 1.15, traffic: 1.3 },
       BALANCED: { degradation: 1.0, traffic: 1.0 },
       AGGRESSIVE: { degradation: 0.85, traffic: 0.7 },
     };
     const rw = riskWeights[riskMode];
-    const phaseAdj = racePhaseDef?.phase_adjustments;
-    const degMult = (phaseAdj?.degradation_weight ?? 1) * rw.degradation;
-    const trafficMult = (phaseAdj?.traffic_weight ?? 1) * rw.traffic;
+    const degMult = rw.degradation;
+    const trafficMult = rw.traffic;
     return {
       ...breakdown,
       tyre_degradation_cost: breakdown.tyre_degradation_cost != null
@@ -247,7 +244,7 @@ function BreakdownTable({ breakdown, riskMode, racePhaseDef, scenarioLabel, scen
           ) * 10) / 10
         : null,
     };
-  }, [breakdown, riskMode, racePhaseDef]);
+  }, [breakdown, riskMode]);
 
   const rows = breakdownToRows(adjustedBreakdown);
   if (rows.length === 0) return null;
@@ -396,10 +393,9 @@ interface Props {
 }
 
 export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
-  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, race_phase, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
+  const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const scoredStrategies = useMemo(() => {
-    if (!race_phase) return null;
     const allStrats = [
       ...alternative_strategies.map(alt => ({
         name: alt.name,
@@ -416,8 +412,8 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
       } as any);
     }
     if (allStrats.length === 0) return null;
-    return scoreStrategies(allStrats, race_phase.phase_adjustments, risk_mode);
-  }, [race_phase, alternative_strategies, recommended_strategy, risk_mode]);
+    return scoreStrategies(allStrats, NEUTRAL_PHASE_ADJUSTMENTS, risk_mode);
+  }, [alternative_strategies, recommended_strategy, risk_mode]);
 
   const topScoredName = scoredStrategies?.[0]?.name ?? null;
   const topScoredReason = scoredStrategies?.[0]?.adjustment_reason ?? null;
@@ -680,7 +676,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {/* ═══════════════════════════════════════════════════════════════
             RACE CONTEXT & SIMULATORE (controls)
         ═══════════════════════════════════════════════════════════════ */}
-        {race_phase && (
+        {(
           <VRESection
             title="Race Context & Simulatore"
             icon={<Activity className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -758,14 +754,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 </div>
               </div>
 
-              {/* Phase indicator */}
-              <div className="flex items-start gap-2">
-                <span className="text-[11px] text-muted-foreground shrink-0 w-20">Fase gara:</span>
-                <div>
-                  <span className="text-[11px] font-semibold text-foreground">{getPhaseLabel(race_phase.current_phase)}</span>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{race_phase.phase_reason}</p>
-                </div>
-              </div>
 
               {/* Risk appetite selector */}
               <div className="flex items-center gap-2">
@@ -1048,7 +1036,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 <BreakdownTable
                   breakdown={actual_breakdown}
                   riskMode="BALANCED"
-                  racePhaseDef={undefined}
                 />
               </div>
             )}
@@ -1170,7 +1157,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                   <BreakdownTable
                     breakdown={recommended_strategy.breakdown}
                     riskMode={risk_mode}
-                    racePhaseDef={race_phase}
                     scenarioLabel={scenario_label}
                     scenarioIsSimulated={scenario_is_simulated}
                     scenarioModifiers={result.scenario_modifiers_applied}
@@ -1305,7 +1291,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                           <BreakdownTable
                             breakdown={alt.breakdown}
                             riskMode={risk_mode}
-                            racePhaseDef={race_phase}
                             scenarioLabel={scenario_label}
                             scenarioIsSimulated={scenario_is_simulated}
                             scenarioModifiers={result.scenario_modifiers_applied}

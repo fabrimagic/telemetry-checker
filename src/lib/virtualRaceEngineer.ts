@@ -9,9 +9,8 @@ import { calculateCorrectedTyreDegradation, type CorrectedDegradationResult } fr
 import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
-import { detectRacePhase, applyConfidenceDamping, type RacePhaseResult, type RacePhase } from "./racePhase";
-import { scoreStrategies, type RiskMode, type ScoredStrategy, type StrategyRiskContext } from "./riskAppetite";
-import { buildIntegratedContext, enrichIntegratedContext, buildBattleContext, type IntegratedStrategyContext, type RacePhaseSummary, type TrafficSummary, type DegradationValidationSummary, type PaceLossSummary } from "./vreContext";
+import { scoreStrategies, NEUTRAL_PHASE_ADJUSTMENTS, type RiskMode, type ScoredStrategy, type StrategyRiskContext } from "./riskAppetite";
+import { buildIntegratedContext, enrichIntegratedContext, buildBattleContext, type IntegratedStrategyContext, type TrafficSummary, type DegradationValidationSummary, type PaceLossSummary } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
@@ -113,7 +112,6 @@ export interface VirtualRaceEngineerResult {
   practice_compounds_used: string[];
   traffic_analysis: TrafficPrediction[];
   actual_breakdown?: StrategyBreakdown;
-  race_phase?: RacePhaseResult;
   risk_mode: RiskMode;
   integrated_context?: IntegratedStrategyContext;
   narrative_insights: string[];
@@ -1565,27 +1563,8 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
   }
 
-  // ── 9. Race Phase Detection ──
-  const lastLap = Math.max(...laps.map(l => l.lap_number));
-  const pitWindowStartLap = recommendedWindows.length > 0
-    ? recommendedWindows[0].range[0]
-    : actualPitLaps.length > 0 ? actualPitLaps[0] - 3 : null;
-  const pitWindowEndLap = recommendedWindows.length > 0
-    ? recommendedWindows[recommendedWindows.length - 1].range[1]
-    : actualPitLaps.length > 0 ? actualPitLaps[actualPitLaps.length - 1] + 3 : null;
-
-  const rawRacePhase = detectRacePhase(
-    lastLap, totalLaps, pitWindowStartLap, pitWindowEndLap,
-    actualPitLaps.length > 0, weatherMap, trackStatusMap,
-  );
-  // Apply scenario modifiers to phase adjustments (with timed scaling)
-  const scenarioAdjustedPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps);
-  // Dampen adjustments when phase confidence is LOW/MEDIUM to avoid uncertain phases driving decisions
-  const confidenceDampedAdj = applyConfidenceDamping(scenarioAdjustedPhaseAdj, rawRacePhase.phase_confidence);
-  const racePhase: RacePhaseResult = {
-    ...rawRacePhase,
-    phase_adjustments: confidenceDampedAdj,
-  };
+  // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
+  const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
   // Per-strategy risk context is extracted from analysis and passed directly to
@@ -1642,7 +1621,7 @@ export function computeVirtualRaceEngineer(
       });
     }
 
-    const riskScored = scoreStrategies(scoringInput, racePhase.phase_adjustments, riskMode);
+    const riskScored = scoreStrategies(scoringInput, scenarioPhaseAdj, riskMode);
 
     const recScored = riskScored.find(s => s.index === -2);
 
@@ -1715,14 +1694,6 @@ export function computeVirtualRaceEngineer(
 
   // ── 10. Enrich IntegratedStrategyContext with summaries from computed modules ──
   {
-    // Race phase summary (reference, not duplication)
-    const racePhaseSummary: RacePhaseSummary = {
-      current_phase: racePhase.current_phase,
-      phase_confidence: racePhase.phase_confidence ?? "MEDIUM",
-      strategy_phase: racePhase.strategy_phase ?? null,
-      execution_phase: racePhase.execution_phase ?? null,
-    };
-
     // Traffic summary from pre-computed analysis
     const trafficSummary: TrafficSummary | null = trafficAnalysis.length > 0 ? {
       total_predictions: trafficAnalysis.length,
@@ -1764,7 +1735,6 @@ export function computeVirtualRaceEngineer(
 
     integratedContext = enrichIntegratedContext(
       integratedContext,
-      racePhaseSummary,
       trafficSummary,
       degradationSummary,
       paceLossSummary,
@@ -1787,7 +1757,6 @@ export function computeVirtualRaceEngineer(
     practice_compounds_used: practiceCompoundsUsed,
     traffic_analysis: trafficAnalysis,
     actual_breakdown: actualBreakdown,
-    race_phase: racePhase,
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,

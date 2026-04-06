@@ -159,7 +159,6 @@ export default function Documentation() {
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
               <TocLink href="#vre-ui">Interfaccia a 4 Sezioni</TocLink>
               <TocLink href="#vre-cost-function">Funzione di Costo</TocLink>
-              <TocLink href="#vre-race-phase">Race Phase</TocLink>
               <TocLink href="#vre-risk-mode">Risk Mode & Decision Layer</TocLink>
               <TocLink href="#vre-scenarios">Scenari What-If</TocLink>
               <TocLink href="#vre-breakdown">Scomposizione del Giudizio</TocLink>
@@ -491,7 +490,6 @@ export default function Documentation() {
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">stintPaceLoss</td><td className="px-3 py-1.5">Pace loss rate + moltiplicatori degrado/cliff/urgency</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">weatherClassification</td><td className="px-3 py-1.5">DRY/WET/MIXED per giro (multi-signal, debounce)</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">trackStatusClassification</td><td className="px-3 py-1.5">GREEN/YELLOW/SC/VSC/RED per giro</td></tr>
-                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">racePhase</td><td className="px-3 py-1.5">Fase gara con moltiplicatori dinamici</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">scenarioContext</td><td className="px-3 py-1.5">Scenari what-if con modifier temporali</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">strategyAnalysis</td><td className="px-3 py-1.5">Analisi multi-obiettivo, robustezza, sensitivity</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">strategyBreakdown</td><td className="px-3 py-1.5">Scomposizione costi per componente</td></tr>
@@ -555,7 +553,6 @@ export default function Documentation() {
           <p>Pannello di controllo per parametrizzare l'analisi:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Scenario selector</strong> — scenari what-if con giro di attivazione e durata</li>
-            <li><strong className="text-foreground">Fase gara</strong> — fase corrente rilevata automaticamente</li>
             <li><strong className="text-foreground">Risk mode</strong> — Conservative / Balanced / Aggressive</li>
             <li><strong className="text-foreground">Degrado personalizzato</strong> — override per-compound per stint INVALID</li>
           </ul>
@@ -602,28 +599,6 @@ export default function Documentation() {
           </p>
         </DocSection>
 
-        <DocSection id="vre-race-phase" title="VRE — Race Phase" icon={<Timer className="h-4 w-4" />}>
-          <p>
-            La gara viene automaticamente segmentata in fasi, ciascuna con moltiplicatori dinamici
-            sui pesi della funzione di costo:
-          </p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">START_PHASE</strong> (giri 1–3) — posizione prioritaria, rischio penalizzato</li>
-            <li><strong className="text-foreground">EARLY_STINT</strong> (&lt; 20% gara) — pesi standard</li>
-            <li><strong className="text-foreground">PRIMARY_PIT_WINDOW</strong> — degrado e traffico amplificati</li>
-            <li><strong className="text-foreground">MID_RACE_MANAGEMENT</strong> — gestione equilibrata</li>
-            <li><strong className="text-foreground">LATE_RACE_ATTACK</strong> (&gt; 75%) — posizione prioritaria, rischio ridotto</li>
-            <li><strong className="text-foreground">FINAL_LAPS</strong> (ultimi 5) — traffico e posizione massimizzati</li>
-            <li><strong className="text-foreground">NEUTRALIZATION_PHASE</strong> — pit opportunistico favorito</li>
-            <li><strong className="text-foreground">WEATHER_TRANSITION_PHASE</strong> — rischio penalizzato, cautela</li>
-          </ul>
-          <p>
-            Ogni fase applica moltiplicatori su: <code className="text-primary">degradation_weight</code>,
-            <code className="text-primary"> traffic_weight</code>, <code className="text-primary">track_position_weight</code>,
-            <code className="text-primary"> risk_penalty_weight</code>, <code className="text-primary">neutralization_opportunity_weight</code>.
-          </p>
-        </DocSection>
-
         <DocSection id="vre-risk-mode" title="VRE — Risk Mode & Decision Layer" icon={<Shield className="h-4 w-4" />}>
           <p>
             Tre profili di rischio che influenzano il ranking finale delle strategie.
@@ -662,7 +637,7 @@ export default function Documentation() {
           <ol className="list-decimal pl-5 space-y-1">
             <li><strong className="text-foreground">Risk penalty</strong> — traffico + degrado pesati dal profilo di rischio</li>
             <li><strong className="text-foreground">Execution penalty</strong> — warmup + pit loss pesati dal profilo</li>
-            <li><strong className="text-foreground">Neutralization bonus</strong> — opportunità SC/VSC modulate dalla fase gara</li>
+            <li><strong className="text-foreground">Neutralization bonus</strong> — opportunità SC/VSC</li>
             <li><strong className="text-foreground">Reward component</strong> — upside modulato dall'execution burden (costi/tempo totale)</li>
             <li><strong className="text-foreground">Context adjustment</strong> — per-strategy: robustezza, cliff risk, pack rejoin, traffic persistence, sensitivity, degradation confidence</li>
           </ol>

@@ -23,7 +23,6 @@ import type { DiaryEvent, BattleType } from "./raceDiary";
 import type { DriverCumulativeDeviation, CumulativeDeviationResult } from "./cumulativeDeviation";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
-import type { RacePhase, PhaseConfidence, StrategyPhase, ExecutionPhase } from "./racePhase";
 import type { RiskMode } from "./riskAppetite";
 import type { DegradationStatus } from "./degradationValidation";
 import type { TrafficLevel } from "./trafficPredictor";
@@ -102,15 +101,6 @@ export interface DiaryContext {
   strategy_relevant_events: { lap: number; description: string }[];
 }
 
-/* ── Race Phase Summary ── */
-
-export interface RacePhaseSummary {
-  current_phase: RacePhase;
-  phase_confidence: PhaseConfidence;
-  strategy_phase: StrategyPhase;
-  execution_phase: ExecutionPhase;
-}
-
 /* ── Traffic Summary ── */
 
 export interface TrafficSummary {
@@ -150,8 +140,6 @@ export interface IntegratedStrategyContext {
   track_status_context: TrackStatusContext | null;
   cumulative_deviation_context: CumulativeDeviationContext | null;
   diary_context: DiaryContext | null;
-  /** Race phase at last lap — reference, not recalculated */
-  race_phase_summary: RacePhaseSummary | null;
   /** Traffic prediction summary for candidate pit laps */
   traffic_summary: TrafficSummary | null;
   /** Degradation validation quality summary */
@@ -357,7 +345,6 @@ export function buildIntegratedContext(
     track_status_context: trackStatusCtx,
     cumulative_deviation_context: cumDevCtx,
     diary_context: diaryCtx,
-    race_phase_summary: null,
     traffic_summary: null,
     degradation_summary: null,
     pace_loss_summary: null,
@@ -372,7 +359,6 @@ export function buildIntegratedContext(
  */
 export function enrichIntegratedContext(
   ctx: IntegratedStrategyContext,
-  racePhase: RacePhaseSummary | null,
   trafficSummary: TrafficSummary | null,
   degradationSummary: DegradationValidationSummary | null,
   paceLossSummary: PaceLossSummary | null,
@@ -380,7 +366,6 @@ export function enrichIntegratedContext(
 ): IntegratedStrategyContext {
   return {
     ...ctx,
-    race_phase_summary: racePhase,
     traffic_summary: trafficSummary,
     degradation_summary: degradationSummary,
     pace_loss_summary: paceLossSummary,
