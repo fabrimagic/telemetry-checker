@@ -72,6 +72,8 @@ export interface AlternativeStrategy {
   pit_laps: number[];
   compounds: string[];
   estimated_delta_vs_actual: number;
+  /** Motorsport convention: negative = faster than actual (mirrors estimated_delta_vs_actual) */
+  time_delta_vs_actual: number;
   pros: string[];
   cons: string[];
   traffic_predictions?: TrafficPrediction[];
