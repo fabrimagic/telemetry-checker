@@ -539,7 +539,7 @@ export function computeVirtualRaceEngineer(
     return totalCost;
   }
 
-  // Simple raw time (no adjustments) for delta calculation baseline
+  // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
   function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[]): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) return null;
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
@@ -555,7 +555,10 @@ export function computeVirtualRaceEngineer(
         total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
       }
     }
-    total += pitLapsArr.length * pitLoss;
+    // Use neutralisation-aware pit loss for each pit lap
+    for (const pl of pitLapsArr) {
+      total += pitLoss * getObservedPitLossMultiplier(pl);
+    }
     return total;
   }
 
