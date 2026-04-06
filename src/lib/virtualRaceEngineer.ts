@@ -194,7 +194,7 @@ export function computeVirtualRaceEngineer(
   scenarioId: ScenarioId = "REAL_CONTEXT",
   scenarioActivationLap: number | null = null,
   scenarioDurationLaps: number | null = null,
-  customDegradationOverride: number | null = null,
+  customDegradationOverride: Record<string, number> | null = null,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
