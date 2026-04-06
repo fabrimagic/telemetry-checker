@@ -553,7 +553,6 @@ export default function Documentation() {
           <p>Pannello di controllo per parametrizzare l'analisi:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Scenario selector</strong> — scenari what-if con giro di attivazione e durata</li>
-            <li><strong className="text-foreground">Fase gara</strong> — fase corrente rilevata automaticamente</li>
             <li><strong className="text-foreground">Risk mode</strong> — Conservative / Balanced / Aggressive</li>
             <li><strong className="text-foreground">Degrado personalizzato</strong> — override per-compound per stint INVALID</li>
           </ul>
