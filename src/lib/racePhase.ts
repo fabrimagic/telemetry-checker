@@ -94,6 +94,27 @@ export function getPhaseLabel(phase: RacePhase): string {
   return PHASE_LABELS[phase] ?? phase;
 }
 
+/**
+ * Modulates phase_adjustments toward neutral (1.0) when confidence is LOW.
+ * HIGH → full weight, MEDIUM → 80% weight, LOW → 50% weight.
+ * This prevents uncertain phase classifications from dominating strategy decisions.
+ */
+export function applyConfidenceDamping(
+  adjustments: PhaseAdjustments,
+  confidence: PhaseConfidence | undefined,
+): PhaseAdjustments {
+  if (!confidence || confidence === "HIGH") return adjustments;
+  const damping = confidence === "MEDIUM" ? 0.8 : 0.5;
+  const blend = (v: number) => 1.0 + (v - 1.0) * damping;
+  return {
+    degradation_weight: blend(adjustments.degradation_weight),
+    traffic_weight: blend(adjustments.traffic_weight),
+    track_position_weight: blend(adjustments.track_position_weight),
+    risk_penalty_weight: blend(adjustments.risk_penalty_weight),
+    neutralization_opportunity_weight: blend(adjustments.neutralization_opportunity_weight),
+  };
+}
+
 /* ── Default adjustments per phase ── */
 
 const PHASE_ADJUSTMENTS: Record<RacePhase, PhaseAdjustments> = {
