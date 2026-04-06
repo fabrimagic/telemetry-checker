@@ -248,15 +248,17 @@ export function computeVirtualRaceEngineer(
   const degradationValidations = resolveDegradationForStrategy(rawValidated);
 
   for (const dv of degradationValidations) {
-    // If user provided a custom override and this stint is INVALID, use it
-    const useCustomOverride = customDegradationOverride != null && dv.status === "INVALID";
-    const effectiveSlope = useCustomOverride ? customDegradationOverride : dv.effective_slope;
+    // If user provided a per-compound custom override and this stint is INVALID, use it
+    const compoundKey = dv.original.compound;
+    const compoundOverride = customDegradationOverride != null ? customDegradationOverride[compoundKey] ?? null : null;
+    const useCustomOverride = compoundOverride != null && dv.status === "INVALID";
+    const effectiveSlope = useCustomOverride ? compoundOverride : dv.effective_slope;
     
     if (useCustomOverride) {
       // Update the validation result to reflect user override
-      dv.effective_slope = customDegradationOverride;
+      dv.effective_slope = compoundOverride;
       dv.fallback_applied = true;
-      dv.fallback_description = `Override utente applicato (${customDegradationOverride.toFixed(3)} s/giro)`;
+      dv.fallback_description = `Override utente applicato per ${compoundKey} (${compoundOverride.toFixed(3)} s/giro)`;
     }
     
     degradationModels.set(dv.original.stint, {
