@@ -9,9 +9,9 @@ import { calculateCorrectedTyreDegradation, type CorrectedDegradationResult } fr
 import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
-import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
+import { detectRacePhase, applyConfidenceDamping, type RacePhaseResult, type RacePhase } from "./racePhase";
 import { scoreStrategies, type RiskMode, type ScoredStrategy, type StrategyRiskContext } from "./riskAppetite";
-import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
+import { buildIntegratedContext, enrichIntegratedContext, buildBattleContext, type IntegratedStrategyContext, type RacePhaseSummary, type TrafficSummary, type DegradationValidationSummary, type PaceLossSummary } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
