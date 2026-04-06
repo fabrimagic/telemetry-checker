@@ -359,7 +359,6 @@ export function buildIntegratedContext(
  */
 export function enrichIntegratedContext(
   ctx: IntegratedStrategyContext,
-  racePhase: RacePhaseSummary | null,
   trafficSummary: TrafficSummary | null,
   degradationSummary: DegradationValidationSummary | null,
   paceLossSummary: PaceLossSummary | null,
@@ -367,7 +366,6 @@ export function enrichIntegratedContext(
 ): IntegratedStrategyContext {
   return {
     ...ctx,
-    race_phase_summary: racePhase,
     traffic_summary: trafficSummary,
     degradation_summary: degradationSummary,
     pace_loss_summary: paceLossSummary,
