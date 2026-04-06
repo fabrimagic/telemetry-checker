@@ -964,7 +964,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 </thead>
                 <tbody>
                   {actual_strategy.stints.map((s) => {
-                    const dv = degradation_validations?.find(d => d.stint_number === s.stint_number);
+                    const dv = degradation_validations?.find(d => d.original.stint === s.stint_number);
                     const statusStyles: Record<string, string> = {
                       VALID: "bg-emerald-500/20 text-emerald-400",
                       NEUTRAL: "bg-amber-500/20 text-amber-400",
