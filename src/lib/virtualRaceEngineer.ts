@@ -672,6 +672,7 @@ export function computeVirtualRaceEngineer(
     pit_windows: recommendedWindows,
     compounds: [...bestCompounds],
     estimated_gain_seconds: Math.round(bestDelta * 10) / 10,
+    time_delta_vs_actual: -Math.round(bestDelta * 10) / 10,
     reason: bestReason,
   };
 
