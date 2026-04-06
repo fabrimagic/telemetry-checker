@@ -225,7 +225,7 @@ interface Props {
   onScenarioChange?: (scenario: ScenarioId) => void;
   onScenarioActivationLapChange?: (lap: number | null) => void;
   onScenarioDurationChange?: (duration: number | null) => void;
-  onCustomDegradationChange?: (deg: number | null) => void;
+  onCustomDegradationChange?: (deg: Record<string, number> | null) => void;
   scenarioActivationLap?: number | null;
   scenarioDurationLaps?: number | null;
 }
