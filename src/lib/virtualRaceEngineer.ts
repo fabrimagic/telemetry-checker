@@ -724,6 +724,7 @@ export function computeVirtualRaceEngineer(
           pit_laps: actualPitLaps,
           compounds: reversed,
           estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
           pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
           cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
         });
