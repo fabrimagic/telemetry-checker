@@ -54,6 +54,7 @@ const confidenceColors: Record<ConfidenceLevel, string> = {
 };
 
 
+const severityLabels: Record<SeverityLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
 const relevanceLabels: Record<StrategicRelevance, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
 const confidenceLabels: Record<ConfidenceLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
 
