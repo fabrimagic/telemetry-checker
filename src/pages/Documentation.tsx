@@ -637,7 +637,7 @@ export default function Documentation() {
           <ol className="list-decimal pl-5 space-y-1">
             <li><strong className="text-foreground">Risk penalty</strong> — traffico + degrado pesati dal profilo di rischio</li>
             <li><strong className="text-foreground">Execution penalty</strong> — warmup + pit loss pesati dal profilo</li>
-            <li><strong className="text-foreground">Neutralization bonus</strong> — opportunità SC/VSC modulate dalla fase gara</li>
+            <li><strong className="text-foreground">Neutralization bonus</strong> — opportunità SC/VSC</li>
             <li><strong className="text-foreground">Reward component</strong> — upside modulato dall'execution burden (costi/tempo totale)</li>
             <li><strong className="text-foreground">Context adjustment</strong> — per-strategy: robustezza, cliff risk, pack rejoin, traffic persistence, sensitivity, degradation confidence</li>
           </ol>
