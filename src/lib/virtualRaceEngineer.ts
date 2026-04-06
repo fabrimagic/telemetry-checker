@@ -55,6 +55,8 @@ export interface RecommendedStrategy {
   pit_windows: { stint: number; ideal_lap: number; range: [number, number]; compound_after: string }[];
   compounds: string[]; // full compound sequence per stint
   estimated_gain_seconds: number;
+  /** Motorsport convention: negative = faster than actual (mirrors estimated_gain_seconds) */
+  time_delta_vs_actual: number;
   reason: string;
   breakdown?: StrategyBreakdown;
   description?: string;
