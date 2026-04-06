@@ -1579,9 +1579,12 @@ export function computeVirtualRaceEngineer(
     actualPitLaps.length > 0, weatherMap, trackStatusMap,
   );
   // Apply scenario modifiers to phase adjustments (with timed scaling)
+  const scenarioAdjustedPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  // Dampen adjustments when phase confidence is LOW/MEDIUM to avoid uncertain phases driving decisions
+  const confidenceDampedAdj = applyConfidenceDamping(scenarioAdjustedPhaseAdj, rawRacePhase.phase_confidence);
   const racePhase: RacePhaseResult = {
     ...rawRacePhase,
-    phase_adjustments: applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps),
+    phase_adjustments: confidenceDampedAdj,
   };
 
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
