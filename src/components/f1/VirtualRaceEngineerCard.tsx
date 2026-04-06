@@ -676,7 +676,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {/* ═══════════════════════════════════════════════════════════════
             RACE CONTEXT & SIMULATORE (controls)
         ═══════════════════════════════════════════════════════════════ */}
-        {race_phase && (
+        {(
           <VRESection
             title="Race Context & Simulatore"
             icon={<Activity className="h-3.5 w-3.5 text-muted-foreground" />}
