@@ -159,7 +159,6 @@ export default function Documentation() {
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
               <TocLink href="#vre-ui">Interfaccia a 4 Sezioni</TocLink>
               <TocLink href="#vre-cost-function">Funzione di Costo</TocLink>
-              <TocLink href="#vre-race-phase">Race Phase</TocLink>
               <TocLink href="#vre-risk-mode">Risk Mode & Decision Layer</TocLink>
               <TocLink href="#vre-scenarios">Scenari What-If</TocLink>
               <TocLink href="#vre-breakdown">Scomposizione del Giudizio</TocLink>
