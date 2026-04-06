@@ -10,7 +10,7 @@ import { validateAllDegradationEstimates, resolveDegradationForStrategy, type De
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
 import { detectRacePhase, type RacePhaseResult, type RacePhase } from "./racePhase";
-import { scoreStrategies, type RiskMode, type ScoredStrategy } from "./riskAppetite";
+import { scoreStrategies, type RiskMode, type ScoredStrategy, type StrategyRiskContext } from "./riskAppetite";
 import { buildIntegratedContext, buildBattleContext, type IntegratedStrategyContext } from "./vreContext";
 import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
@@ -1583,16 +1583,49 @@ export function computeVirtualRaceEngineer(
   };
 
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
-  // Uses robustness, sensitivity, cliff risk and degradation quality as tie-breakers
-  // on top of the raw simulation cost.
+  // Per-strategy risk context is extracted from analysis and passed directly to
+  // scoreStrategies, which applies mode-dependent context adjustments internally.
   {
-    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean }[] = [];
+    /** Extract StrategyRiskContext from EnrichedStrategyAnalysis + degradation quality */
+    function buildRiskContext(analysis: EnrichedStrategyAnalysis | undefined, degConfidence?: number): StrategyRiskContext | undefined {
+      if (!analysis) return degConfidence != null ? { degradation_confidence: degConfidence } : undefined;
+      const ctx: StrategyRiskContext = {
+        robustness_label: analysis.robustness.robustness_label,
+        robustness_score: analysis.robustness.robustness_score,
+        sensitivity_to_degradation: analysis.sensitivity.sensitivity_to_degradation,
+        sensitivity_to_traffic: analysis.sensitivity.sensitivity_to_traffic,
+        sensitivity_to_pit_loss: analysis.sensitivity.sensitivity_to_pit_loss,
+      };
+      if (analysis.stint_extension) {
+        ctx.cliff_risk = analysis.stint_extension.cliff_risk_if_extend;
+      }
+      if (analysis.competitor_context) {
+        ctx.release_classification = analysis.competitor_context.release_classification;
+        ctx.traffic_risk_after_pit = analysis.competitor_context.traffic_risk_after_pit;
+        ctx.rejoin_in_pack = analysis.competitor_context.rejoin_in_pack;
+      }
+      if (analysis.overtake_difficulty) {
+        ctx.expected_laps_stuck = analysis.overtake_difficulty.expected_laps_stuck;
+      }
+      if (degConfidence != null) {
+        ctx.degradation_confidence = degConfidence;
+      }
+      return ctx;
+    }
+
+    // Degradation confidence: ratio of VALID stints
+    const totalStintCount = degradationValidations.length;
+    const validStintCount = degradationValidations.filter(v => v.status === "VALID").length;
+    const degConfidence = totalStintCount > 0 ? validStintCount / totalStintCount : undefined;
+
+    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean; riskContext?: StrategyRiskContext }[] = [];
 
     scoringInput.push({
       name: recommendedStrategy.description ?? "Strategia raccomandata",
       delta: recommendedStrategy.estimated_gain_seconds,
       breakdown: recommendedStrategy.breakdown,
       isRecommended: true,
+      riskContext: buildRiskContext(recommendedStrategy.analysis, degConfidence),
     });
 
     for (const alt of alternatives) {
@@ -1600,71 +1633,22 @@ export function computeVirtualRaceEngineer(
         name: alt.name,
         delta: alt.estimated_delta_vs_actual,
         breakdown: alt.breakdown,
+        riskContext: buildRiskContext(alt.analysis, degConfidence),
       });
     }
 
     const riskScored = scoreStrategies(scoringInput, racePhase.phase_adjustments, riskMode);
 
-    // ── Multi-criteria adjustment: apply lightweight penalties/bonuses from
-    // already-computed analysis (robustness, cliff, degradation reliability).
-    // These adjustments are small (≤ 1s) and only nudge borderline cases.
-
-    /** Compute a small multi-criteria bonus/penalty for a strategy based on its analysis */
-    function multiCriteriaAdjustment(analysis: EnrichedStrategyAnalysis | undefined): number {
-      if (!analysis) return 0;
-      let adj = 0;
-
-      // Robustness: ROBUST gets a small bonus, FRAGILE a penalty
-      if (analysis.robustness.robustness_label === "ROBUST") adj += 0.3;
-      else if (analysis.robustness.robustness_label === "FRAGILE") adj -= 0.5;
-
-      // Cliff risk from stint extension
-      if (analysis.stint_extension && analysis.stint_extension.cliff_risk_if_extend > 0.6) {
-        adj -= analysis.stint_extension.cliff_risk_if_extend * 0.8; // up to -0.8s
-      }
-
-      // Heavy traffic / pack rejoin
-      if (analysis.competitor_context) {
-        const cc = analysis.competitor_context;
-        if (cc.release_classification === "PACK") adj -= 0.4;
-        if (cc.traffic_risk_after_pit > 0.7) adj -= 0.3;
-      }
-
-      // Overtake difficulty
-      if (analysis.overtake_difficulty && analysis.overtake_difficulty.expected_laps_stuck > 4) {
-        adj -= 0.3;
-      }
-
-      return adj;
-    }
-
-    // Apply multi-criteria adjustments to risk scores
     const recScored = riskScored.find(s => s.index === -2);
-    const recMCAdj = multiCriteriaAdjustment(recommendedStrategy.analysis);
-    if (recScored) recScored.adjusted_score += recMCAdj;
-
-    // Degradation quality penalty: if recommended relies heavily on INVALID/fallback stints
-    const invalidStintCount = degradationValidations.filter(v => v.status === "INVALID").length;
-    const totalStintCount = degradationValidations.length;
-    if (recScored && totalStintCount > 0 && invalidStintCount / totalStintCount > 0.5) {
-      // Reduce confidence in the recommended's advantage — dampen its score
-      recScored.adjusted_score *= 0.85;
-    }
 
     const altScores = new Map<number, ScoredStrategy>();
     for (const scored of riskScored) {
       if (scored.index >= 0) {
-        // Find the matching alternative's analysis
-        const altIdx = scored.index - 1; // scoringInput[0] = recommended, so alt index = scored.index - 1
-        const alt = alternatives[altIdx];
-        if (alt?.analysis) {
-          scored.adjusted_score += multiCriteriaAdjustment(alt.analysis);
-        }
         altScores.set(scored.index, scored);
       }
     }
 
-    // Reorder alternatives by risk-aware + multi-criteria adjusted_score (descending)
+    // Reorder alternatives by risk-aware adjusted_score (descending)
     alternatives.sort((a, b) => {
       const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
       const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
@@ -1681,14 +1665,11 @@ export function computeVirtualRaceEngineer(
       .sort((a, b) => b.adjusted_score - a.adjusted_score)[0];
 
     if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 1.0) {
-      // Find the corresponding alternative
       const promoAltIdx = bestAltScored.index - 1;
       const promoAlt = alternatives[promoAltIdx];
       if (promoAlt) {
-        // Check that the promoted alternative's analysis supports promotion (not FRAGILE)
         const promoRobust = promoAlt.analysis?.robustness.robustness_label;
         if (promoRobust !== "FRAGILE") {
-          // Swap: update recommended fields from the promoted alternative
           recommendedStrategy.pit_windows = promoAlt.pit_laps.map((pl, i) => ({
             stint: i + 1,
             ideal_lap: pl,
@@ -1712,7 +1693,6 @@ export function computeVirtualRaceEngineer(
         }
       }
     } else if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 0.5) {
-      // Not enough to promote, but worth noting
       narrativeInsights.push(
         `Risk scoring (${riskMode}): "${bestAltScored.name}" ha un punteggio risk-adjusted migliore della raccomandata di ${(bestAltScored.adjusted_score - recScored.adjusted_score).toFixed(1)}s. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? `(${bestAltScored.adjustment_reason})` : ""}`.trim()
       );
