@@ -23,7 +23,6 @@ import type { DiaryEvent, BattleType } from "./raceDiary";
 import type { DriverCumulativeDeviation, CumulativeDeviationResult } from "./cumulativeDeviation";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
-import type { RacePhase, PhaseConfidence, StrategyPhase, ExecutionPhase } from "./racePhase";
 import type { RiskMode } from "./riskAppetite";
 import type { DegradationStatus } from "./degradationValidation";
 import type { TrafficLevel } from "./trafficPredictor";

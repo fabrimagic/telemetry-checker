@@ -1,5 +1,21 @@
-import type { PhaseAdjustments } from "./racePhase";
 import type { StrategyBreakdown } from "./strategyBreakdown";
+
+/** Neutral weight adjustments passed to scoring functions */
+export interface PhaseAdjustments {
+  degradation_weight: number;
+  traffic_weight: number;
+  track_position_weight: number;
+  risk_penalty_weight: number;
+  neutralization_opportunity_weight: number;
+}
+
+export const NEUTRAL_PHASE_ADJUSTMENTS: PhaseAdjustments = {
+  degradation_weight: 1.0,
+  traffic_weight: 1.0,
+  track_position_weight: 1.0,
+  risk_penalty_weight: 1.0,
+  neutralization_opportunity_weight: 1.0,
+};
 
 /* ── Types ── */
 
