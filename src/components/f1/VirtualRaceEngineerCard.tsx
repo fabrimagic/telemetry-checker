@@ -754,14 +754,6 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 </div>
               </div>
 
-              {/* Phase indicator */}
-              <div className="flex items-start gap-2">
-                <span className="text-[11px] text-muted-foreground shrink-0 w-20">Fase gara:</span>
-                <div>
-                  <span className="text-[11px] font-semibold text-foreground">{getPhaseLabel(race_phase.current_phase)}</span>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{race_phase.phase_reason}</p>
-                </div>
-              </div>
 
               {/* Risk appetite selector */}
               <div className="flex items-center gap-2">
