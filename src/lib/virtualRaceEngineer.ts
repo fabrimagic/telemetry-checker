@@ -112,7 +112,6 @@ export interface VirtualRaceEngineerResult {
   practice_compounds_used: string[];
   traffic_analysis: TrafficPrediction[];
   actual_breakdown?: StrategyBreakdown;
-  race_phase?: RacePhaseResult;
   risk_mode: RiskMode;
   integrated_context?: IntegratedStrategyContext;
   narrative_insights: string[];
