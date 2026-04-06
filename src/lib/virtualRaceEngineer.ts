@@ -1563,27 +1563,8 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
   }
 
-  // ── 9. Race Phase Detection ──
-  const lastLap = Math.max(...laps.map(l => l.lap_number));
-  const pitWindowStartLap = recommendedWindows.length > 0
-    ? recommendedWindows[0].range[0]
-    : actualPitLaps.length > 0 ? actualPitLaps[0] - 3 : null;
-  const pitWindowEndLap = recommendedWindows.length > 0
-    ? recommendedWindows[recommendedWindows.length - 1].range[1]
-    : actualPitLaps.length > 0 ? actualPitLaps[actualPitLaps.length - 1] + 3 : null;
-
-  const rawRacePhase = detectRacePhase(
-    lastLap, totalLaps, pitWindowStartLap, pitWindowEndLap,
-    actualPitLaps.length > 0, weatherMap, trackStatusMap,
-  );
-  // Apply scenario modifiers to phase adjustments (with timed scaling)
-  const scenarioAdjustedPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, rawRacePhase.phase_adjustments, scenarioActivationLap, totalLaps, scenarioDurationLaps);
-  // Dampen adjustments when phase confidence is LOW/MEDIUM to avoid uncertain phases driving decisions
-  const confidenceDampedAdj = applyConfidenceDamping(scenarioAdjustedPhaseAdj, rawRacePhase.phase_confidence);
-  const racePhase: RacePhaseResult = {
-    ...rawRacePhase,
-    phase_adjustments: confidenceDampedAdj,
-  };
+  // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
+  const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
   // Per-strategy risk context is extracted from analysis and passed directly to
