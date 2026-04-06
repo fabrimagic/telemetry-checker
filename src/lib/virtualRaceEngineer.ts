@@ -128,7 +128,7 @@ export interface VirtualRaceEngineerResult {
   scenario_activation_warning: string | null;
   degradation_validations: DegradationValidationResult[];
   pace_loss_results: StintPaceLossResult[];
-  custom_degradation_override: number | null;
+  custom_degradation_override: Record<string, number> | null;
 }
 
 /* ── Helpers ── */
