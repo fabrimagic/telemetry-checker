@@ -140,8 +140,6 @@ export interface IntegratedStrategyContext {
   track_status_context: TrackStatusContext | null;
   cumulative_deviation_context: CumulativeDeviationContext | null;
   diary_context: DiaryContext | null;
-  /** Race phase at last lap — reference, not recalculated */
-  race_phase_summary: RacePhaseSummary | null;
   /** Traffic prediction summary for candidate pit laps */
   traffic_summary: TrafficSummary | null;
   /** Degradation validation quality summary */
