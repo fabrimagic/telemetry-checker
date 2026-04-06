@@ -101,15 +101,6 @@ export interface DiaryContext {
   strategy_relevant_events: { lap: number; description: string }[];
 }
 
-/* ── Race Phase Summary ── */
-
-export interface RacePhaseSummary {
-  current_phase: RacePhase;
-  phase_confidence: PhaseConfidence;
-  strategy_phase: StrategyPhase;
-  execution_phase: ExecutionPhase;
-}
-
 /* ── Traffic Summary ── */
 
 export interface TrafficSummary {
