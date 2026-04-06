@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, BarChart3, Gauge, Brain, Cloud, Flag, Swords, TrendingDown, Timer, Shield, Beaker, Target, Layers, ChevronDown, Play, Users, Table, Map, Activity, Thermometer, Wrench, Eye, Zap, LayoutDashboard, Settings, Info, Lightbulb } from "lucide-react";
+import { ArrowLeft, BookOpen, BarChart3, Gauge, Brain, Cloud, Flag, Swords, TrendingDown, Timer, Shield, Beaker, Target, Layers, ChevronDown, Play, Users, Table, Map, Activity, Thermometer, Wrench, Eye, Zap, LayoutDashboard, Settings, Info, Lightbulb, Navigation, Scale, FlaskConical, ArrowRight } from "lucide-react";
 import { useState } from "react";
 
 /* ── Collapsible Section ── */
@@ -50,7 +50,6 @@ function TocLink({ href, children }: { href: string; children: React.ReactNode }
         const el = document.querySelector(href);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "start" });
-          // Open the section if collapsed
           const btn = el.querySelector("button");
           const chevron = btn?.querySelector("svg:last-child");
           if (chevron && !chevron.classList.contains("rotate-180")) {
@@ -74,6 +73,15 @@ function SectionDivider({ title }: { title: string }) {
   );
 }
 
+function KeyValue({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-2 text-xs">
+      <span className="text-muted-foreground shrink-0 w-36">{label}</span>
+      <span className="text-foreground">{children}</span>
+    </div>
+  );
+}
+
 /* ── Main Page ── */
 
 export default function Documentation() {
@@ -86,7 +94,7 @@ export default function Documentation() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <BookOpen className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-bold tracking-tight">Documentazione</h1>
+          <h1 className="text-lg font-bold tracking-tight">Documentazione Tecnica</h1>
         </div>
       </header>
 
@@ -98,14 +106,21 @@ export default function Documentation() {
         <div className="bg-card rounded-lg border border-border p-5 space-y-3">
           <p className="text-foreground font-semibold text-lg">F1 Telemetry Checker</p>
           <p className="text-sm text-muted-foreground">
-            Applicazione web per l'analisi strategica e telemetrica delle sessioni di Formula 1, 
+            Applicazione web per l'analisi strategica e telemetrica delle sessioni di Formula 1,
             basata interamente su dati pubblici provenienti dall'API <strong className="text-foreground">OpenF1</strong>.
           </p>
           <p className="text-sm text-muted-foreground">
-            Ogni modulo analitico è progettato per essere <strong className="text-foreground">trasparente</strong>, <strong className="text-foreground">tracciabile</strong> e <strong className="text-foreground">anti-allucinatorio</strong>: 
-            nessun dato viene inventato, nessuna stima viene presentata come certezza. Dove il modello 
+            Ogni modulo analitico è progettato per essere <strong className="text-foreground">trasparente</strong>, <strong className="text-foreground">tracciabile</strong> e <strong className="text-foreground">anti-allucinatorio</strong>:
+            nessun dato viene inventato, nessuna stima viene presentata come certezza. Dove il modello
             è incerto, la confidenza viene ridotta e comunicata esplicitamente.
           </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">React 18</span>
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">TypeScript 5</span>
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">Vite 5</span>
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">Recharts</span>
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">OpenF1 API</span>
+          </div>
         </div>
 
         {/* ═══════════════════════════════════════════════ */}
@@ -142,6 +157,7 @@ export default function Documentation() {
             <div className="space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-2">Virtual Race Engineer</p>
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
+              <TocLink href="#vre-ui">Interfaccia a 4 Sezioni</TocLink>
               <TocLink href="#vre-cost-function">Funzione di Costo</TocLink>
               <TocLink href="#vre-race-phase">Race Phase</TocLink>
               <TocLink href="#vre-risk-mode">Risk Mode & Decision Layer</TocLink>
@@ -149,14 +165,17 @@ export default function Documentation() {
               <TocLink href="#vre-breakdown">Scomposizione del Giudizio</TocLink>
               <TocLink href="#vre-verdict">Verdetto e Confidenza</TocLink>
               <TocLink href="#vre-context">Contesto Integrato</TocLink>
+              <TocLink href="#vre-delta-convention">Convenzione Delta</TocLink>
 
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-3">Modelli di calcolo</p>
               <TocLink href="#tyre-degradation">Degrado Gomme (Modello)</TocLink>
+              <TocLink href="#corrected-degradation">Degrado Corretto (Two-Stage)</TocLink>
               <TocLink href="#degradation-validation">Validazione Degrado</TocLink>
               <TocLink href="#tyre-warmup">Tyre Warmup</TocLink>
               <TocLink href="#weather-classification">Classificazione Meteo</TocLink>
               <TocLink href="#track-status">Track Status</TocLink>
               <TocLink href="#traffic-predictor">Traffic Predictor</TocLink>
+              <TocLink href="#strategy-analysis">Strategy Analysis</TocLink>
               <TocLink href="#pace-loss">Pace Loss Rate</TocLink>
               <TocLink href="#battle-detection">Battle Detection</TocLink>
               <TocLink href="#long-run">Long Run Detector</TocLink>
@@ -176,18 +195,18 @@ export default function Documentation() {
           <p>L'applicazione si articola in tre passaggi principali:</p>
           <ol className="list-decimal pl-5 space-y-2">
             <li>
-              <strong className="text-foreground">Seleziona una sessione</strong> — Puoi inserire manualmente una <em>Session Key</em> (es. 9161) 
-              oppure usare il <strong className="text-foreground">Session Picker</strong> per sfogliare le sessioni per anno, gran premio e tipo 
+              <strong className="text-foreground">Seleziona una sessione</strong> — Puoi inserire manualmente una <em>Session Key</em> (es. 9161)
+              oppure usare il <strong className="text-foreground">Session Picker</strong> per sfogliare le sessioni per anno, gran premio e tipo
               (Practice 1–3, Qualifying, Sprint, Race). Il picker carica automaticamente gli eventi disponibili dall'API OpenF1.
             </li>
             <li>
-              <strong className="text-foreground">Seleziona uno o più piloti</strong> — Una volta caricata la sessione, 
-              compare l'elenco dei piloti con nome, acronimo e colore del team. 
-              Puoi selezionare <strong className="text-foreground">più piloti</strong> per confronti multi-driver 
+              <strong className="text-foreground">Seleziona uno o più piloti</strong> — Una volta caricata la sessione,
+              compare l'elenco dei piloti con nome, acronimo e colore del team.
+              Puoi selezionare <strong className="text-foreground">più piloti</strong> per confronti multi-driver
               oppure <strong className="text-foreground">un singolo pilota</strong> per attivare l'analisi individuale e il Virtual Race Engineer.
             </li>
             <li>
-              <strong className="text-foreground">Esplora i dati</strong> — Il sistema carica automaticamente tempi al giro, stint, pit stop, 
+              <strong className="text-foreground">Esplora i dati</strong> — Il sistema carica automaticamente tempi al giro, stint, pit stop,
               meteo e posizioni. Le visualizzazioni e le card analitiche si adattano alla selezione corrente.
             </li>
           </ol>
@@ -201,7 +220,7 @@ export default function Documentation() {
 
         <DocSection id="data-source" title="Fonte Dati — OpenF1 API" icon={<Layers className="h-4 w-4" />}>
           <p>
-            Tutti i dati provengono dall'API pubblica <strong className="text-foreground">api.openf1.org</strong>. 
+            Tutti i dati provengono dall'API pubblica <strong className="text-foreground">api.openf1.org</strong>.
             Gli endpoint utilizzati includono:
           </p>
           <ul className="list-disc pl-5 space-y-1">
@@ -220,7 +239,7 @@ export default function Documentation() {
             <li><strong className="text-foreground">session_result</strong> — classifica finale</li>
           </ul>
           <p className="text-xs italic">
-            Limitazione: OpenF1 non espone carico carburante reale, setup vettura, pressioni gomme 
+            Limitazione: OpenF1 non espone carico carburante reale, setup vettura, pressioni gomme
             o dati GPS di alta precisione. Ogni modulo tiene conto di questi limiti e utilizza proxy dove necessario.
           </p>
         </DocSection>
@@ -231,13 +250,13 @@ export default function Documentation() {
 
         <DocSection id="lap-times-chart" title="Grafico Tempi al Giro" icon={<BarChart3 className="h-4 w-4" />}>
           <p>
-            Mostra l'andamento dei tempi al giro per ogni pilota selezionato. 
-            I giri con <code className="text-primary">lap_duration == null</code> o con flag 
-            <code className="text-primary"> is_pit_out_lap</code> vengono comunque visualizzati 
+            Mostra l'andamento dei tempi al giro per ogni pilota selezionato.
+            I giri con <code className="text-primary">lap_duration == null</code> o con flag
+            <code className="text-primary"> is_pit_out_lap</code> vengono comunque visualizzati
             ma segnalati visivamente con marker differenziati.
           </p>
           <p>
-            Il confronto multi-pilota permette di sovrapporre le curve di passo per individuare 
+            Il confronto multi-pilota permette di sovrapporre le curve di passo per individuare
             cross-over points, stint differenziali e perdite di performance relative.
           </p>
           <h4 className="font-semibold text-foreground mt-3">Funzionalità</h4>
@@ -262,15 +281,15 @@ export default function Documentation() {
             <li><strong className="text-foreground">Marcia</strong> — rapporto inserito 1–8 (grafico step)</li>
           </ul>
           <p>
-            I 5 grafici sono allineati verticalmente con <strong className="text-foreground">asse X condiviso</strong> (tempo relativo dall'inizio giro). 
+            I 5 grafici sono allineati verticalmente con <strong className="text-foreground">asse X condiviso</strong> (tempo relativo dall'inizio giro).
             Un <strong className="text-foreground">cursore verticale sincronizzato</strong> si muove su tutti i grafici quando l'utente passa il mouse.
           </p>
           <h4 className="font-semibold text-foreground mt-3">Track Map</h4>
           <p>
-            La <strong className="text-foreground">Track Map</strong> ricostruisce la traiettoria del giro usando 
-            le coordinate X/Y dal endpoint <code className="text-primary">location</code>, disegnate in SVG. 
-            Un <strong className="text-foreground">punto evidenziato</strong> mostra la posizione del pilota 
-            corrispondente al timestamp selezionato nei grafici telemetrici. 
+            La <strong className="text-foreground">Track Map</strong> ricostruisce la traiettoria del giro usando
+            le coordinate X/Y dal endpoint <code className="text-primary">location</code>, disegnate in SVG.
+            Un <strong className="text-foreground">punto evidenziato</strong> mostra la posizione del pilota
+            corrispondente al timestamp selezionato nei grafici telemetrici.
             La sincronizzazione è bidirezionale: cliccando sulla telemetria si aggiorna la mappa e viceversa.
           </p>
         </DocSection>
@@ -285,7 +304,7 @@ export default function Documentation() {
             <li><strong className="text-foreground" style={{ color: "hsl(45, 93%, 58%)" }}>Giallo</strong> — tempo nella norma</li>
           </ul>
           <p>
-            Questa codifica, identica a quella usata nella grafica TV ufficiale F1, permette di identificare 
+            Questa codifica, identica a quella usata nella grafica TV ufficiale F1, permette di identificare
             rapidamente dove un pilota sta guadagnando o perdendo tempo.
           </p>
         </DocSection>
@@ -300,23 +319,25 @@ export default function Documentation() {
           </p>
           <h4 className="font-semibold text-foreground mt-3">Overview</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Classifica finale della sessione con posizione, pilota, team e tempo</li>
-            <li>Condizioni meteo aggregate (temperatura pista/aria, pioggia)</li>
-            <li>Informazioni sessione (circuito, data, tipo)</li>
+            <li>Classifica finale della sessione con posizione, pilota, team, tempo, gap e stato</li>
+            <li>Griglia di partenza con confronto posizione start/finish</li>
+            <li>Condizioni meteo aggregate (temperatura pista/aria, pioggia, umidità, pressione, vento)</li>
           </ul>
           <h4 className="font-semibold text-foreground mt-3">Race Charts</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Position Chart</strong> — evoluzione delle posizioni giro per giro</li>
-            <li><strong className="text-foreground">Gap to Leader</strong> — distacco dal leader nel tempo</li>
+            <li><strong className="text-foreground">Position Chart</strong> — evoluzione delle posizioni giro per giro per tutti i piloti</li>
+            <li><strong className="text-foreground">Gap to Leader</strong> — distacco dal leader nel tempo con tooltip dettagliato</li>
             <li><strong className="text-foreground">Deviazione Cumulativa</strong> — perdita di performance cumulativa rispetto al vincitore</li>
           </ul>
           <h4 className="font-semibold text-foreground mt-3">Strategy</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Mappa strategica</strong> — barre colorate per stint/compound di ogni pilota</li>
+            <li><strong className="text-foreground">Mappa strategica</strong> — barre colorate per stint/compound di ogni pilota in ordine classifica</li>
             <li><strong className="text-foreground">Tabella pit stop</strong> — dettaglio timing, durata e compound per ogni sosta</li>
           </ul>
-          <p className="text-xs italic">
-            La deviazione cumulativa nel Session Report usa lo stesso modulo analitico del VRE per garantire coerenza.
+          <h4 className="font-semibold text-foreground mt-3">Filtro piloti</h4>
+          <p>
+            Una barra filtro in alto permette di selezionare/deselezionare piloti individualmente
+            con pulsanti rapidi "All" e "None". Il filtro è condiviso tra tutte le schede.
           </p>
         </DocSection>
 
@@ -325,9 +346,7 @@ export default function Documentation() {
         {/* ═══════════════════════════════════════════════════════ */}
 
         <DocSection id="weather-card" title="Card Meteo" icon={<Cloud className="h-4 w-4" />}>
-          <p>
-            Mostra le condizioni meteo durante la sessione con dettaglio per giro:
-          </p>
+          <p>Mostra le condizioni meteo durante la sessione:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Temperatura pista</strong> e <strong className="text-foreground">aria</strong> — andamento nel tempo</li>
             <li><strong className="text-foreground">Pioggia</strong> — intensità rilevata dal sensore meteo</li>
@@ -343,7 +362,7 @@ export default function Documentation() {
             <li><strong className="text-foreground">Pit lane duration</strong> — tempo totale in pit lane (ingresso → uscita)</li>
             <li><strong className="text-foreground">Stop duration</strong> — tempo di sosta (solo il cambio gomme)</li>
             <li><strong className="text-foreground">Compound in → out</strong> — mescola montata prima e dopo la sosta</li>
-            <li><strong className="text-foreground">Under neutralisation</strong> — indica se la sosta è avvenuta durante SC/VSC</li>
+            <li><strong className="text-foreground">Under neutralisation</strong> — indica se la sosta è avvenuta durante SC/VSC (con tipo)</li>
           </ul>
         </DocSection>
 
@@ -358,9 +377,7 @@ export default function Documentation() {
         </DocSection>
 
         <DocSection id="overtakes" title="Card Sorpassi" icon={<Swords className="h-4 w-4" />}>
-          <p>
-            Ricostruisce i sorpassi effettuati e subiti analizzando i cambi di posizione giro per giro:
-          </p>
+          <p>Ricostruisce i sorpassi effettuati e subiti analizzando i cambi di posizione giro per giro:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Sorpassi effettuati</strong> — posizioni guadagnate in pista (escluse variazioni da pit stop)</li>
             <li><strong className="text-foreground">Sorpassi subiti</strong> — posizioni perse</li>
@@ -369,9 +386,7 @@ export default function Documentation() {
         </DocSection>
 
         <DocSection id="race-diary" title="Card Diario di Gara" icon={<BookOpen className="h-4 w-4" />}>
-          <p>
-            Cronologia completa degli eventi significativi per il pilota durante la gara:
-          </p>
+          <p>Cronologia completa degli eventi significativi per il pilota durante la gara:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">OVERTAKE_DONE</strong> — sorpassi effettuati con dettaglio pilota</li>
             <li><strong className="text-foreground">OVERTAKE_RECEIVED</strong> — sorpassi subiti</li>
@@ -385,9 +400,7 @@ export default function Documentation() {
         </DocSection>
 
         <DocSection id="cumulative-deviation" title="Card Deviazione Cumulativa" icon={<TrendingDown className="h-4 w-4" />}>
-          <p>
-            Misura la perdita cumulativa di performance rispetto al tempo medio del vincitore:
-          </p>
+          <p>Misura la perdita cumulativa di performance rispetto al tempo medio del vincitore:</p>
           <Formula>delta_lap = lap_time_pilota - media_vincitore</Formula>
           <Formula>deviazione_cumulativa = Σ(delta_lap₁ ... delta_lapₙ)</Formula>
           <ul className="list-disc pl-5 space-y-1">
@@ -400,7 +413,7 @@ export default function Documentation() {
 
         <DocSection id="tyre-degradation-card" title="Card Degrado Gomme" icon={<TrendingDown className="h-4 w-4" />}>
           <p>
-            Per ogni stint del pilota mostra la stima del degrado (s/giro), il tipo di modello utilizzato 
+            Per ogni stint del pilota mostra la stima del degrado (s/giro), il tipo di modello utilizzato
             (corrected two-stage, fuel-only, fallback) e la classificazione di validità (VALID, NEUTRAL, INVALID).
           </p>
           <ul className="list-disc pl-5 space-y-1">
@@ -420,12 +433,12 @@ export default function Documentation() {
 
         <DocSection id="vre-overview" title="VRE — Panoramica" icon={<Brain className="h-4 w-4" />} defaultOpen>
           <p>
-            Il cuore analitico dell'applicazione. Disponibile solo per sessioni 
-            <strong className="text-foreground"> Race</strong> e <strong className="text-foreground">Sprint</strong> 
+            Il cuore analitico dell'applicazione. Disponibile solo per sessioni
+            <strong className="text-foreground"> Race</strong> e <strong className="text-foreground">Sprint</strong>
             con un singolo pilota selezionato.
           </p>
           <p>
-            Il VRE analizza la strategia realmente seguita in gara e la confronta con strategie alternative simulate, 
+            Il VRE analizza la strategia realmente seguita in gara e la confronta con strategie alternative simulate,
             producendo un verdetto sulla qualità della scelta strategica con scomposizione dettagliata dei fattori.
           </p>
 
@@ -436,44 +449,121 @@ export default function Documentation() {
               degrado, traffico, warmup, pit loss, cliff penalty, modulati da scenario e risk mode
             </li>
             <li>
-              <strong className="text-foreground">Explanation Layer</strong> — Breakdown, analisi di robustezza, 
-              narrative insights, pros/cons, predizioni del traffico
+              <strong className="text-foreground">Explanation Layer</strong> — Breakdown, analisi di robustezza,
+              narrative insights, pros/cons, predizioni del traffico, analisi multi-obiettivo
             </li>
             <li>
-              <strong className="text-foreground">Decision Layer</strong> — Scoring finale e ranking risk-aware 
-              tramite il modulo <code className="text-primary">riskAppetite</code>
+              <strong className="text-foreground">Decision Layer</strong> — Scoring finale e ranking risk-aware
+              tramite il modulo <code className="text-primary">riskAppetite</code> con context adjustment per-strategy
             </li>
           </ol>
 
           <h4 className="font-semibold text-foreground mt-4">Pipeline di calcolo</h4>
           <ol className="list-decimal pl-5 space-y-1">
             <li>Ricostruzione strategia reale (stint, pit stop, tempi)</li>
-            <li>Degrado corretto a due stadi + validazione per ogni stint</li>
+            <li>Degrado baseline + degrado corretto a due stadi per ogni stint</li>
+            <li>Validazione multi-criterio del degrado per ogni stint</li>
             <li>Pace Loss Rate per ogni stint (moltiplicatori degrado, cliff, urgency)</li>
+            <li>Classificazione meteo e track status per giro</li>
             <li>Costruzione modelli per mescola (slope + intercept per compound)</li>
             <li>Simulazione strategie candidate (1, 2, 3 pit stop)</li>
             <li>Traffic prediction per ogni strategia simulata</li>
-            <li>Warmup cost per ogni strategia simulata</li>
-            <li>Breakdown e analisi multi-obiettivo</li>
-            <li>Ranking risk-aware finale</li>
+            <li>Warmup cost compound-specific per ogni strategia simulata</li>
+            <li>Breakdown e analisi multi-obiettivo (EnrichedStrategyAnalysis)</li>
+            <li>Context adjustment per-strategy (robustness, cliff, traffic, sensitivity)</li>
+            <li>Ranking risk-aware finale tramite scoreStrategies</li>
             <li>Verdetto, confidenza e narrative insights</li>
           </ol>
 
-          <h4 className="font-semibold text-foreground mt-4">Interfaccia</h4>
-          <p>L'interfaccia segue il principio della <strong className="text-foreground">progressive disclosure</strong>:</p>
+          <h4 className="font-semibold text-foreground mt-4">Moduli utilizzati</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded mt-1">
+              <thead><tr className="bg-muted/40 border-b border-border">
+                <th className="px-3 py-1.5 text-left font-semibold text-foreground">Modulo</th>
+                <th className="px-3 py-1.5 text-left font-semibold text-foreground">Ruolo</th>
+              </tr></thead>
+              <tbody>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">tyreDegradation</td><td className="px-3 py-1.5">Stima degrado baseline (regressione, cliff, outlier)</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">correctedDegradation</td><td className="px-3 py-1.5">Correzione a due stadi (fuel proxy + temperatura)</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">degradationValidation</td><td className="px-3 py-1.5">Classificazione VALID/NEUTRAL/INVALID + fallback ranking</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">trafficPredictor</td><td className="px-3 py-1.5">Predizione traffico post-pit (rejoin, pack, persistence)</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">tyreWarmup</td><td className="px-3 py-1.5">Penalità termica post-pit (compound-specific)</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">stintPaceLoss</td><td className="px-3 py-1.5">Pace loss rate + moltiplicatori degrado/cliff/urgency</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">weatherClassification</td><td className="px-3 py-1.5">DRY/WET/MIXED per giro (multi-signal, debounce)</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">trackStatusClassification</td><td className="px-3 py-1.5">GREEN/YELLOW/SC/VSC/RED per giro</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">racePhase</td><td className="px-3 py-1.5">Fase gara con moltiplicatori dinamici</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">scenarioContext</td><td className="px-3 py-1.5">Scenari what-if con modifier temporali</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">strategyAnalysis</td><td className="px-3 py-1.5">Analisi multi-obiettivo, robustezza, sensitivity</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">strategyBreakdown</td><td className="px-3 py-1.5">Scomposizione costi per componente</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-mono text-primary">riskAppetite</td><td className="px-3 py-1.5">Scoring risk-aware con context adjustment</td></tr>
+                <tr><td className="px-3 py-1.5 font-mono text-primary">vreContext</td><td className="px-3 py-1.5">Contesto integrato (battle, meteo, track status, deviation)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </DocSection>
+
+        <DocSection id="vre-ui" title="VRE — Interfaccia a 4 Sezioni" icon={<LayoutDashboard className="h-4 w-4" />}>
+          <p>L'interfaccia del VRE è organizzata in 4 sezioni distinte che separano chiaramente il contesto globale dai dati delle singole strategie:</p>
+
+          <h4 className="font-semibold text-foreground mt-3">A. Analisi globale gara</h4>
+          <p>Contesto condiviso, comune a tutte le strategie:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Verdetto immediato</strong> — giudizio sintetico con delta temporale e icona</li>
-            <li><strong className="text-foreground">Timeline comparativa</strong> — Reale vs Consigliata con indicazione delle soste</li>
-            <li><strong className="text-foreground">Griglia di riepilogo</strong> — Battaglie, Meteo, Neutralizzazioni, Deviazione</li>
-            <li><strong className="text-foreground">Strategia raccomandata</strong> — con pros/cons, traffic prediction e breakdown (espandibile)</li>
-            <li><strong className="text-foreground">Strategie alternative</strong> — ciascuna con lo stesso livello di dettaglio della raccomandata</li>
-            <li><strong className="text-foreground">Race Context</strong> — controlli per Risk Mode, scenario simulato, degrado personalizzato</li>
+            <li>Griglia riassuntiva: battaglie, meteo, neutralizzazioni, deviazione cumulativa</li>
+            <li>Narrative insights contestuali (generati dal contesto integrato)</li>
+            <li>Weather e neutralisation impact</li>
+            <li>Traffic release analysis globale</li>
+            <li>Pace Loss per stint (con contaminazione e confidenza)</li>
+            <li>Confidence factors (lista esplicita dei fattori che influenzano l'affidabilità)</li>
+            <li>Data gaps (moduli con dati non disponibili)</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">B. Strategia reale</h4>
+          <p>Solo dati della strategia effettivamente eseguita in gara:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Sequenza stint con compound, giri, passo medio</li>
+            <li>Tabella degrado per stint (slope grezza, corretta, R², status VALID/NEUTRAL/INVALID)</li>
+            <li>Pit stop reali con compound in/out, durata, flag neutralizzazione</li>
+            <li>Scomposizione costi reali (actual_breakdown)</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">C. Strategia raccomandata</h4>
+          <p>La strategia ottimale calcolata dal simulatore, con dettaglio completo:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Sequenza compound consigliata</li>
+            <li>Pit windows con giro ideale e range</li>
+            <li>Guadagno stimato vs reale (con doppia convenzione delta)</li>
+            <li>Pros e cons derivati dall'analisi multi-obiettivo</li>
+            <li>Traffic prediction specifica per questa strategia</li>
+            <li>Analisi multi-obiettivo: tempo, posizione, rischio, robustezza</li>
+            <li>Dettagli avanzati: sensitivity, competitor context, stint extension, overtake difficulty</li>
+            <li>Badge di robustezza (ROBUST / MEDIUM / FRAGILE)</li>
+            <li>Breakdown con modifier di risk mode e scenario applicati</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">D. Strategie alternative</h4>
+          <p>Una card per ogni strategia alternativa simulata, ciascuna con:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Nome, descrizione, delta vs reale</li>
+            <li>Badge di robustezza e score aggiustato per risk mode</li>
+            <li>Pros e cons specifici</li>
+            <li>Traffic prediction, multi-obiettivo, dettagli avanzati</li>
+            <li>Breakdown espandibile con modifier applicati</li>
+            <li>Ordinamento per adjusted_score (risk-aware) quando il risk mode non è Balanced</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Race Context & Simulatore</h4>
+          <p>Pannello di controllo per parametrizzare l'analisi:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Scenario selector</strong> — scenari what-if con giro di attivazione e durata</li>
+            <li><strong className="text-foreground">Fase gara</strong> — fase corrente rilevata automaticamente</li>
+            <li><strong className="text-foreground">Risk mode</strong> — Conservative / Balanced / Aggressive</li>
+            <li><strong className="text-foreground">Degrado personalizzato</strong> — override per-compound per stint INVALID</li>
           </ul>
         </DocSection>
 
         <DocSection id="vre-cost-function" title="VRE — Funzione di Costo Strategia" icon={<Brain className="h-4 w-4" />}>
           <p>
-            Per ogni strategia candidata, la funzione <code className="text-primary">simulateStrategyCost()</code> 
+            Per ogni strategia candidata, la funzione <code className="text-primary">simulateStrategyCost()</code>
             calcola il tempo totale simulato:
           </p>
           <Formula>
@@ -491,23 +581,30 @@ export default function Documentation() {
             <li><strong className="text-foreground">traffic</strong> — costo traffico post-pit da traffic predictor, modulato da posizione, risk mode e scenario</li>
           </ul>
 
+          <h4 className="font-semibold text-foreground mt-3">Pit loss sotto neutralizzazione</h4>
+          <p>
+            Se il pit reale è avvenuto sotto SC/VSC, il VRE applica un <strong className="text-foreground">pit loss corretto</strong> alla strategia reale,
+            evitando che una sosta neutralizzata sembri artificialmente peggiore rispetto ad alternative con pit in green.
+            Le strategie alternative beneficiano del minor pit loss <strong className="text-foreground">solo se il pit simulato cade su una SC/VSC reale</strong>.
+          </p>
+
           <h4 className="font-semibold text-foreground mt-3">Vincolo regolamentare</h4>
           <p>
-            Ogni strategia deve utilizzare <strong className="text-foreground">almeno 2 mescole diverse</strong> 
+            Ogni strategia deve utilizzare <strong className="text-foreground">almeno 2 mescole diverse</strong>
             (regolamento F1 asciutto). Strategie con una sola mescola vengono scartate automaticamente.
           </p>
 
           <h4 className="font-semibold text-foreground mt-3">Esplorazione dello spazio strategico</h4>
           <p>
-            Il sistema esplora strategie con 1, 2 e 3 pit stop, variando il giro di pit 
-            in una finestra attorno al primo pit reale (±6 giri). Per scenari SC/VSC, 
+            Il sistema esplora strategie con 1, 2 e 3 pit stop, variando il giro di pit
+            in una finestra attorno al primo pit reale (±6 giri). Per scenari SC/VSC,
             vengono esplorate anche strategie N+1 (un pit aggiuntivo rispetto alla reale).
           </p>
         </DocSection>
 
         <DocSection id="vre-race-phase" title="VRE — Race Phase" icon={<Timer className="h-4 w-4" />}>
           <p>
-            La gara viene automaticamente segmentata in fasi, ciascuna con moltiplicatori dinamici 
+            La gara viene automaticamente segmentata in fasi, ciascuna con moltiplicatori dinamici
             sui pesi della funzione di costo:
           </p>
           <ul className="list-disc pl-5 space-y-1">
@@ -521,17 +618,20 @@ export default function Documentation() {
             <li><strong className="text-foreground">WEATHER_TRANSITION_PHASE</strong> — rischio penalizzato, cautela</li>
           </ul>
           <p>
-            Ogni fase applica moltiplicatori su: <code className="text-primary">degradation_weight</code>, 
-            <code className="text-primary"> traffic_weight</code>, <code className="text-primary">track_position_weight</code>, 
+            Ogni fase applica moltiplicatori su: <code className="text-primary">degradation_weight</code>,
+            <code className="text-primary"> traffic_weight</code>, <code className="text-primary">track_position_weight</code>,
             <code className="text-primary"> risk_penalty_weight</code>, <code className="text-primary">neutralization_opportunity_weight</code>.
           </p>
         </DocSection>
 
         <DocSection id="vre-risk-mode" title="VRE — Risk Mode & Decision Layer" icon={<Shield className="h-4 w-4" />}>
           <p>
-            Tre profili di rischio che influenzano sia la funzione di costo (simulation layer) 
-            sia il ranking finale (decision layer):
+            Tre profili di rischio che influenzano il ranking finale delle strategie.
+            Il Risk Mode <strong className="text-foreground">non altera i tempi simulati</strong>,
+            ma modifica il modo in cui le strategie vengono valutate e scelte.
           </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Profili di rischio</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -543,106 +643,106 @@ export default function Documentation() {
                 </tr>
               </thead>
               <tbody className="font-mono">
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">degradation</td><td className="text-center">×1.15</td><td className="text-center">×1.00</td><td className="text-center">×0.85</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">traffic</td><td className="text-center">×1.30</td><td className="text-center">×1.00</td><td className="text-center">×0.70</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">cliff_penalty</td><td className="text-center">0.12</td><td className="text-center">0.06</td><td className="text-center">0.02</td></tr>
-                <tr><td className="py-1.5 pr-3">opportunity</td><td className="text-center">×0.80</td><td className="text-center">×1.00</td><td className="text-center">×1.30</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">degradation_w</td><td className="text-center">+15%</td><td className="text-center">0%</td><td className="text-center">−8%</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">traffic_w</td><td className="text-center">+30%</td><td className="text-center">0%</td><td className="text-center">−20%</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">warmup_w</td><td className="text-center">+20%</td><td className="text-center">0%</td><td className="text-center">−10%</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">pit_loss_w</td><td className="text-center">+10%</td><td className="text-center">0%</td><td className="text-center">0%</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">upside_base</td><td className="text-center">×0.85</td><td className="text-center">×1.00</td><td className="text-center">×1.25</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">upside_dampen_cap</td><td className="text-center">60%</td><td className="text-center">30%</td><td className="text-center">15%</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">robustness_bonus</td><td className="text-center">+0.5s</td><td className="text-center">+0.3s</td><td className="text-center">+0.1s</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">robustness_penalty</td><td className="text-center">−0.8s</td><td className="text-center">−0.5s</td><td className="text-center">−0.2s</td></tr>
+                <tr className="border-b border-border/50"><td className="py-1.5 pr-3">cliff_w</td><td className="text-center">1.0</td><td className="text-center">0.8</td><td className="text-center">0.4</td></tr>
+                <tr><td className="py-1.5 pr-3">pack_rejoin_penalty</td><td className="text-center">−0.6s</td><td className="text-center">−0.4s</td><td className="text-center">−0.15s</td></tr>
               </tbody>
             </table>
           </div>
 
-          <h4 className="font-semibold text-foreground mt-3">Decision Layer (riskAppetite)</h4>
-          <p>
-            Dopo la simulazione, il modulo <code className="text-primary">riskAppetite</code> applica uno scoring multi-componente 
-            per il ranking finale delle strategie. Lo scoring decompone la valutazione in:
-          </p>
+          <h4 className="font-semibold text-foreground mt-3">Scoring multi-criterio</h4>
+          <p>Il punteggio finale di ogni strategia è calcolato in 5 strati:</p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li><strong className="text-foreground">Risk penalty</strong> — traffico + degrado pesati dal profilo di rischio</li>
+            <li><strong className="text-foreground">Execution penalty</strong> — warmup + pit loss pesati dal profilo</li>
+            <li><strong className="text-foreground">Neutralization bonus</strong> — opportunità SC/VSC modulate dalla fase gara</li>
+            <li><strong className="text-foreground">Reward component</strong> — upside modulato dall'execution burden (costi/tempo totale)</li>
+            <li><strong className="text-foreground">Context adjustment</strong> — per-strategy: robustezza, cliff risk, pack rejoin, traffic persistence, sensitivity, degradation confidence</li>
+          </ol>
+
+          <h4 className="font-semibold text-foreground mt-3">StrategyRiskContext (per-strategy)</h4>
+          <p>Ogni strategia può avere un proprio profilo di rischio basato su dati reali:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Reward</strong> — guadagno stimato dal delta, modulato dall'execution burden</li>
-            <li><strong className="text-foreground">Risk Penalty</strong> — penalità da traffico e degrado, pesata per race phase e profilo</li>
-            <li><strong className="text-foreground">Execution Penalty</strong> — costi warmup e pit loss, pesati per profilo</li>
-            <li><strong className="text-foreground">Neutralization Bonus</strong> — vantaggio da pit sotto SC/VSC</li>
+            <li><code className="text-primary">robustness_label</code> — ROBUST / MEDIUM / FRAGILE</li>
+            <li><code className="text-primary">cliff_risk</code> — 0–1, rischio cliff se si estende lo stint</li>
+            <li><code className="text-primary">release_classification</code> — CLEAR / TRAFFIC / PACK</li>
+            <li><code className="text-primary">traffic_risk_after_pit</code> — 0–1, rischio traffico post-pit</li>
+            <li><code className="text-primary">expected_laps_stuck</code> — giri previsti in traffico</li>
+            <li><code className="text-primary">rejoin_in_pack</code> — rientro in un pack compresso</li>
+            <li><code className="text-primary">sensitivity_to_*</code> — sensibilità a variazioni di degrado, traffico, pit loss</li>
+            <li><code className="text-primary">degradation_confidence</code> — 0–1, affidabilità del dato di degrado</li>
           </ul>
 
-          <h4 className="font-semibold text-foreground mt-3">Execution Burden</h4>
+          <h4 className="font-semibold text-foreground mt-3">Promozione della recommended strategy</h4>
           <p>
-            L'<strong className="text-foreground">Execution Burden</strong> misura l'incidenza dei costi operativi 
-            (traffico + warmup + degrado) sul tempo totale stimato. Strategie con delta positivo 
-            ma costi esecutivi elevati subiscono un <strong className="text-foreground">upside dampening</strong>: 
-            il bonus viene ridotto proporzionalmente, specialmente in profilo Conservative.
+            La strategia raccomandata non è scelta solo per tempo minimo. Se un'alternativa ha
+            uno score aggiustato migliore di oltre 1s rispetto alla "best raw" e non è FRAGILE,
+            viene promossa a strategia raccomandata.
           </p>
-          <p className="text-xs italic">
-            Questo impedisce che strategie apparentemente vantaggiose ma con alto rischio esecutivo 
-            vengano favorite nel ranking.
-          </p>
-
-          <h4 className="font-semibold text-foreground mt-3">Comportamento per profilo</h4>
-          <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Conservative</strong> — penalizza di più traffico, degrado e warmup; upside dampening forte; privilegia robustezza</li>
-            <li><strong className="text-foreground">Balanced</strong> — pesi neutri su tutti i fattori; compromesso equilibrato</li>
-            <li><strong className="text-foreground">Aggressive</strong> — riduce il peso di degrado e traffico; amplifica l'upside; accetta più rischio</li>
-          </ul>
         </DocSection>
 
-        <DocSection id="vre-scenarios" title="VRE — Scenari What-If" icon={<Beaker className="h-4 w-4" />}>
+        <DocSection id="vre-scenarios" title="VRE — Scenari What-If" icon={<FlaskConical className="h-4 w-4" />}>
           <p>
-            Il sistema supporta scenari simulati temporizzati. Ogni scenario modifica 
-            i moltiplicatori della funzione di costo <strong className="text-foreground">senza alterare i dati osservati</strong>.
+            Scenari simulati che modificano i pesi della funzione di costo senza alterare i dati reali.
+            L'utente può selezionare uno scenario, un giro di attivazione e una durata.
           </p>
 
           <h4 className="font-semibold text-foreground mt-3">Scenari disponibili</h4>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full text-xs border border-border rounded">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 pr-3 text-foreground">Scenario</th>
-                  <th className="text-left py-2 text-foreground">Effetto principale</th>
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="px-3 py-1.5 text-left font-semibold text-foreground">Scenario</th>
+                  <th className="px-3 py-1.5 text-left font-semibold text-foreground">Effetto principale</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Safety Car</td><td>Pit loss ×0.62, traffico ×0.85, opportunità ×1.30</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">VSC</td><td>Pit loss ×0.78, traffico ×0.90, opportunità ×1.15</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Clean Air</td><td>Traffico ×0.12</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Heavy Traffic</td><td>Traffico ×1.55, rischio ×1.15</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Light Rain</td><td>Degrado ×1.10, meteo ×1.35, confidenza -1</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Mixed Conditions</td><td>Degrado ×1.15, meteo ×1.55, confidenza -2</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Tyre Cliff Risk</td><td>Degrado ×1.45, rischio ×1.25</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Late Race Attack</td><td>Degrado ×0.88, posizione ×1.35, rischio ×0.72</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Battle Mode</td><td>Posizione ×1.45, traffico ×1.15</td></tr>
-                <tr className="border-b border-border/50"><td className="py-1.5 pr-3 font-medium text-foreground">Undercut</td><td>Traffico ×0.72, degrado ×1.18, posizione ×1.28</td></tr>
-                <tr><td className="py-1.5 pr-3 font-medium text-foreground">Overcut</td><td>Degrado ×0.88, rischio ×0.88</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Safety Car</td><td className="px-3 py-1.5">Pit loss ×0.62, traffico ×0.85, opportunità ×1.30</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">VSC</td><td className="px-3 py-1.5">Pit loss ×0.78, traffico ×0.90, opportunità ×1.15</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Clean Air</td><td className="px-3 py-1.5">Traffico ×0.12</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Heavy Traffic</td><td className="px-3 py-1.5">Traffico ×1.55, rischio ×1.15</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Light Rain</td><td className="px-3 py-1.5">Degrado ×1.10, meteo ×1.35, confidenza −1</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Mixed Conditions</td><td className="px-3 py-1.5">Degrado ×1.15, meteo ×1.55, confidenza −2</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Tyre Cliff Risk</td><td className="px-3 py-1.5">Degrado ×1.45, rischio ×1.25</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Late Race Attack</td><td className="px-3 py-1.5">Degrado ×0.88, posizione ×1.35, rischio ×0.72</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Battle Mode</td><td className="px-3 py-1.5">Posizione ×1.45, traffico ×1.15</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5 font-medium text-foreground">Undercut</td><td className="px-3 py-1.5">Traffico ×0.72, degrado ×1.18, posizione ×1.28</td></tr>
+                <tr><td className="px-3 py-1.5 font-medium text-foreground">Overcut</td><td className="px-3 py-1.5">Degrado ×0.88, rischio ×0.88</td></tr>
               </tbody>
             </table>
           </div>
 
           <h4 className="font-semibold text-foreground mt-3">Parametri temporali</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Activation Lap</strong> — giro in cui lo scenario diventa attivo</li>
-            <li><strong className="text-foreground">Duration</strong> — durata in giri della finestra scenario</li>
+            <li><strong className="text-foreground">Activation Lap</strong> — giro in cui lo scenario diventa attivo (opzionale)</li>
+            <li><strong className="text-foreground">Duration</strong> — durata in giri della finestra scenario (opzionale, default: intera gara)</li>
           </ul>
 
-          <h4 className="font-semibold text-foreground mt-3">Scenario Engine contestuale</h4>
-          <p>
-            Lo scenario engine utilizza un modello di scaling <strong className="text-foreground">non-lineare</strong> e contestuale:
-          </p>
+          <h4 className="font-semibold text-foreground mt-3">Scaling contestuale</h4>
+          <p>I modifier sono modulati da tre metriche:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Severity</strong> — peso intrinseco dello scenario (quanto è estremo il what-if)</li>
-            <li><strong className="text-foreground">Relevance</strong> — copertura della finestra sulla gara totale (scaling sub-lineare √)</li>
-            <li><strong className="text-foreground">Feasibility</strong> — uno scenario troppo breve o troppo tardivo ha impatto ridotto</li>
+            <li><strong className="text-foreground">Severity</strong> (0–1) — peso intrinseco dello scenario</li>
+            <li><strong className="text-foreground">Relevance</strong> — copertura della finestra sulla gara (scaling sub-lineare √)</li>
+            <li><strong className="text-foreground">Feasibility</strong> — penalizza finestre troppo brevi (&lt; 3 giri) o tardive</li>
           </ul>
-          <p>
-            I modifier non vengono applicati in modo rigido ma vengono blendati 
-            con il contesto temporale, evitando che scenari estremi producano effetti irrealistici.
-          </p>
+          <Formula>effective_scale = raw_scale × 0.5 + (raw_scale × relevance × feasibility) × 0.5</Formula>
 
           <p className="text-xs italic mt-2">
-            Anti-allucinazione: gli scenari NON creano eventi fittizi, NON alterano la telemetria, 
+            Anti-allucinazione: gli scenari NON creano eventi fittizi, NON alterano la telemetria,
             NON inventano tempi al giro. Modificano solo i moltiplicatori del modello strategico.
           </p>
         </DocSection>
 
         <DocSection id="vre-breakdown" title="VRE — Scomposizione del Giudizio (Breakdown)" icon={<Layers className="h-4 w-4" />}>
           <p>
-            Per ogni strategia (reale, consigliata, alternativa), il sistema produce un breakdown 
+            Per ogni strategia (reale, consigliata, alternativa), il sistema produce un breakdown
             che scompone il tempo stimato nelle sue componenti:
           </p>
           <ul className="list-disc pl-5 space-y-1">
@@ -652,21 +752,21 @@ export default function Documentation() {
             <li><strong className="text-foreground">Tempo perso ai box</strong> — pit stop × pit_loss_per_stop</li>
             <li><strong className="text-foreground">Tempo perso nel traffico</strong> — da traffic predictor</li>
             <li><strong className="text-foreground">Impatto meteo</strong> — +2.0s per giro WET/MIXED</li>
-            <li><strong className="text-foreground">Effetto neutralizzazione</strong> — -10s per pit sotto SC/VSC</li>
+            <li><strong className="text-foreground">Effetto neutralizzazione</strong> — −10s per pit sotto SC/VSC</li>
           </ul>
           <p>
             Ogni componente è codificata con impatto: <strong className="text-foreground" style={{ color: "hsl(142, 70%, 45%)" }}>favorevole</strong>,{" "}
             <strong className="text-foreground">neutro</strong> o <strong className="text-foreground" style={{ color: "hsl(0, 62%, 50%)" }}>penalizzante</strong>.
-            I modificatori di scenario e risk mode vengono applicati ai singoli componenti, 
+          </p>
+          <p>
+            I modifier di scenario e risk mode vengono applicati ai singoli componenti nel breakdown,
             rendendo visibile quale fattore cambia e di quanto.
           </p>
         </DocSection>
 
         <DocSection id="vre-verdict" title="VRE — Verdetto e Confidenza" icon={<Target className="h-4 w-4" />}>
           <h4 className="font-semibold text-foreground">Verdetto</h4>
-          <p>
-            Il delta tra la strategia consigliata e la strategia reale determina il giudizio:
-          </p>
+          <p>Il delta tra la strategia consigliata e la strategia reale determina il giudizio:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">delta ≤ 1s</strong> — "Strategia reale vicina all'ottimo"</li>
             <li><strong className="text-foreground">1–5s</strong> — "Strategia reale marginalmente migliorabile"</li>
@@ -676,7 +776,7 @@ export default function Documentation() {
 
           <h4 className="font-semibold text-foreground mt-3">Confidenza</h4>
           <p>
-            Il punteggio di confidenza (<strong className="text-foreground">HIGH</strong> / <strong className="text-foreground">MEDIUM</strong> / <strong className="text-foreground">LOW</strong>) 
+            Il punteggio di confidenza (<strong className="text-foreground">HIGH</strong> / <strong className="text-foreground">MEDIUM</strong> / <strong className="text-foreground">LOW</strong>)
             viene calcolato partendo da un punteggio base e sottraendo penalità per:
           </p>
           <ul className="list-disc pl-5 space-y-1">
@@ -692,14 +792,14 @@ export default function Documentation() {
 
           <h4 className="font-semibold text-foreground mt-3">Confidence Factors</h4>
           <p>
-            Ogni fattore che modifica la confidenza viene registrato e mostrato all'utente come lista esplicita 
+            Ogni fattore che modifica la confidenza viene registrato e mostrato all'utente come lista esplicita
             di motivi, garantendo trasparenza totale sulla qualità della stima.
           </p>
         </DocSection>
 
         <DocSection id="vre-context" title="VRE — Contesto Integrato" icon={<Layers className="h-4 w-4" />}>
           <p>
-            Il layer di orchestrazione <code className="text-primary">vreContext</code> raccoglie 
+            Il layer di orchestrazione <code className="text-primary">vreContext</code> raccoglie
             gli output di tutti i moduli analitici e li normalizza in un contesto strategico unificato:
           </p>
           <ul className="list-disc pl-5 space-y-1">
@@ -711,8 +811,37 @@ export default function Documentation() {
             <li><strong className="text-foreground">Data Gaps</strong> — elenco dei moduli non disponibili (riduce confidenza)</li>
           </ul>
           <p className="text-xs italic">
-            Il contesto integrato viene usato sia per la generazione di narrative insights 
+            Il contesto integrato viene usato sia per la generazione di narrative insights
             sia per la calibrazione dei confidence factors.
+          </p>
+        </DocSection>
+
+        <DocSection id="vre-delta-convention" title="VRE — Convenzione Delta Tempo" icon={<Info className="h-4 w-4" />}>
+          <p>Il VRE utilizza una <strong className="text-foreground">doppia convenzione</strong> per i delta temporali:</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded mt-2">
+              <thead><tr className="bg-muted/40 border-b border-border">
+                <th className="px-3 py-1.5 text-left font-semibold text-foreground">Campo</th>
+                <th className="px-3 py-1.5 text-left font-semibold text-foreground">Segno</th>
+                <th className="px-3 py-1.5 text-left font-semibold text-foreground">Significato</th>
+              </tr></thead>
+              <tbody>
+                <tr className="border-b border-border/50">
+                  <td className="px-3 py-1.5 font-mono text-primary">estimated_gain_seconds</td>
+                  <td className="px-3 py-1.5">Positivo = meglio</td>
+                  <td className="px-3 py-1.5">Quanto si poteva guadagnare rispetto alla reale</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-1.5 font-mono text-primary">time_delta_vs_actual</td>
+                  <td className="px-3 py-1.5">Negativo = più veloce</td>
+                  <td className="px-3 py-1.5">Convenzione motorsport: Δt negativo = strategia più rapida</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs mt-2">
+            I due campi sono speculari: <code className="text-primary">time_delta_vs_actual = −estimated_gain_seconds</code>.
+            La UI mostra entrambi dove utile per chiarezza.
           </p>
         </DocSection>
 
@@ -720,40 +849,21 @@ export default function Documentation() {
         <SectionDivider title="Modelli di calcolo" />
         {/* ═══════════════════════════════════════════════════════ */}
 
-        <DocSection id="tyre-degradation" title="Degrado Gomme — Modello a Due Stadi" icon={<TrendingDown className="h-4 w-4" />}>
+        <DocSection id="tyre-degradation" title="Degrado Gomme — Modello Baseline" icon={<TrendingDown className="h-4 w-4" />}>
           <p>
-            Il sistema calcola il degrado gomme per ogni stint usando un <strong className="text-foreground">modello 
-            di regressione a due stadi</strong> che corregge per effetti confondenti:
+            Il modulo <code className="text-primary">tyreDegradation.ts</code> calcola il degrado baseline per ogni stint
+            usando regressione lineare robusta con pipeline di filtraggio multi-stadio:
           </p>
 
-          <h4 className="font-semibold text-foreground mt-3">Stadio A — Rimozione effetti non-gomma</h4>
-          <p>Regressione multivariata dei tempi al giro su variabili centrate:</p>
-          <Formula>lap_time = β₀ + β₁·fuel_proxy_centered + β₂·track_temp_centered + β₃·air_temp_centered + residuo</Formula>
-          <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">fuel_proxy</strong> — approssimazione del carico carburante tramite <code className="text-primary">laps_remaining = totalLaps - lapNumber</code>. NON è il carico reale</li>
-            <li><strong className="text-foreground">track_temp / air_temp</strong> — temperature associate per timestamp più vicino (tolleranza 5 min)</li>
-            <li>Variabili centrate per stabilità numerica</li>
-            <li>Se varianza temperature &lt; 0.3°C → solo fuel proxy</li>
-          </ul>
-
-          <h4 className="font-semibold text-foreground mt-3">Stadio B — Degrado isolato</h4>
-          <Formula>residuo = α + γ·tyre_life + errore</Formula>
-          <p>
-            Il coefficiente <strong className="text-foreground">γ</strong> è la slope corretta di degrado (s/giro): 
-            quanto il tempo al giro aumenta per ogni giro di vita della gomma, 
-            dopo aver rimosso l'effetto del carburante e della temperatura.
-          </p>
-
-          <h4 className="font-semibold text-foreground mt-3">Pipeline di filtraggio (Baseline)</h4>
-          <p>Il modulo baseline applica una pipeline in 4 stadi prima della regressione:</p>
+          <h4 className="font-semibold text-foreground mt-3">Pipeline di filtraggio (4 stadi)</h4>
           <ol className="list-decimal pl-5 space-y-1">
             <li><strong className="text-foreground">Esclusioni strutturali</strong> — pit-out, in-lap (tranne ultimo stint), durate nulle/negative</li>
-            <li><strong className="text-foreground">Filtro outlier MAD</strong> — Median Absolute Deviation con moltiplicatore compound-specific (Soft/Medium: 3.0σ, Hard: 3.5σ)</li>
-            <li><strong className="text-foreground">Esclusione warmup</strong> — primi giri esclusi se più lenti della mediana (Soft/Medium: 1, Hard: 2)</li>
-            <li><strong className="text-foreground">Cliff detection</strong> — giri finali con residui anomali (&gt; 2.0–2.5× RMSE) esclusi dalla regressione</li>
+            <li><strong className="text-foreground">Filtro outlier MAD</strong> — Median Absolute Deviation con moltiplicatore compound-specific</li>
+            <li><strong className="text-foreground">Esclusione warmup</strong> — primi giri esclusi se più lenti della mediana</li>
+            <li><strong className="text-foreground">Cliff detection</strong> — giri finali con residui anomali esclusi dalla regressione</li>
           </ol>
 
-          <h4 className="font-semibold text-foreground mt-3">Profili Compound-Specific</h4>
+          <h4 className="font-semibold text-foreground mt-3">Profili compound-specific</h4>
           <table className="w-full text-xs border border-border rounded mt-1">
             <thead><tr className="bg-muted/40"><th className="px-2 py-1 text-left">Parametro</th><th className="px-2 py-1">SOFT</th><th className="px-2 py-1">MEDIUM</th><th className="px-2 py-1">HARD</th></tr></thead>
             <tbody>
@@ -766,20 +876,47 @@ export default function Documentation() {
 
           <h4 className="font-semibold text-foreground mt-3">Output</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <Param name="slope_raw" desc="Slope grezza (senza correzione)" />
-            <Param name="slope_corrected" desc="Slope corretta dopo rimozione fuel/temp" />
-            <Param name="model_type" desc="corrected_two_stage | corrected_fuel_only | simple_fallback" />
-            <Param name="r_squared_corrected" desc="R² del modello corretto (Stadio B)" />
-            <Param name="rmse" desc="Root Mean Square Error della regressione" />
+            <Param name="slope" desc="Slope di degrado (s/giro)" />
+            <Param name="intercept" desc="Intercetta (passo base stimato)" />
+            <Param name="r_squared" desc="Coefficiente di determinazione" />
+            <Param name="rmse" desc="Root Mean Square Error" />
             <Param name="cliffDetected" desc="Presenza di cliff a fine stint" />
             <Param name="filterSummary" desc="Elenco testuale dei filtri applicati" />
           </ul>
+        </DocSection>
 
-          <h4 className="font-semibold text-foreground mt-3">Fallback</h4>
+        <DocSection id="corrected-degradation" title="Degrado Corretto — Two-Stage Model" icon={<TrendingDown className="h-4 w-4" />}>
+          <p>
+            Il modulo <code className="text-primary">correctedDegradation.ts</code> rimuove gli effetti confondenti
+            (carburante e temperatura) per isolare il puro degrado gomme:
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Stadio A — Rimozione effetti non-gomma</h4>
+          <Formula>lap_time = β₀ + β₁·fuel_proxy_centered + β₂·track_temp_centered + β₃·air_temp_centered + residuo</Formula>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Se il modello a due stadi non è applicabile → regressione semplice <code className="text-primary">lap_time ~ tyre_life</code></li>
-            <li>Se la slope corretta &gt; 0.30 s/giro → si usa la regressione semplice (il modello corretto è implausibile)</li>
+            <li><strong className="text-foreground">fuel_proxy</strong> — approssimazione tramite <code className="text-primary">laps_remaining = totalLaps - lapNumber</code>. NON è il carico reale</li>
+            <li><strong className="text-foreground">track_temp / air_temp</strong> — temperature associate per timestamp più vicino (tolleranza 5 min)</li>
+            <li>Variabili centrate per stabilità numerica</li>
+            <li>Se varianza temperature &lt; 0.3°C → solo fuel proxy</li>
           </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Stadio B — Degrado isolato</h4>
+          <Formula>residuo = α + γ·tyre_life + errore</Formula>
+          <p>
+            Il coefficiente <strong className="text-foreground">γ</strong> è la slope corretta di degrado (s/giro):
+            quanto il tempo al giro aumenta per ogni giro di vita della gomma,
+            dopo aver rimosso l'effetto del carburante e della temperatura.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Tipi di modello</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <Param name="corrected_two_stage" desc="Modello completo con fuel + temperature" />
+            <Param name="corrected_fuel_only" desc="Solo fuel proxy (temperature insufficienti)" />
+            <Param name="simple_fallback" desc="Regressione semplice (modello corretto implausibile o dati insufficienti)" />
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Guardrail</h4>
+          <p>Se la slope corretta &gt; 0.30 s/giro → si usa la regressione semplice (il modello corretto è implausibile).</p>
         </DocSection>
 
         <DocSection id="degradation-validation" title="Validazione del Degrado Gomme" icon={<Shield className="h-4 w-4" />}>
@@ -805,9 +942,9 @@ export default function Documentation() {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">-0.01</td><td className="px-3 py-1.5 text-right">0.015</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">5</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">-0.02</td><td className="px-3 py-1.5 text-right">0.01</td><td className="px-3 py-1.5 text-right">0.20</td><td className="px-3 py-1.5 text-right">6</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">-0.025</td><td className="px-3 py-1.5 text-right">0.008</td><td className="px-3 py-1.5 text-right">0.15</td><td className="px-3 py-1.5 text-right">7</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">−0.01</td><td className="px-3 py-1.5 text-right">0.015</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">5</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">−0.02</td><td className="px-3 py-1.5 text-right">0.01</td><td className="px-3 py-1.5 text-right">0.20</td><td className="px-3 py-1.5 text-right">6</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">−0.025</td><td className="px-3 py-1.5 text-right">0.008</td><td className="px-3 py-1.5 text-right">0.15</td><td className="px-3 py-1.5 text-right">7</td></tr>
               </tbody>
             </table>
           </div>
@@ -829,72 +966,59 @@ export default function Documentation() {
 
           <h4 className="font-semibold text-foreground mt-3">Override degrado personalizzato</h4>
           <p>
-            Quando almeno uno stint ha degrado <strong style={{ color: "hsl(0, 62%, 50%)" }}>INVALID</strong>, 
-            l'utente può inserire un valore personalizzato (0.001–0.300 s/giro, precisione ai millesimi).
-            Viene applicato <strong className="text-foreground">solo agli stint INVALID</strong> e il ricalcolo è immediato.
+            Quando uno o più stint risultano INVALID, l'utente può inserire un valore di degrado
+            personalizzato <strong className="text-foreground">per ciascuna mescola</strong> (es. 0.045 s/giro per SOFT, 0.030 per MEDIUM).
+            Ogni campo è indipendente e opzionale: se lasciato vuoto, il sistema usa il fallback automatico.
+            L'override si applica solo agli stint INVALID della mescola corrispondente.
           </p>
         </DocSection>
 
         <DocSection id="tyre-warmup" title="Modello Tyre Warmup" icon={<Thermometer className="h-4 w-4" />}>
           <p>
-            Dopo ogni pit stop, le gomme nuove non sono ancora alla temperatura operativa.
-            Il modello simula questa penalità temporanea:
+            Modello di penalità termica per i giri immediatamente successivi a un pit stop.
+            Il warmup si applica <strong className="text-foreground">solo alle strategie simulate</strong>
+            (raccomandata + alternative), non alla strategia reale (che rappresenta ciò che è successo).
           </p>
-          <Formula>warmup_penalty(lap) = base_penalty × exp(-lap_after_pit / decay)</Formula>
+
+          <h4 className="font-semibold text-foreground mt-3">Formula</h4>
+          <Formula>warmup_lap_penalty = base_penalty × e^(−decay × (lap − 1))</Formula>
 
           <h4 className="font-semibold text-foreground mt-3">Parametri per compound</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border border-border rounded">
-              <thead>
-                <tr className="bg-muted/40">
-                  <th className="px-3 py-1.5 text-left font-semibold text-foreground">Compound</th>
-                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Base (s)</th>
-                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Decay</th>
-                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Giri</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">0.6</td><td className="px-3 py-1.5 text-right">1.2</td><td className="px-3 py-1.5 text-right">2</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">0.9</td><td className="px-3 py-1.5 text-right">1.6</td><td className="px-3 py-1.5 text-right">3</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">1.4</td><td className="px-3 py-1.5 text-right">2.2</td><td className="px-3 py-1.5 text-right">4</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full text-xs border border-border rounded mt-1">
+            <thead><tr className="bg-muted/40"><th className="px-2 py-1 text-left">Compound</th><th className="px-2 py-1">Base penalty</th><th className="px-2 py-1">Decay</th><th className="px-2 py-1">Giri effetto</th></tr></thead>
+            <tbody>
+              <tr><td className="px-2 py-1">SOFT</td><td className="px-2 py-1 text-center">0.8s</td><td className="px-2 py-1 text-center">1.2</td><td className="px-2 py-1 text-center">~2</td></tr>
+              <tr><td className="px-2 py-1">MEDIUM</td><td className="px-2 py-1 text-center">1.2s</td><td className="px-2 py-1 text-center">0.8</td><td className="px-2 py-1 text-center">~3</td></tr>
+              <tr><td className="px-2 py-1">HARD</td><td className="px-2 py-1 text-center">1.8s</td><td className="px-2 py-1 text-center">0.5</td><td className="px-2 py-1 text-center">~4</td></tr>
+              <tr><td className="px-2 py-1">INTERMEDIATE</td><td className="px-2 py-1 text-center">1.5s</td><td className="px-2 py-1 text-center">0.6</td><td className="px-2 py-1 text-center">~3</td></tr>
+              <tr><td className="px-2 py-1">WET</td><td className="px-2 py-1 text-center">2.0s</td><td className="px-2 py-1 text-center">0.4</td><td className="px-2 py-1 text-center">~5</td></tr>
+            </tbody>
+          </table>
 
-          <h4 className="font-semibold text-foreground mt-3">Integrazione</h4>
+          <h4 className="font-semibold text-foreground mt-3">Impatto strategico</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Applicato <strong className="text-foreground">solo alle strategie simulate</strong> (non alla strategia reale)</li>
-            <li>Il primo stint della gara non ha warmup (gomme calde dal giro di formazione)</li>
-            <li>Appare nella breakdown come voce separata "Tyre warmup"</li>
-            <li>Influenza undercut/overcut: gomme Hard hanno warmup più lento → undercut meno efficace</li>
-            <li>Stint molto corti penalizzati (il warmup pesa proporzionalmente di più)</li>
+            <li>Penalizza strategie con tanti pit stop (maggiore costo warmup cumulativo)</li>
+            <li>Influenza undercut/overcut (la mescola con warmup più lungo è svantaggiata nell'undercut)</li>
+            <li>Penalizza stint troppo corti (warmup pesa di più proporzionalmente)</li>
           </ul>
-          <p className="text-xs italic mt-2">
-            Il warmup NON è degrado: è una penalità termica temporanea che si esaurisce in pochi giri.
-          </p>
         </DocSection>
 
         <DocSection id="weather-classification" title="Classificazione Meteo" icon={<Cloud className="h-4 w-4" />}>
           <p>
-            Ogni giro viene classificato come <strong className="text-foreground">DRY</strong>, 
-            <strong className="text-foreground"> WET</strong> o <strong className="text-foreground">MIXED</strong> 
-            usando un modello di persistenza del bagnato a <strong className="text-foreground">decadimento esponenziale</strong>.
+            Il modulo <code className="text-primary">weatherClassification.ts</code> classifica ogni giro in:
           </p>
-
-          <h4 className="font-semibold text-foreground mt-3">Logica</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Per ogni giro si apre una finestra temporale che include i campioni meteo</li>
-            <li>Se pioggia attiva durante il giro → accumulo di <strong className="text-foreground">persistence score</strong></li>
-            <li>Se pioggia cessata → il persistence score decade esponenzialmente nel tempo</li>
-            <li>La velocità di asciugatura è modulata dalla <strong className="text-foreground">temperatura pista</strong>:
-              <ul className="list-disc pl-5 mt-1">
-                <li>Asfalto caldo (&gt; 40°C) → asciugatura accelerata (fino a 1.6×)</li>
-                <li>Asfalto freddo (&lt; 25°C) → asciugatura rallentata (0.6×)</li>
-              </ul>
-            </li>
-            <li>Persistence score alto + pioggia diretta → <strong className="text-foreground">WET</strong></li>
-            <li>Persistence score medio o pioggia intermittente → <strong className="text-foreground">MIXED</strong></li>
-            <li>Nessuna pioggia e persistence bassa → <strong className="text-foreground">DRY</strong></li>
+            <li><strong className="text-foreground">DRY</strong> — nessuna pioggia rilevata</li>
+            <li><strong className="text-foreground">WET</strong> — pioggia costante o intensa</li>
+            <li><strong className="text-foreground">MIXED</strong> — condizioni variabili, pioggia intermittente o transizione</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Pipeline multi-segnale</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Analisi del campo <code className="text-primary">rainfall</code> con soglie per intensità</li>
+            <li>Debounce temporale per evitare oscillazioni rapide DRY/WET</li>
+            <li>Smoothing con finestra mobile per stabilizzare la classificazione</li>
+            <li>Fallback conservativo in caso di dati insufficienti</li>
           </ul>
           <p className="text-xs italic">
             Utilizzata dal VRE per escludere giri bagnati dalle stime di degrado e per classificare le fasi di gara.
@@ -902,9 +1026,7 @@ export default function Documentation() {
         </DocSection>
 
         <DocSection id="track-status" title="Classificazione Track Status" icon={<Flag className="h-4 w-4" />}>
-          <p>
-            I messaggi di Race Control vengono analizzati per classificare ogni giro:
-          </p>
+          <p>I messaggi di Race Control vengono analizzati per classificare ogni giro:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">GREEN</strong> — condizioni normali</li>
             <li><strong className="text-foreground">YELLOW / DOUBLE_YELLOW</strong> — bandiere gialle</li>
@@ -915,13 +1037,13 @@ export default function Documentation() {
           </ul>
           <p>Priorità: RED &gt; SC &gt; VSC &gt; DOUBLE_YELLOW &gt; YELLOW.</p>
           <p className="mt-2">
-            <strong className="text-foreground">Eccezione ultimo giro:</strong> una bandiera rossa 
-            all'ultimo giro viene trattata come fine gara normale, non come neutralizzazione. 
+            <strong className="text-foreground">Eccezione ultimo giro:</strong> una bandiera rossa
+            all'ultimo giro viene trattata come fine gara normale, non come neutralizzazione.
             Questo evita alterazioni delle stime strategiche per un evento senza impatto sulla strategia.
           </p>
         </DocSection>
 
-        <DocSection id="traffic-predictor" title="Traffic Predictor" icon={<Target className="h-4 w-4" />}>
+        <DocSection id="traffic-predictor" title="Traffic Predictor" icon={<Navigation className="h-4 w-4" />}>
           <p>
             Modulo di predizione del traffico post-pit, progettato per avvicinarsi
             alla logica di strategy engineering F1.
@@ -950,9 +1072,40 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="strategy-analysis" title="Strategy Analysis (Multi-Obiettivo)" icon={<Target className="h-4 w-4" />}>
+          <p>
+            Il modulo <code className="text-primary">strategyAnalysis.ts</code> arricchisce ogni strategia simulata
+            con un'analisi multi-obiettivo completa:
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Obiettivi analizzati</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">race_time_objective</strong> — delta tempo vs strategia reale</li>
+            <li><strong className="text-foreground">track_position_objective</strong> — posizioni guadagnate/perse stimate</li>
+            <li><strong className="text-foreground">risk_objective</strong> — rischio combinato (cliff, traffico, sensibilità)</li>
+            <li><strong className="text-foreground">robustness_objective</strong> — robustezza della strategia (ROBUST / MEDIUM / FRAGILE)</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Analisi di robustezza</h4>
+          <p>Ogni strategia è classificata per robustezza basandosi su:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Sensitivity analysis: variazione del risultato per degrado +20%, traffico +50%, pit loss +2s</li>
+            <li>Cliff risk: probabilità di cliff se si estende lo stint</li>
+            <li>Variabilità dei costi stimati</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Analisi complementari</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Competitor context</strong> — posizione rientro, undercut risk/opportunity, traffic risk</li>
+            <li><strong className="text-foreground">Overtake difficulty</strong> — score, giri bloccato, dirty air penalty</li>
+            <li><strong className="text-foreground">Stint extension</strong> — costo/giro, penalità totale, cliff risk se si estende</li>
+            <li><strong className="text-foreground">Pit window</strong> — finestra ottimale, best lap, time spread</li>
+          </ul>
+        </DocSection>
+
         <DocSection id="pace-loss" title="Pace Loss Rate" icon={<TrendingDown className="h-4 w-4" />}>
           <p>
-            Misura la velocità con cui un pilota perde prestazione durante uno stint, 
+            Misura la velocità con cui un pilota perde prestazione durante uno stint,
             indicando se la performance si sta degradando più velocemente del modello di degrado.
           </p>
           <Formula>pace_loss_rate = (media ultimi 5 giri - media primi 5 giri) / durata_stint_validi</Formula>
@@ -979,36 +1132,32 @@ export default function Documentation() {
         </DocSection>
 
         <DocSection id="battle-detection" title="Battle Detection" icon={<Swords className="h-4 w-4" />}>
-          <p>
-            Rileva episodi di battaglia ravvicinata analizzando intervalli e posizioni:
-          </p>
+          <p>Rileva episodi di battaglia ravvicinata analizzando intervalli e posizioni:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">ATTACKING</strong> — intervallo &lt; 1.0s rispetto a chi precede</li>
             <li><strong className="text-foreground">DEFENDING</strong> — il pilota dietro ha intervallo &lt; 1.0s</li>
             <li><strong className="text-foreground">BOTH</strong> — attacco e difesa contemporanei</li>
           </ul>
           <p>
-            Le battaglie vengono usate dal pace loss per escludere giri in aria sporca 
+            Le battaglie vengono usate dal pace loss per escludere giri in aria sporca
             e dal VRE per penalizzare pit stop durante fasi di battaglia attiva.
           </p>
         </DocSection>
 
         <DocSection id="long-run" title="Long Run Detector (Practice)" icon={<Beaker className="h-4 w-4" />}>
-          <p>
-            Nelle prove libere, identifica le simulazioni di gara (long run) all'interno degli stint:
-          </p>
+          <p>Nelle prove libere, identifica le simulazioni di gara (long run) all'interno degli stint:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Lunghezza</strong> — ≥ 8 giri: +30pt, ≥ 6: +20pt</li>
             <li><strong className="text-foreground">Regolarità</strong> — std &lt; 0.5s: +25pt</li>
             <li><strong className="text-foreground">Trend degrado</strong> — slope positiva 0–0.2 s/giro: +20pt</li>
-            <li><strong className="text-foreground">Push lap penalty</strong> — giri &lt; 99% mediana: -25pt</li>
+            <li><strong className="text-foreground">Push lap penalty</strong> — giri &lt; 99% mediana: −25pt</li>
           </ul>
           <p>Score ≥ 40 → long run valido. I modelli di degrado dalle FP vengono usati dal VRE come riferimento per mescole non usate in gara.</p>
         </DocSection>
 
-        <DocSection id="scenario-engine" title="Scenario Engine — Dettaglio tecnico" icon={<Settings className="h-4 w-4" />}>
+        <DocSection id="scenario-engine" title="Scenario Engine — Dettaglio Tecnico" icon={<Settings className="h-4 w-4" />}>
           <p>
-            Lo scenario engine utilizza un sistema di weighting contestuale e non-lineare 
+            Lo scenario engine utilizza un sistema di weighting contestuale e non-lineare
             per modulare l'impatto degli scenari what-if:
           </p>
 
@@ -1019,18 +1168,10 @@ export default function Documentation() {
             <li><strong className="text-foreground">Feasibility</strong> — penalizza finestre troppo brevi (&lt; 3 giri) o troppo tardive nella gara</li>
           </ul>
 
-          <h4 className="font-semibold text-foreground mt-3">Scaling non-lineare</h4>
-          <Formula>effective_scale = raw_scale × 0.5 + (raw_scale × relevance × feasibility) × 0.5</Formula>
-          <p>
-            Lo scaling usa curve di potenza: scenari brevi hanno impatto localizzato, 
-            scenari lunghi hanno effetto più stabile ma sub-lineare, 
-            scenari tardivi hanno effetto ridotto ma non nullo.
-          </p>
-
           <h4 className="font-semibold text-foreground mt-3">Blending dei modifier</h4>
           <p>
-            I modifier non vengono applicati rigidamente: vengono blendati con il contesto temporale 
-            usando una combinazione di scale, relevance e feasibility. Questo impedisce che scenari 
+            I modifier non vengono applicati rigidamente: vengono blendati con il contesto temporale
+            usando una combinazione di scale, relevance e feasibility. Questo impedisce che scenari
             estremi in finestre marginali producano effetti irrealistici.
           </p>
         </DocSection>
@@ -1045,37 +1186,46 @@ export default function Documentation() {
           </p>
           <ol className="list-decimal pl-5 space-y-2">
             <li>
-              <strong className="text-foreground">Nessun dato inventato</strong> — ogni valore proviene 
+              <strong className="text-foreground">Nessun dato inventato</strong> — ogni valore proviene
               dall'API OpenF1 o è derivato tramite formule esplicite e tracciabili.
             </li>
             <li>
-              <strong className="text-foreground">Slope negativa ≠ gomma migliore</strong> — viene classificata 
+              <strong className="text-foreground">Slope negativa ≠ gomma migliore</strong> — viene classificata
               INVALID e sostituita con fallback conservativo.
             </li>
             <li>
-              <strong className="text-foreground">Deviazione cumulativa ≠ degrado gomme</strong> — è un indicatore 
+              <strong className="text-foreground">Deviazione cumulativa ≠ degrado gomme</strong> — è un indicatore
               di pace relativa, non una misura di usura. Usata come metrica ausiliaria.
             </li>
             <li>
-              <strong className="text-foreground">Contaminazione esplicita</strong> — traffico, battaglie, 
-              meteo e neutralizzazioni vengono identificati. I giri contaminati 
+              <strong className="text-foreground">Contaminazione esplicita</strong> — traffico, battaglie,
+              meteo e neutralizzazioni vengono identificati. I giri contaminati
               vengono esclusi o la metrica declassata a UNRELIABLE.
             </li>
             <li>
-              <strong className="text-foreground">Scenari ≠ previsioni</strong> — gli scenari what-if 
+              <strong className="text-foreground">Scenari ≠ previsioni</strong> — gli scenari what-if
               modificano solo i moltiplicatori, non creano eventi fittizi.
             </li>
             <li>
-              <strong className="text-foreground">Confidenza dinamica</strong> — ogni fattore che riduce 
+              <strong className="text-foreground">Confidenza dinamica</strong> — ogni fattore che riduce
               l'affidabilità viene registrato e comunicato all'utente.
             </li>
             <li>
-              <strong className="text-foreground">Fuel proxy ≠ carburante reale</strong> — il sistema 
+              <strong className="text-foreground">Fuel proxy ≠ carburante reale</strong> — il sistema
               usa <code className="text-primary">laps_remaining</code> come proxy. Non ha accesso al fuel load reale.
             </li>
             <li>
-              <strong className="text-foreground">Fallback conservativi</strong> — dove i dati sono insufficienti 
+              <strong className="text-foreground">Fallback conservativi</strong> — dove i dati sono insufficienti
               o inaffidabili, il sistema usa valori conservativi per compound e riduce la confidenza.
+            </li>
+            <li>
+              <strong className="text-foreground">Warmup solo su strategie simulate</strong> — il modello di warmup
+              non si applica alla strategia reale, che rappresenta ciò che è effettivamente successo.
+            </li>
+            <li>
+              <strong className="text-foreground">Context adjustment opzionale</strong> — i fattori di rischio contestuali
+              (robustezza, cliff, traffico) vengono applicati solo se realmente calcolati dai moduli.
+              Campi assenti → contributo 0 (nessuna penalità fittizia).
             </li>
           </ol>
         </DocSection>
