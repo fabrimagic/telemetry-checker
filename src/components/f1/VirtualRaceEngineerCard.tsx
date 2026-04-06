@@ -540,59 +540,86 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 </p>
               </details>
 
-              {/* Custom degradation override */}
-              {degradation_validations?.some(dv => dv.status === "INVALID") && (
-                <div className="bg-muted/30 border border-border rounded-md p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                    <p className="text-[11px] font-semibold text-foreground">Degrado personalizzato (opzionale)</p>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    Uno o più stint hanno degrado classificato come <strong className="text-red-400">INVALID</strong>. 
-                    Puoi inserire un valore di degrado personalizzato (in secondi al giro) che verrà usato al posto del fallback automatico per il calcolo delle strategie.
-                    Sono supportate frazioni fino ai millesimi di secondo (es. 0.045).
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      step="0.001"
-                      min="0.001"
-                      max="0.300"
-                      placeholder="es. 0.045"
-                      className="w-28 h-7 text-xs font-mono bg-background"
-                      value={custom_degradation_override != null ? custom_degradation_override : ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "" || val === null) {
-                          onCustomDegradationChange?.(null);
-                          return;
-                        }
-                        const num = parseFloat(val);
-                        if (!isNaN(num) && num >= 0.001 && num <= 0.300) {
-                          onCustomDegradationChange?.(num);
-                        } else if (!isNaN(num) && num === 0) {
-                          // Allow typing "0." as intermediate
-                        }
-                      }}
-                    />
-                    <span className="text-[10px] text-muted-foreground">s/giro</span>
-                    {custom_degradation_override != null && (
-                      <button
-                        onClick={() => onCustomDegradationChange?.(null)}
-                        className="text-[10px] text-red-400 hover:text-red-300 underline"
-                      >
-                        Rimuovi
-                      </button>
+              {/* Custom degradation override — per compound */}
+              {degradation_validations?.some(dv => dv.status === "INVALID") && (() => {
+                // Collect unique compounds from INVALID stints
+                const invalidCompounds = Array.from(new Set(
+                  degradation_validations.filter(dv => dv.status === "INVALID").map(dv => dv.original.compound)
+                ));
+                const overrideMap: Record<string, number> = custom_degradation_override != null && typeof custom_degradation_override === "object" ? custom_degradation_override : {};
+                const hasAnyOverride = Object.keys(overrideMap).length > 0;
+
+                return (
+                  <div className="bg-muted/30 border border-border rounded-md p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <p className="text-[11px] font-semibold text-foreground">Degrado personalizzato (opzionale)</p>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Uno o più stint hanno degrado classificato come <strong className="text-red-400">INVALID</strong>. 
+                      Puoi inserire un valore di degrado personalizzato per ciascuna mescola (in secondi al giro). 
+                      I campi lasciati vuoti useranno il fallback automatico.
+                    </p>
+                    <div className="space-y-1.5">
+                      {invalidCompounds.map(compound => (
+                        <div key={compound} className="flex items-center gap-2">
+                          <CompoundBadge compound={compound} />
+                          <Input
+                            type="number"
+                            step="0.001"
+                            min="0.001"
+                            max="0.300"
+                            placeholder="es. 0.045"
+                            className="w-28 h-7 text-xs font-mono bg-background"
+                            value={overrideMap[compound] != null ? overrideMap[compound] : ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const newMap = { ...overrideMap };
+                              if (val === "" || val === null) {
+                                delete newMap[compound];
+                              } else {
+                                const num = parseFloat(val);
+                                if (!isNaN(num) && num >= 0.001 && num <= 0.300) {
+                                  newMap[compound] = num;
+                                } else if (!isNaN(num) && num === 0) {
+                                  // Allow typing "0." as intermediate
+                                  return;
+                                } else {
+                                  return;
+                                }
+                              }
+                              onCustomDegradationChange?.(Object.keys(newMap).length > 0 ? newMap : null);
+                            }}
+                          />
+                          <span className="text-[10px] text-muted-foreground">s/giro</span>
+                          {overrideMap[compound] != null && (
+                            <button
+                              onClick={() => {
+                                const newMap = { ...overrideMap };
+                                delete newMap[compound];
+                                onCustomDegradationChange?.(Object.keys(newMap).length > 0 ? newMap : null);
+                              }}
+                              className="text-[10px] text-red-400 hover:text-red-300 underline"
+                            >
+                              Rimuovi
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {hasAnyOverride && (
+                      <div className="space-y-0.5">
+                        {Object.entries(overrideMap).map(([comp, val]) => (
+                          <p key={comp} className="text-[9px] text-amber-400/80 flex items-center gap-1">
+                            <Gauge className="h-3 w-3" />
+                            Override attivo per {comp}: {val.toFixed(3)} s/giro
+                          </p>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {custom_degradation_override != null && (
-                    <p className="text-[9px] text-amber-400/80 flex items-center gap-1">
-                      <Gauge className="h-3 w-3" />
-                      Override attivo: {custom_degradation_override.toFixed(3)} s/giro applicato agli stint INVALID
-                    </p>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </div>
           </VRESection>
         )}
