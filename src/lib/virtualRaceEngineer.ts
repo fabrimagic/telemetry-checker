@@ -1694,14 +1694,6 @@ export function computeVirtualRaceEngineer(
 
   // ── 10. Enrich IntegratedStrategyContext with summaries from computed modules ──
   {
-    // Race phase summary (reference, not duplication)
-    const racePhaseSummary: RacePhaseSummary = {
-      current_phase: racePhase.current_phase,
-      phase_confidence: racePhase.phase_confidence ?? "MEDIUM",
-      strategy_phase: racePhase.strategy_phase ?? null,
-      execution_phase: racePhase.execution_phase ?? null,
-    };
-
     // Traffic summary from pre-computed analysis
     const trafficSummary: TrafficSummary | null = trafficAnalysis.length > 0 ? {
       total_predictions: trafficAnalysis.length,
@@ -1743,7 +1735,6 @@ export function computeVirtualRaceEngineer(
 
     integratedContext = enrichIntegratedContext(
       integratedContext,
-      racePhaseSummary,
       trafficSummary,
       degradationSummary,
       paceLossSummary,
