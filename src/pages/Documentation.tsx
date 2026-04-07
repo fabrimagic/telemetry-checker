@@ -152,6 +152,7 @@ export default function Documentation() {
               <TocLink href="#cumulative-deviation">Deviazione Cumulativa</TocLink>
               <TocLink href="#tyre-degradation-card">Degrado Gomme (Card)</TocLink>
               <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
+            </div>
             <div className="space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-2">Virtual Race Engineer</p>
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
