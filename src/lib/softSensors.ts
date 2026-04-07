@@ -965,6 +965,9 @@ function mostFrequent<T>(arr: T[]): T {
   }
   return best;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+ * STRATEGY REFINEMENT
  *
  * Applies small, traceable adjustments to simulated strategy costs.
  * Anti-double-counting:
