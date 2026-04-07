@@ -548,7 +548,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                            <span className="text-green-500">✓</span>}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
