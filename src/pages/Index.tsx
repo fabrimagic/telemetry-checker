@@ -56,8 +56,8 @@ import {
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
-import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
-import { VirtualRaceEngineerCard, type AnalysisMode } from "@/components/f1/VirtualRaceEngineerCard";
+import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel, type AnalysisMode } from "@/lib/virtualRaceEngineer";
+import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
 import { computeKeyDecisionMoments, type KeyDecisionMomentsResult } from "@/lib/keyDecisionMoments";
 import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";

@@ -1,4 +1,4 @@
-import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
+import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy, AnalysisMode } from "@/lib/virtualRaceEngineer";
 import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition, WarmupInterpretation, DegradationValidationContext, ValidationSupportLevel, SoftSensorScoringGate } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
@@ -802,7 +802,7 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
   );
 }
 
-export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
+// AnalysisMode is now imported from @/lib/virtualRaceEngineer
 
 interface Props {
   result: VirtualRaceEngineerResult;
