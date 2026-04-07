@@ -1336,6 +1336,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           </VRESection>
         )}
 
+        </>)}
       </CardContent>
     </Card>
   );
