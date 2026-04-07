@@ -393,10 +393,10 @@ export function computeVirtualRaceEngineer(
     return new Set(compounds).size >= 2;
   }
 
-  const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
-  const scenarioMods = buildTimedScenarioModifiers(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
-  const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
-  const scenarioWindow = isSimulatedScenario(scenarioId) ? computeScenarioWindow(scenarioActivationLap, scenarioDurationLaps, totalLaps) : null;
+  const scenarioDef = SCENARIO_DEFINITIONS[effectiveScenarioId];
+  const scenarioMods = buildTimedScenarioModifiers(effectiveScenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioActivationWarning = validateScenarioActivationLap(effectiveScenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioWindow = isSimulatedScenario(effectiveScenarioId) ? computeScenarioWindow(scenarioActivationLap, scenarioDurationLaps, totalLaps) : null;
 
   // ── Risk mode base weights ──
   const RISK_BASE = {
@@ -428,13 +428,13 @@ export function computeVirtualRaceEngineer(
 
   // Helper: check if a lap is inside the scenario window
   function isInScenarioWindow(lap: number): boolean {
-    if (!scenarioWindow) return isSimulatedScenario(scenarioId); // no window = full race
+    if (!scenarioWindow) return isSimulatedScenario(effectiveScenarioId); // no window = full race
     return lap >= scenarioWindow.start && lap <= scenarioWindow.end;
   }
 
   // Per-lap modifier for degradation based on scenario
   function lapDegradationMult(lap: number): number {
-    const base = isSimulatedScenario(scenarioId) && isInScenarioWindow(lap)
+    const base = isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(lap)
       ? riskBase.degradation * scenarioMods.degradation_weight
       : riskBase.degradation;
     return base * plDegAdj; // pace loss adjustment
@@ -455,7 +455,7 @@ export function computeVirtualRaceEngineer(
     }
 
     // No real neutralisation: apply scenario modifier if active
-    if (isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)) {
+    if (isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(pitLap)) {
       return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
     }
 
@@ -509,7 +509,7 @@ export function computeVirtualRaceEngineer(
     const pos = driverPositionAtLap.get(pitLap) ?? driverPositionAtLap.get(pitLap - 1) ?? 10;
     const positionFactor = precise ? 1.0 : (pos <= 3 ? 0.3 : pos <= 6 ? 0.7 : pos <= 14 ? 1.0 : 0.5);
 
-    const trafficMult = isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)
+    const trafficMult = isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(pitLap)
       ? riskBase.traffic * scenarioMods.traffic_weight
       : riskBase.traffic;
 
@@ -937,10 +937,10 @@ export function computeVirtualRaceEngineer(
 
   // ── 4c. Strategy Breakdowns (with scenario/risk modifiers) ──
   const breakdownMods: import("./strategyBreakdown").BreakdownModifiers = {
-    degradation_mult: isSimulatedScenario(scenarioId) ? riskBase.degradation * scenarioMods.degradation_weight : riskBase.degradation,
-    pit_loss_mult: isSimulatedScenario(scenarioId) ? riskBase.pitLoss * scenarioMods.pit_loss_multiplier : riskBase.pitLoss,
-    traffic_mult: isSimulatedScenario(scenarioId) ? riskBase.traffic * scenarioMods.traffic_weight : riskBase.traffic,
-    neutralization_mult: isSimulatedScenario(scenarioId) ? scenarioMods.neutralization_weight : 1.0,
+    degradation_mult: isSimulatedScenario(effectiveScenarioId) ? riskBase.degradation * scenarioMods.degradation_weight : riskBase.degradation,
+    pit_loss_mult: isSimulatedScenario(effectiveScenarioId) ? riskBase.pitLoss * scenarioMods.pit_loss_multiplier : riskBase.pitLoss,
+    traffic_mult: isSimulatedScenario(effectiveScenarioId) ? riskBase.traffic * scenarioMods.traffic_weight : riskBase.traffic,
+    neutralization_mult: isSimulatedScenario(effectiveScenarioId) ? scenarioMods.neutralization_weight : 1.0,
   };
 
   const actualTraffic = predictTrafficForPitLaps(
@@ -986,7 +986,7 @@ export function computeVirtualRaceEngineer(
       alt.pit_laps, alt.compounds, alt.estimated_delta_vs_actual,
       totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
       pitLoss, trafficAvgBaseline, altTraffic,
-      riskMode, scenarioId,
+      riskMode, effectiveScenarioId,
       intervals, positions, stints, allDrivers, driverNumber,
       simulateStrategyCost, driverAvgPace, actualPitLaps,
     );
@@ -1046,7 +1046,7 @@ export function computeVirtualRaceEngineer(
       bestPitLaps, bestCompounds, recommendedStrategy.estimated_gain_seconds,
       totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
       pitLoss, trafficAvgBaseline, recTraffic,
-      riskMode, scenarioId,
+      riskMode, effectiveScenarioId,
       intervals, positions, stints, allDrivers, driverNumber,
       simulateStrategyCost, driverAvgPace, actualPitLaps,
     );
@@ -1521,7 +1521,7 @@ export function computeVirtualRaceEngineer(
   const finalConfidence: Confidence = confScore >= 6 ? "HIGH" : confScore >= 3 ? "MEDIUM" : "LOW";
 
   // Add scenario note if simulated
-  if (isSimulatedScenario(scenarioId)) {
+  if (isSimulatedScenario(effectiveScenarioId)) {
     const lapNote = scenarioActivationLap != null ? ` dal giro ${scenarioActivationLap}` : "";
     const durNote = scenarioDurationLaps != null ? ` per ${scenarioDurationLaps} giri` : "";
     const windowNote = scenarioWindow ? ` (giri ${scenarioWindow.start}–${scenarioWindow.end})` : "";
@@ -1588,7 +1588,7 @@ export function computeVirtualRaceEngineer(
   }
 
   // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
-  const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(effectiveScenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
   // ── 9a. Compute Soft Sensors Timeline early (needed for scoring gate) ──
   const softSensorsTimeline = computeSoftSensorsTimeline(
@@ -1872,11 +1872,11 @@ export function computeVirtualRaceEngineer(
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,
-    scenario_id: scenarioId,
-    scenario_is_simulated: isSimulatedScenario(scenarioId),
+    scenario_id: effectiveScenarioId,
+    scenario_is_simulated: isSimulatedScenario(effectiveScenarioId),
     scenario_label: scenarioDef.label,
     scenario_description: (() => {
-      if (!isSimulatedScenario(scenarioId)) return scenarioDef.description;
+      if (!isSimulatedScenario(effectiveScenarioId)) return scenarioDef.description;
       const parts = [scenarioDef.description];
       if (scenarioActivationLap != null) parts.push(`dal giro ${scenarioActivationLap}`);
       if (scenarioDurationLaps != null) parts.push(`per ${scenarioDurationLaps} giri`);
@@ -1886,8 +1886,8 @@ export function computeVirtualRaceEngineer(
     scenario_modifiers_applied: Object.fromEntries(
       Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
     ) as Record<string, number>,
-    scenario_activation_lap: isSimulatedScenario(scenarioId) ? scenarioActivationLap : null,
-    scenario_duration_laps: isSimulatedScenario(scenarioId) ? scenarioDurationLaps : null,
+    scenario_activation_lap: isSimulatedScenario(effectiveScenarioId) ? scenarioActivationLap : null,
+    scenario_duration_laps: isSimulatedScenario(effectiveScenarioId) ? scenarioDurationLaps : null,
     scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
     degradation_validations: degradationValidations,
