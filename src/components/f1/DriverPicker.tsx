@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Driver } from "@/lib/openf1";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
@@ -19,28 +20,45 @@ interface Props {
 
 export function DriverPicker({ drivers, selected, onAdd, onRemove, max = 3 }: Props) {
   const available = drivers.filter((d) => !selected.includes(d.driver_number));
+  const [imgErrors, setImgErrors] = useState<Set<number>>(new Set());
+
+  const handleImgError = (driverNumber: number) => {
+    setImgErrors((prev) => new Set(prev).add(driverNumber));
+  };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
         Drivers <span className="normal-case text-muted-foreground/60">({selected.length}/{max})</span>
       </label>
 
-      {/* Selected chips */}
+      {/* Selected driver cards with headshot */}
       {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {selected.map((num) => {
             const d = drivers.find((dr) => dr.driver_number === num);
             if (!d) return null;
+            const showPhoto = d.headshot_url && !imgErrors.has(num);
             return (
-              <span
+              <div
                 key={num}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border border-border bg-muted"
+                className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-border bg-muted"
               >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: `#${d.team_colour || "ffffff"}` }}
-                />
+                {showPhoto && (
+                  <img
+                    src={d.headshot_url!}
+                    alt={d.full_name}
+                    onError={() => handleImgError(num)}
+                    className="w-8 h-8 rounded-full object-cover object-top shrink-0 ring-2 ring-offset-1 ring-offset-background"
+                    style={{ ringColor: `#${d.team_colour || "888"}` } as React.CSSProperties}
+                  />
+                )}
+                {!showPhoto && (
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: `#${d.team_colour || "ffffff"}` }}
+                  />
+                )}
                 <span className="font-mono font-bold">{d.name_acronym}</span>
                 <button
                   onClick={() => onRemove(num)}
@@ -48,7 +66,7 @@ export function DriverPicker({ drivers, selected, onAdd, onRemove, max = 3 }: Pr
                 >
                   <X className="h-3 w-3" />
                 </button>
-              </span>
+              </div>
             );
           })}
         </div>
