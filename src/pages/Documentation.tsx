@@ -115,11 +115,9 @@ export default function Documentation() {
             è incerto, la confidenza viene ridotta e comunicata esplicitamente.
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
-            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">React 18</span>
-            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">TypeScript 5</span>
-            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">Vite 5</span>
-            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">Recharts</span>
             <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">OpenF1 API</span>
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">Analisi in tempo reale</span>
+            <span className="text-[10px] px-2 py-1 rounded bg-muted border border-border text-muted-foreground">Anti-allucinazione</span>
           </div>
         </div>
 
