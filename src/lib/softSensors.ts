@@ -107,6 +107,90 @@ export interface StrategySoftSensorAdjustment {
   confidence: SoftSensorConfidence;
 }
 
+/* ── Scoring gate types ── */
+export interface SoftSensorScoringGate {
+  soft_sensor_scoring_enabled: boolean;
+  soft_sensor_block_reason: string | null;
+}
+
+/**
+ * Validates whether soft sensors can influence scoring.
+ * Gate conditions:
+ * 1. Timeline available and non-empty
+ * 2. Overall confidence != LOW
+ * 3. DegradationValidationContext overall_support != WEAK
+ * 4. No major conflicts between thermal/stress/grip
+ */
+export function validateSoftSensorScoringGate(
+  timeline: SoftSensorsTimeline | undefined,
+  validationContext: DegradationValidationContext | undefined,
+): SoftSensorScoringGate {
+  if (!timeline || timeline.by_lap.length === 0) {
+    return { soft_sensor_scoring_enabled: false, soft_sensor_block_reason: "Timeline soft sensors non disponibile" };
+  }
+
+  if (timeline.summary.overall_confidence === "LOW") {
+    return { soft_sensor_scoring_enabled: false, soft_sensor_block_reason: "Confidence complessiva della timeline troppo bassa (LOW)" };
+  }
+
+  if (validationContext && validationContext.overall_support === "WEAK") {
+    return { soft_sensor_scoring_enabled: false, soft_sensor_block_reason: "Supporto validazione degrado debole (WEAK) — soft sensors non affidabili per lo scoring" };
+  }
+
+  // Check signal coherence: if >40% of laps have conflicting extreme states, block
+  const conflictLaps = timeline.by_lap.filter(l => {
+    const thermalExtreme = l.tyre_thermal.label === "COLD" || l.tyre_thermal.label === "OVERHEATED";
+    const stressExtreme = l.tyre_stress.label === "CRITICAL";
+    const gripExtreme = l.track_grip.label === "LOW_GRIP" || l.track_grip.label === "FALLING";
+    // Conflict: thermal says cold but stress says critical (contradictory)
+    if (l.tyre_thermal.label === "COLD" && l.tyre_stress.label === "CRITICAL") return true;
+    // Conflict: grip improving but stress critical and thermal overheated
+    if (l.track_grip.label === "IMPROVING" && stressExtreme && thermalExtreme) return true;
+    return false;
+  });
+
+  if (conflictLaps.length > timeline.by_lap.length * 0.4) {
+    return { soft_sensor_scoring_enabled: false, soft_sensor_block_reason: "Segnali soft sensor in conflitto su oltre il 40% dei giri — scoring disabilitato" };
+  }
+
+  return { soft_sensor_scoring_enabled: true, soft_sensor_block_reason: null };
+}
+
+/** Maximum delta between strategies beyond which SS scoring is ignored */
+const SS_SCORING_DELTA_THRESHOLD = 5.0; // seconds
+
+/**
+ * Compute soft sensor scoring delta for a strategy.
+ * Returns the amount to add to the scoring adjusted_score.
+ * 
+ * Rules:
+ * - If gate is closed → 0
+ * - If strategy delta vs best is > threshold → 0
+ * - Confidence weighting: HIGH=1.0, MEDIUM=0.5, LOW=0
+ * - Global clamp: ±1.0s max effect on scoring
+ */
+export function computeSoftSensorScoringDelta(
+  adjustment: StrategySoftSensorAdjustment,
+  gate: SoftSensorScoringGate,
+  strategyDelta: number,
+  bestDelta: number,
+): number {
+  if (!gate.soft_sensor_scoring_enabled) return 0;
+
+  // If this strategy is far from the best, SS cannot influence
+  if (Math.abs(strategyDelta - bestDelta) > SS_SCORING_DELTA_THRESHOLD) return 0;
+
+  const confWeight = adjustment.confidence === "HIGH" ? 1.0 : adjustment.confidence === "MEDIUM" ? 0.5 : 0;
+  if (confWeight === 0) return 0;
+
+  // SS adjustment is a cost (positive = penalty). For scoring, we invert:
+  // higher SS cost → lower score
+  const rawDelta = -adjustment.total_soft_sensor_adjustment * confWeight;
+
+  // Clamp to ±1.0s to keep it weak
+  return Math.max(-1.0, Math.min(1.0, Math.round(rawDelta * 100) / 100));
+}
+
 /* ── Warmup Interpretation types ── */
 export interface WarmupAnomaly {
   stint_number: number;

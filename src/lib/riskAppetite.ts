@@ -184,6 +184,12 @@ export interface ScoredStrategy {
   adjustment_reason: string;
   /** Per-strategy context penalty/bonus from risk context (0 if no context) */
   context_adjustment: number;
+  /** Soft sensor scoring delta (weak input, 0 if gate closed or N/A) */
+  soft_sensor_scoring_delta: number;
+  /** Score without soft sensor contribution */
+  scoring_without_soft_sensors: number;
+  /** Score with soft sensor contribution */
+  scoring_with_soft_sensors: number;
 }
 
 /**
@@ -208,6 +214,8 @@ export function scoreStrategies(
     isRecommended?: boolean;
     /** Optional per-strategy risk context from analysis modules */
     riskContext?: StrategyRiskContext;
+    /** Optional soft sensor scoring delta (pre-validated through gate) */
+    softSensorScoringDelta?: number;
   }[],
   phaseAdj: PhaseAdjustments,
   riskMode: RiskMode,
@@ -233,7 +241,15 @@ export function scoreStrategies(
     /* ── 5. Context penalty from per-strategy risk signals ── */
     const ctxAdj = computeContextAdjustment(s.riskContext, profile, reasons);
 
-    const adjustedScore = Math.round((reward + ctxAdj) * 10) / 10;
+    const scoreWithoutSS = Math.round((reward + ctxAdj) * 10) / 10;
+
+    /* ── 6. Soft sensor weak input (validated through gate) ── */
+    const ssDelta = s.softSensorScoringDelta ?? 0;
+    if (Math.abs(ssDelta) > 0.01) {
+      reasons.push(`soft sensors: ${ssDelta > 0 ? "+" : ""}${ssDelta.toFixed(2)}s`);
+    }
+
+    const adjustedScore = Math.round((scoreWithoutSS + ssDelta) * 10) / 10;
 
     return {
       index: s.isRecommended ? -2 : i,
@@ -242,6 +258,9 @@ export function scoreStrategies(
       adjusted_score: adjustedScore,
       adjustment_reason: buildAdjustmentReason(reasons),
       context_adjustment: Math.round(ctxAdj * 10) / 10,
+      soft_sensor_scoring_delta: Math.round(ssDelta * 100) / 100,
+      scoring_without_soft_sensors: scoreWithoutSS,
+      scoring_with_soft_sensors: adjustedScore,
     };
   }).sort((a, b) => b.adjusted_score - a.adjusted_score);
 }
