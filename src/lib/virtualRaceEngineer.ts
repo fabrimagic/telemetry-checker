@@ -145,6 +145,7 @@ export interface VirtualRaceEngineerResult {
   warmup_interpretation?: WarmupInterpretation;
   degradation_validation_context?: DegradationValidationContext;
   soft_sensor_scoring_gate?: SoftSensorScoringGate;
+  analysis_mode: AnalysisMode;
 }
 
 /* ── Helpers ── */
@@ -211,6 +212,7 @@ export function computeVirtualRaceEngineer(
   scenarioActivationLap: number | null = null,
   scenarioDurationLaps: number | null = null,
   customDegradationOverride: Record<string, number> | null = null,
+  analysisMode: AnalysisMode = "POST_RACE",
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
