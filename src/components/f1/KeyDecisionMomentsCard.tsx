@@ -248,8 +248,6 @@ export function KeyDecisionMomentsCard({ result, sessionKey, currentYear, onAnal
 
     try {
       const fetchSessions = async (yearStart: number, yearEnd: number): Promise<SessionInfo[]> => {
-        const { default: fetchFn } = await import("@/lib/openf1");
-        // We don't have a direct sessions-by-year endpoint, so we search broadly
         const res = await fetch(`https://api.openf1.org/v1/sessions?session_type=Race&date_start>=${yearStart}-01-01&date_start<=${yearEnd}-12-31`);
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         return res.json();
