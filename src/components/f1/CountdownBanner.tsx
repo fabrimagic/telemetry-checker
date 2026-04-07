@@ -13,7 +13,7 @@ function formatCountdown(diffMs: number): string {
   const pad = (n: number) => String(n).padStart(2, "0");
 
   if (days > 0) {
-    return `${days}g ${pad(hours)}:${pad(minutes)}`;
+    return `${days}g ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
   }
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
