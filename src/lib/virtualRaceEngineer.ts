@@ -81,6 +81,8 @@ export interface AlternativeStrategy {
   traffic_predictions?: TrafficPrediction[];
   breakdown?: StrategyBreakdown;
   analysis?: EnrichedStrategyAnalysis;
+  soft_sensor_adjustment?: StrategySoftSensorAdjustment;
+  soft_sensor_notes?: string[];
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
