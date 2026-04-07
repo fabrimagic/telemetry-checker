@@ -1,4 +1,5 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
+import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
