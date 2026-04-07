@@ -1777,7 +1777,17 @@ export function computeVirtualRaceEngineer(
         earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
       );
 
-  // ── 11b. Apply soft sensor refinement to recommended + alternatives ──
+  // ── 11b. Warmup interpretation & degradation validation context ──
+  const warmupInterpretation = computeWarmupInterpretation(softSensorsTimeline, stintAnalyses);
+  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations);
+
+  // ── 11c. Enhanced narrative insights from soft sensors ──
+  const sensorNarrativeInsights = extractSoftSensorNarrativeInsights(softSensorsTimeline, stintAnalyses);
+  for (const insight of sensorNarrativeInsights) {
+    narrativeInsights.push(insight);
+  }
+
+  // ── 11d. Apply soft sensor refinement to recommended + alternatives ──
   {
     const recAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
     recommendedStrategy.soft_sensor_adjustment = recAdj;
