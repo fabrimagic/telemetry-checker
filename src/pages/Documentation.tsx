@@ -1434,6 +1434,37 @@ export default function Documentation() {
             per garantire coerenza. Sono presentati come sezione collassabile nel VRE con etichetta "STIMA".
           </p>
 
+          <h4 className="font-semibold text-foreground mt-4">Layer di supporto</h4>
+          <p>
+            I soft sensors forniscono supporto contestuale a quattro aree del sistema, senza mai sostituire
+            o ribaltare i moduli esistenti:
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Interpretazione warmup</strong> — Analizza la timeline termica per identificare anomalie
+              nel riscaldamento gomme (warmup più lento o più rapido del modello). Non modifica il calcolo
+              della penalità warmup, ma fornisce spiegazioni e contesto (es. "warmup persistente per 5 giri vs 3 previsti").
+            </li>
+            <li>
+              <strong>Contesto validazione degrado</strong> — Valuta la coerenza tra stress gomma, grip pista e
+              stabilità termica durante ogni stint per classificare il supporto contestuale alla validazione
+              del degrado (STRONG, PARTIAL, WEAK). Segnala inconsistenze (es. "stress basso nonostante slope elevata")
+              senza modificare la classificazione originale del degrado.
+            </li>
+            <li>
+              <strong>Narrativa arricchita</strong> — Estrae fino a 6 insight narrativi dalla timeline,
+              tracciabili a giro e sensore specifico: anomalie warmup, ingresso in stress elevato,
+              transizioni grip, combinazioni critiche. Ogni insight è prudente e non attribuisce cause non osservabili.
+            </li>
+            <li>
+              <strong>Contesto decisionale (Key Decision Moments)</strong> — Per ogni momento decisionale,
+              aggrega gli stati dei tre sensori sulla finestra di 1–3 giri, valuta la coerenza dei segnali
+              e fornisce note contestuali (es. "stress elevato: segnale coerente con pressione verso il pit",
+              "gomme non in finestra: undercut penalizzato dal warmup"). I soft sensors sono un fattore
+              secondario, mai un driver principale della decisione.
+            </li>
+          </ul>
+
           <h4 className="font-semibold text-foreground mt-4">Anti-allucinazione</h4>
           <ul className="list-disc list-inside space-y-1">
             <li>Nessun valore fisico assoluto viene prodotto (nessuna °C, kPa, ecc.)</li>
@@ -1443,6 +1474,8 @@ export default function Documentation() {
             <li>Se i dati sono insufficienti o contraddittori, lo stato è UNKNOWN con confidenza bassa</li>
             <li>Gli aggiustamenti strategici sono piccoli, limitati e non possono ribaltare un risultato robusto</li>
             <li>Nessun effetto forte senza evidenze convergenti</li>
+            <li>Il layer di supporto non modifica i risultati dei moduli core (warmup, degrado, pace loss)</li>
+            <li>Ogni insight narrativo è tracciabile a un giro e un sensore specifico</li>
           </ul>
         </DocSection>
 
