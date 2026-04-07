@@ -144,6 +144,7 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
     trafficAnalysis, paceLossResults, degradationValidations,
     diaryEvents, driverCumDev, positions, intervals,
     driverNumber, driverAcronym, sessionKey, totalLaps,
+    softSensorsTimeline,
   } = input;
 
   const pitLapSet = new Set(pitStops.map(p => p.lap_number));
