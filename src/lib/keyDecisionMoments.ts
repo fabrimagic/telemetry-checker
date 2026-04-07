@@ -912,10 +912,9 @@ export async function searchHistoricalAnalogs(
     const sessionYear = new Date(session.date_start).getFullYear();
     const gpName = session.session_name || `Session ${session.session_key}`;
 
-    // Find all pit stops in this session and check each as a potential analog
-    const allDriverNumbers: number[] = [...new Set(data.stints.map(s => s.driver_number))];
+    const allDriverNums = Array.from(new Set(data.stints.map(s => s.driver_number)));
 
-    for (const dn of allDrivers) {
+    for (const dn of allDriverNums) {
       const driverLaps = data.laps.filter(l => l.driver_number === dn);
       const driverStints = data.stints.filter(s => s.driver_number === dn);
       const driverPits = data.pitStops.filter(p => p.driver_number === dn);
