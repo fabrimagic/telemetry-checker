@@ -1582,6 +1582,49 @@ export function computeVirtualRaceEngineer(
   // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
   const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
+  // ── 9a. Compute Soft Sensors Timeline early (needed for scoring gate) ──
+  const softSensorsTimeline = computeSoftSensorsTimeline(
+    stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
+    earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+  );
+  const softSensors: SoftSensorsContext | undefined = softSensorsTimeline.summary.latest_state
+    ? {
+        tyre_thermal: softSensorsTimeline.summary.latest_state.tyre_thermal,
+        tyre_stress: softSensorsTimeline.summary.latest_state.tyre_stress,
+        track_grip: softSensorsTimeline.summary.latest_state.track_grip,
+        overall_confidence: softSensorsTimeline.summary.overall_confidence,
+        reliability_notes: softSensorsTimeline.summary.reliability_notes,
+      }
+    : computeSoftSensors(
+        stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
+        earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+      );
+  const warmupInterpretation = computeWarmupInterpretation(softSensorsTimeline, stintAnalyses);
+  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations);
+
+  // Soft sensor refinement adjustments
+  const recSSAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
+  recommendedStrategy.soft_sensor_adjustment = recSSAdj;
+  if (recSSAdj.total_soft_sensor_adjustment !== 0) {
+    recommendedStrategy.soft_sensor_notes = recSSAdj.adjustment_reasons;
+  }
+  for (const alt of alternatives) {
+    const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline);
+    alt.soft_sensor_adjustment = altAdj;
+    if (altAdj.total_soft_sensor_adjustment !== 0) {
+      alt.soft_sensor_notes = altAdj.adjustment_reasons;
+    }
+  }
+
+  // Soft sensor scoring gate
+  const softSensorScoringGate = validateSoftSensorScoringGate(softSensorsTimeline, degradationValidationContext);
+
+  // Enhanced narrative insights from soft sensors
+  const sensorNarrativeInsights = extractSoftSensorNarrativeInsights(softSensorsTimeline, stintAnalyses);
+  for (const insight of sensorNarrativeInsights) {
+    narrativeInsights.push(insight);
+  }
+
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
   // Per-strategy risk context is extracted from analysis and passed directly to
   // scoreStrategies, which applies mode-dependent context adjustments internally.
