@@ -58,6 +58,9 @@ import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
+import { computeKeyDecisionMoments, type KeyDecisionMomentsResult, type DecisionPoint, type HistoricalAnalog } from "@/lib/keyDecisionMoments";
+import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
+import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DriverState {
