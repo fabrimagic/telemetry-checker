@@ -516,6 +516,7 @@ export default function Documentation() {
           </p>
           <ul className="list-disc pl-5 space-y-1">
             <li>Utilizza solo le informazioni disponibili fino al giro corrente</li>
+            <li>Le strategie simulate <strong className="text-foreground">non beneficiano</strong> di SC/VSC futuri: il pit loss è calcolato senza sconti da neutralizzazione</li>
             <li>Scenario forzato su <strong className="text-foreground">Real Conditions</strong> — non modificabile</li>
             <li>Il selettore scenari what-if è nascosto</li>
             <li>Risk mode selezionabile normalmente</li>
@@ -529,11 +530,20 @@ export default function Documentation() {
           </p>
           <ul className="list-disc pl-5 space-y-1">
             <li>Utilizza la timeline reale completa della gara</li>
+            <li>Le strategie simulate <strong className="text-foreground">beneficiano</strong> di SC/VSC reali: il pit loss è scontato se il pit cade durante una neutralizzazione</li>
             <li>Scenario selezionabile dall'utente (default: Real Conditions)</li>
             <li>Scenari what-if disponibili con giro di attivazione e durata</li>
             <li>Risk mode selezionabile normalmente</li>
             <li>Output: "Strategia ottimale a posteriori, considerando tutti gli eventi della gara"</li>
           </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Ricalcolo completo</h4>
+          <p>
+            Ogni cambio di modalità (Race Engineer ↔ Post-Race), scenario o risk mode
+            esegue un <strong className="text-foreground">ricalcolo completo</strong> dell'intero motore strategico:
+            preprocessing, degrado, traffico, soft sensors, pace loss, strategia reale, raccomandata,
+            alternative, scoring, decision moments e narrative. Nessuna cache è riutilizzata tra modalità diverse.
+          </p>
 
           <h4 className="font-semibold text-foreground mt-4">Differenze chiave</h4>
           <div className="overflow-x-auto">
@@ -547,9 +557,11 @@ export default function Documentation() {
               </thead>
               <tbody>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5">Prospettiva</td><td className="px-3 py-1.5">Ex-ante (in tempo reale)</td><td className="px-3 py-1.5">Ex-post (a posteriori)</td></tr>
-                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Eventi futuri</td><td className="px-3 py-1.5">Non utilizzati</td><td className="px-3 py-1.5">Completamente disponibili</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Eventi futuri</td><td className="px-3 py-1.5">Non utilizzati nelle simulazioni</td><td className="px-3 py-1.5">Completamente disponibili</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">SC/VSC pit loss</td><td className="px-3 py-1.5">Nessuno sconto (simulazioni)</td><td className="px-3 py-1.5">Sconto applicato se pit in neutralizzazione</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5">Scenari what-if</td><td className="px-3 py-1.5">Disabilitati (Real Conditions)</td><td className="px-3 py-1.5">Selezionabili</td></tr>
                 <tr className="border-b border-border/50"><td className="px-3 py-1.5">Risk mode</td><td className="px-3 py-1.5">Selezionabile</td><td className="px-3 py-1.5">Selezionabile</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Ricalcolo</td><td className="px-3 py-1.5">Completo ad ogni cambio</td><td className="px-3 py-1.5">Completo ad ogni cambio</td></tr>
                 <tr><td className="px-3 py-1.5">Soft sensors</td><td className="px-3 py-1.5">Invariati (dati osservati)</td><td className="px-3 py-1.5">Invariati (dati osservati)</td></tr>
               </tbody>
             </table>
@@ -561,6 +573,7 @@ export default function Documentation() {
             <li>Post-Race Mode non è predittiva — è un'analisi retrospettiva, non una previsione</li>
             <li>I soft sensors sono sempre basati su dati osservati, indipendentemente dalla modalità</li>
             <li>Nessuna modalità inventa eventi o dati non presenti</li>
+            <li>Non è possibile riutilizzare risultati calcolati con una modalità diversa</li>
           </ul>
         </DocSection>
         <DocSection id="vre-ui" title="VRE — Interfaccia a 4 Sezioni" icon={<LayoutDashboard className="h-4 w-4" />}>
