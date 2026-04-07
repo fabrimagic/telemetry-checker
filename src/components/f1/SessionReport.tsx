@@ -212,6 +212,40 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return weather[weather.length - 1];
   }, [weather]);
 
+  const weatherTimeline = useMemo(() => {
+    if (!weather.length || !allLaps.length) return [];
+    // Build a sorted list of lap start times from all drivers
+    const lapTimes: { lap: number; date: string }[] = [];
+    const seenLaps = new Set<number>();
+    for (const l of allLaps) {
+      if (l.date_start && !seenLaps.has(l.lap_number)) {
+        seenLaps.add(l.lap_number);
+        lapTimes.push({ lap: l.lap_number, date: l.date_start });
+      }
+    }
+    lapTimes.sort((a, b) => a.lap - b.lap);
+
+    // For each lap, find the closest weather sample
+    const result: { lap: number; air_temperature: number; track_temperature: number; humidity: number; wind_speed: number; rainfall: number }[] = [];
+    for (const lt of lapTimes) {
+      let best = weather[0];
+      let bestDiff = Math.abs(new Date(weather[0].date).getTime() - new Date(lt.date).getTime());
+      for (let i = 1; i < weather.length; i++) {
+        const diff = Math.abs(new Date(weather[i].date).getTime() - new Date(lt.date).getTime());
+        if (diff < bestDiff) { best = weather[i]; bestDiff = diff; }
+      }
+      result.push({
+        lap: lt.lap,
+        air_temperature: best.air_temperature,
+        track_temperature: best.track_temperature,
+        humidity: best.humidity,
+        wind_speed: best.wind_speed,
+        rainfall: best.rainfall,
+      });
+    }
+    return result;
+  }, [weather, allLaps]);
+
   const tyreStrategy = useMemo(() => {
     if (!stints.length || !results.length) return [];
     const resultOrder = results.map((r) => r.driver_number);
@@ -555,39 +589,67 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
               </div>
             </div>
 
-            {/* Weather + Grid side by side */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {weatherSummary && (
+            {/* Weather Timeline + Grid */}
+            <div className="space-y-4">
+              {weatherTimeline.length > 0 && (
                 <div className="bg-card rounded-lg border border-border p-4">
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
                     <Cloud className="h-3.5 w-3.5" />
-                    Weather Conditions
+                    Weather Evolution
                   </h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-4">
+                    {/* Temperature chart */}
                     <div>
-                      <span className="text-xs text-muted-foreground">Air Temp</span>
-                      <p className="font-mono font-bold text-sm">{weatherSummary.air_temperature}°C</p>
+                      <p className="text-[10px] text-muted-foreground mb-1 font-medium uppercase tracking-wider">Temperature (°C)</p>
+                      <ResponsiveContainer width="100%" height={140}>
+                        <LineChart data={weatherTimeline} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="lap" tick={{ fontSize: 10 }} label={{ value: "Lap", position: "insideBottomRight", offset: -2, fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
+                          <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }} />
+                          <Line type="monotone" dataKey="track_temperature" name="Track" stroke="hsl(0 80% 55%)" dot={false} strokeWidth={2} />
+                          <Line type="monotone" dataKey="air_temperature" name="Air" stroke="hsl(210 80% 60%)" dot={false} strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
+                    {/* Humidity & Wind chart */}
                     <div>
-                      <span className="text-xs text-muted-foreground">Track Temp</span>
-                      <p className="font-mono font-bold text-sm">{weatherSummary.track_temperature}°C</p>
+                      <p className="text-[10px] text-muted-foreground mb-1 font-medium uppercase tracking-wider">Humidity (%) & Wind (km/h)</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <LineChart data={weatherTimeline} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="lap" tick={{ fontSize: 10 }} label={{ value: "Lap", position: "insideBottomRight", offset: -2, fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
+                          <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }} />
+                          <Line type="monotone" dataKey="humidity" name="Humidity %" stroke="hsl(180 60% 50%)" dot={false} strokeWidth={1.5} />
+                          <Line type="monotone" dataKey="wind_speed" name="Wind km/h" stroke="hsl(45 80% 55%)" dot={false} strokeWidth={1.5} />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Humidity</span>
-                      <p className="font-mono font-bold text-sm">{weatherSummary.humidity}%</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Wind</span>
-                      <p className="font-mono font-bold text-sm">{weatherSummary.wind_speed} km/h</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Rainfall</span>
-                      <p className="font-mono font-bold text-sm">{weatherSummary.rainfall > 0 ? "Yes 🌧" : "No ☀️"}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Pressure</span>
-                      <p className="font-mono font-bold text-sm">{weatherSummary.pressure} hPa</p>
-                    </div>
+                    {/* Rainfall indicator */}
+                    {weatherTimeline.some(w => w.rainfall > 0) && (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1 font-medium uppercase tracking-wider">🌧 Rainfall</p>
+                        <div className="flex gap-[1px] h-4 items-end">
+                          {weatherTimeline.map((w, i) => (
+                            <div
+                              key={i}
+                              className="flex-1 rounded-sm"
+                              style={{
+                                backgroundColor: w.rainfall > 0 ? "hsl(210 80% 60%)" : "hsl(var(--muted))",
+                                height: w.rainfall > 0 ? "100%" : "30%",
+                                opacity: w.rainfall > 0 ? 1 : 0.3,
+                              }}
+                              title={`Lap ${w.lap}: ${w.rainfall > 0 ? "Rain" : "Dry"}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                          <span>L{weatherTimeline[0]?.lap}</span>
+                          <span>L{weatherTimeline[weatherTimeline.length - 1]?.lap}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
