@@ -509,16 +509,28 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {results.map((r) => (
-                      <TableRow key={r.driver_number}>
-                        <TableCell className="font-mono font-bold">{r.position}</TableCell>
+                    {results.map((r) => {
+                      const headshot = driverHeadshot(r.driver_number);
+                      return (
+                      <TableRow key={r.driver_number} className={r.dnf || r.dns || r.dsq ? "opacity-60" : ""}>
+                        <TableCell className="font-mono font-bold">{r.position ?? "—"}</TableCell>
                         <TableCell>
                           <span className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
-                            />
-                            <span className="font-mono font-bold">{driverName(r.driver_number)}</span>
+                            {headshot ? (
+                              <img
+                                src={headshot}
+                                alt={driverBroadcastName(r.driver_number)}
+                                className="w-7 h-7 rounded-full object-cover shrink-0 border"
+                                style={{ borderColor: `#${driverColor(r.driver_number)}` }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                            ) : (
+                              <span
+                                className="w-7 h-7 rounded-full shrink-0"
+                                style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
+                              />
+                            )}
+                            <span className="font-semibold text-sm">{driverBroadcastName(r.driver_number)}</span>
                           </span>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-xs">{driverTeam(r.driver_number)}</TableCell>
