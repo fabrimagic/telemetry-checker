@@ -1470,6 +1470,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 {recommended_strategy.analysis && (
                   <StrategyAdvancedDetails analysis={recommended_strategy.analysis} />
                 )}
+
+                {/* Soft Sensor Impact */}
+                {recommended_strategy.soft_sensor_adjustment && (
+                  <SoftSensorImpactDetail adjustment={recommended_strategy.soft_sensor_adjustment} />
+                )}
               </div>
 
               {/* Breakdown for recommended */}
