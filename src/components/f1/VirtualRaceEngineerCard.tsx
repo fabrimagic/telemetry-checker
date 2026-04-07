@@ -1554,6 +1554,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                           </span>
                         )}
                         <DeltaBadge delta={alt.estimated_delta_vs_actual} />
+                        {alt.soft_sensor_adjustment && <SoftSensorImpactBadge adjustment={alt.soft_sensor_adjustment} />}
                       </div>
                     </div>
 
