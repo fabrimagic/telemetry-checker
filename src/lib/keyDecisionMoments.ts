@@ -900,7 +900,10 @@ export async function searchHistoricalAnalogs(
     warnings.push(`Campione limitato a 10 sessioni su ${raceSessions.length} disponibili`);
   }
 
-  for (const session of sampled) {
+  for (let si = 0; si < sampled.length; si++) {
+    const session = sampled[si];
+    // Add delay between session fetches to respect rate limits
+    if (si > 0) await new Promise(r => setTimeout(r, 1200));
     let data;
     try {
       data = await fetchSessionDataFn(session.session_key);
