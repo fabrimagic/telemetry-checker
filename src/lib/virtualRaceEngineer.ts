@@ -17,7 +17,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
-import { computeSoftSensors, type SoftSensorsContext } from "./softSensors";
+import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment } from "./softSensors";
 
 /* ── Types ── */
 
