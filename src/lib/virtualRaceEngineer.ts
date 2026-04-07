@@ -416,8 +416,12 @@ export function computeVirtualRaceEngineer(
   /**
    * Returns the pit loss multiplier based on observed (real) track status at a given lap.
    * Only uses trackStatusMap (real data), never scenario-simulated neutralisations.
+   * In RACE_ENGINEER mode, returns 1.0 for simulated strategies (no future knowledge).
+   * Use forActualStrategy=true to always use real data (for actual strategy breakdown).
    */
-  function getObservedPitLossMultiplier(pitLap: number): number {
+  function getObservedPitLossMultiplier(pitLap: number, forActualStrategy: boolean = false): number {
+    // In RACE_ENGINEER mode, simulated strategies don't benefit from SC/VSC knowledge
+    if (isRaceEngineerMode && !forActualStrategy) return 1.0;
     const status = trackStatusMap.get(pitLap);
     if (status === "SC") return SC_PIT_LOSS_MULT;
     if (status === "VSC") return VSC_PIT_LOSS_MULT;
