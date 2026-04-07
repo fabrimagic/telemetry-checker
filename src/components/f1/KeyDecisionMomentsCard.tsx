@@ -304,6 +304,11 @@ function DecisionPointCard({ point }: { point: DecisionPoint }) {
             <OutcomeBlock outcome={point.outcome} realAction={point.real_action} />
           </div>
 
+          {/* Soft Sensor Context */}
+          {point.soft_sensor_context && (
+            <SoftSensorContextBlock ctx={point.soft_sensor_context} />
+          )}
+
           {/* Reliability Notes */}
           {point.reliability_notes.length > 0 && (
             <div className="rounded-md bg-muted/20 border border-border/30 px-2.5 py-2">
