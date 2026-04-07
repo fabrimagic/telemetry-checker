@@ -1543,6 +1543,12 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 {recommended_strategy.soft_sensor_adjustment && (
                   <SoftSensorImpactDetail adjustment={recommended_strategy.soft_sensor_adjustment} />
                 )}
+                <SoftSensorScoringImpact
+                  scoringWithout={recommended_strategy.scoring_without_soft_sensors}
+                  scoringWith={recommended_strategy.scoring_with_soft_sensors}
+                  delta={recommended_strategy.scoring_delta_soft_sensors}
+                  gate={data.soft_sensor_scoring_gate}
+                />
               </div>
 
               {/* Breakdown for recommended */}
@@ -1681,6 +1687,12 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                     {alt.soft_sensor_adjustment && (
                       <SoftSensorImpactDetail adjustment={alt.soft_sensor_adjustment} />
                     )}
+                    <SoftSensorScoringImpact
+                      scoringWithout={alt.scoring_without_soft_sensors}
+                      scoringWith={alt.scoring_with_soft_sensors}
+                      delta={alt.scoring_delta_soft_sensors}
+                      gate={data.soft_sensor_scoring_gate}
+                    />
 
                     {/* Breakdown per-strategy */}
                     {alt.breakdown && (
