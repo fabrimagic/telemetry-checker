@@ -1608,6 +1608,11 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                       <StrategyAdvancedDetails analysis={alt.analysis} />
                     )}
 
+                    {/* Soft Sensor Impact */}
+                    {alt.soft_sensor_adjustment && (
+                      <SoftSensorImpactDetail adjustment={alt.soft_sensor_adjustment} />
+                    )}
+
                     {/* Breakdown per-strategy */}
                     {alt.breakdown && (
                       <details className="group mt-1">
