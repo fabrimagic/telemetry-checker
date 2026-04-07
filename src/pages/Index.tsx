@@ -58,7 +58,7 @@ import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
-import { computeKeyDecisionMoments, type KeyDecisionMomentsResult, type DecisionPoint, type HistoricalAnalog } from "@/lib/keyDecisionMoments";
+import { computeKeyDecisionMoments, type KeyDecisionMomentsResult } from "@/lib/keyDecisionMoments";
 import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
 import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
@@ -979,25 +979,8 @@ export default function Index() {
               )}
 
               {/* Key Decision Moments */}
-              {(sessionType === "Race" || sessionType === "Sprint") && kdmResult && kdmResult.decision_points.length > 0 && sessionKey && (
-                <KeyDecisionMomentsCard
-                  result={kdmResult}
-                  sessionKey={sessionKey}
-                  currentYear={new Date().getFullYear()}
-                  onAnalogsLoaded={(pointId, analogs, warnings) => {
-                    setKdmResult(prev => {
-                      if (!prev) return prev;
-                      return {
-                        ...prev,
-                        decision_points: prev.decision_points.map(dp =>
-                          dp.id === pointId
-                            ? { ...dp, analogs, analogs_status: "LOADED" as const, reliability_notes: [...dp.reliability_notes, ...warnings] }
-                            : dp
-                        ),
-                      };
-                    });
-                  }}
-                />
+              {(sessionType === "Race" || sessionType === "Sprint") && kdmResult && kdmResult.decision_points.length > 0 && (
+                <KeyDecisionMomentsCard result={kdmResult} />
               )}
           </>
         )}
