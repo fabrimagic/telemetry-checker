@@ -707,8 +707,8 @@ export default function Index() {
         {allDrivers.length > 0 && (
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "drivers" | "report")}>
             <TabsList>
-              <TabsTrigger value="drivers">Driver Analysis</TabsTrigger>
-              <TabsTrigger value="report">Session Report</TabsTrigger>
+              <TabsTrigger value="drivers">Analisi Pilota</TabsTrigger>
+              <TabsTrigger value="report">Report Sessione</TabsTrigger>
             </TabsList>
 
             <TabsContent value="report" className="mt-4">
