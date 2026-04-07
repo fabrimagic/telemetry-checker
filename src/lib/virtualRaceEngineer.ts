@@ -17,7 +17,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
-import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment } from "./softSensors";
+import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext } from "./softSensors";
 
 /* ── Types ── */
 
@@ -134,6 +134,8 @@ export interface VirtualRaceEngineerResult {
   custom_degradation_override: Record<string, number> | null;
   soft_sensors?: SoftSensorsContext;
   soft_sensors_timeline?: SoftSensorsTimeline;
+  warmup_interpretation?: WarmupInterpretation;
+  degradation_validation_context?: DegradationValidationContext;
 }
 
 /* ── Helpers ── */
