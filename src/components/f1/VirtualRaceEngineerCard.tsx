@@ -802,7 +802,7 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
   );
 }
 
-// AnalysisMode is now imported from @/lib/virtualRaceEngineer
+export type { AnalysisMode } from "@/lib/virtualRaceEngineer";
 
 interface Props {
   result: VirtualRaceEngineerResult;
