@@ -231,7 +231,7 @@ function SensorMiniCard({ title, icon, sensor, labelMap }: {
   );
 }
 
-function SoftSensorsSection({ sensors, timeline }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline }) {
+function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validationContext }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline; warmupInterpretation?: WarmupInterpretation; validationContext?: DegradationValidationContext }) {
   const [showTimeline, setShowTimeline] = useState(false);
 
   // Compute timeline highlights
