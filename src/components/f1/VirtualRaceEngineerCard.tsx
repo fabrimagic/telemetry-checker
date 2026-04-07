@@ -231,16 +231,54 @@ function SensorMiniCard({ title, icon, sensor, labelMap }: {
   );
 }
 
-function SoftSensorsSection({ sensors }: { sensors: SoftSensorsContext }) {
+function SoftSensorsSection({ sensors, timeline }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline }) {
+  const [showTimeline, setShowTimeline] = useState(false);
+
+  // Compute timeline highlights
+  const timelineHighlights = useMemo(() => {
+    if (!timeline || timeline.by_lap.length === 0) return null;
+    const highlights: { lap: number; type: string; detail: string }[] = [];
+
+    // Warmup events (post-pit COLD/WARMING_UP)
+    const warmupStints = Array.from(timeline.summary.warmup_laps_by_stint.entries());
+    for (const [stint, laps] of warmupStints) {
+      if (laps > 0) highlights.push({ lap: 0, type: "🌡️ Warmup", detail: `Stint ${stint}: ${laps} giri di riscaldamento` });
+    }
+
+    // First high/critical stress
+    if (timeline.summary.first_high_stress_lap != null) {
+      highlights.push({ lap: timeline.summary.first_high_stress_lap, type: "⚠️ Stress alto", detail: `Primo segnale di stress elevato al giro ${timeline.summary.first_high_stress_lap}` });
+    }
+    if (timeline.summary.first_critical_stress_lap != null) {
+      highlights.push({ lap: timeline.summary.first_critical_stress_lap, type: "🔴 Stress critico", detail: `Stress critico al giro ${timeline.summary.first_critical_stress_lap}` });
+    }
+
+    // Grip transitions
+    for (const gt of timeline.summary.grip_transitions.slice(0, 3)) {
+      const fromLabel = GRIP_LABELS[gt.from]?.text ?? gt.from;
+      const toLabel = GRIP_LABELS[gt.to]?.text ?? gt.to;
+      highlights.push({ lap: gt.lap, type: "🛣️ Grip", detail: `Giro ${gt.lap}: ${fromLabel} → ${toLabel}` });
+    }
+
+    return highlights.length > 0 ? highlights : null;
+  }, [timeline]);
+
   return (
     <VRESection
       title="Soft Sensors"
       icon={<Thermometer className="h-3.5 w-3.5 text-muted-foreground" />}
       defaultOpen={false}
       badge={
-        <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">
-          STIMA
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">
+            STIMA
+          </Badge>
+          {timeline && (
+            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">
+              {timeline.by_lap.length} GIRI
+            </Badge>
+          )}
+        </div>
       }
     >
       <p className="text-[10px] text-muted-foreground mb-2 italic">
@@ -266,6 +304,69 @@ function SoftSensorsSection({ sensors }: { sensors: SoftSensorsContext }) {
           labelMap={GRIP_LABELS}
         />
       </div>
+
+      {/* Timeline highlights */}
+      {timelineHighlights && (
+        <div className="mt-2.5 space-y-1">
+          <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+            <Layers className="h-3 w-3" /> Transizioni rilevanti
+          </p>
+          {timelineHighlights.map((h, i) => (
+            <p key={i} className="text-[10px] text-muted-foreground flex items-start gap-1.5 pl-1">
+              <span className="shrink-0">{h.type.split(" ")[0]}</span>
+              <span>{h.detail}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Expandable mini-timeline table */}
+      {timeline && timeline.by_lap.length > 0 && (
+        <details className="mt-2 group">
+          <summary className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <BarChart3 className="h-3 w-3 shrink-0" />
+            <span>Timeline completa ({timeline.by_lap.length} giri)</span>
+            <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-1.5 overflow-x-auto max-h-48 overflow-y-auto">
+            <table className="w-full text-[10px]">
+              <thead className="sticky top-0 bg-card">
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="text-left py-1 pr-1">Giro</th>
+                  <th className="text-left py-1 pr-1">Stint</th>
+                  <th className="text-center py-1 pr-1">Termico</th>
+                  <th className="text-center py-1 pr-1">Stress</th>
+                  <th className="text-center py-1 pr-1">Grip</th>
+                  <th className="text-center py-1">Conf.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {timeline.by_lap.map((ls) => (
+                  <tr key={ls.lap_number} className="border-b border-border/30">
+                    <td className="py-0.5 pr-1 font-mono">{ls.lap_number}</td>
+                    <td className="py-0.5 pr-1 font-mono">{ls.stint_number}</td>
+                    <td className={`py-0.5 pr-1 text-center ${THERMAL_LABELS[ls.tyre_thermal.label]?.color ?? ""}`}>
+                      {THERMAL_LABELS[ls.tyre_thermal.label]?.text ?? ls.tyre_thermal.label}
+                    </td>
+                    <td className={`py-0.5 pr-1 text-center ${STRESS_LABELS[ls.tyre_stress.label]?.color ?? ""}`}>
+                      {STRESS_LABELS[ls.tyre_stress.label]?.text ?? ls.tyre_stress.label}
+                    </td>
+                    <td className={`py-0.5 pr-1 text-center ${GRIP_LABELS[ls.track_grip.label]?.color ?? ""}`}>
+                      {GRIP_LABELS[ls.track_grip.label]?.text ?? ls.track_grip.label}
+                    </td>
+                    <td className="py-0.5 text-center">
+                      <span className={`text-[8px] ${ls.overall_confidence === "HIGH" ? "text-emerald-400" : ls.overall_confidence === "MEDIUM" ? "text-amber-400" : "text-red-400"}`}>
+                        {ls.overall_confidence === "HIGH" ? "●" : ls.overall_confidence === "MEDIUM" ? "◐" : "○"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+
       {sensors.reliability_notes.length > 0 && (
         <div className="mt-2 space-y-0.5">
           {sensors.reliability_notes.map((note, i) => (
@@ -277,6 +378,51 @@ function SoftSensorsSection({ sensors }: { sensors: SoftSensorsContext }) {
         </div>
       )}
     </VRESection>
+  );
+}
+
+/* ── Soft Sensor Strategy Impact (inline within strategy cards) ── */
+function SoftSensorImpactBadge({ adjustment }: { adjustment: StrategySoftSensorAdjustment }) {
+  if (Math.abs(adjustment.total_soft_sensor_adjustment) < 0.01) return null;
+  const total = adjustment.total_soft_sensor_adjustment;
+  const isPositive = total > 0; // positive = penalty
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono ${isPositive ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
+      <Thermometer className="h-3 w-3" />
+      SS: {total > 0 ? "+" : ""}{total.toFixed(2)}s
+    </span>
+  );
+}
+
+function SoftSensorImpactDetail({ adjustment }: { adjustment: StrategySoftSensorAdjustment }) {
+  if (Math.abs(adjustment.total_soft_sensor_adjustment) < 0.01) return null;
+  const confStyle: Record<SoftSensorConfidence, string> = {
+    HIGH: "text-emerald-400",
+    MEDIUM: "text-amber-400",
+    LOW: "text-red-400",
+  };
+  return (
+    <div className="mt-1 rounded bg-muted/20 border border-border/50 px-2 py-1.5 space-y-0.5">
+      <div className="flex items-center gap-2 text-[9px]">
+        <Thermometer className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="text-muted-foreground font-semibold">Soft Sensors Impact</span>
+        <span className={`ml-auto ${confStyle[adjustment.confidence]}`}>{adjustment.confidence}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground">
+        {Math.abs(adjustment.thermal_adjustment_total) > 0.005 && (
+          <span>🌡️ Termico: <strong className="font-mono text-foreground">{adjustment.thermal_adjustment_total > 0 ? "+" : ""}{adjustment.thermal_adjustment_total.toFixed(2)}s</strong></span>
+        )}
+        {Math.abs(adjustment.stress_adjustment_total) > 0.005 && (
+          <span>⚡ Stress: <strong className="font-mono text-foreground">{adjustment.stress_adjustment_total > 0 ? "+" : ""}{adjustment.stress_adjustment_total.toFixed(2)}s</strong></span>
+        )}
+        {Math.abs(adjustment.grip_adjustment_total) > 0.005 && (
+          <span>🛣️ Grip: <strong className="font-mono text-foreground">{adjustment.grip_adjustment_total > 0 ? "+" : ""}{adjustment.grip_adjustment_total.toFixed(2)}s</strong></span>
+        )}
+      </div>
+      {adjustment.adjustment_reasons.length > 0 && adjustment.adjustment_reasons[0] !== "Nessun aggiustamento significativo dai soft sensors" && (
+        <p className="text-[9px] text-muted-foreground italic">{adjustment.adjustment_reasons.join("; ")}</p>
+      )}
+    </div>
   );
 }
 
