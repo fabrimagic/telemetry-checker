@@ -131,6 +131,7 @@ interface ExtractionInput {
   driverAcronym: string;
   sessionKey: number;
   totalLaps: number;
+  softSensorsTimeline?: SoftSensorsTimeline;
 }
 
 /**
