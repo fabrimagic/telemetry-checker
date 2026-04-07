@@ -1504,10 +1504,21 @@ export default function Documentation() {
               della penalità warmup, ma fornisce spiegazioni e contesto (es. "warmup persistente per 5 giri vs 3 previsti").
             </li>
             <li>
-              <strong>Contesto validazione degrado</strong> — Valuta la coerenza tra stress gomma, grip pista e
-              stabilità termica durante ogni stint per classificare il supporto contestuale alla validazione
-              del degrado (STRONG, PARTIAL, WEAK). Segnala inconsistenze (es. "stress basso nonostante slope elevata")
-              senza modificare la classificazione originale del degrado.
+              <strong>Contesto validazione degrado</strong> — Analizza la timeline per giro su tre assi indipendenti
+              per ogni stint:
+              <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5">
+                <li><strong>Consistenza termica</strong> — verifica se il warmup ha contaminato la parte iniziale del fit,
+                  confrontando i giri COLD/WARMING_UP osservati con il modello previsto.</li>
+                <li><strong>Consistenza stress</strong> — valuta se il pattern di stress è coerente con la slope stimata.
+                  Stress crescente nella seconda metà con validazione VALID rafforza la fiducia; stress basso con slope alta
+                  segnala possibile incoerenza.</li>
+                <li><strong>Contaminazione grip</strong> — distingue il degrado gomma dalle variazioni pista.
+                  Grip stabile durante lo stint supporta la lettura; grip misto o in calo aumenta il rischio di contaminazione.</li>
+              </ul>
+              <p className="mt-1">Per ogni stint viene calcolato un <strong>support_score</strong> (0–1, media pesata dei tre assi)
+              e un <strong>contamination_score</strong> (0–1). Il livello di supporto (STRONG, PARTIAL, WEAK) richiede convergenza
+              di almeno due assi e bassa contaminazione per raggiungere STRONG. Nessun singolo asse può determinare da solo
+              il livello massimo. I segnali di supporto e di contraddizione sono elencati separatamente per trasparenza.</p>
             </li>
             <li>
               <strong>Narrativa arricchita</strong> — Estrae fino a 6 insight narrativi dalla timeline,

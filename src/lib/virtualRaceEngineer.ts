@@ -1600,7 +1600,7 @@ export function computeVirtualRaceEngineer(
         earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
       );
   const warmupInterpretation = computeWarmupInterpretation(softSensorsTimeline, stintAnalyses);
-  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations);
+  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations, paceLossResults, weatherMap, trackStatusMap);
 
   // Soft sensor refinement adjustments
   const recSSAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
