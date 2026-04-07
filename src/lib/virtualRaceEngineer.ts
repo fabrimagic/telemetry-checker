@@ -1832,5 +1832,6 @@ export function computeVirtualRaceEngineer(
     pace_loss_results: paceLossResults,
     custom_degradation_override: customDegradationOverride,
     soft_sensors: softSensors,
+    soft_sensors_timeline: softSensorsTimeline,
   };
 }
