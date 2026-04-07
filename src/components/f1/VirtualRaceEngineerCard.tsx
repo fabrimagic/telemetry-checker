@@ -284,6 +284,16 @@ function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validatio
       <p className="text-[10px] text-muted-foreground mb-2 italic">
         Stati latenti stimati — indicazioni coerenti con i dati disponibili, non misure fisiche dirette.
       </p>
+      {scoringGate && (
+        <div className={`flex items-center gap-1.5 mb-2 text-[9px] px-2 py-1 rounded border ${scoringGate.soft_sensor_scoring_enabled ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-muted/30 border-border text-muted-foreground"}`}>
+          <Shield className="h-3 w-3 shrink-0" />
+          <span className="font-semibold">Scoring gate:</span>
+          <span>{scoringGate.soft_sensor_scoring_enabled ? "Attivo — i soft sensors influenzano lo scoring (input debole)" : "Chiuso"}</span>
+          {scoringGate.soft_sensor_block_reason && !scoringGate.soft_sensor_scoring_enabled && (
+            <span className="text-[8px] ml-1">— {scoringGate.soft_sensor_block_reason}</span>
+          )}
+        </div>
+      )}
       <div className="space-y-1.5">
         <SensorMiniCard
           title="Stato termico gomme"
@@ -1062,7 +1072,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {/* ═══════════════════════════════════════════════════════════════
             SOFT SENSORS
         ═══════════════════════════════════════════════════════════════ */}
-        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} warmupInterpretation={result.warmup_interpretation} validationContext={result.degradation_validation_context} />}
+        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} warmupInterpretation={result.warmup_interpretation} validationContext={result.degradation_validation_context} scoringGate={result.soft_sensor_scoring_gate} />}
 
 
         {/* ═══════════════════════════════════════════════════════════════
