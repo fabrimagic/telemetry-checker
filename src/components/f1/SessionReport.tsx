@@ -101,7 +101,17 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         try {
           const res = await getSessionResult(sessionKey);
           if (cancelled) return;
-          setResults(res.sort((a, b) => a.position - b.position));
+          // Sort: finishers by position first, then DNF/DNS/DSQ at the bottom
+          setResults(res.sort((a, b) => {
+            const aOut = a.dnf || a.dns || a.dsq;
+            const bOut = b.dnf || b.dns || b.dsq;
+            if (aOut && !bOut) return 1;
+            if (!aOut && bOut) return -1;
+            if (a.position != null && b.position != null) return a.position - b.position;
+            if (a.position != null) return -1;
+            if (b.position != null) return 1;
+            return 0;
+          }));
         } catch { /* optional */ }
 
         try {
