@@ -1598,6 +1598,37 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`Degrado da Practice disponibile per: ${practiceCompoundsUsed.join(", ")}`);
   }
 
+  // ── 8a. Post-Race: missed neutralisation opportunity ──
+  if (!isRaceEngineerMode) {
+    const scVscLaps: { lap: number; status: TrackStatus }[] = [];
+    trackStatusMap.forEach((status, lap) => {
+      if (status === "SC" || status === "VSC" || status === "MIXED") {
+        scVscLaps.push({ lap, status });
+      }
+    });
+
+    if (scVscLaps.length > 0) {
+      const driverPittedDuringNeutral = pitStopAnalyses.some(p => p.under_neutralisation);
+      if (!driverPittedDuringNeutral) {
+        // Find the neutralisation window
+        const neutralStart = Math.min(...scVscLaps.map(s => s.lap));
+        const neutralEnd = Math.max(...scVscLaps.map(s => s.lap));
+        const neutralType = scVscLaps.some(s => s.status === "SC") ? "Safety Car" : "VSC";
+        const windowDesc = neutralStart === neutralEnd
+          ? `giro ${neutralStart}`
+          : `giri ${neutralStart}-${neutralEnd}`;
+
+        verdictSummary += ` In analisi post-gara: ${neutralType} rilevata (${windowDesc}). Il pilota non ha effettuato pit stop durante la neutralizzazione — un pit in quella finestra avrebbe comportato una perdita di tempo ridotta rispetto agli avversari.`;
+        
+        // If the driver pitted before the SC, note it
+        const pitBeforeNeutral = actualPitLaps.filter(pl => pl < neutralStart);
+        if (pitBeforeNeutral.length > 0) {
+          verdictSummary += ` Il pit reale (giro ${pitBeforeNeutral[pitBeforeNeutral.length - 1]}) è avvenuto prima della neutralizzazione.`;
+        }
+      }
+    }
+  }
+
   // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
   const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(effectiveScenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
