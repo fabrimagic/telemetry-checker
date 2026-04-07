@@ -1387,16 +1387,51 @@ export default function Documentation() {
             Non viene attribuito alla pista ciò che è chiaramente effetto gomma o traffico.
           </p>
 
+          <h4 className="font-semibold text-foreground mt-4">Timeline lap-by-lap</h4>
+          <p>
+            I soft sensors vengono calcolati per ogni singolo giro della gara, producendo una timeline completa.
+            Per ciascun giro il sistema identifica lo stint attivo, la validazione del degrado e il pace loss
+            corrispondente, e applica i tre sensori (termico, stress, grip) con le stesse regole del summary ma
+            con il contesto specifico del giro.
+          </p>
+          <p>
+            Dal timeline vengono estratti automaticamente:
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">Giri di warmup per stint</strong> — quanti giri ogni stint ha trascorso in stato COLD o WARMING_UP</li>
+            <li><strong className="text-foreground">Primo giro di stress alto/critico</strong> — quando il primo segnale di stress elevato è apparso</li>
+            <li><strong className="text-foreground">Transizioni grip</strong> — cambi di stato del grip pista (es. Improving → Stable)</li>
+          </ul>
+          <p>
+            L'interfaccia mostra le transizioni rilevanti in modo sintetico, con possibilità di espandere
+            la timeline completa giro per giro in formato tabellare.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Raffinamento delle strategie (Strategy Refinement)</h4>
+          <p>
+            La timeline dei soft sensors viene utilizzata per applicare piccoli aggiustamenti ai costi simulati
+            della strategia raccomandata e di tutte le alternative. Il refinement è separato, tracciabile e limitato:
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">Thermal refinement</strong> — modula il warmup esistente nei primi giri post-pit, senza duplicare la penalità già calcolata dal modello warmup</li>
+            <li><strong className="text-foreground">Stress refinement</strong> — aggiunge un costo marginale nei giri avanzati dello stint quando lo stress è HIGH o CRITICAL, senza sostituire il modello di degrado</li>
+            <li><strong className="text-foreground">Grip refinement</strong> — applica un leggero modificatore basato sullo stato grip osservato (es. pista in miglioramento → lieve beneficio)</li>
+          </ul>
+          <p>
+            Ogni aggiustamento è limitato individualmente (max ±0.15s/giro per il termico, ±0.10s per lo stress,
+            ±0.08s per il grip) e globalmente (max ±3.0s totali). I giri con confidenza bassa vengono ignorati.
+            Il sistema evita esplicitamente il doppio conteggio con i moduli di warmup, degrado e traffico.
+          </p>
+          <p>
+            L'impatto dei soft sensors è visibile per ogni strategia con un badge dedicato (SS: +X.XXs)
+            e un dettaglio espandibile che mostra la contribuzione di ogni componente (termico, stress, grip).
+          </p>
+
           <h4 className="font-semibold text-foreground mt-4">Integrazione nel VRE</h4>
           <p>
             I soft sensors sono calcolati dopo tutti i moduli analitici (degrado, traffico, pace loss, contesto integrato)
-            e prima della narrativa finale. Sono presentati come sezione collassabile nel VRE con etichetta "STIMA".
-            Ogni sensore mostra etichetta, confidenza e le 1-3 motivazioni principali; espandendo il dettaglio
-            si visualizzano punteggio e contaminazioni.
-          </p>
-          <p>
-            In questa fase, i soft sensors non influenzano lo scoring o il ranking delle strategie:
-            sono un layer interpretativo aggiuntivo, non decisionale.
+            e prima della narrativa finale. Il summary è derivato dalla timeline (non da una logica separata)
+            per garantire coerenza. Sono presentati come sezione collassabile nel VRE con etichetta "STIMA".
           </p>
 
           <h4 className="font-semibold text-foreground mt-4">Anti-allucinazione</h4>
@@ -1406,6 +1441,8 @@ export default function Documentation() {
             <li>Ogni inferenza è accompagnata da motivazione e livello di confidenza</li>
             <li>I segnali contaminanti vengono dichiarati esplicitamente</li>
             <li>Se i dati sono insufficienti o contraddittori, lo stato è UNKNOWN con confidenza bassa</li>
+            <li>Gli aggiustamenti strategici sono piccoli, limitati e non possono ribaltare un risultato robusto</li>
+            <li>Nessun effetto forte senza evidenze convergenti</li>
           </ul>
         </DocSection>
 
