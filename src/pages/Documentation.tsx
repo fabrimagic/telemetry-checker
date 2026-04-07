@@ -1407,6 +1407,7 @@ export default function Documentation() {
             <li>I segnali contaminanti vengono dichiarati esplicitamente</li>
             <li>Se i dati sono insufficienti o contraddittori, lo stato è UNKNOWN con confidenza bassa</li>
           </ul>
+        </DocSection>
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground py-8 space-y-1">
