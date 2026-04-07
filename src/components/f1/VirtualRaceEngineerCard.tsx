@@ -802,6 +802,8 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
   );
 }
 
+export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
+
 interface Props {
   result: VirtualRaceEngineerResult;
   onRiskModeChange?: (mode: RiskMode) => void;
@@ -809,14 +811,17 @@ interface Props {
   onScenarioActivationLapChange?: (lap: number | null) => void;
   onScenarioDurationChange?: (duration: number | null) => void;
   onCustomDegradationChange?: (deg: Record<string, number> | null) => void;
+  onAnalysisModeChange?: (mode: AnalysisMode) => void;
   scenarioActivationLap?: number | null;
   scenarioDurationLaps?: number | null;
+  analysisMode?: AnalysisMode;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, onAnalysisModeChange, scenarioActivationLap, scenarioDurationLaps, analysisMode = "RACE_ENGINEER" }: Props) {
   const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const [viewMode, setViewMode] = useState<ViewMode>("ENGINEER");
+  const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
 
   const scoredStrategies = useMemo(() => {
     const allStrats = [
@@ -849,11 +854,46 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
             <span className="text-base">🏎️</span> Virtual Race Engineer
           </CardTitle>
-          <ConfidenceBadge level={confidence} />
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+              isRaceEngineerMode
+                ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+            }`}>
+              {isRaceEngineerMode ? "🔴 Race Engineer" : "📊 Post-Race Analysis"}
+            </span>
+            <ConfidenceBadge level={confidence} />
+          </div>
         </div>
         <p className="text-[11px] text-muted-foreground mt-1">
-          Analisi strategica basata su degrado gomme, pit stop, meteo e neutralizzazioni.
+          {isRaceEngineerMode
+            ? "Decisione ottimale basata sulle informazioni disponibili in quel momento — senza conoscenza del futuro."
+            : "Analisi strategica a posteriori con conoscenza completa degli eventi della gara."
+          }
         </p>
+
+        {/* Analysis Mode Toggle */}
+        <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
+          {(["RACE_ENGINEER", "POST_RACE"] as AnalysisMode[]).map((mode) => {
+            const labels: Record<AnalysisMode, string> = { RACE_ENGINEER: "Race Engineer", POST_RACE: "Post-Race Analysis" };
+            const icons: Record<AnalysisMode, string> = { RACE_ENGINEER: "🔴", POST_RACE: "📊" };
+            const isActive = analysisMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => onAnalysisModeChange?.(mode)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <span>{icons[mode]}</span>
+                {labels[mode]}
+              </button>
+            );
+          })}
+        </div>
 
         {/* View Mode Selector */}
         <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
@@ -876,7 +916,30 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           })}
         </div>
 
-        {scenario_is_simulated && (
+        {/* Mode context indicator */}
+        <div className={`mt-2 rounded-md px-3 py-1.5 flex items-center gap-2 text-[10px] ${
+          isRaceEngineerMode
+            ? "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+            : "bg-muted/30 border border-border text-muted-foreground"
+        }`}>
+          {isRaceEngineerMode ? (
+            <>
+              <Shield className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold">Scenario: Real Conditions (bloccato)</span>
+              <span className="ml-1">— solo informazioni disponibili al momento della decisione</span>
+            </>
+          ) : (
+            <>
+              <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold">Scenario: {scenario_label}</span>
+              {scenario_is_simulated && scenario_window && (
+                <span className="ml-1">(giri {scenario_window.start}–{scenario_window.end})</span>
+              )}
+            </>
+          )}
+        </div>
+
+        {!isRaceEngineerMode && scenario_is_simulated && (
          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
              <p className="text-[11px] text-amber-400 font-semibold">
@@ -1132,84 +1195,92 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
 
         {/* ═══════════════════════════════════════════════════════════════
             RACE CONTEXT & SIMULATORE (controls)
+            Scenario selector only visible in POST_RACE mode
         ═══════════════════════════════════════════════════════════════ */}
         {(
           <VRESection
-            title="Race Context & Simulatore"
+            title={isRaceEngineerMode ? "Configurazione" : "Race Context & Simulatore"}
             icon={<Activity className="h-3.5 w-3.5 text-muted-foreground" />}
             defaultOpen={false}
           >
             <div className="space-y-3 pl-1">
-              {/* Scenario selector */}
-              <div className="flex items-start gap-2">
-                <span className="text-[11px] text-muted-foreground shrink-0 w-20 pt-2">Scenario:</span>
-                <div className="flex-1 space-y-1">
-                  <Select
-                    value={scenario_id}
-                    onValueChange={(val) => onScenarioChange?.(val as ScenarioId)}
-                  >
-                    <SelectTrigger className="h-8 text-[11px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ALL_SCENARIO_IDS.map((sid) => {
-                        const def = SCENARIO_DEFINITIONS[sid];
-                        return (
-                          <SelectItem key={sid} value={sid} className="text-[11px]">
-                            <span className="flex items-center gap-1.5">
-                              {isSimulatedScenario(sid) && <FlaskConical className="h-3 w-3 text-amber-400" />}
-                              {def.label}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
-                  {scenario_is_simulated && (
-                    <>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-muted-foreground shrink-0">Giro:</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
-                          value={scenarioActivationLap ?? ""}
-                          placeholder="Tutti"
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            onScenarioActivationLapChange?.(val === "" ? null : parseInt(val, 10));
-                          }}
-                          className="h-7 w-16 text-[11px] font-mono"
-                        />
-                        <span className="text-[10px] text-muted-foreground shrink-0">Durata:</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
-                          value={scenarioDurationLaps ?? ""}
-                          placeholder="∞"
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            onScenarioDurationChange?.(val === "" ? null : parseInt(val, 10));
-                          }}
-                          className="h-7 w-16 text-[11px] font-mono"
-                        />
-                      </div>
-                      {scenario_window && (
-                        <p className="text-[10px] text-foreground/70 font-mono mt-0.5">
-                          📌 Finestra: giro {scenario_window.start} → {scenario_window.end}
-                        </p>
-                      )}
-                      {scenario_activation_warning && (
-                        <p className="text-[10px] text-amber-400 flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
-                        </p>
-                      )}
-                    </>
-                  )}
+              {/* Scenario selector — only in POST_RACE mode */}
+              {!isRaceEngineerMode ? (
+                <div className="flex items-start gap-2">
+                  <span className="text-[11px] text-muted-foreground shrink-0 w-20 pt-2">Scenario:</span>
+                  <div className="flex-1 space-y-1">
+                    <Select
+                      value={scenario_id}
+                      onValueChange={(val) => onScenarioChange?.(val as ScenarioId)}
+                    >
+                      <SelectTrigger className="h-8 text-[11px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ALL_SCENARIO_IDS.map((sid) => {
+                          const def = SCENARIO_DEFINITIONS[sid];
+                          return (
+                            <SelectItem key={sid} value={sid} className="text-[11px]">
+                              <span className="flex items-center gap-1.5">
+                                {isSimulatedScenario(sid) && <FlaskConical className="h-3 w-3 text-amber-400" />}
+                                {def.label}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
+                    {scenario_is_simulated && (
+                      <>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-muted-foreground shrink-0">Giro:</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
+                            value={scenarioActivationLap ?? ""}
+                            placeholder="Tutti"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              onScenarioActivationLapChange?.(val === "" ? null : parseInt(val, 10));
+                            }}
+                            className="h-7 w-16 text-[11px] font-mono"
+                          />
+                          <span className="text-[10px] text-muted-foreground shrink-0">Durata:</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
+                            value={scenarioDurationLaps ?? ""}
+                            placeholder="∞"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              onScenarioDurationChange?.(val === "" ? null : parseInt(val, 10));
+                            }}
+                            className="h-7 w-16 text-[11px] font-mono"
+                          />
+                        </div>
+                        {scenario_window && (
+                          <p className="text-[10px] text-foreground/70 font-mono mt-0.5">
+                            📌 Finestra: giro {scenario_window.start} → {scenario_window.end}
+                          </p>
+                        )}
+                        {scenario_activation_warning && (
+                          <p className="text-[10px] text-amber-400 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-md bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-[10px] text-blue-400 flex items-center gap-2">
+                  <Shield className="h-3.5 w-3.5 shrink-0" />
+                  <span>Scenario bloccato su <strong>Real Conditions</strong> — in Race Engineer Mode non è possibile selezionare scenari what-if.</span>
+                </div>
+              )}
 
 
               {/* Risk appetite selector */}

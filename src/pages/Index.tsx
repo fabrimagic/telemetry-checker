@@ -57,7 +57,7 @@ import {
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
-import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
+import { VirtualRaceEngineerCard, type AnalysisMode } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
 import { computeKeyDecisionMoments, type KeyDecisionMomentsResult } from "@/lib/keyDecisionMoments";
 import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
@@ -103,6 +103,7 @@ export default function Index() {
   const [vreScenarioLap, setVreScenarioLap] = useState<number | null>(null);
   const [vreScenarioDuration, setVreScenarioDuration] = useState<number | null>(null);
   const [vreCustomDeg, setVreCustomDeg] = useState<Record<string, number> | null>(null);
+  const [vreAnalysisMode, setVreAnalysisMode] = useState<AnalysisMode>("RACE_ENGINEER");
   const vreArgsRef = useRef<{
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
@@ -382,7 +383,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER");
   }, []);
 
   // Select lap for a driver
@@ -484,7 +485,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null);
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -837,7 +838,25 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} onRiskModeChange={(mode) => {
+                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} analysisMode={vreAnalysisMode} onAnalysisModeChange={(mode) => {
+                    setVreAnalysisMode(mode);
+                    if (mode === "RACE_ENGINEER") {
+                      setVreScenario("REAL_CONTEXT");
+                      setVreScenarioLap(null);
+                      setVreScenarioDuration(null);
+                      const args = vreArgsRef.current;
+                      if (args) {
+                        const newVre = computeVirtualRaceEngineer(
+                          args.driverNumber, args.driverAcronym, args.sessionKey,
+                          args.laps, args.stints, args.pits,
+                          args.weather, args.raceControl,
+                          args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                          args.diaryEvents, args.cumDevResult, "REAL_CONTEXT", null, null, vreCustomDeg,
+                        );
+                        setVreResult(newVre);
+                      }
+                    }
+                  }} onRiskModeChange={(mode) => {
                     setVreRiskMode(mode);
                     const args = vreArgsRef.current;
                     if (args) {
