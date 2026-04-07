@@ -319,6 +319,36 @@ export default function Index() {
               diaryForVre, cumDevForVre, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
             );
             setVreResult(vre);
+
+            // Compute Key Decision Moments from VRE data
+            if (vre) {
+              try {
+                const weatherMapForKdm = classifyLapsWeather(laps, sessionWeather);
+                const trackStatusMapForKdm = classifyLapsTrackStatus(laps, raceControlMessages);
+                const driverCumDevForKdm = cumDevForVre?.drivers.find(d => d.driver_number === driverNumber) ?? null;
+                const kdm = computeKeyDecisionMoments({
+                  laps,
+                  stints: driverStints,
+                  pitStops: pitsForVre,
+                  weatherMap: weatherMapForKdm,
+                  trackStatusMap: trackStatusMapForKdm,
+                  trafficAnalysis: vre.traffic_analysis,
+                  paceLossResults: vre.pace_loss_results,
+                  degradationValidations: vre.degradation_validations,
+                  diaryEvents: diaryForVre,
+                  driverCumDev: driverCumDevForKdm,
+                  positions: pos,
+                  intervals: ivls,
+                  driverNumber,
+                  driverAcronym: driver.name_acronym,
+                  sessionKey,
+                  totalLaps: Math.max(...laps.map(l => l.lap_number)),
+                });
+                setKdmResult(kdm);
+              } catch { setKdmResult(null); }
+            } else {
+              setKdmResult(null);
+            }
           } catch { /* optional */ }
           setLoadingVre(false);
         }
