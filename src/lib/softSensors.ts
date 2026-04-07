@@ -212,9 +212,24 @@ export type ValidationSupportLevel = "STRONG" | "PARTIAL" | "WEAK";
 export interface StintValidationContext {
   stint_number: number;
   support_level: ValidationSupportLevel;
-  inconsistencies: string[];
+  support_score: number;           // 0–1
+  contamination_score: number;     // 0–1
+  support_signals: string[];
+  contradiction_signals: string[];
   notes: string[];
   adjusted_confidence: SoftSensorConfidence;
+  /** Sub-axis details */
+  thermal_support_score: number;
+  thermal_contamination_flag: boolean;
+  thermal_notes: string[];
+  stress_support_score: number;
+  stress_inconsistency_flag: boolean;
+  stress_notes: string[];
+  grip_contamination_score: number;
+  grip_support_score: number;
+  grip_notes: string[];
+  /** Backward-compat */
+  inconsistencies: string[];
 }
 
 export interface DegradationValidationContext {
