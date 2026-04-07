@@ -20,6 +20,8 @@ import type { StintPaceLossResult } from "./stintPaceLoss";
 import type { DegradationValidationResult } from "./degradationValidation";
 import type { DiaryEvent } from "./raceDiary";
 import type { DriverCumulativeDeviation, LapDeviation } from "./cumulativeDeviation";
+import type { SoftSensorsTimeline, DecisionSoftSensorContext } from "./softSensors";
+import { buildDecisionSoftSensorContext } from "./softSensors";
 
 /* ══════════════════════════════════════════════════════════════
    Types
