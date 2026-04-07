@@ -912,7 +912,10 @@ export async function searchHistoricalAnalogs(
     const sessionYear = new Date(session.date_start).getFullYear();
     const gpName = session.session_name || `Session ${session.session_key}`;
 
-    const allDriverNums = Array.from(new Set(data.stints.map(s => s.driver_number)));
+    const driverNumSet = new Set<number>();
+    for (const s of data.stints) driverNumSet.add(s.driver_number);
+    const allDriverNums: number[] = [];
+    driverNumSet.forEach(n => allDriverNums.push(n));
 
     for (const dn of allDriverNums) {
       const driverLaps = data.laps.filter(l => l.driver_number === dn);
