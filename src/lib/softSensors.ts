@@ -201,7 +201,7 @@ export function estimateTyreStressState(
   const reasons: string[] = [];
   const contaminated: string[] = [];
   const sources: string[] = ["tyre_age", "stint_length"];
-  let confidence: SoftSensorConfidence = "HIGH";
+  let confidence = "HIGH" as SoftSensorConfidence;
 
   let stressScore = 0;
 
