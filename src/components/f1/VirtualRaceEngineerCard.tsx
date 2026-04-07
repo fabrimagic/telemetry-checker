@@ -469,7 +469,13 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
 
       <CardContent className="space-y-3 pt-0">
 
-        {/* ══════ VERDICT (always visible) ══════ */}
+        {/* ══════ ANALYST / BROADCAST MODES ══════ */}
+        {viewMode === "ANALYST" && <AnalystView result={result} />}
+        {viewMode === "BROADCAST" && <BroadcastView result={result} />}
+
+        {/* ══════ ENGINEER MODE (full detail) ══════ */}
+        {viewMode === "ENGINEER" && (<>
+
         <div className="rounded-lg bg-muted/50 border border-border p-4">
           <div className="flex items-start gap-3">
             {verdict.delta_seconds != null && verdict.delta_seconds > 2
