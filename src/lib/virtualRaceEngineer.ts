@@ -66,6 +66,9 @@ export interface RecommendedStrategy {
   analysis?: EnrichedStrategyAnalysis;
   soft_sensor_adjustment?: StrategySoftSensorAdjustment;
   soft_sensor_notes?: string[];
+  scoring_without_soft_sensors?: number;
+  scoring_with_soft_sensors?: number;
+  scoring_delta_soft_sensors?: number;
 }
 
 export interface AlternativeStrategy {
@@ -83,6 +86,9 @@ export interface AlternativeStrategy {
   analysis?: EnrichedStrategyAnalysis;
   soft_sensor_adjustment?: StrategySoftSensorAdjustment;
   soft_sensor_notes?: string[];
+  scoring_without_soft_sensors?: number;
+  scoring_with_soft_sensors?: number;
+  scoring_delta_soft_sensors?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -136,6 +142,7 @@ export interface VirtualRaceEngineerResult {
   soft_sensors_timeline?: SoftSensorsTimeline;
   warmup_interpretation?: WarmupInterpretation;
   degradation_validation_context?: DegradationValidationContext;
+  soft_sensor_scoring_gate?: SoftSensorScoringGate;
 }
 
 /* ── Helpers ── */
