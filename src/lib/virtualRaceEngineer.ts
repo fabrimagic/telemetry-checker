@@ -1902,5 +1902,6 @@ export function computeVirtualRaceEngineer(
     warmup_interpretation: warmupInterpretation,
     degradation_validation_context: degradationValidationContext,
     soft_sensor_scoring_gate: softSensorScoringGate,
+    analysis_mode: analysisMode,
   };
 }
