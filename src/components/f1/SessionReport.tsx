@@ -212,6 +212,40 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return weather[weather.length - 1];
   }, [weather]);
 
+  const weatherTimeline = useMemo(() => {
+    if (!weather.length || !allLaps.length) return [];
+    // Build a sorted list of lap start times from all drivers
+    const lapTimes: { lap: number; date: string }[] = [];
+    const seenLaps = new Set<number>();
+    for (const l of allLaps) {
+      if (l.date_start && !seenLaps.has(l.lap_number)) {
+        seenLaps.add(l.lap_number);
+        lapTimes.push({ lap: l.lap_number, date: l.date_start });
+      }
+    }
+    lapTimes.sort((a, b) => a.lap - b.lap);
+
+    // For each lap, find the closest weather sample
+    const result: { lap: number; air_temperature: number; track_temperature: number; humidity: number; wind_speed: number; rainfall: number }[] = [];
+    for (const lt of lapTimes) {
+      let best = weather[0];
+      let bestDiff = Math.abs(new Date(weather[0].date).getTime() - new Date(lt.date).getTime());
+      for (let i = 1; i < weather.length; i++) {
+        const diff = Math.abs(new Date(weather[i].date).getTime() - new Date(lt.date).getTime());
+        if (diff < bestDiff) { best = weather[i]; bestDiff = diff; }
+      }
+      result.push({
+        lap: lt.lap,
+        air_temperature: best.air_temperature,
+        track_temperature: best.track_temperature,
+        humidity: best.humidity,
+        wind_speed: best.wind_speed,
+        rainfall: best.rainfall,
+      });
+    }
+    return result;
+  }, [weather, allLaps]);
+
   const tyreStrategy = useMemo(() => {
     if (!stints.length || !results.length) return [];
     const resultOrder = results.map((r) => r.driver_number);
