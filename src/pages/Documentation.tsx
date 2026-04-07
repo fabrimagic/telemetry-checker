@@ -151,6 +151,7 @@ export default function Documentation() {
               <TocLink href="#race-diary">Diario di Gara</TocLink>
               <TocLink href="#cumulative-deviation">Deviazione Cumulativa</TocLink>
               <TocLink href="#tyre-degradation-card">Degrado Gomme (Card)</TocLink>
+              <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-2">Virtual Race Engineer</p>
@@ -1246,6 +1247,76 @@ export default function Documentation() {
               Campi assenti → contributo 0 (nessuna penalità fittizia).
             </li>
           </ol>
+        </DocSection>
+
+        {/* Key Decision Moments */}
+        <DocSection id="key-decision-moments" title="Key Decision Moments" icon={<Target className="h-5 w-5" />}>
+          <p>
+            La sezione <strong className="text-foreground">Key Decision Moments</strong> identifica i momenti della gara
+            in cui una scelta strategica tra <em>"pit stop"</em> e <em>"stay out"</em> era realisticamente plausibile.
+            È disponibile esclusivamente per le sessioni di tipo <strong className="text-foreground">Race</strong> e <strong className="text-foreground">Sprint</strong>.
+          </p>
+          <p>
+            La card è collassabile e mostra nel titolo il numero totale di momenti decisionali individuati.
+            Ogni momento è presentato come una card compatta espandibile per consultare il dettaglio completo.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Come viene individuato un momento decisionale</h4>
+          <p>
+            Un decision point viene rilevato quando almeno una di queste condizioni è vera:
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>Il pilota si trova dentro o vicino alla finestra di pit stop ottimale</li>
+            <li>Il degrado gomme entra in zona critica o ad alta perdita</li>
+            <li>È presente una battaglia attiva o appena conclusa</li>
+            <li>Il traffico previsto al rientro in pista è rilevante</li>
+            <li>Si verifica un cambio meteo o una condizione non dry</li>
+            <li>È in corso una Safety Car, Virtual Safety Car o altra neutralizzazione</li>
+            <li>La perdita cumulativa inizia a peggiorare in modo consistente</li>
+            <li>Un pit stop è effettivamente avvenuto in quel giro</li>
+          </ul>
+          <p>
+            La finestra decisionale copre da 1 a 3 giri, non un singolo istante rigido.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Card compatta</h4>
+          <p>Ogni card compatta mostra a colpo d'occhio:</p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">Giro o finestra giri</strong> — il momento esatto della decisione</li>
+            <li><strong className="text-foreground">Tipo di decisione</strong> — PIT NOW, STAY OUT o MARGINALE</li>
+            <li><strong className="text-foreground">Azione reale</strong> — se il pilota ha effettivamente pittato o è rimasto in pista</li>
+            <li><strong className="text-foreground">Confidenza</strong> — Alta, Media o Bassa</li>
+            <li><strong className="text-foreground">Fattori principali</strong> — i 2-3 driver più rilevanti del momento</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Dettaglio espanso</h4>
+          <p>Espandendo un decision point si visualizzano:</p>
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              <strong className="text-foreground">Contesto decisionale (Decision Snapshot)</strong> — mescola, età gomme,
+              posizione in pista, degrado, gap, meteo, status pista, giri rimanenti e trend di perdita cumulativa.
+            </li>
+            <li>
+              <strong className="text-foreground">Fattori</strong> — elenco completo dei fattori che spingono verso PIT
+              o STAY OUT, con peso (HIGH, MEDIUM, LOW) e dettaglio testuale.
+            </li>
+            <li>
+              <strong className="text-foreground">Azione reale ed esito</strong> — la decisione effettivamente presa
+              dal team e l'esito osservato nei giri successivi (variazione di posizione, riepilogo, evento successivo).
+            </li>
+            <li>
+              <strong className="text-foreground">Note di affidabilità</strong> — avvertenze esplicite sui limiti dei dati
+              disponibili o sulla confidenza dell'analisi.
+            </li>
+          </ol>
+
+          <h4 className="font-semibold text-foreground mt-4">Anti-allucinazione</h4>
+          <p>
+            La sezione utilizza esclusivamente dati reali provenienti dai moduli di analisi già calcolati
+            (degrado, traffico, pace loss, meteo, neutralizzazioni, deviazione cumulativa).
+            Non vengono inventati eventi, battaglie, decisioni o relazioni causali.
+            Se un dato non è disponibile, viene esplicitamente indicato come "N/D" o omesso.
+          </p>
         </DocSection>
 
         {/* Footer */}
