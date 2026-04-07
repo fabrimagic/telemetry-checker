@@ -17,7 +17,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
-import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext } from "./softSensors";
+import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
 
 /* ── Types ── */
 
@@ -66,6 +66,9 @@ export interface RecommendedStrategy {
   analysis?: EnrichedStrategyAnalysis;
   soft_sensor_adjustment?: StrategySoftSensorAdjustment;
   soft_sensor_notes?: string[];
+  scoring_without_soft_sensors?: number;
+  scoring_with_soft_sensors?: number;
+  scoring_delta_soft_sensors?: number;
 }
 
 export interface AlternativeStrategy {
@@ -83,6 +86,9 @@ export interface AlternativeStrategy {
   analysis?: EnrichedStrategyAnalysis;
   soft_sensor_adjustment?: StrategySoftSensorAdjustment;
   soft_sensor_notes?: string[];
+  scoring_without_soft_sensors?: number;
+  scoring_with_soft_sensors?: number;
+  scoring_delta_soft_sensors?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -136,6 +142,7 @@ export interface VirtualRaceEngineerResult {
   soft_sensors_timeline?: SoftSensorsTimeline;
   warmup_interpretation?: WarmupInterpretation;
   degradation_validation_context?: DegradationValidationContext;
+  soft_sensor_scoring_gate?: SoftSensorScoringGate;
 }
 
 /* ── Helpers ── */
@@ -1575,6 +1582,49 @@ export function computeVirtualRaceEngineer(
   // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
   const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
+  // ── 9a. Compute Soft Sensors Timeline early (needed for scoring gate) ──
+  const softSensorsTimeline = computeSoftSensorsTimeline(
+    stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
+    earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+  );
+  const softSensors: SoftSensorsContext | undefined = softSensorsTimeline.summary.latest_state
+    ? {
+        tyre_thermal: softSensorsTimeline.summary.latest_state.tyre_thermal,
+        tyre_stress: softSensorsTimeline.summary.latest_state.tyre_stress,
+        track_grip: softSensorsTimeline.summary.latest_state.track_grip,
+        overall_confidence: softSensorsTimeline.summary.overall_confidence,
+        reliability_notes: softSensorsTimeline.summary.reliability_notes,
+      }
+    : computeSoftSensors(
+        stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
+        earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+      );
+  const warmupInterpretation = computeWarmupInterpretation(softSensorsTimeline, stintAnalyses);
+  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations);
+
+  // Soft sensor refinement adjustments
+  const recSSAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
+  recommendedStrategy.soft_sensor_adjustment = recSSAdj;
+  if (recSSAdj.total_soft_sensor_adjustment !== 0) {
+    recommendedStrategy.soft_sensor_notes = recSSAdj.adjustment_reasons;
+  }
+  for (const alt of alternatives) {
+    const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline);
+    alt.soft_sensor_adjustment = altAdj;
+    if (altAdj.total_soft_sensor_adjustment !== 0) {
+      alt.soft_sensor_notes = altAdj.adjustment_reasons;
+    }
+  }
+
+  // Soft sensor scoring gate
+  const softSensorScoringGate = validateSoftSensorScoringGate(softSensorsTimeline, degradationValidationContext);
+
+  // Enhanced narrative insights from soft sensors
+  const sensorNarrativeInsights = extractSoftSensorNarrativeInsights(softSensorsTimeline, stintAnalyses);
+  for (const insight of sensorNarrativeInsights) {
+    narrativeInsights.push(insight);
+  }
+
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
   // Per-strategy risk context is extracted from analysis and passed directly to
   // scoreStrategies, which applies mode-dependent context adjustments internally.
@@ -1611,7 +1661,19 @@ export function computeVirtualRaceEngineer(
     const validStintCount = degradationValidations.filter(v => v.status === "VALID").length;
     const degConfidence = totalStintCount > 0 ? validStintCount / totalStintCount : undefined;
 
-    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean; riskContext?: StrategyRiskContext }[] = [];
+    // Compute SS scoring deltas using the gate
+    const bestScoringDelta = recommendedStrategy.estimated_gain_seconds;
+    const recSSScoringDelta = computeSoftSensorScoringDelta(
+      recSSAdj, softSensorScoringGate, bestScoringDelta, bestScoringDelta,
+    );
+
+    const altSSScoringDeltas = alternatives.map(alt => {
+      const adj = alt.soft_sensor_adjustment;
+      if (!adj) return 0;
+      return computeSoftSensorScoringDelta(adj, softSensorScoringGate, alt.estimated_delta_vs_actual, bestScoringDelta);
+    });
+
+    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean; riskContext?: StrategyRiskContext; softSensorScoringDelta?: number }[] = [];
 
     scoringInput.push({
       name: recommendedStrategy.description ?? "Strategia raccomandata",
@@ -1619,14 +1681,17 @@ export function computeVirtualRaceEngineer(
       breakdown: recommendedStrategy.breakdown,
       isRecommended: true,
       riskContext: buildRiskContext(recommendedStrategy.analysis, degConfidence),
+      softSensorScoringDelta: recSSScoringDelta,
     });
 
-    for (const alt of alternatives) {
+    for (let ai = 0; ai < alternatives.length; ai++) {
+      const alt = alternatives[ai];
       scoringInput.push({
         name: alt.name,
         delta: alt.estimated_delta_vs_actual,
         breakdown: alt.breakdown,
         riskContext: buildRiskContext(alt.analysis, degConfidence),
+        softSensorScoringDelta: altSSScoringDeltas[ai],
       });
     }
 
@@ -1634,10 +1699,28 @@ export function computeVirtualRaceEngineer(
 
     const recScored = riskScored.find(s => s.index === -2);
 
+    // Attach scoring fields to strategies
+    if (recScored) {
+      recommendedStrategy.scoring_without_soft_sensors = recScored.scoring_without_soft_sensors;
+      recommendedStrategy.scoring_with_soft_sensors = recScored.scoring_with_soft_sensors;
+      recommendedStrategy.scoring_delta_soft_sensors = recScored.soft_sensor_scoring_delta;
+    }
+
     const altScores = new Map<number, ScoredStrategy>();
     for (const scored of riskScored) {
       if (scored.index >= 0) {
         altScores.set(scored.index, scored);
+      }
+    }
+
+    // Attach scoring fields to alternatives
+    for (let ai = 0; ai < alternatives.length; ai++) {
+      const idxInInput = scoringInput.findIndex(s => s.name === alternatives[ai].name && !s.isRecommended);
+      const scored = altScores.get(idxInInput);
+      if (scored) {
+        alternatives[ai].scoring_without_soft_sensors = scored.scoring_without_soft_sensors;
+        alternatives[ai].scoring_with_soft_sensors = scored.scoring_with_soft_sensors;
+        alternatives[ai].scoring_delta_soft_sensors = scored.soft_sensor_scoring_delta;
       }
     }
 
@@ -1693,6 +1776,16 @@ export function computeVirtualRaceEngineer(
 
     if (recScored && recScored.adjustment_reason !== "Nessun aggiustamento") {
       confidenceFactors.push(`Risk scoring (${riskMode}): ${recScored.adjustment_reason}`);
+    }
+
+    // Soft sensor scoring narrative
+    if (softSensorScoringGate.soft_sensor_scoring_enabled) {
+      const anySSEffect = recSSScoringDelta !== 0 || altSSScoringDeltas.some(d => d !== 0);
+      if (anySSEffect) {
+        narrativeInsights.push(`Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.`);
+      }
+    } else if (softSensorScoringGate.soft_sensor_block_reason) {
+      narrativeInsights.push(`Soft sensors esclusi dallo scoring: ${softSensorScoringGate.soft_sensor_block_reason}`);
     }
   }
 
@@ -1751,58 +1844,7 @@ export function computeVirtualRaceEngineer(
     );
   }
 
-  // ── 11. Soft Sensors (latent state estimation — lap-by-lap timeline) ──
-  const softSensorsTimeline = computeSoftSensorsTimeline(
-    stintAnalyses,
-    pitStopAnalyses,
-    degradationValidations,
-    paceLossResults,
-    earlyBattleCtx,
-    weatherMap,
-    trackStatusMap,
-    totalLaps,
-  );
-
-  // Derive backward-compatible summary from timeline
-  const softSensors: SoftSensorsContext | undefined = softSensorsTimeline.summary.latest_state
-    ? {
-        tyre_thermal: softSensorsTimeline.summary.latest_state.tyre_thermal,
-        tyre_stress: softSensorsTimeline.summary.latest_state.tyre_stress,
-        track_grip: softSensorsTimeline.summary.latest_state.track_grip,
-        overall_confidence: softSensorsTimeline.summary.overall_confidence,
-        reliability_notes: softSensorsTimeline.summary.reliability_notes,
-      }
-    : computeSoftSensors(
-        stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
-        earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
-      );
-
-  // ── 11b. Warmup interpretation & degradation validation context ──
-  const warmupInterpretation = computeWarmupInterpretation(softSensorsTimeline, stintAnalyses);
-  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations);
-
-  // ── 11c. Enhanced narrative insights from soft sensors ──
-  const sensorNarrativeInsights = extractSoftSensorNarrativeInsights(softSensorsTimeline, stintAnalyses);
-  for (const insight of sensorNarrativeInsights) {
-    narrativeInsights.push(insight);
-  }
-
-  // ── 11d. Apply soft sensor refinement to recommended + alternatives ──
-  {
-    const recAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
-    recommendedStrategy.soft_sensor_adjustment = recAdj;
-    if (recAdj.total_soft_sensor_adjustment !== 0) {
-      recommendedStrategy.soft_sensor_notes = recAdj.adjustment_reasons;
-    }
-
-    for (const alt of alternatives) {
-      const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline);
-      alt.soft_sensor_adjustment = altAdj;
-      if (altAdj.total_soft_sensor_adjustment !== 0) {
-        alt.soft_sensor_notes = altAdj.adjustment_reasons;
-      }
-    }
-  }
+  // (Soft sensors computed earlier in section 9a for scoring integration)
 
   return {
     driver_number: driverNumber,
@@ -1847,5 +1889,6 @@ export function computeVirtualRaceEngineer(
     soft_sensors_timeline: softSensorsTimeline,
     warmup_interpretation: warmupInterpretation,
     degradation_validation_context: degradationValidationContext,
+    soft_sensor_scoring_gate: softSensorScoringGate,
   };
 }

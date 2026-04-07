@@ -1,5 +1,5 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
-import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition, WarmupInterpretation, DegradationValidationContext, ValidationSupportLevel } from "@/lib/softSensors";
+import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition, WarmupInterpretation, DegradationValidationContext, ValidationSupportLevel, SoftSensorScoringGate } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
@@ -231,7 +231,7 @@ function SensorMiniCard({ title, icon, sensor, labelMap }: {
   );
 }
 
-function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validationContext }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline; warmupInterpretation?: WarmupInterpretation; validationContext?: DegradationValidationContext }) {
+function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validationContext, scoringGate }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline; warmupInterpretation?: WarmupInterpretation; validationContext?: DegradationValidationContext; scoringGate?: SoftSensorScoringGate }) {
   const [showTimeline, setShowTimeline] = useState(false);
 
   // Compute timeline highlights
@@ -284,6 +284,16 @@ function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validatio
       <p className="text-[10px] text-muted-foreground mb-2 italic">
         Stati latenti stimati — indicazioni coerenti con i dati disponibili, non misure fisiche dirette.
       </p>
+      {scoringGate && (
+        <div className={`flex items-center gap-1.5 mb-2 text-[9px] px-2 py-1 rounded border ${scoringGate.soft_sensor_scoring_enabled ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-muted/30 border-border text-muted-foreground"}`}>
+          <Shield className="h-3 w-3 shrink-0" />
+          <span className="font-semibold">Scoring gate:</span>
+          <span>{scoringGate.soft_sensor_scoring_enabled ? "Attivo — i soft sensors influenzano lo scoring (input debole)" : "Chiuso"}</span>
+          {scoringGate.soft_sensor_block_reason && !scoringGate.soft_sensor_scoring_enabled && (
+            <span className="text-[8px] ml-1">— {scoringGate.soft_sensor_block_reason}</span>
+          )}
+        </div>
+      )}
       <div className="space-y-1.5">
         <SensorMiniCard
           title="Stato termico gomme"
@@ -466,6 +476,29 @@ function SoftSensorImpactDetail({ adjustment }: { adjustment: StrategySoftSensor
       </div>
       {adjustment.adjustment_reasons.length > 0 && adjustment.adjustment_reasons[0] !== "Nessun aggiustamento significativo dai soft sensors" && (
         <p className="text-[9px] text-muted-foreground italic">{adjustment.adjustment_reasons.join("; ")}</p>
+      )}
+    </div>
+  );
+}
+
+/* ── Soft Sensor Scoring Impact (scoring_with vs scoring_without) ── */
+function SoftSensorScoringImpact({ scoringWithout, scoringWith, delta, gate }: {
+  scoringWithout?: number;
+  scoringWith?: number;
+  delta?: number;
+  gate?: SoftSensorScoringGate;
+}) {
+  if (delta == null || Math.abs(delta) < 0.01) return null;
+  const isPositive = delta > 0;
+  return (
+    <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
+      <Scale className="h-3 w-3 shrink-0" />
+      <span>Scoring SS: <strong className={`font-mono ${isPositive ? "text-emerald-400" : "text-amber-400"}`}>{delta > 0 ? "+" : ""}{delta.toFixed(2)}s</strong></span>
+      {scoringWithout != null && scoringWith != null && (
+        <span className="text-[8px]">({scoringWithout.toFixed(1)} → {scoringWith.toFixed(1)})</span>
+      )}
+      {gate && !gate.soft_sensor_scoring_enabled && (
+        <span className="text-red-400 text-[8px]">gate chiuso</span>
       )}
     </div>
   );
@@ -1039,7 +1072,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {/* ═══════════════════════════════════════════════════════════════
             SOFT SENSORS
         ═══════════════════════════════════════════════════════════════ */}
-        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} warmupInterpretation={result.warmup_interpretation} validationContext={result.degradation_validation_context} />}
+        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} warmupInterpretation={result.warmup_interpretation} validationContext={result.degradation_validation_context} scoringGate={result.soft_sensor_scoring_gate} />}
 
 
         {/* ═══════════════════════════════════════════════════════════════
@@ -1520,6 +1553,12 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                 {recommended_strategy.soft_sensor_adjustment && (
                   <SoftSensorImpactDetail adjustment={recommended_strategy.soft_sensor_adjustment} />
                 )}
+                <SoftSensorScoringImpact
+                  scoringWithout={recommended_strategy.scoring_without_soft_sensors}
+                  scoringWith={recommended_strategy.scoring_with_soft_sensors}
+                  delta={recommended_strategy.scoring_delta_soft_sensors}
+                  gate={result.soft_sensor_scoring_gate}
+                />
               </div>
 
               {/* Breakdown for recommended */}
@@ -1658,6 +1697,12 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                     {alt.soft_sensor_adjustment && (
                       <SoftSensorImpactDetail adjustment={alt.soft_sensor_adjustment} />
                     )}
+                    <SoftSensorScoringImpact
+                      scoringWithout={alt.scoring_without_soft_sensors}
+                      scoringWith={alt.scoring_with_soft_sensors}
+                      delta={alt.scoring_delta_soft_sensors}
+                      gate={result.soft_sensor_scoring_gate}
+                    />
 
                     {/* Breakdown per-strategy */}
                     {alt.breakdown && (

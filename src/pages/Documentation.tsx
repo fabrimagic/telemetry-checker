@@ -1427,10 +1427,68 @@ export default function Documentation() {
             e un dettaglio espandibile che mostra la contribuzione di ogni componente (termico, stress, grip).
           </p>
 
+          <h4 className="font-semibold text-foreground mt-4">Integrazione nello scoring strategico (Weak Scoring Input)</h4>
+          <p>
+            Oltre al refinement dei costi simulati, i soft sensors possono influenzare lo <strong className="text-foreground">scoring multi-criterio</strong> delle
+            strategie come input debole e validato. Questo livello aggiuntivo opera in tre stadi distinti:
+          </p>
+
+          <p className="font-semibold text-foreground mt-2">1. Interpretation Layer</p>
+          <p>
+            I soft sensors interpretano la timeline per produrre insight narrativi (warmup, stress, grip) e contesto
+            per la validazione del degrado e i momenti decisionali. Non modificano alcun modulo core.
+          </p>
+
+          <p className="font-semibold text-foreground mt-2">2. Refinement Layer</p>
+          <p>
+            Micro-aggiustamenti lap-by-lap applicati ai costi simulati (max ±0.15s/giro termico, ±0.10s stress,
+            ±0.08s grip, ±3.0s totali). Separati dai moduli base, con anti-double-counting esplicito.
+          </p>
+
+          <p className="font-semibold text-foreground mt-2">3. Scoring Layer (Weak Input)</p>
+          <p>
+            I soft sensors alimentano lo scoring solo dopo aver superato un <strong className="text-foreground">gate di validazione</strong> obbligatorio.
+            Il gate verifica quattro condizioni:
+          </p>
+          <ul className="list-disc list-inside space-y-1 ml-4">
+            <li>Timeline disponibile e non vuota</li>
+            <li>Confidence complessiva != LOW</li>
+            <li>Supporto validazione degrado != WEAK</li>
+            <li>Assenza di conflitti evidenti tra i segnali dei tre sensori</li>
+          </ul>
+          <p>
+            Se una qualsiasi condizione non è soddisfatta, l'impatto sullo scoring è zero e il motivo del blocco
+            è esplicitamente indicato nell'interfaccia.
+          </p>
+          <p>
+            Quando il gate è attivo, l'effetto sullo scoring è limitato a <strong className="text-foreground">±1.0s massimo per strategia</strong>,
+            pesato per la confidence dell'adjustment (HIGH: 100%, MEDIUM: 50%, LOW: 0%). Se la distanza tra due
+            strategie supera i 5.0s, i soft sensors non possono influenzare il ranking tra di esse.
+          </p>
+          <p>
+            Per ogni strategia, l'interfaccia mostra: lo scoring senza soft sensors, lo scoring con soft sensors
+            e il delta introdotto, rendendo ogni effetto completamente tracciabile e verificabile.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Anti-double-counting</h4>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">Thermal</strong> — modula il warmup, non lo duplica (il modello base già applica la penalità)</li>
+            <li><strong className="text-foreground">Stress</strong> — aggiustamento marginale sul degrado tardivo, non un secondo modello di degrado</li>
+            <li><strong className="text-foreground">Grip</strong> — contesto pista leggero, non un nuovo modello meteo</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Limitazioni</h4>
+          <ul className="list-disc list-inside space-y-1">
+            <li>L'effetto sullo scoring è non deterministico — dipende dalla qualità e coerenza dei segnali disponibili</li>
+            <li>Non stabilisce causalità: segnala correlazioni osservate, non cause</li>
+            <li>La qualità dell'output è direttamente legata alla disponibilità dei dati upstream (meteo, degrado, pace loss)</li>
+            <li>Non può ribaltare da solo una strategia chiaramente migliore per i moduli core</li>
+          </ul>
+
           <h4 className="font-semibold text-foreground mt-4">Integrazione nel VRE</h4>
           <p>
-            I soft sensors sono calcolati dopo tutti i moduli analitici (degrado, traffico, pace loss, contesto integrato)
-            e prima della narrativa finale. Il summary è derivato dalla timeline (non da una logica separata)
+            I soft sensors sono calcolati prima dello scoring multi-criterio, garantendo che gli adjustment
+            siano disponibili come input per il ranking. Il summary è derivato dalla timeline (non da una logica separata)
             per garantire coerenza. Sono presentati come sezione collassabile nel VRE con etichetta "STIMA".
           </p>
 
