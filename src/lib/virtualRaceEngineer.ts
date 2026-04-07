@@ -1749,8 +1749,8 @@ export function computeVirtualRaceEngineer(
     );
   }
 
-  // ── 11. Soft Sensors (latent state estimation) ──
-  const softSensors = computeSoftSensors(
+  // ── 11. Soft Sensors (latent state estimation — lap-by-lap timeline) ──
+  const softSensorsTimeline = computeSoftSensorsTimeline(
     stintAnalyses,
     pitStopAnalyses,
     degradationValidations,
@@ -1760,6 +1760,37 @@ export function computeVirtualRaceEngineer(
     trackStatusMap,
     totalLaps,
   );
+
+  // Derive backward-compatible summary from timeline
+  const softSensors: SoftSensorsContext | undefined = softSensorsTimeline.summary.latest_state
+    ? {
+        tyre_thermal: softSensorsTimeline.summary.latest_state.tyre_thermal,
+        tyre_stress: softSensorsTimeline.summary.latest_state.tyre_stress,
+        track_grip: softSensorsTimeline.summary.latest_state.track_grip,
+        overall_confidence: softSensorsTimeline.summary.overall_confidence,
+        reliability_notes: softSensorsTimeline.summary.reliability_notes,
+      }
+    : computeSoftSensors(
+        stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
+        earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+      );
+
+  // ── 11b. Apply soft sensor refinement to recommended + alternatives ──
+  {
+    const recAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
+    recommendedStrategy.soft_sensor_adjustment = recAdj;
+    if (recAdj.total_soft_sensor_adjustment !== 0) {
+      recommendedStrategy.soft_sensor_notes = recAdj.adjustment_reasons;
+    }
+
+    for (const alt of alternatives) {
+      const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline);
+      alt.soft_sensor_adjustment = altAdj;
+      if (altAdj.total_soft_sensor_adjustment !== 0) {
+        alt.soft_sensor_notes = altAdj.adjustment_reasons;
+      }
+    }
+  }
 
   return {
     driver_number: driverNumber,
