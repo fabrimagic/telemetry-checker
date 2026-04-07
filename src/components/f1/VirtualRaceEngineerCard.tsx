@@ -994,7 +994,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {/* ═══════════════════════════════════════════════════════════════
             SOFT SENSORS
         ═══════════════════════════════════════════════════════════════ */}
-        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} />}
+        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} />}
 
 
         {/* ═══════════════════════════════════════════════════════════════
