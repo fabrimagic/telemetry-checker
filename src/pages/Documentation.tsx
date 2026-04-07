@@ -502,6 +502,67 @@ export default function Documentation() {
           </div>
         </DocSection>
 
+        <DocSection id="vre-analysis-modes" title="VRE — Modalità di Analisi" icon={<Eye className="h-4 w-4" />}>
+          <p>
+            Il VRE supporta due modalità operative fondamentali, selezionabili tramite il toggle nell'header della card.
+            Le due modalità rappresentano prospettive temporali diverse sulla stessa gara e determinano
+            quali informazioni il sistema può utilizzare.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">🔴 Race Engineer Mode (default)</h4>
+          <p>
+            Simula la prospettiva del race engineer <strong className="text-foreground">durante la gara</strong>,
+            senza conoscenza degli eventi futuri.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Utilizza solo le informazioni disponibili fino al giro corrente</li>
+            <li>Scenario forzato su <strong className="text-foreground">Real Conditions</strong> — non modificabile</li>
+            <li>Il selettore scenari what-if è nascosto</li>
+            <li>Risk mode selezionabile normalmente</li>
+            <li>Output: "Decisione ottimale in quel momento, basata sulle informazioni disponibili"</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">📊 Post-Race Analysis Mode</h4>
+          <p>
+            Analisi a posteriori con <strong className="text-foreground">conoscenza completa</strong> di tutti
+            gli eventi della gara: safety car, VSC, meteo, traffico.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Utilizza la timeline reale completa della gara</li>
+            <li>Scenario selezionabile dall'utente (default: Real Conditions)</li>
+            <li>Scenari what-if disponibili con giro di attivazione e durata</li>
+            <li>Risk mode selezionabile normalmente</li>
+            <li>Output: "Strategia ottimale a posteriori, considerando tutti gli eventi della gara"</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Differenze chiave</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+              <thead className="bg-muted/50">
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 text-left font-semibold text-foreground">Aspetto</th>
+                  <th className="px-3 py-2 text-left font-semibold text-foreground">Race Engineer</th>
+                  <th className="px-3 py-2 text-left font-semibold text-foreground">Post-Race</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Prospettiva</td><td className="px-3 py-1.5">Ex-ante (in tempo reale)</td><td className="px-3 py-1.5">Ex-post (a posteriori)</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Eventi futuri</td><td className="px-3 py-1.5">Non utilizzati</td><td className="px-3 py-1.5">Completamente disponibili</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Scenari what-if</td><td className="px-3 py-1.5">Disabilitati (Real Conditions)</td><td className="px-3 py-1.5">Selezionabili</td></tr>
+                <tr className="border-b border-border/50"><td className="px-3 py-1.5">Risk mode</td><td className="px-3 py-1.5">Selezionabile</td><td className="px-3 py-1.5">Selezionabile</td></tr>
+                <tr><td className="px-3 py-1.5">Soft sensors</td><td className="px-3 py-1.5">Invariati (dati osservati)</td><td className="px-3 py-1.5">Invariati (dati osservati)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 className="font-semibold text-foreground mt-4">Limitazioni</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Race Engineer Mode non conosce il futuro — le raccomandazioni riflettono solo ciò che era noto al momento</li>
+            <li>Post-Race Mode non è predittiva — è un'analisi retrospettiva, non una previsione</li>
+            <li>I soft sensors sono sempre basati su dati osservati, indipendentemente dalla modalità</li>
+            <li>Nessuna modalità inventa eventi o dati non presenti</li>
+          </ul>
+        </DocSection>
         <DocSection id="vre-ui" title="VRE — Interfaccia a 4 Sezioni" icon={<LayoutDashboard className="h-4 w-4" />}>
           <p>L'interfaccia del VRE è organizzata in 4 sezioni distinte che separano chiaramente il contesto globale dai dati delle singole strategie:</p>
 
