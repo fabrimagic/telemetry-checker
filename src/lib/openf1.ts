@@ -7,6 +7,7 @@ export interface Driver {
   name_acronym: string;
   team_name: string;
   team_colour: string;
+  headshot_url: string | null;
   session_key: number;
 }
 
