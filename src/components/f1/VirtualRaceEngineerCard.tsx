@@ -854,11 +854,46 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
             <span className="text-base">🏎️</span> Virtual Race Engineer
           </CardTitle>
-          <ConfidenceBadge level={confidence} />
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+              isRaceEngineerMode
+                ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+            }`}>
+              {isRaceEngineerMode ? "🔴 Race Engineer" : "📊 Post-Race Analysis"}
+            </span>
+            <ConfidenceBadge level={confidence} />
+          </div>
         </div>
         <p className="text-[11px] text-muted-foreground mt-1">
-          Analisi strategica basata su degrado gomme, pit stop, meteo e neutralizzazioni.
+          {isRaceEngineerMode
+            ? "Decisione ottimale basata sulle informazioni disponibili in quel momento — senza conoscenza del futuro."
+            : "Analisi strategica a posteriori con conoscenza completa degli eventi della gara."
+          }
         </p>
+
+        {/* Analysis Mode Toggle */}
+        <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
+          {(["RACE_ENGINEER", "POST_RACE"] as AnalysisMode[]).map((mode) => {
+            const labels: Record<AnalysisMode, string> = { RACE_ENGINEER: "Race Engineer", POST_RACE: "Post-Race Analysis" };
+            const icons: Record<AnalysisMode, string> = { RACE_ENGINEER: "🔴", POST_RACE: "📊" };
+            const isActive = analysisMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => onAnalysisModeChange?.(mode)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <span>{icons[mode]}</span>
+                {labels[mode]}
+              </button>
+            );
+          })}
+        </div>
 
         {/* View Mode Selector */}
         <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
@@ -881,7 +916,30 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           })}
         </div>
 
-        {scenario_is_simulated && (
+        {/* Mode context indicator */}
+        <div className={`mt-2 rounded-md px-3 py-1.5 flex items-center gap-2 text-[10px] ${
+          isRaceEngineerMode
+            ? "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+            : "bg-muted/30 border border-border text-muted-foreground"
+        }`}>
+          {isRaceEngineerMode ? (
+            <>
+              <Shield className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold">Scenario: Real Conditions (bloccato)</span>
+              <span className="ml-1">— solo informazioni disponibili al momento della decisione</span>
+            </>
+          ) : (
+            <>
+              <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold">Scenario: {scenario_label}</span>
+              {scenario_is_simulated && scenario_window && (
+                <span className="ml-1">(giri {scenario_window.start}–{scenario_window.end})</span>
+              )}
+            </>
+          )}
+        </div>
+
+        {!isRaceEngineerMode && scenario_is_simulated && (
          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
              <p className="text-[11px] text-amber-400 font-semibold">
