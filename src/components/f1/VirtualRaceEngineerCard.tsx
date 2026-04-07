@@ -1,4 +1,5 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
+import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
@@ -10,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers, Globe, Flag, Repeat } from "lucide-react";
+import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers, Globe, Flag, Repeat, Thermometer } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { AnalystView, BroadcastView, type ViewMode } from "./VREViewModes";
 
@@ -136,6 +137,146 @@ function VRESection({ title, icon, defaultOpen = false, badge, children }: {
         {children}
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/* ── Soft Sensors Section ── */
+
+const THERMAL_LABELS: Record<TyreThermalLabel, { text: string; color: string }> = {
+  COLD: { text: "Fredde", color: "text-blue-400" },
+  WARMING_UP: { text: "In riscaldamento", color: "text-amber-400" },
+  IN_WINDOW: { text: "In finestra", color: "text-emerald-400" },
+  HOT: { text: "Calde", color: "text-orange-400" },
+  OVERHEATED: { text: "Surriscaldate", color: "text-red-400" },
+  UNKNOWN: { text: "N/D", color: "text-muted-foreground" },
+};
+
+const STRESS_LABELS: Record<TyreStressLabel, { text: string; color: string }> = {
+  LOW: { text: "Basso", color: "text-emerald-400" },
+  MODERATE: { text: "Moderato", color: "text-amber-400" },
+  HIGH: { text: "Alto", color: "text-orange-400" },
+  CRITICAL: { text: "Critico", color: "text-red-400" },
+  UNKNOWN: { text: "N/D", color: "text-muted-foreground" },
+};
+
+const GRIP_LABELS: Record<TrackGripLabel, { text: string; color: string }> = {
+  LOW_GRIP: { text: "Basso grip", color: "text-red-400" },
+  IMPROVING: { text: "In miglioramento", color: "text-emerald-400" },
+  STABLE: { text: "Stabile", color: "text-foreground" },
+  FALLING: { text: "In peggioramento", color: "text-orange-400" },
+  MIXED: { text: "Misto", color: "text-amber-400" },
+  UNKNOWN: { text: "N/D", color: "text-muted-foreground" },
+};
+
+function SensorMiniCard({ title, icon, sensor, labelMap }: {
+  title: string;
+  icon: React.ReactNode;
+  sensor: SoftSensorResult;
+  labelMap: Record<string, { text: string; color: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const info = labelMap[sensor.label] ?? { text: sensor.label, color: "text-muted-foreground" };
+  const confStyle: Record<SoftSensorConfidence, string> = {
+    HIGH: "bg-emerald-500/15 text-emerald-400",
+    MEDIUM: "bg-amber-500/15 text-amber-400",
+    LOW: "bg-red-500/15 text-red-400",
+  };
+  const confLabels: Record<SoftSensorConfidence, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
+
+  return (
+    <div className="border border-border rounded-md bg-card/50">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors"
+      >
+        <span className="text-muted-foreground shrink-0">{icon}</span>
+        <span className="text-[11px] text-muted-foreground shrink-0">{title}</span>
+        <span className={`text-[11px] font-semibold ml-auto ${info.color}`}>{info.text}</span>
+        <span className={`text-[9px] px-1.5 py-0.5 rounded ${confStyle[sensor.confidence]}`}>
+          {confLabels[sensor.confidence]}
+        </span>
+        <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-3 pb-2.5 space-y-1.5 border-t border-border pt-2">
+          {sensor.score != null && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">Score:</span>
+              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary/70"
+                  style={{ width: `${Math.round(sensor.score * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-foreground">{(sensor.score * 100).toFixed(0)}%</span>
+            </div>
+          )}
+          <div className="space-y-0.5">
+            {sensor.reasons.slice(0, 3).map((r, i) => (
+              <p key={i} className="text-[10px] text-muted-foreground flex items-start gap-1">
+                <span className="shrink-0 mt-0.5">•</span>
+                <span>{r}</span>
+              </p>
+            ))}
+          </div>
+          {sensor.contaminated_by && sensor.contaminated_by.length > 0 && (
+            <p className="text-[9px] text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              Contaminato da: {sensor.contaminated_by.join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SoftSensorsSection({ sensors }: { sensors: SoftSensorsContext }) {
+  return (
+    <VRESection
+      title="Soft Sensors"
+      icon={<Thermometer className="h-3.5 w-3.5 text-muted-foreground" />}
+      defaultOpen={false}
+      badge={
+        <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">
+          STIMA
+        </Badge>
+      }
+    >
+      <p className="text-[10px] text-muted-foreground mb-2 italic">
+        Stati latenti stimati — indicazioni coerenti con i dati disponibili, non misure fisiche dirette.
+      </p>
+      <div className="space-y-1.5">
+        <SensorMiniCard
+          title="Stato termico gomme"
+          icon={<Thermometer className="h-3 w-3" />}
+          sensor={sensors.tyre_thermal}
+          labelMap={THERMAL_LABELS}
+        />
+        <SensorMiniCard
+          title="Stress gomme"
+          icon={<Activity className="h-3 w-3" />}
+          sensor={sensors.tyre_stress}
+          labelMap={STRESS_LABELS}
+        />
+        <SensorMiniCard
+          title="Grip pista"
+          icon={<Navigation className="h-3 w-3" />}
+          sensor={sensors.track_grip}
+          labelMap={GRIP_LABELS}
+        />
+      </div>
+      {sensors.reliability_notes.length > 0 && (
+        <div className="mt-2 space-y-0.5">
+          {sensors.reliability_notes.map((note, i) => (
+            <p key={i} className="text-[9px] text-amber-400/80 flex items-start gap-1">
+              <Info className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>{note}</span>
+            </p>
+          ))}
+        </div>
+      )}
+    </VRESection>
   );
 }
 
@@ -702,6 +843,12 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
             )}
           </div>
         </VRESection>
+
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SOFT SENSORS
+        ═══════════════════════════════════════════════════════════════ */}
+        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} />}
 
 
         {/* ═══════════════════════════════════════════════════════════════

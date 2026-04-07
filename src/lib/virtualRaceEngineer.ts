@@ -17,6 +17,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
+import { computeSoftSensors, type SoftSensorsContext } from "./softSensors";
 
 /* ── Types ── */
 
@@ -127,6 +128,7 @@ export interface VirtualRaceEngineerResult {
   degradation_validations: DegradationValidationResult[];
   pace_loss_results: StintPaceLossResult[];
   custom_degradation_override: Record<string, number> | null;
+  soft_sensors?: SoftSensorsContext;
 }
 
 /* ── Helpers ── */
@@ -1742,6 +1744,18 @@ export function computeVirtualRaceEngineer(
     );
   }
 
+  // ── 11. Soft Sensors (latent state estimation) ──
+  const softSensors = computeSoftSensors(
+    stintAnalyses,
+    pitStopAnalyses,
+    degradationValidations,
+    paceLossResults,
+    earlyBattleCtx,
+    weatherMap,
+    trackStatusMap,
+    totalLaps,
+  );
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
@@ -1781,5 +1795,6 @@ export function computeVirtualRaceEngineer(
     degradation_validations: degradationValidations,
     pace_loss_results: paceLossResults,
     custom_degradation_override: customDegradationOverride,
+    soft_sensors: softSensors,
   };
 }
