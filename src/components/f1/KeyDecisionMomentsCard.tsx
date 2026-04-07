@@ -8,6 +8,7 @@ import type {
   DecisionType,
   ConfidenceLevel,
 } from "@/lib/keyDecisionMoments";
+import type { DecisionSoftSensorContext, SoftSensorConfidence } from "@/lib/softSensors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
