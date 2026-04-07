@@ -1661,7 +1661,19 @@ export function computeVirtualRaceEngineer(
     const validStintCount = degradationValidations.filter(v => v.status === "VALID").length;
     const degConfidence = totalStintCount > 0 ? validStintCount / totalStintCount : undefined;
 
-    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean; riskContext?: StrategyRiskContext }[] = [];
+    // Compute SS scoring deltas using the gate
+    const bestScoringDelta = recommendedStrategy.estimated_gain_seconds;
+    const recSSScoringDelta = computeSoftSensorScoringDelta(
+      recSSAdj, softSensorScoringGate, bestScoringDelta, bestScoringDelta,
+    );
+
+    const altSSScoringDeltas = alternatives.map(alt => {
+      const adj = alt.soft_sensor_adjustment;
+      if (!adj) return 0;
+      return computeSoftSensorScoringDelta(adj, softSensorScoringGate, alt.estimated_delta_vs_actual, bestScoringDelta);
+    });
+
+    const scoringInput: { name: string; delta: number; breakdown: StrategyBreakdown | undefined; isRecommended?: boolean; riskContext?: StrategyRiskContext; softSensorScoringDelta?: number }[] = [];
 
     scoringInput.push({
       name: recommendedStrategy.description ?? "Strategia raccomandata",
@@ -1669,14 +1681,17 @@ export function computeVirtualRaceEngineer(
       breakdown: recommendedStrategy.breakdown,
       isRecommended: true,
       riskContext: buildRiskContext(recommendedStrategy.analysis, degConfidence),
+      softSensorScoringDelta: recSSScoringDelta,
     });
 
-    for (const alt of alternatives) {
+    for (let ai = 0; ai < alternatives.length; ai++) {
+      const alt = alternatives[ai];
       scoringInput.push({
         name: alt.name,
         delta: alt.estimated_delta_vs_actual,
         breakdown: alt.breakdown,
         riskContext: buildRiskContext(alt.analysis, degConfidence),
+        softSensorScoringDelta: altSSScoringDeltas[ai],
       });
     }
 
@@ -1684,10 +1699,28 @@ export function computeVirtualRaceEngineer(
 
     const recScored = riskScored.find(s => s.index === -2);
 
+    // Attach scoring fields to strategies
+    if (recScored) {
+      recommendedStrategy.scoring_without_soft_sensors = recScored.scoring_without_soft_sensors;
+      recommendedStrategy.scoring_with_soft_sensors = recScored.scoring_with_soft_sensors;
+      recommendedStrategy.scoring_delta_soft_sensors = recScored.soft_sensor_scoring_delta;
+    }
+
     const altScores = new Map<number, ScoredStrategy>();
     for (const scored of riskScored) {
       if (scored.index >= 0) {
         altScores.set(scored.index, scored);
+      }
+    }
+
+    // Attach scoring fields to alternatives
+    for (let ai = 0; ai < alternatives.length; ai++) {
+      const idxInInput = scoringInput.findIndex(s => s.name === alternatives[ai].name && !s.isRecommended);
+      const scored = altScores.get(idxInInput);
+      if (scored) {
+        alternatives[ai].scoring_without_soft_sensors = scored.scoring_without_soft_sensors;
+        alternatives[ai].scoring_with_soft_sensors = scored.scoring_with_soft_sensors;
+        alternatives[ai].scoring_delta_soft_sensors = scored.soft_sensor_scoring_delta;
       }
     }
 
