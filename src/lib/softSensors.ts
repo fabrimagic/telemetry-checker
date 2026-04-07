@@ -107,6 +107,47 @@ export interface StrategySoftSensorAdjustment {
   confidence: SoftSensorConfidence;
 }
 
+/* ── Warmup Interpretation types ── */
+export interface WarmupAnomaly {
+  stint_number: number;
+  type: "FASTER_THAN_EXPECTED" | "SLOWER_THAN_EXPECTED";
+  expected_laps: number;
+  observed_laps: number;
+  detail: string;
+}
+
+export interface WarmupInterpretation {
+  warmup_observed_laps_by_stint: Map<number, number>;
+  warmup_anomalies: WarmupAnomaly[];
+  reliability_notes: string[];
+}
+
+/* ── Degradation Validation Context types ── */
+export type ValidationSupportLevel = "STRONG" | "PARTIAL" | "WEAK";
+
+export interface StintValidationContext {
+  stint_number: number;
+  support_level: ValidationSupportLevel;
+  inconsistencies: string[];
+  notes: string[];
+  adjusted_confidence: SoftSensorConfidence;
+}
+
+export interface DegradationValidationContext {
+  by_stint: StintValidationContext[];
+  overall_support: ValidationSupportLevel;
+  reliability_notes: string[];
+}
+
+/* ── Soft Sensor Context for Decision Points ── */
+export interface DecisionSoftSensorContext {
+  thermal_state_summary: string;
+  stress_state_summary: string;
+  grip_state_summary: string;
+  consistency: SoftSensorConfidence;
+  notes: string[];
+}
+
 /* ══════════════════════════════════════════════════════════════════
  * TYRE THERMAL STATE (single lap)
  * ══════════════════════════════════════════════════════════════════ */
@@ -601,6 +642,328 @@ export function computeSoftSensorsTimeline(
       reliability_notes: summaryNotes,
     },
   };
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * SUPPORT LAYER 1: WARMUP INTERPRETATION
+ *
+ * Uses timeline to explain warmup behavior per stint.
+ * Does NOT change computeTyreWarmupPenalty — only interprets.
+ * ══════════════════════════════════════════════════════════════════ */
+
+export function computeWarmupInterpretation(
+  timeline: SoftSensorsTimeline,
+  stints: StintAnalysis[],
+): WarmupInterpretation {
+  const observedByStint = new Map<number, number>(timeline.summary.warmup_laps_by_stint);
+  const anomalies: WarmupAnomaly[] = [];
+  const notes: string[] = [];
+
+  for (const stint of stints) {
+    const compound = stint.compound.toUpperCase();
+    const warmupConfig = TYRE_WARMUP_CONFIG[compound];
+    const expectedLaps = warmupConfig?.laps_affected ?? 3;
+    const observedLaps = observedByStint.get(stint.stint_number) ?? 0;
+
+    // Skip first stint (no pit stop warmup)
+    if (stint.stint_number === 1) continue;
+
+    if (observedLaps === 0) {
+      // No warmup detected — could be missing data
+      notes.push(`Stint ${stint.stint_number}: nessun giro di riscaldamento rilevato (dati potenzialmente incompleti)`);
+      continue;
+    }
+
+    const diff = observedLaps - expectedLaps;
+    if (diff <= -2) {
+      anomalies.push({
+        stint_number: stint.stint_number,
+        type: "FASTER_THAN_EXPECTED",
+        expected_laps: expectedLaps,
+        observed_laps: observedLaps,
+        detail: `Stint ${stint.stint_number} (${compound}): warmup completato in ${observedLaps} giri vs ${expectedLaps} previsti — riscaldamento più rapido del modello`,
+      });
+    } else if (diff >= 2) {
+      anomalies.push({
+        stint_number: stint.stint_number,
+        type: "SLOWER_THAN_EXPECTED",
+        expected_laps: expectedLaps,
+        observed_laps: observedLaps,
+        detail: `Stint ${stint.stint_number} (${compound}): warmup persistente per ${observedLaps} giri vs ${expectedLaps} previsti — riscaldamento più lento del modello`,
+      });
+    }
+  }
+
+  return {
+    warmup_observed_laps_by_stint: observedByStint,
+    warmup_anomalies: anomalies,
+    reliability_notes: notes,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * SUPPORT LAYER 2: DEGRADATION VALIDATION CONTEXT
+ *
+ * Enriches degradation validation interpretation using timeline
+ * stress + grip signals. Does NOT change validateAllDegradationEstimates.
+ * ══════════════════════════════════════════════════════════════════ */
+
+export function computeDegradationValidationContext(
+  timeline: SoftSensorsTimeline,
+  stints: StintAnalysis[],
+  degradationValidations: DegradationValidationResult[],
+): DegradationValidationContext {
+  const byStint: StintValidationContext[] = [];
+
+  for (const dv of degradationValidations) {
+    const stint = stints.find(s => s.stint_number === dv.original.stint);
+    if (!stint) continue;
+
+    const stintLaps = timeline.by_lap.filter(
+      l => l.stint_number === stint.stint_number
+    );
+
+    if (stintLaps.length === 0) {
+      byStint.push({
+        stint_number: stint.stint_number,
+        support_level: "WEAK",
+        inconsistencies: [],
+        notes: ["Nessun dato soft sensor disponibile per questo stint"],
+        adjusted_confidence: "LOW",
+      });
+      continue;
+    }
+
+    const inconsistencies: string[] = [];
+    const notes: string[] = [];
+    let supportScore = 0;
+
+    // Analyze stress pattern
+    const highStressLaps = stintLaps.filter(l => l.tyre_stress.label === "HIGH" || l.tyre_stress.label === "CRITICAL");
+    const lowStressLaps = stintLaps.filter(l => l.tyre_stress.label === "LOW");
+    const hasHighSlope = dv.effective_slope > 0.06;
+
+    if (highStressLaps.length > stintLaps.length * 0.4 && dv.status === "VALID") {
+      supportScore += 2;
+      notes.push("Stress elevato coerente con degrado validato");
+    } else if (lowStressLaps.length > stintLaps.length * 0.7 && hasHighSlope) {
+      inconsistencies.push("Stress basso nonostante slope elevata: possibile contaminazione del fit");
+      supportScore -= 1;
+    }
+
+    // Analyze grip pattern
+    const mixedGripLaps = stintLaps.filter(l => l.track_grip.label === "MIXED" || l.track_grip.label === "LOW_GRIP");
+    if (mixedGripLaps.length > stintLaps.length * 0.3) {
+      inconsistencies.push("Grip pista instabile durante lo stint: lettura del degrado potenzialmente contaminata");
+      supportScore -= 1;
+    } else if (stintLaps.every(l => l.track_grip.label === "STABLE" || l.track_grip.label === "IMPROVING")) {
+      supportScore += 1;
+      notes.push("Condizioni pista stabili: contesto favorevole a una stima affidabile");
+    }
+
+    // Thermal instability
+    const thermalLabels = new Set(stintLaps.map(l => l.tyre_thermal.label));
+    if (thermalLabels.size >= 3) {
+      inconsistencies.push("Stato termico instabile durante lo stint: ridotta affidabilità della lettura");
+      supportScore -= 1;
+    }
+
+    // Low confidence laps
+    const lowConfLaps = stintLaps.filter(l => l.overall_confidence === "LOW");
+    if (lowConfLaps.length > stintLaps.length * 0.5) {
+      notes.push("Oltre metà dei giri con confidence bassa: contesto interpretativo debole");
+      supportScore -= 1;
+    }
+
+    const supportLevel: ValidationSupportLevel =
+      supportScore >= 2 ? "STRONG" : supportScore >= 0 ? "PARTIAL" : "WEAK";
+
+    const adjustedConfidence: SoftSensorConfidence =
+      supportLevel === "STRONG" ? "HIGH" : supportLevel === "PARTIAL" ? "MEDIUM" : "LOW";
+
+    byStint.push({
+      stint_number: stint.stint_number,
+      support_level: supportLevel,
+      inconsistencies,
+      notes,
+      adjusted_confidence: adjustedConfidence,
+    });
+  }
+
+  const overallSupport: ValidationSupportLevel = byStint.length === 0
+    ? "WEAK"
+    : byStint.every(s => s.support_level === "STRONG") ? "STRONG"
+    : byStint.some(s => s.support_level === "WEAK") ? "WEAK"
+    : "PARTIAL";
+
+  const reliabilityNotes: string[] = [];
+  const weakStints = byStint.filter(s => s.support_level === "WEAK");
+  if (weakStints.length > 0) {
+    reliabilityNotes.push(`${weakStints.length} stint con supporto debole dai soft sensors`);
+  }
+
+  return { by_stint: byStint, overall_support: overallSupport, reliability_notes: reliabilityNotes };
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * SUPPORT LAYER 3: ENHANCED NARRATIVE INSIGHTS
+ *
+ * Extracts narrative-ready insights from timeline.
+ * Each insight is traceable to a specific lap and sensor label.
+ * ══════════════════════════════════════════════════════════════════ */
+
+export function extractSoftSensorNarrativeInsights(
+  timeline: SoftSensorsTimeline,
+  stints: StintAnalysis[],
+): string[] {
+  if (timeline.by_lap.length === 0) return [];
+
+  const insights: string[] = [];
+
+  // 1. Warmup anomalies
+  const warmupInterp = computeWarmupInterpretation(timeline, stints);
+  for (const anomaly of warmupInterp.warmup_anomalies.slice(0, 2)) {
+    if (anomaly.type === "SLOWER_THAN_EXPECTED") {
+      insights.push(`Warmup più lungo del previsto nello stint ${anomaly.stint_number} (thermal WARMING_UP fino al giro ${anomaly.observed_laps} vs ${anomaly.expected_laps} previsti)`);
+    } else {
+      insights.push(`Warmup più rapido del previsto nello stint ${anomaly.stint_number} (${anomaly.observed_laps} giri vs ${anomaly.expected_laps} previsti)`);
+    }
+  }
+
+  // 2. First high/critical stress entry
+  if (timeline.summary.first_high_stress_lap != null) {
+    const stintAtStress = stints.find(s =>
+      timeline.summary.first_high_stress_lap! >= s.lap_start &&
+      timeline.summary.first_high_stress_lap! <= s.lap_end
+    );
+    const stintInfo = stintAtStress ? ` (stint ${stintAtStress.stint_number}, ${stintAtStress.compound})` : "";
+    insights.push(`Stress gomma elevato a partire dal giro ${timeline.summary.first_high_stress_lap}${stintInfo}`);
+  }
+
+  if (timeline.summary.first_critical_stress_lap != null) {
+    insights.push(`Stress critico rilevato dal giro ${timeline.summary.first_critical_stress_lap} — segnale convergente con degrado avanzato`);
+  }
+
+  // 3. Grip transitions
+  for (const gt of timeline.summary.grip_transitions.slice(0, 2)) {
+    const fromText = gt.from === "LOW_GRIP" ? "basso grip" : gt.from === "IMPROVING" ? "in miglioramento" : gt.from === "FALLING" ? "in calo" : gt.from.toLowerCase();
+    const toText = gt.to === "LOW_GRIP" ? "basso grip" : gt.to === "IMPROVING" ? "in miglioramento" : gt.to === "FALLING" ? "in calo" : gt.to === "STABLE" ? "stabile" : gt.to.toLowerCase();
+    insights.push(`Grip pista: transizione da ${fromText} a ${toText} al giro ${gt.lap}`);
+  }
+
+  // 4. Combined critical states
+  const criticalCombos = timeline.by_lap.filter(
+    l => (l.tyre_stress.label === "CRITICAL" || l.tyre_stress.label === "HIGH") &&
+         (l.tyre_thermal.label === "HOT" || l.tyre_thermal.label === "OVERHEATED") &&
+         l.overall_confidence !== "LOW"
+  );
+  if (criticalCombos.length >= 2 && insights.length < 5) {
+    const firstLap = criticalCombos[0].lap_number;
+    insights.push(`Combinazione stress elevato + stato termico caldo osservata per ${criticalCombos.length} giri (dal giro ${firstLap}) — indicazione di pressione operativa sulla gomma`);
+  }
+
+  return insights.slice(0, 6);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * SUPPORT LAYER 4: DECISION POINT SOFT SENSOR CONTEXT
+ *
+ * Aggregates sensor states over a decision window (1–3 laps)
+ * for use in Key Decision Moments.
+ * ══════════════════════════════════════════════════════════════════ */
+
+export function buildDecisionSoftSensorContext(
+  timeline: SoftSensorsTimeline,
+  windowStart: number,
+  windowEnd: number,
+): DecisionSoftSensorContext | null {
+  if (timeline.by_lap.length === 0) return null;
+
+  const windowLaps = timeline.by_lap.filter(
+    l => l.lap_number >= windowStart && l.lap_number <= windowEnd
+  );
+
+  if (windowLaps.length === 0) return null;
+
+  // Aggregate thermal
+  const thermalLabels = windowLaps.map(l => l.tyre_thermal.label);
+  const thermalDominant = mostFrequent(thermalLabels);
+  const thermalSummary = thermalDominant === "COLD" ? "Gomme fredde"
+    : thermalDominant === "WARMING_UP" ? "Gomme in fase di riscaldamento"
+    : thermalDominant === "IN_WINDOW" ? "Gomme in finestra operativa"
+    : thermalDominant === "HOT" ? "Gomme calde"
+    : thermalDominant === "OVERHEATED" ? "Gomme surriscaldate"
+    : "Stato termico non determinabile";
+
+  // Aggregate stress
+  const stressLabels = windowLaps.map(l => l.tyre_stress.label);
+  const stressDominant = mostFrequent(stressLabels);
+  const stressSummary = stressDominant === "LOW" ? "Stress basso"
+    : stressDominant === "MODERATE" ? "Stress moderato"
+    : stressDominant === "HIGH" ? "Stress elevato"
+    : stressDominant === "CRITICAL" ? "Stress critico"
+    : "Stress non determinabile";
+
+  // Aggregate grip
+  const gripLabels = windowLaps.map(l => l.track_grip.label);
+  const gripDominant = mostFrequent(gripLabels);
+  const gripSummary = gripDominant === "LOW_GRIP" ? "Grip pista basso"
+    : gripDominant === "IMPROVING" ? "Grip in miglioramento"
+    : gripDominant === "STABLE" ? "Grip stabile"
+    : gripDominant === "FALLING" ? "Grip in calo"
+    : gripDominant === "MIXED" ? "Grip misto"
+    : "Grip non determinabile";
+
+  // Consistency: do all laps agree?
+  const notes: string[] = [];
+  const thermalSet = new Set(thermalLabels.filter(l => l !== "UNKNOWN"));
+  const stressSet = new Set(stressLabels.filter(l => l !== "UNKNOWN"));
+  const gripSet = new Set(gripLabels.filter(l => l !== "UNKNOWN"));
+
+  let consistency: SoftSensorConfidence = "HIGH";
+  if (thermalSet.size > 1 || stressSet.size > 1 || gripSet.size > 1) {
+    consistency = "MEDIUM";
+    notes.push("Segnali non uniformi nella finestra decisionale");
+  }
+
+  const lowConfLaps = windowLaps.filter(l => l.overall_confidence === "LOW");
+  if (lowConfLaps.length > windowLaps.length * 0.5) {
+    consistency = "LOW";
+    notes.push("Confidence bassa nella maggioranza dei giri della finestra");
+  }
+
+  // Contextual notes for decision-making
+  if (stressDominant === "HIGH" || stressDominant === "CRITICAL") {
+    notes.push("Stress elevato: segnale coerente con pressione verso il pit");
+  }
+  if (thermalDominant === "WARMING_UP" || thermalDominant === "COLD") {
+    notes.push("Gomme non ancora in finestra: undercut immediato penalizzato dal warmup");
+  }
+  if (gripDominant === "IMPROVING") {
+    notes.push("Grip in miglioramento: possibile riduzione dell'urgenza pit");
+  }
+  if (gripDominant === "LOW_GRIP" || gripDominant === "FALLING") {
+    notes.push("Grip basso/in calo: incertezza aggiuntiva sulla permanenza in pista");
+  }
+
+  return {
+    thermal_state_summary: thermalSummary,
+    stress_state_summary: stressSummary,
+    grip_state_summary: gripSummary,
+    consistency,
+    notes,
+  };
+}
+
+function mostFrequent<T>(arr: T[]): T {
+  const counts = new Map<T, number>();
+  for (const item of arr) counts.set(item, (counts.get(item) ?? 0) + 1);
+  let best = arr[0];
+  let bestCount = 0;
+  for (const [item, count] of counts) {
+    if (count > bestCount) { best = item; bestCount = count; }
+  }
+  return best;
 }
 
 /* ══════════════════════════════════════════════════════════════════

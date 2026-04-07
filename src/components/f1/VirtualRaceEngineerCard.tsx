@@ -1,5 +1,5 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy } from "@/lib/virtualRaceEngineer";
-import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition } from "@/lib/softSensors";
+import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition, WarmupInterpretation, DegradationValidationContext, ValidationSupportLevel } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
 import { breakdownToRows } from "@/lib/strategyBreakdown";
@@ -231,7 +231,7 @@ function SensorMiniCard({ title, icon, sensor, labelMap }: {
   );
 }
 
-function SoftSensorsSection({ sensors, timeline }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline }) {
+function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validationContext }: { sensors: SoftSensorsContext; timeline?: SoftSensorsTimeline; warmupInterpretation?: WarmupInterpretation; validationContext?: DegradationValidationContext }) {
   const [showTimeline, setShowTimeline] = useState(false);
 
   // Compute timeline highlights
@@ -375,6 +375,51 @@ function SoftSensorsSection({ sensors, timeline }: { sensors: SoftSensorsContext
               <span>{note}</span>
             </p>
           ))}
+        </div>
+      )}
+
+      {/* Warmup Interpretation */}
+      {warmupInterpretation && warmupInterpretation.warmup_anomalies.length > 0 && (
+        <div className="mt-2.5 rounded-md bg-muted/20 border border-border/30 px-2.5 py-2">
+          <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 mb-1">
+            <Thermometer className="h-3 w-3" /> Interpretazione warmup
+          </p>
+          {warmupInterpretation.warmup_anomalies.map((a, i) => (
+            <p key={i} className="text-[10px] text-muted-foreground flex items-start gap-1.5 pl-1">
+              <span className="shrink-0">{a.type === "SLOWER_THAN_EXPECTED" ? "🐢" : "⚡"}</span>
+              <span>{a.detail}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Degradation Validation Context */}
+      {validationContext && validationContext.by_stint.some(s => s.inconsistencies.length > 0 || s.notes.length > 0) && (
+        <div className="mt-2.5 rounded-md bg-muted/20 border border-border/30 px-2.5 py-2">
+          <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 mb-1">
+            <Shield className="h-3 w-3" /> Contesto validazione degrado
+            <span className={`ml-auto text-[8px] px-1.5 py-0.5 rounded border font-semibold ${
+              validationContext.overall_support === "STRONG" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+              : validationContext.overall_support === "PARTIAL" ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+              : "bg-red-500/15 text-red-400 border-red-500/30"
+            }`}>
+              {validationContext.overall_support === "STRONG" ? "Supporto forte" : validationContext.overall_support === "PARTIAL" ? "Supporto parziale" : "Supporto debole"}
+            </span>
+          </p>
+          {validationContext.by_stint.map((sv) => {
+            if (sv.inconsistencies.length === 0 && sv.notes.length === 0) return null;
+            return (
+              <div key={sv.stint_number} className="text-[10px] pl-1 mb-1">
+                <span className="font-mono font-semibold text-foreground">Stint {sv.stint_number}</span>
+                {sv.notes.map((n, i) => (
+                  <p key={`n${i}`} className="text-muted-foreground pl-2">• {n}</p>
+                ))}
+                {sv.inconsistencies.map((inc, i) => (
+                  <p key={`i${i}`} className="text-amber-400/80 pl-2">⚠️ {inc}</p>
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </VRESection>
@@ -994,7 +1039,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         {/* ═══════════════════════════════════════════════════════════════
             SOFT SENSORS
         ═══════════════════════════════════════════════════════════════ */}
-        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} />}
+        {result.soft_sensors && <SoftSensorsSection sensors={result.soft_sensors} timeline={result.soft_sensors_timeline} warmupInterpretation={result.warmup_interpretation} validationContext={result.degradation_validation_context} />}
 
 
         {/* ═══════════════════════════════════════════════════════════════

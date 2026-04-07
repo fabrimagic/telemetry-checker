@@ -20,6 +20,8 @@ import type { StintPaceLossResult } from "./stintPaceLoss";
 import type { DegradationValidationResult } from "./degradationValidation";
 import type { DiaryEvent } from "./raceDiary";
 import type { DriverCumulativeDeviation, LapDeviation } from "./cumulativeDeviation";
+import type { SoftSensorsTimeline, DecisionSoftSensorContext } from "./softSensors";
+import { buildDecisionSoftSensorContext } from "./softSensors";
 
 /* ══════════════════════════════════════════════════════════════
    Types
@@ -98,6 +100,7 @@ export interface DecisionPoint {
   analogs: HistoricalAnalog[];
   analogs_status: "LOADED" | "LOADING" | "NOT_LOADED" | "NO_DATA" | "ERROR";
   reliability_notes: string[];
+  soft_sensor_context?: DecisionSoftSensorContext;
 }
 
 export interface KeyDecisionMomentsResult {
@@ -128,6 +131,7 @@ interface ExtractionInput {
   driverAcronym: string;
   sessionKey: number;
   totalLaps: number;
+  softSensorsTimeline?: SoftSensorsTimeline;
 }
 
 /**
@@ -140,6 +144,7 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
     trafficAnalysis, paceLossResults, degradationValidations,
     diaryEvents, driverCumDev, positions, intervals,
     driverNumber, driverAcronym, sessionKey, totalLaps,
+    softSensorsTimeline,
   } = input;
 
   const pitLapSet = new Set(pitStops.map(p => p.lap_number));
@@ -217,6 +222,11 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
       reliabilityNotes.push("Previsione traffico non disponibile per questo giro");
     }
 
+    // Soft sensor context for this decision window
+    const softSensorCtx = softSensorsTimeline
+      ? buildDecisionSoftSensorContext(softSensorsTimeline, windowStart, windowEnd)
+      : undefined;
+
     points.push({
       id: `dp_${sessionKey}_${driverNumber}_${lap}`,
       lap_window: [windowStart, windowEnd],
@@ -231,6 +241,7 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
       analogs: [],
       analogs_status: "NOT_LOADED",
       reliability_notes: reliabilityNotes,
+      soft_sensor_context: softSensorCtx ?? undefined,
     });
   }
 

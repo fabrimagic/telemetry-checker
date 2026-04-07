@@ -17,7 +17,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
-import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment } from "./softSensors";
+import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext } from "./softSensors";
 
 /* ── Types ── */
 
@@ -134,6 +134,8 @@ export interface VirtualRaceEngineerResult {
   custom_degradation_override: Record<string, number> | null;
   soft_sensors?: SoftSensorsContext;
   soft_sensors_timeline?: SoftSensorsTimeline;
+  warmup_interpretation?: WarmupInterpretation;
+  degradation_validation_context?: DegradationValidationContext;
 }
 
 /* ── Helpers ── */
@@ -1775,7 +1777,17 @@ export function computeVirtualRaceEngineer(
         earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
       );
 
-  // ── 11b. Apply soft sensor refinement to recommended + alternatives ──
+  // ── 11b. Warmup interpretation & degradation validation context ──
+  const warmupInterpretation = computeWarmupInterpretation(softSensorsTimeline, stintAnalyses);
+  const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations);
+
+  // ── 11c. Enhanced narrative insights from soft sensors ──
+  const sensorNarrativeInsights = extractSoftSensorNarrativeInsights(softSensorsTimeline, stintAnalyses);
+  for (const insight of sensorNarrativeInsights) {
+    narrativeInsights.push(insight);
+  }
+
+  // ── 11d. Apply soft sensor refinement to recommended + alternatives ──
   {
     const recAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
     recommendedStrategy.soft_sensor_adjustment = recAdj;
@@ -1833,5 +1845,7 @@ export function computeVirtualRaceEngineer(
     custom_degradation_override: customDegradationOverride,
     soft_sensors: softSensors,
     soft_sensors_timeline: softSensorsTimeline,
+    warmup_interpretation: warmupInterpretation,
+    degradation_validation_context: degradationValidationContext,
   };
 }

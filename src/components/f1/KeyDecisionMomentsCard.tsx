@@ -8,6 +8,7 @@ import type {
   DecisionType,
   ConfidenceLevel,
 } from "@/lib/keyDecisionMoments";
+import type { DecisionSoftSensorContext, SoftSensorConfidence } from "@/lib/softSensors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -171,6 +172,51 @@ function OutcomeBlock({ outcome, realAction }: { outcome: DecisionOutcome; realA
   );
 }
 
+/* ══════ Soft Sensor Context Block ══════ */
+
+const SS_CONSISTENCY_STYLES: Record<SoftSensorConfidence, string> = {
+  HIGH: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  MEDIUM: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  LOW: "bg-red-500/15 text-red-400 border-red-500/30",
+};
+
+function SoftSensorContextBlock({ ctx }: { ctx: DecisionSoftSensorContext }) {
+  return (
+    <div className="rounded-md bg-muted/20 border border-border/30 px-2.5 py-2 space-y-1.5">
+      <h4 className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+        <Gauge className="h-3 w-3" /> Contesto soft sensors
+        <span className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded border text-[8px] font-semibold ${SS_CONSISTENCY_STYLES[ctx.consistency]}`}>
+          {ctx.consistency === "HIGH" ? "Coerente" : ctx.consistency === "MEDIUM" ? "Parziale" : "Debole"}
+        </span>
+      </h4>
+      <div className="grid grid-cols-3 gap-2 text-[10px]">
+        <div>
+          <span className="text-muted-foreground">🌡️ Termico:</span>
+          <p className="font-semibold text-foreground">{ctx.thermal_state_summary}</p>
+        </div>
+        <div>
+          <span className="text-muted-foreground">⚡ Stress:</span>
+          <p className="font-semibold text-foreground">{ctx.stress_state_summary}</p>
+        </div>
+        <div>
+          <span className="text-muted-foreground">🛣️ Grip:</span>
+          <p className="font-semibold text-foreground">{ctx.grip_state_summary}</p>
+        </div>
+      </div>
+      {ctx.notes.length > 0 && (
+        <div className="space-y-0.5">
+          {ctx.notes.slice(0, 3).map((note, i) => (
+            <p key={i} className="text-[9px] text-muted-foreground italic flex items-start gap-1">
+              <span className="mt-0.5 shrink-0">•</span>
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ══════ Main Component ══════ */
 
 interface Props {
@@ -302,6 +348,11 @@ function DecisionPointCard({ point }: { point: DecisionPoint }) {
             </h4>
             <OutcomeBlock outcome={point.outcome} realAction={point.real_action} />
           </div>
+
+          {/* Soft Sensor Context */}
+          {point.soft_sensor_context && (
+            <SoftSensorContextBlock ctx={point.soft_sensor_context} />
+          )}
 
           {/* Reliability Notes */}
           {point.reliability_notes.length > 0 && (
