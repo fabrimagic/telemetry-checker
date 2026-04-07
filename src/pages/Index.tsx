@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from "react";
+import { CountdownBanner } from "@/components/f1/CountdownBanner";
 import { Link } from "react-router-dom";
 import { SessionPicker } from "@/components/f1/SessionPicker";
 import { LapTimesChart } from "@/components/f1/LapTimesChart";
@@ -639,6 +640,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      <CountdownBanner />
       <header className="border-b border-border px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
