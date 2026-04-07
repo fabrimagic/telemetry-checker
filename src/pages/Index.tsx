@@ -319,6 +319,7 @@ export default function Index() {
               sessionWeather, raceControlMessages,
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
               diaryForVre, cumDevForVre, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
+              vreAnalysisMode,
             );
             setVreResult(vre);
 
