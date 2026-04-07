@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers, Globe, Flag, Repeat } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import { AnalystView, BroadcastView, type ViewMode } from "./VREViewModes";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -395,6 +396,8 @@ interface Props {
 export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
   const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
+  const [viewMode, setViewMode] = useState<ViewMode>("ENGINEER");
+
   const scoredStrategies = useMemo(() => {
     const allStrats = [
       ...alternative_strategies.map(alt => ({
@@ -431,6 +434,28 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         <p className="text-[11px] text-muted-foreground mt-1">
           Analisi strategica basata su degrado gomme, pit stop, meteo e neutralizzazioni.
         </p>
+
+        {/* View Mode Selector */}
+        <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
+          {(["ENGINEER", "ANALYST", "BROADCAST"] as ViewMode[]).map((mode) => {
+            const labels: Record<ViewMode, string> = { ENGINEER: "Engineer", ANALYST: "Analyst", BROADCAST: "Broadcast" };
+            const isActive = viewMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-3 py-1.5 text-[10px] font-semibold transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {labels[mode]}
+              </button>
+            );
+          })}
+        </div>
+
         {scenario_is_simulated && (
          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
@@ -444,7 +469,13 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
 
       <CardContent className="space-y-3 pt-0">
 
-        {/* ══════ VERDICT (always visible) ══════ */}
+        {/* ══════ ANALYST / BROADCAST MODES ══════ */}
+        {viewMode === "ANALYST" && <AnalystView result={result} />}
+        {viewMode === "BROADCAST" && <BroadcastView result={result} />}
+
+        {/* ══════ ENGINEER MODE (full detail) ══════ */}
+        {viewMode === "ENGINEER" && (<>
+
         <div className="rounded-lg bg-muted/50 border border-border p-4">
           <div className="flex items-start gap-3">
             {verdict.delta_seconds != null && verdict.delta_seconds > 2
@@ -1305,6 +1336,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
           </VRESection>
         )}
 
+        </>)}
       </CardContent>
     </Card>
   );
