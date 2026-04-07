@@ -253,14 +253,33 @@ export function KeyDecisionMomentsCard({ result, sessionKey, currentYear, onAnal
         return res.json();
       };
 
+      const rateLimitedFetch = async (url: string): Promise<Response> => {
+        const maxRetries = 3;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          const res = await fetch(url);
+          if (res.status === 429) {
+            await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+            continue;
+          }
+          return res;
+        }
+        return fetch(url);
+      };
+
       const fetchSessionData = async (sk: number) => {
-        const [lapsRes, stintsRes, pitsRes, posRes, ivsRes, driversRes] = await Promise.all([
-          fetch(`https://api.openf1.org/v1/laps?session_key=${sk}`),
-          fetch(`https://api.openf1.org/v1/stints?session_key=${sk}`),
-          fetch(`https://api.openf1.org/v1/pit?session_key=${sk}`),
-          fetch(`https://api.openf1.org/v1/position?session_key=${sk}`),
-          fetch(`https://api.openf1.org/v1/intervals?session_key=${sk}`),
-          fetch(`https://api.openf1.org/v1/drivers?session_key=${sk}`),
+        // Fetch in two batches of 3 to respect 3 req/s rate limit
+        const [lapsRes, stintsRes, pitsRes] = await Promise.all([
+          rateLimitedFetch(`https://api.openf1.org/v1/laps?session_key=${sk}`),
+          rateLimitedFetch(`https://api.openf1.org/v1/stints?session_key=${sk}`),
+          rateLimitedFetch(`https://api.openf1.org/v1/pit?session_key=${sk}`),
+        ]);
+
+        await new Promise(r => setTimeout(r, 500));
+
+        const [posRes, ivsRes, driversRes] = await Promise.all([
+          rateLimitedFetch(`https://api.openf1.org/v1/position?session_key=${sk}`),
+          rateLimitedFetch(`https://api.openf1.org/v1/intervals?session_key=${sk}`),
+          rateLimitedFetch(`https://api.openf1.org/v1/drivers?session_key=${sk}`),
         ]);
 
         if (!lapsRes.ok || !stintsRes.ok) return null;
