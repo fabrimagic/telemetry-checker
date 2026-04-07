@@ -183,6 +183,22 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     [drivers]
   );
 
+  const driverBroadcastName = useCallback(
+    (num: number) => {
+      const d = drivers.find((dr) => dr.driver_number === num);
+      return d?.broadcast_name || driverName(num);
+    },
+    [drivers, driverName]
+  );
+
+  const driverHeadshot = useCallback(
+    (num: number) => {
+      const d = drivers.find((dr) => dr.driver_number === num);
+      return d?.headshot_url || null;
+    },
+    [drivers]
+  );
+
   const driverTeam = useCallback(
     (num: number) => {
       const d = drivers.find((dr) => dr.driver_number === num);
