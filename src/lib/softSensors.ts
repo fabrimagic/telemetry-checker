@@ -231,7 +231,7 @@ export function estimateTyreStressState(
       }
     }
   } else {
-    confidence = confidence === "LOW" ? "LOW" : "MEDIUM";
+    if (confidence !== "LOW") confidence = "MEDIUM";
   }
 
   // Factor 3: Pace loss status
