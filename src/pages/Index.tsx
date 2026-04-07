@@ -58,6 +58,9 @@ import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
 import type { RiskMode } from "@/lib/riskAppetite";
+import { computeKeyDecisionMoments, type KeyDecisionMomentsResult, type DecisionPoint, type HistoricalAnalog } from "@/lib/keyDecisionMoments";
+import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
+import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DriverState {
@@ -92,6 +95,7 @@ export default function Index() {
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
+  const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
   const [loadingVre, setLoadingVre] = useState(false);
   const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
   const [vreScenario, setVreScenario] = useState<import("@/lib/scenarioContext").ScenarioId>("REAL_CONTEXT");
@@ -315,6 +319,36 @@ export default function Index() {
               diaryForVre, cumDevForVre, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
             );
             setVreResult(vre);
+
+            // Compute Key Decision Moments from VRE data
+            if (vre) {
+              try {
+                const weatherMapForKdm = classifyLapsWeather(laps, sessionWeather);
+                const trackStatusMapForKdm = classifyLapsTrackStatus(laps, raceControlMessages);
+                const driverCumDevForKdm = cumDevForVre?.drivers.find(d => d.driver_number === driverNumber) ?? null;
+                const kdm = computeKeyDecisionMoments({
+                  laps,
+                  stints: driverStints,
+                  pitStops: pitsForVre,
+                  weatherMap: weatherMapForKdm,
+                  trackStatusMap: trackStatusMapForKdm,
+                  trafficAnalysis: vre.traffic_analysis,
+                  paceLossResults: vre.pace_loss_results,
+                  degradationValidations: vre.degradation_validations,
+                  diaryEvents: diaryForVre,
+                  driverCumDev: driverCumDevForKdm,
+                  positions: pos,
+                  intervals: ivls,
+                  driverNumber,
+                  driverAcronym: driver.name_acronym,
+                  sessionKey,
+                  totalLaps: Math.max(...laps.map(l => l.lap_number)),
+                });
+                setKdmResult(kdm);
+              } catch { setKdmResult(null); }
+            } else {
+              setKdmResult(null);
+            }
           } catch { /* optional */ }
           setLoadingVre(false);
         }
@@ -942,6 +976,28 @@ export default function Index() {
                     }
                   }} />
                 ) : null
+              )}
+
+              {/* Key Decision Moments */}
+              {(sessionType === "Race" || sessionType === "Sprint") && kdmResult && kdmResult.decision_points.length > 0 && sessionKey && (
+                <KeyDecisionMomentsCard
+                  result={kdmResult}
+                  sessionKey={sessionKey}
+                  currentYear={new Date().getFullYear()}
+                  onAnalogsLoaded={(pointId, analogs, warnings) => {
+                    setKdmResult(prev => {
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        decision_points: prev.decision_points.map(dp =>
+                          dp.id === pointId
+                            ? { ...dp, analogs, analogs_status: "LOADED" as const, reliability_notes: [...dp.reliability_notes, ...warnings] }
+                            : dp
+                        ),
+                      };
+                    });
+                  }}
+                />
               )}
           </>
         )}
