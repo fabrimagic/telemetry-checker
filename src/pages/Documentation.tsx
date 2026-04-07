@@ -158,6 +158,7 @@ export default function Documentation() {
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-2">Virtual Race Engineer</p>
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
               <TocLink href="#vre-ui">Interfaccia a 4 Sezioni</TocLink>
+              <TocLink href="#vre-view-modes">Modalità di Visualizzazione</TocLink>
               <TocLink href="#vre-cost-function">Funzione di Costo</TocLink>
               <TocLink href="#vre-risk-mode">Risk Mode & Decision Layer</TocLink>
               <TocLink href="#vre-scenarios">Scenari What-If</TocLink>
