@@ -1777,6 +1777,16 @@ export function computeVirtualRaceEngineer(
     if (recScored && recScored.adjustment_reason !== "Nessun aggiustamento") {
       confidenceFactors.push(`Risk scoring (${riskMode}): ${recScored.adjustment_reason}`);
     }
+
+    // Soft sensor scoring narrative
+    if (softSensorScoringGate.soft_sensor_scoring_enabled) {
+      const anySSEffect = recSSScoringDelta !== 0 || altSSScoringDeltas.some(d => d !== 0);
+      if (anySSEffect) {
+        narrativeInsights.push(`Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.`);
+      }
+    } else if (softSensorScoringGate.soft_sensor_block_reason) {
+      narrativeInsights.push(`Soft sensors esclusi dallo scoring: ${softSensorScoringGate.soft_sensor_block_reason}`);
+    }
   }
 
   // Reduce confidence if degradation is unreliable
@@ -1879,5 +1889,6 @@ export function computeVirtualRaceEngineer(
     soft_sensors_timeline: softSensorsTimeline,
     warmup_interpretation: warmupInterpretation,
     degradation_validation_context: degradationValidationContext,
+    soft_sensor_scoring_gate: softSensorScoringGate,
   };
 }
