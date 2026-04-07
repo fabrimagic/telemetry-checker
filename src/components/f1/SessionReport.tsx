@@ -101,7 +101,17 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
         try {
           const res = await getSessionResult(sessionKey);
           if (cancelled) return;
-          setResults(res.sort((a, b) => a.position - b.position));
+          // Sort: finishers by position first, then DNF/DNS/DSQ at the bottom
+          setResults(res.sort((a, b) => {
+            const aOut = a.dnf || a.dns || a.dsq;
+            const bOut = b.dnf || b.dns || b.dsq;
+            if (aOut && !bOut) return 1;
+            if (!aOut && bOut) return -1;
+            if (a.position != null && b.position != null) return a.position - b.position;
+            if (a.position != null) return -1;
+            if (b.position != null) return 1;
+            return 0;
+          }));
         } catch { /* optional */ }
 
         try {
@@ -169,6 +179,22 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     (num: number) => {
       const d = drivers.find((dr) => dr.driver_number === num);
       return d?.team_colour || "ffffff";
+    },
+    [drivers]
+  );
+
+  const driverBroadcastName = useCallback(
+    (num: number) => {
+      const d = drivers.find((dr) => dr.driver_number === num);
+      return d?.broadcast_name || driverName(num);
+    },
+    [drivers, driverName]
+  );
+
+  const driverHeadshot = useCallback(
+    (num: number) => {
+      const d = drivers.find((dr) => dr.driver_number === num);
+      return d?.headshot_url || null;
     },
     [drivers]
   );
@@ -483,16 +509,28 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {results.map((r) => (
-                      <TableRow key={r.driver_number}>
-                        <TableCell className="font-mono font-bold">{r.position}</TableCell>
+                    {results.map((r) => {
+                      const headshot = driverHeadshot(r.driver_number);
+                      return (
+                      <TableRow key={r.driver_number} className={r.dnf || r.dns || r.dsq ? "opacity-60" : ""}>
+                        <TableCell className="font-mono font-bold">{r.position ?? "—"}</TableCell>
                         <TableCell>
                           <span className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
-                            />
-                            <span className="font-mono font-bold">{driverName(r.driver_number)}</span>
+                            {headshot ? (
+                              <img
+                                src={headshot}
+                                alt={driverBroadcastName(r.driver_number)}
+                                className="w-7 h-7 rounded-full object-cover shrink-0 border"
+                                style={{ borderColor: `#${driverColor(r.driver_number)}` }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                            ) : (
+                              <span
+                                className="w-7 h-7 rounded-full shrink-0"
+                                style={{ backgroundColor: `#${driverColor(r.driver_number)}` }}
+                              />
+                            )}
+                            <span className="font-semibold text-sm">{driverBroadcastName(r.driver_number)}</span>
                           </span>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-xs">{driverTeam(r.driver_number)}</TableCell>
@@ -510,7 +548,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                            <span className="text-green-500">✓</span>}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
