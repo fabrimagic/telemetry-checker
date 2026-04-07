@@ -1,23 +1,19 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import type {
   DecisionPoint,
   KeyDecisionMomentsResult,
   DecisionDriver,
   ContextSnapshot,
   DecisionOutcome,
-  HistoricalAnalog,
   DecisionType,
   ConfidenceLevel,
-  AnalogStrength,
 } from "@/lib/keyDecisionMoments";
-import { searchHistoricalAnalogs } from "@/lib/keyDecisionMoments";
-import type { SessionInfo, Lap, StintData, PitData, PositionData, IntervalData, Driver } from "@/lib/openf1";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  ChevronDown, Target, ArrowRight, Clock, AlertTriangle,
-  CheckCircle, Search, Loader2, Info, TrendingUp, TrendingDown,
+  ChevronDown, Target, ArrowRight,
+  AlertTriangle, Info, TrendingUp, TrendingDown,
   Minus, Gauge, Shield,
 } from "lucide-react";
 
@@ -33,12 +29,6 @@ const CONFIDENCE_STYLES: Record<ConfidenceLevel, string> = {
   HIGH: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   MEDIUM: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   LOW: "bg-red-500/20 text-red-400 border-red-500/30",
-};
-
-const ANALOG_STRENGTH_STYLES: Record<AnalogStrength, { bg: string; label: string }> = {
-  STRONG: { bg: "bg-emerald-500/20 text-emerald-400", label: "Forte" },
-  WEAK: { bg: "bg-amber-500/20 text-amber-400", label: "Debole" },
-  NONE: { bg: "bg-muted text-muted-foreground", label: "—" },
 };
 
 const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = { HIGH: "Alta", MEDIUM: "Media", LOW: "Bassa" };
@@ -181,203 +171,76 @@ function OutcomeBlock({ outcome, realAction }: { outcome: DecisionOutcome; realA
   );
 }
 
-function AnalogCard({ analog }: { analog: HistoricalAnalog }) {
-  const [expanded, setExpanded] = useState(false);
-  const strengthStyle = ANALOG_STRENGTH_STYLES[analog.analog_strength];
-
-  return (
-    <div className="rounded-md bg-muted/20 border border-border/50 p-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-foreground">{analog.gp_name} {analog.year}</span>
-          <span className="text-[9px] text-muted-foreground">{analog.driver_acronym}</span>
-          <DecisionBadge type={analog.decision_taken} />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono font-semibold text-foreground">{Math.round(analog.similarity_score * 100)}%</span>
-          <span className={`inline-flex items-center px-1.5 py-0 rounded text-[9px] font-semibold ${strengthStyle.bg}`}>
-            {strengthStyle.label}
-          </span>
-          <ConfBadge level={analog.reliability} />
-        </div>
-      </div>
-
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="mt-1 flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-        Dettagli
-      </button>
-
-      {expanded && (
-        <div className="mt-1.5 space-y-1.5 text-[10px]">
-          <p className="text-muted-foreground">{analog.outcome_summary}</p>
-          <div>
-            <span className="text-emerald-400 font-semibold text-[9px]">In comune: </span>
-            <span className="text-muted-foreground text-[9px]">{analog.matching_factors.join(", ")}</span>
-          </div>
-          <div>
-            <span className="text-amber-400 font-semibold text-[9px]">Differenze: </span>
-            <span className="text-muted-foreground text-[9px]">{analog.differences.join(", ")}</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ══════ Main Component ══════ */
 
 interface Props {
   result: KeyDecisionMomentsResult;
-  sessionKey: number;
-  currentYear: number;
-  onAnalogsLoaded?: (pointId: string, analogs: HistoricalAnalog[], warnings: string[]) => void;
 }
 
-export function KeyDecisionMomentsCard({ result, sessionKey, currentYear, onAnalogsLoaded }: Props) {
+export function KeyDecisionMomentsCard({ result }: Props) {
   const { decision_points, warnings } = result;
-  const [loadingAnalogs, setLoadingAnalogs] = useState<Set<string>>(new Set());
-  const [analogErrors, setAnalogErrors] = useState<Map<string, string>>(new Map());
-
-  const handleLoadAnalogs = useCallback(async (point: DecisionPoint) => {
-    if (point.analogs_status === "LOADED" || loadingAnalogs.has(point.id)) return;
-
-    setLoadingAnalogs(prev => new Set(prev).add(point.id));
-
-    try {
-      const fetchSessions = async (yearStart: number, yearEnd: number): Promise<SessionInfo[]> => {
-        const res = await fetch(`https://api.openf1.org/v1/sessions?session_type=Race&date_start>=${yearStart}-01-01&date_start<=${yearEnd}-12-31`);
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        return res.json();
-      };
-
-      const rateLimitedFetch = async (url: string): Promise<Response> => {
-        const maxRetries = 3;
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          const res = await fetch(url);
-          if (res.status === 429) {
-            await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
-            continue;
-          }
-          return res;
-        }
-        return fetch(url);
-      };
-
-      const fetchSessionData = async (sk: number) => {
-        // Fetch in two batches of 3 to respect 3 req/s rate limit
-        const [lapsRes, stintsRes, pitsRes] = await Promise.all([
-          rateLimitedFetch(`https://api.openf1.org/v1/laps?session_key=${sk}`),
-          rateLimitedFetch(`https://api.openf1.org/v1/stints?session_key=${sk}`),
-          rateLimitedFetch(`https://api.openf1.org/v1/pit?session_key=${sk}`),
-        ]);
-
-        await new Promise(r => setTimeout(r, 500));
-
-        const [posRes, ivsRes, driversRes] = await Promise.all([
-          rateLimitedFetch(`https://api.openf1.org/v1/position?session_key=${sk}`),
-          rateLimitedFetch(`https://api.openf1.org/v1/intervals?session_key=${sk}`),
-          rateLimitedFetch(`https://api.openf1.org/v1/drivers?session_key=${sk}`),
-        ]);
-
-        if (!lapsRes.ok || !stintsRes.ok) return null;
-
-        return {
-          laps: await lapsRes.json() as Lap[],
-          stints: await stintsRes.json() as StintData[],
-          pitStops: await pitsRes.json() as PitData[],
-          positions: await posRes.json() as PositionData[],
-          intervals: await ivsRes.json() as IntervalData[],
-          drivers: await driversRes.json() as Driver[],
-        };
-      };
-
-      const { analogs, warnings: analogWarnings } = await searchHistoricalAnalogs(
-        point,
-        currentYear,
-        fetchSessions,
-        fetchSessionData,
-      );
-
-      onAnalogsLoaded?.(point.id, analogs, analogWarnings);
-    } catch (err) {
-      setAnalogErrors(prev => new Map(prev).set(point.id, "Errore nel recupero degli analoghi storici"));
-    } finally {
-      setLoadingAnalogs(prev => {
-        const next = new Set(prev);
-        next.delete(point.id);
-        return next;
-      });
-    }
-  }, [currentYear, loadingAnalogs, onAnalogsLoaded]);
+  const [cardOpen, setCardOpen] = useState(false);
 
   if (decision_points.length === 0 && warnings.length === 0) return null;
 
   return (
-    <Card className="border-border">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
-          <Target className="h-4 w-4" />
-          Key Decision Moments
-        </CardTitle>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          Momenti della gara in cui una scelta strategica "pit vs stay out" era plausibile.
-        </p>
-        {warnings.length > 0 && (
-          <div className="mt-1.5">
-            {warnings.map((w, i) => (
-              <p key={i} className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                <Info className="h-3 w-3 shrink-0" /> {w}
-              </p>
-            ))}
-          </div>
-        )}
-      </CardHeader>
+    <Collapsible open={cardOpen} onOpenChange={setCardOpen}>
+      <Card className="border-border">
+        <CollapsibleTrigger className="w-full text-left">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Key Decision Moments
+              <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                ({decision_points.length} {decision_points.length === 1 ? "momento" : "momenti"})
+              </span>
+              <ChevronDown className={`h-4 w-4 ml-auto text-muted-foreground transition-transform ${cardOpen ? "rotate-180" : ""}`} />
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Momenti della gara in cui una scelta strategica "pit vs stay out" era plausibile.
+            </p>
+          </CardHeader>
+        </CollapsibleTrigger>
 
-      <CardContent className="space-y-2 pt-0">
-        {decision_points.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground text-center py-4">
-            Nessun momento decisionale plausibile identificato.
-          </p>
-        ) : (
-          decision_points.map((point) => (
-            <DecisionPointCard
-              key={point.id}
-              point={point}
-              isLoadingAnalogs={loadingAnalogs.has(point.id)}
-              analogError={analogErrors.get(point.id)}
-              onLoadAnalogs={() => handleLoadAnalogs(point)}
-            />
-          ))
-        )}
-      </CardContent>
-    </Card>
+        <CollapsibleContent>
+          <CardContent className="space-y-2 pt-0">
+            {warnings.length > 0 && (
+              <div className="mb-2">
+                {warnings.map((w, i) => (
+                  <p key={i} className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                    <Info className="h-3 w-3 shrink-0" /> {w}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {decision_points.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground text-center py-4">
+                Nessun momento decisionale plausibile identificato.
+              </p>
+            ) : (
+              decision_points.map((point) => (
+                <DecisionPointCard key={point.id} point={point} />
+              ))
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
 /* ══════ Decision Point Card ══════ */
 
-function DecisionPointCard({ point, isLoadingAnalogs, analogError, onLoadAnalogs }: {
-  point: DecisionPoint;
-  isLoadingAnalogs: boolean;
-  analogError?: string;
-  onLoadAnalogs: () => void;
-}) {
+function DecisionPointCard({ point }: { point: DecisionPoint }) {
   const [open, setOpen] = useState(false);
 
-  // Top 2-3 drivers for compact view
   const topDrivers = point.drivers
     .filter(d => d.weight === "HIGH" || d.weight === "MEDIUM")
     .slice(0, 3);
 
-  const hasAnalogs = point.analogs.length > 0;
-  const analogsAvailable = point.analogs_status === "LOADED";
-
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      {/* ── Compact Card ── */}
       <CollapsibleTrigger className="w-full text-left">
         <div className="rounded-lg bg-muted/30 border border-border p-3 hover:bg-muted/40 transition-colors">
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -396,16 +259,10 @@ function DecisionPointCard({ point, isLoadingAnalogs, analogError, onLoadAnalogs
             </div>
             <div className="flex items-center gap-1.5">
               <ConfBadge level={point.confidence} />
-              {analogsAvailable && (
-                <Badge variant="outline" className={`text-[8px] px-1.5 py-0 ${hasAnalogs ? "border-emerald-500/30 text-emerald-400" : "border-border text-muted-foreground"}`}>
-                  {hasAnalogs ? `${point.analogs.length} analoghi` : "0 analoghi"}
-                </Badge>
-              )}
               <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
             </div>
           </div>
 
-          {/* Top drivers preview */}
           {topDrivers.length > 0 && (
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               {topDrivers.map((d, i) => (
@@ -419,7 +276,6 @@ function DecisionPointCard({ point, isLoadingAnalogs, analogError, onLoadAnalogs
         </div>
       </CollapsibleTrigger>
 
-      {/* ── Expanded Detail ── */}
       <CollapsibleContent>
         <div className="ml-2 mr-2 mt-1 space-y-3 border-l-2 border-border/50 pl-3 pb-2">
 
@@ -447,48 +303,7 @@ function DecisionPointCard({ point, isLoadingAnalogs, analogError, onLoadAnalogs
             <OutcomeBlock outcome={point.outcome} realAction={point.real_action} />
           </div>
 
-          {/* 4. Historical Analogs */}
-          <div>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-              <Search className="h-3 w-3" /> Casi recenti simili (ultimi 5 anni)
-            </h4>
-
-            {point.analogs_status === "NOT_LOADED" && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onLoadAnalogs(); }}
-                disabled={isLoadingAnalogs}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
-              >
-                {isLoadingAnalogs ? (
-                  <><Loader2 className="h-3 w-3 animate-spin" /> Ricerca in corso...</>
-                ) : (
-                  <><Search className="h-3 w-3" /> Cerca analoghi storici</>
-                )}
-              </button>
-            )}
-
-            {analogError && (
-              <p className="text-[10px] text-red-400 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> {analogError}
-              </p>
-            )}
-
-            {point.analogs_status === "LOADED" && point.analogs.length === 0 && (
-              <p className="text-[10px] text-muted-foreground italic">
-                Nessun caso comparabile trovato nella finestra storica.
-              </p>
-            )}
-
-            {point.analogs.length > 0 && (
-              <div className="space-y-1.5">
-                {point.analogs.map((analog, i) => (
-                  <AnalogCard key={i} analog={analog} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 5. Reliability Notes */}
+          {/* Reliability Notes */}
           {point.reliability_notes.length > 0 && (
             <div className="rounded-md bg-muted/20 border border-border/30 px-2.5 py-2">
               <h4 className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
