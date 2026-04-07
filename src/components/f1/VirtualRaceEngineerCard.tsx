@@ -404,9 +404,9 @@ function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validatio
       )}
 
       {/* Degradation Validation Context */}
-      {validationContext && validationContext.by_stint.some(s => s.inconsistencies.length > 0 || s.notes.length > 0) && (
+      {validationContext && validationContext.by_stint.length > 0 && (
         <div className="mt-2.5 rounded-md bg-muted/20 border border-border/30 px-2.5 py-2">
-          <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 mb-1">
+          <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 mb-1.5">
             <Shield className="h-3 w-3" /> Contesto validazione degrado
             <span className={`ml-auto text-[8px] px-1.5 py-0.5 rounded border font-semibold ${
               validationContext.overall_support === "STRONG" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
@@ -416,20 +416,75 @@ function SoftSensorsSection({ sensors, timeline, warmupInterpretation, validatio
               {validationContext.overall_support === "STRONG" ? "Supporto forte" : validationContext.overall_support === "PARTIAL" ? "Supporto parziale" : "Supporto debole"}
             </span>
           </p>
-          {validationContext.by_stint.map((sv) => {
-            if (sv.inconsistencies.length === 0 && sv.notes.length === 0) return null;
-            return (
-              <div key={sv.stint_number} className="text-[10px] pl-1 mb-1">
+          {validationContext.by_stint.map((sv) => (
+            <details key={sv.stint_number} className="group mb-1.5 last:mb-0">
+              <summary className="flex items-center gap-2 text-[10px] cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-muted/30 rounded px-1 py-0.5">
                 <span className="font-mono font-semibold text-foreground">Stint {sv.stint_number}</span>
-                {sv.notes.map((n, i) => (
-                  <p key={`n${i}`} className="text-muted-foreground pl-2">• {n}</p>
-                ))}
-                {sv.inconsistencies.map((inc, i) => (
-                  <p key={`i${i}`} className="text-amber-400/80 pl-2">⚠️ {inc}</p>
-                ))}
+                <span className={`text-[8px] px-1.5 py-0 rounded border font-semibold ${
+                  sv.support_level === "STRONG" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                  : sv.support_level === "PARTIAL" ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                  : "bg-red-500/15 text-red-400 border-red-500/30"
+                }`}>
+                  {sv.support_level}
+                </span>
+                <span className="text-[8px] font-mono text-muted-foreground ml-auto">
+                  Supp: {sv.support_score.toFixed(2)} · Contam: {sv.contamination_score.toFixed(2)}
+                </span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-180 shrink-0" />
+              </summary>
+              <div className="pl-3 mt-1 space-y-1.5 text-[9px]">
+                {/* Sub-axis bars */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-muted-foreground">🌡️ Termico</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex-1 h-1 rounded-full bg-muted/40 overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500/60" style={{ width: `${sv.thermal_support_score * 100}%` }} />
+                      </div>
+                      <span className="font-mono text-[8px] w-6 text-right">{sv.thermal_support_score.toFixed(2)}</span>
+                    </div>
+                    {sv.thermal_contamination_flag && <span className="text-amber-400/80 text-[8px]">⚠ contaminazione</span>}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">⚡ Stress</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex-1 h-1 rounded-full bg-muted/40 overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500/60" style={{ width: `${sv.stress_support_score * 100}%` }} />
+                      </div>
+                      <span className="font-mono text-[8px] w-6 text-right">{sv.stress_support_score.toFixed(2)}</span>
+                    </div>
+                    {sv.stress_inconsistency_flag && <span className="text-amber-400/80 text-[8px]">⚠ incoerenza</span>}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">🛣️ Grip</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex-1 h-1 rounded-full bg-muted/40 overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500/60" style={{ width: `${sv.grip_support_score * 100}%` }} />
+                      </div>
+                      <span className="font-mono text-[8px] w-6 text-right">{sv.grip_support_score.toFixed(2)}</span>
+                    </div>
+                    {sv.grip_contamination_score > 0.3 && <span className="text-amber-400/80 text-[8px]">⚠ contam. {sv.grip_contamination_score.toFixed(2)}</span>}
+                  </div>
+                </div>
+                {/* Support signals */}
+                {sv.support_signals.length > 0 && (
+                  <div>
+                    {sv.support_signals.map((s, i) => (
+                      <p key={i} className="text-emerald-400/80 pl-1">✓ {s}</p>
+                    ))}
+                  </div>
+                )}
+                {/* Contradiction signals */}
+                {sv.contradiction_signals.length > 0 && (
+                  <div>
+                    {sv.contradiction_signals.map((c, i) => (
+                      <p key={i} className="text-amber-400/80 pl-1">⚠ {c}</p>
+                    ))}
+                  </div>
+                )}
               </div>
-            );
-          })}
+            </details>
+          ))}
         </div>
       )}
     </VRESection>
