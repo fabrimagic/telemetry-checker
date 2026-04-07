@@ -596,7 +596,7 @@ export function computeVirtualRaceEngineer(
 
   const actualCompounds = stints.map(s => s.compound);
   const actualPitLaps = pitStops.map(p => p.lap_number);
-  const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds);
+  const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
 
   // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
