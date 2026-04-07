@@ -222,6 +222,11 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
       reliabilityNotes.push("Previsione traffico non disponibile per questo giro");
     }
 
+    // Soft sensor context for this decision window
+    const softSensorCtx = softSensorsTimeline
+      ? buildDecisionSoftSensorContext(softSensorsTimeline, windowStart, windowEnd)
+      : undefined;
+
     points.push({
       id: `dp_${sessionKey}_${driverNumber}_${lap}`,
       lap_window: [windowStart, windowEnd],
@@ -236,6 +241,7 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
       analogs: [],
       analogs_status: "NOT_LOADED",
       reliability_notes: reliabilityNotes,
+      soft_sensor_context: softSensorCtx ?? undefined,
     });
   }
 
