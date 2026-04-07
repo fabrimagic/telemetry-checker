@@ -158,6 +158,7 @@ export default function Documentation() {
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-2">Virtual Race Engineer</p>
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
               <TocLink href="#vre-ui">Interfaccia a 4 Sezioni</TocLink>
+              <TocLink href="#vre-view-modes">Modalità di Visualizzazione</TocLink>
               <TocLink href="#vre-cost-function">Funzione di Costo</TocLink>
               <TocLink href="#vre-risk-mode">Risk Mode & Decision Layer</TocLink>
               <TocLink href="#vre-scenarios">Scenari What-If</TocLink>
@@ -558,7 +559,51 @@ export default function Documentation() {
           </ul>
         </DocSection>
 
-        <DocSection id="vre-cost-function" title="VRE — Funzione di Costo Strategia" icon={<Brain className="h-4 w-4" />}>
+        <DocSection id="vre-view-modes" title="VRE — Modalità di Visualizzazione" icon={<Brain className="h-4 w-4" />}>
+          <p>
+            Il VRE presenta lo stesso risultato analitico in tre modalità di lettura diverse,
+            selezionabili tramite il selettore <strong className="text-foreground">Engineer / Analyst / Broadcast</strong> nell'header della card.
+            Nessuna modalità altera i calcoli: cambia solo la presentazione.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">🔧 Engineer</h4>
+          <p>Massimo dettaglio tecnico. Pensata per strategist, data analyst e race engineer.</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Verdict con delta e confidence</li>
+            <li>Timeline comparativa reale vs ottimale</li>
+            <li>Analisi globale gara: battaglie, meteo, neutralizzazioni, deviazione cumulativa, traffic release, pace loss per stint, fattori di confidenza</li>
+            <li>Race Context & Simulatore: scenario what-if, risk mode, degrado personalizzato</li>
+            <li>Strategia reale con stint, degrado grezzo/corretto, R², status di validazione</li>
+            <li>Strategia raccomandata con breakdown, pros/cons, traffico, analisi multi-obiettivo, dettagli avanzati (sensibilità, competitor context, cliff risk)</li>
+            <li>Strategie alternative con scoring risk-adjusted, breakdown e dettagli per ciascuna</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">📊 Analyst</h4>
+          <p>Equilibrio tra rigore tecnico e leggibilità. Per fan avanzati, creator e giornalisti tecnici.</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Sintesi</strong> — 2-4 frasi con verdetto, delta e livello di affidabilità</li>
+            <li><strong className="text-foreground">Punti chiave</strong> — fino a 5 insight su degrado, traffico, neutralizzazioni, meteo e robustezza</li>
+            <li><strong className="text-foreground">Perché questo risultato</strong> — spiegazione semplice dei driver principali del risultato</li>
+            <li><strong className="text-foreground">Confronto strategico</strong> — card reale vs raccomandata con compound, pit lap e pro/contro</li>
+            <li><strong className="text-foreground">Alternative</strong> — top 2 alternative con delta, pro e contro</li>
+            <li><strong className="text-foreground">Affidabilità</strong> — fattori di confidenza e dati mancanti</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">📺 Broadcast</h4>
+          <p>Narrativa chiara e immediata. Per fan generalisti, social, video e podcast.</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Headline</strong> — una frase che riassume il punto centrale</li>
+            <li><strong className="text-foreground">La gara</strong> — racconto strategico in 3-6 frasi: cosa è successo, perché, momento chiave</li>
+            <li><strong className="text-foreground">In sintesi</strong> — massimo 3 takeaway: cosa ha aiutato, cosa ha penalizzato, cosa avrebbe potuto cambiare</li>
+            <li><strong className="text-foreground">Trust Marker</strong> — indicatore di affidabilità finale (alta / media / prudente)</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Anti-allucinazione</h4>
+          <p>
+            Tutte e tre le modalità mostrano <strong className="text-foreground">esclusivamente</strong> dati provenienti
+            dal motore di calcolo. Nessun dato viene inventato, arrotondato arbitrariamente o interpretato oltre
+            quanto l'output tecnico supporta. Se un'informazione manca, viene dichiarato esplicitamente.
+          </p>
           <p>
             Per ogni strategia candidata, la funzione <code className="text-primary">simulateStrategyCost()</code>
             calcola il tempo totale simulato:
