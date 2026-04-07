@@ -613,11 +613,11 @@ export default function Documentation() {
           </ul>
 
           <h4 className="font-semibold text-foreground mt-3">Race Context & Simulatore</h4>
-          <p>Pannello di controllo per parametrizzare l'analisi:</p>
+          <p>Pannello di controllo per parametrizzare l'analisi. Il contenuto visibile dipende dalla modalità di analisi selezionata:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Scenario selector</strong> — scenari what-if con giro di attivazione e durata</li>
-            <li><strong className="text-foreground">Risk mode</strong> — Conservative / Balanced / Aggressive</li>
-            <li><strong className="text-foreground">Degrado personalizzato</strong> — override per-compound per stint INVALID</li>
+            <li><strong className="text-foreground">Scenario selector</strong> — scenari what-if con giro di attivazione e durata (<strong className="text-amber-400">solo in Post-Race Analysis Mode</strong>, bloccato su Real Conditions in Race Engineer Mode)</li>
+            <li><strong className="text-foreground">Risk mode</strong> — Conservative / Balanced / Aggressive (sempre disponibile)</li>
+            <li><strong className="text-foreground">Degrado personalizzato</strong> — override per-compound per stint INVALID (sempre disponibile)</li>
           </ul>
         </DocSection>
 
