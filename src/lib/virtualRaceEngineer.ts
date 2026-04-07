@@ -216,6 +216,10 @@ export function computeVirtualRaceEngineer(
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
+  // RACE_ENGINEER mode forces REAL_CONTEXT
+  const effectiveScenarioId: ScenarioId = analysisMode === "RACE_ENGINEER" ? "REAL_CONTEXT" : scenarioId;
+  const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
+
   const weatherMap = classifyLapsWeather(laps, weather);
   const trackStatusMapRaw = classifyLapsTrackStatus(laps, raceControl);
   // Red flag on the very last lap = race ended, not a neutralization
