@@ -17,7 +17,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
-import { computeSoftSensors, type SoftSensorsContext } from "./softSensors";
+import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment } from "./softSensors";
 
 /* ── Types ── */
 
@@ -64,6 +64,8 @@ export interface RecommendedStrategy {
   cons?: string[];
   traffic_predictions?: TrafficPrediction[];
   analysis?: EnrichedStrategyAnalysis;
+  soft_sensor_adjustment?: StrategySoftSensorAdjustment;
+  soft_sensor_notes?: string[];
 }
 
 export interface AlternativeStrategy {
@@ -79,6 +81,8 @@ export interface AlternativeStrategy {
   traffic_predictions?: TrafficPrediction[];
   breakdown?: StrategyBreakdown;
   analysis?: EnrichedStrategyAnalysis;
+  soft_sensor_adjustment?: StrategySoftSensorAdjustment;
+  soft_sensor_notes?: string[];
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -129,6 +133,7 @@ export interface VirtualRaceEngineerResult {
   pace_loss_results: StintPaceLossResult[];
   custom_degradation_override: Record<string, number> | null;
   soft_sensors?: SoftSensorsContext;
+  soft_sensors_timeline?: SoftSensorsTimeline;
 }
 
 /* ── Helpers ── */
@@ -1744,8 +1749,8 @@ export function computeVirtualRaceEngineer(
     );
   }
 
-  // ── 11. Soft Sensors (latent state estimation) ──
-  const softSensors = computeSoftSensors(
+  // ── 11. Soft Sensors (latent state estimation — lap-by-lap timeline) ──
+  const softSensorsTimeline = computeSoftSensorsTimeline(
     stintAnalyses,
     pitStopAnalyses,
     degradationValidations,
@@ -1755,6 +1760,37 @@ export function computeVirtualRaceEngineer(
     trackStatusMap,
     totalLaps,
   );
+
+  // Derive backward-compatible summary from timeline
+  const softSensors: SoftSensorsContext | undefined = softSensorsTimeline.summary.latest_state
+    ? {
+        tyre_thermal: softSensorsTimeline.summary.latest_state.tyre_thermal,
+        tyre_stress: softSensorsTimeline.summary.latest_state.tyre_stress,
+        track_grip: softSensorsTimeline.summary.latest_state.track_grip,
+        overall_confidence: softSensorsTimeline.summary.overall_confidence,
+        reliability_notes: softSensorsTimeline.summary.reliability_notes,
+      }
+    : computeSoftSensors(
+        stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
+        earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+      );
+
+  // ── 11b. Apply soft sensor refinement to recommended + alternatives ──
+  {
+    const recAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
+    recommendedStrategy.soft_sensor_adjustment = recAdj;
+    if (recAdj.total_soft_sensor_adjustment !== 0) {
+      recommendedStrategy.soft_sensor_notes = recAdj.adjustment_reasons;
+    }
+
+    for (const alt of alternatives) {
+      const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline);
+      alt.soft_sensor_adjustment = altAdj;
+      if (altAdj.total_soft_sensor_adjustment !== 0) {
+        alt.soft_sensor_notes = altAdj.adjustment_reasons;
+      }
+    }
+  }
 
   return {
     driver_number: driverNumber,
@@ -1796,5 +1832,6 @@ export function computeVirtualRaceEngineer(
     pace_loss_results: paceLossResults,
     custom_degradation_override: customDegradationOverride,
     soft_sensors: softSensors,
+    soft_sensors_timeline: softSensorsTimeline,
   };
 }
