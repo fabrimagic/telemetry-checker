@@ -1547,7 +1547,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                   scoringWithout={recommended_strategy.scoring_without_soft_sensors}
                   scoringWith={recommended_strategy.scoring_with_soft_sensors}
                   delta={recommended_strategy.scoring_delta_soft_sensors}
-                  gate={data.soft_sensor_scoring_gate}
+                  gate={result.soft_sensor_scoring_gate}
                 />
               </div>
 
@@ -1691,7 +1691,7 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
                       scoringWithout={alt.scoring_without_soft_sensors}
                       scoringWith={alt.scoring_with_soft_sensors}
                       delta={alt.scoring_delta_soft_sensors}
-                      gate={data.soft_sensor_scoring_gate}
+                      gate={result.soft_sensor_scoring_gate}
                     />
 
                     {/* Breakdown per-strategy */}
