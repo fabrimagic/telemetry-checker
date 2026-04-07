@@ -81,7 +81,7 @@ export function estimateTyreThermalState(
   const reasons: string[] = [];
   const contaminated: string[] = [];
   const sources: string[] = ["compound", "tyre_age", "warmup_model"];
-  let confidence: SoftSensorConfidence = "HIGH";
+  let confidence = "HIGH" as SoftSensorConfidence;
 
   // Check if within warmup window
   const lapsAffected = warmupConfig?.laps_affected ?? 3;
@@ -328,7 +328,7 @@ export function estimateTrackGripState(
 ): TrackGripSensor {
   const reasons: string[] = [];
   const sources: string[] = [];
-  let confidence: SoftSensorConfidence = "HIGH";
+  let confidence = "HIGH" as SoftSensorConfidence;
 
   // Collect recent weather window (last 5 laps)
   const windowSize = Math.min(5, currentLap);
