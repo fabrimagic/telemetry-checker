@@ -838,7 +838,25 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} onRiskModeChange={(mode) => {
+                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} analysisMode={vreAnalysisMode} onAnalysisModeChange={(mode) => {
+                    setVreAnalysisMode(mode);
+                    if (mode === "RACE_ENGINEER") {
+                      setVreScenario("REAL_CONTEXT");
+                      setVreScenarioLap(null);
+                      setVreScenarioDuration(null);
+                      const args = vreArgsRef.current;
+                      if (args) {
+                        const newVre = computeVirtualRaceEngineer(
+                          args.driverNumber, args.driverAcronym, args.sessionKey,
+                          args.laps, args.stints, args.pits,
+                          args.weather, args.raceControl,
+                          args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                          args.diaryEvents, args.cumDevResult, "REAL_CONTEXT", null, null, vreCustomDeg,
+                        );
+                        setVreResult(newVre);
+                      }
+                    }
+                  }} onRiskModeChange={(mode) => {
                     setVreRiskMode(mode);
                     const args = vreArgsRef.current;
                     if (args) {
