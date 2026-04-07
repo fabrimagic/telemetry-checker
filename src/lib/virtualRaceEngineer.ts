@@ -572,7 +572,7 @@ export function computeVirtualRaceEngineer(
   }
 
   // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
-  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[]): number | null {
+  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[], forActualStrategy: boolean = false): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) return null;
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
@@ -589,7 +589,7 @@ export function computeVirtualRaceEngineer(
     }
     // Use neutralisation-aware pit loss for each pit lap
     for (const pl of pitLapsArr) {
-      total += pitLoss * getObservedPitLossMultiplier(pl);
+      total += pitLoss * getObservedPitLossMultiplier(pl, forActualStrategy);
     }
     return total;
   }
