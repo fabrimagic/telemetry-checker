@@ -434,6 +434,28 @@ export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioCh
         <p className="text-[11px] text-muted-foreground mt-1">
           Analisi strategica basata su degrado gomme, pit stop, meteo e neutralizzazioni.
         </p>
+
+        {/* View Mode Selector */}
+        <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
+          {(["ENGINEER", "ANALYST", "BROADCAST"] as ViewMode[]).map((mode) => {
+            const labels: Record<ViewMode, string> = { ENGINEER: "Engineer", ANALYST: "Analyst", BROADCAST: "Broadcast" };
+            const isActive = viewMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-3 py-1.5 text-[10px] font-semibold transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {labels[mode]}
+              </button>
+            );
+          })}
+        </div>
+
         {scenario_is_simulated && (
          <div className="mt-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-amber-400 shrink-0" />
