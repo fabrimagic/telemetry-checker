@@ -1247,6 +1247,13 @@ export function computeVirtualRaceEngineer(
 
   const narrativeInsights: string[] = [];
 
+  // Analysis mode narrative
+  if (isRaceEngineerMode) {
+    narrativeInsights.push("🏁 Modalità Race Engineer (ex-ante): le strategie simulate non utilizzano conoscenza di eventi futuri (SC, VSC, meteo). Le decisioni sono valutate con le sole informazioni disponibili al momento.");
+  } else {
+    narrativeInsights.push("📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.");
+  }
+
   // ── 7.pre Degradation validation insights ──
   for (const dv of degradationValidations) {
     if (dv.status === "INVALID") {
