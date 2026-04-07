@@ -977,6 +977,28 @@ export default function Index() {
                   }} />
                 ) : null
               )}
+
+              {/* Key Decision Moments */}
+              {(sessionType === "Race" || sessionType === "Sprint") && kdmResult && kdmResult.decision_points.length > 0 && sessionKey && (
+                <KeyDecisionMomentsCard
+                  result={kdmResult}
+                  sessionKey={sessionKey}
+                  currentYear={new Date().getFullYear()}
+                  onAnalogsLoaded={(pointId, analogs, warnings) => {
+                    setKdmResult(prev => {
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        decision_points: prev.decision_points.map(dp =>
+                          dp.id === pointId
+                            ? { ...dp, analogs, analogs_status: "LOADED" as const, reliability_notes: [...dp.reliability_notes, ...warnings] }
+                            : dp
+                        ),
+                      };
+                    });
+                  }}
+                />
+              )}
           </>
         )}
             </TabsContent>
