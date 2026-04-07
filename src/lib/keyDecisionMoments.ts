@@ -100,6 +100,7 @@ export interface DecisionPoint {
   analogs: HistoricalAnalog[];
   analogs_status: "LOADED" | "LOADING" | "NOT_LOADED" | "NO_DATA" | "ERROR";
   reliability_notes: string[];
+  soft_sensor_context?: DecisionSoftSensorContext;
 }
 
 export interface KeyDecisionMomentsResult {
