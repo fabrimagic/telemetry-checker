@@ -869,7 +869,7 @@ export default function Documentation() {
 
         <DocSection id="tyre-degradation" title="Degrado Gomme — Modello Baseline" icon={<TrendingDown className="h-4 w-4" />}>
           <p>
-            Il modulo <code className="text-primary">tyreDegradation.ts</code> calcola il degrado baseline per ogni stint
+            Il modulo di calcolo del degrado gomme baseline determina il degrado per ogni stint
             usando regressione lineare robusta con pipeline di filtraggio multi-stadio:
           </p>
 
@@ -905,7 +905,7 @@ export default function Documentation() {
 
         <DocSection id="corrected-degradation" title="Degrado Corretto — Two-Stage Model" icon={<TrendingDown className="h-4 w-4" />}>
           <p>
-            Il modulo <code className="text-primary">correctedDegradation.ts</code> rimuove gli effetti confondenti
+            Il modulo di correzione del degrado rimuove gli effetti confondenti
             (carburante e temperatura) per isolare il puro degrado gomme:
           </p>
 
@@ -1023,7 +1023,7 @@ export default function Documentation() {
 
         <DocSection id="weather-classification" title="Classificazione Meteo" icon={<Cloud className="h-4 w-4" />}>
           <p>
-            Il modulo <code className="text-primary">weatherClassification.ts</code> classifica ogni giro in:
+            Il modulo di classificazione meteo classifica ogni giro in:
           </p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">DRY</strong> — nessuna pioggia rilevata</li>
@@ -1092,8 +1092,8 @@ export default function Documentation() {
 
         <DocSection id="strategy-analysis" title="Strategy Analysis (Multi-Obiettivo)" icon={<Target className="h-4 w-4" />}>
           <p>
-            Il modulo <code className="text-primary">strategyAnalysis.ts</code> arricchisce ogni strategia simulata
-            con un'analisi multi-obiettivo completa:
+            Il modulo di analisi strategica multi-obiettivo arricchisce ogni strategia simulata
+            con un'analisi completa:
           </p>
 
           <h4 className="font-semibold text-foreground mt-3">Obiettivi analizzati</h4>
