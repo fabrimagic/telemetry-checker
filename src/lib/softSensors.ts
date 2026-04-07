@@ -107,6 +107,47 @@ export interface StrategySoftSensorAdjustment {
   confidence: SoftSensorConfidence;
 }
 
+/* ── Warmup Interpretation types ── */
+export interface WarmupAnomaly {
+  stint_number: number;
+  type: "FASTER_THAN_EXPECTED" | "SLOWER_THAN_EXPECTED";
+  expected_laps: number;
+  observed_laps: number;
+  detail: string;
+}
+
+export interface WarmupInterpretation {
+  warmup_observed_laps_by_stint: Map<number, number>;
+  warmup_anomalies: WarmupAnomaly[];
+  reliability_notes: string[];
+}
+
+/* ── Degradation Validation Context types ── */
+export type ValidationSupportLevel = "STRONG" | "PARTIAL" | "WEAK";
+
+export interface StintValidationContext {
+  stint_number: number;
+  support_level: ValidationSupportLevel;
+  inconsistencies: string[];
+  notes: string[];
+  adjusted_confidence: SoftSensorConfidence;
+}
+
+export interface DegradationValidationContext {
+  by_stint: StintValidationContext[];
+  overall_support: ValidationSupportLevel;
+  reliability_notes: string[];
+}
+
+/* ── Soft Sensor Context for Decision Points ── */
+export interface DecisionSoftSensorContext {
+  thermal_state_summary: string;
+  stress_state_summary: string;
+  grip_state_summary: string;
+  consistency: SoftSensorConfidence;
+  notes: string[];
+}
+
 /* ══════════════════════════════════════════════════════════════════
  * TYRE THERMAL STATE (single lap)
  * ══════════════════════════════════════════════════════════════════ */
