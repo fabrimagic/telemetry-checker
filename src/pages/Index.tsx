@@ -343,6 +343,7 @@ export default function Index() {
                   driverAcronym: driver.name_acronym,
                   sessionKey,
                   totalLaps: Math.max(...laps.map(l => l.lap_number)),
+                  softSensorsTimeline: vre.soft_sensors_timeline,
                 });
                 setKdmResult(kdm);
               } catch { setKdmResult(null); }
