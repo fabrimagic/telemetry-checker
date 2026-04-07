@@ -1320,6 +1320,94 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        {/* Soft Sensors */}
+        <DocSection id="soft-sensors" title="Soft Sensors" icon={<Thermometer className="h-5 w-5" />}>
+          <p>
+            I <strong className="text-foreground">Soft Sensors</strong> sono un layer aggiuntivo di stima degli stati latenti,
+            integrato nel Virtual Race Engineer come arricchimento opzionale. Non misurano grandezze fisiche reali
+            (temperature, pressioni) ma stimano stati qualitativi utili all'interpretazione strategica,
+            usando esclusivamente dati già calcolati dai moduli a monte.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Principio di funzionamento</h4>
+          <p>
+            Ogni soft sensor combina più segnali osservabili per produrre una classificazione qualitativa.
+            La stima include sempre un'etichetta di stato, un livello di confidenza (Alta, Media, Bassa),
+            le motivazioni della classificazione e, dove i dati lo supportano, un punteggio normalizzato 0–100%.
+            Se un segnale è contaminato o assente, la confidenza viene ridotta e la contaminazione dichiarata esplicitamente.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">1. Stato termico gomme</h4>
+          <p>
+            Stima lo stato termico operativo della gomma durante lo stint, con attenzione particolare alla fase post-pit stop.
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">COLD</strong> — primo giro su gomme nuove, riscaldamento non iniziato</li>
+            <li><strong className="text-foreground">WARMING_UP</strong> — entro la finestra di riscaldamento prevista dal modello warmup</li>
+            <li><strong className="text-foreground">IN_WINDOW</strong> — gomme a regime operativo stimato</li>
+            <li><strong className="text-foreground">HOT</strong> — gomme a temperatura elevata stimata (battaglia attiva, alta età)</li>
+            <li><strong className="text-foreground">UNKNOWN</strong> — segnali contrastanti o insufficienti</li>
+          </ul>
+          <p className="text-xs mt-1">
+            Segnali: compound, età gomma, modello warmup, meteo, neutralizzazioni recenti, battaglia attiva.
+            La mescola Hard produce un riscaldamento più lento, coerentemente con il modello warmup esistente.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">2. Stress gomme</h4>
+          <p>
+            Stima il livello di stress operativo della gomma. Lo stress non è sinonimo di degrado:
+            una gomma può avere basso degrado ma alto stress (es. battaglia prolungata su gomme giovani).
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">LOW</strong> — nessun segnale significativo di stress</li>
+            <li><strong className="text-foreground">MODERATE</strong> — segnali moderati (età media, degrado non critico)</li>
+            <li><strong className="text-foreground">HIGH</strong> — segnali convergenti di stress elevato</li>
+            <li><strong className="text-foreground">CRITICAL</strong> — almeno 3 segnali forti convergenti (degrado, pace loss, battaglia)</li>
+            <li><strong className="text-foreground">UNKNOWN</strong> — dati insufficienti o inaffidabili</li>
+          </ul>
+          <p className="text-xs mt-1">
+            Segnali: età gomma, slope degrado, validazione degrado, pace loss, battaglia attiva, meteo misto, restart post-neutralizzazione.
+            Lo stato CRITICAL richiede almeno tre fattori convergenti per evitare falsi allarmi.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">3. Grip pista</h4>
+          <p>
+            Stima l'evoluzione del grip pista utile a contestualizzare stint, degrado e timing strategico.
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong className="text-foreground">LOW_GRIP</strong> — tutti i giri recenti in condizioni bagnate</li>
+            <li><strong className="text-foreground">IMPROVING</strong> — transizione bagnato→asciutto o fase iniziale gara</li>
+            <li><strong className="text-foreground">STABLE</strong> — condizioni asciutte costanti oltre il primo terzo di gara</li>
+            <li><strong className="text-foreground">FALLING</strong> — segnali di peggioramento grip</li>
+            <li><strong className="text-foreground">MIXED</strong> — segnali contrastanti o neutralizzazioni frequenti</li>
+            <li><strong className="text-foreground">UNKNOWN</strong> — dati meteo assenti</li>
+          </ul>
+          <p className="text-xs mt-1">
+            Segnali: meteo degli ultimi 5 giri, transizioni meteo, neutralizzazioni, fase della gara.
+            Non viene attribuito alla pista ciò che è chiaramente effetto gomma o traffico.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Integrazione nel VRE</h4>
+          <p>
+            I soft sensors sono calcolati dopo tutti i moduli analitici (degrado, traffico, pace loss, contesto integrato)
+            e prima della narrativa finale. Sono presentati come sezione collassabile nel VRE con etichetta "STIMA".
+            Ogni sensore mostra etichetta, confidenza e le 1-3 motivazioni principali; espandendo il dettaglio
+            si visualizzano punteggio e contaminazioni.
+          </p>
+          <p>
+            In questa fase, i soft sensors non influenzano lo scoring o il ranking delle strategie:
+            sono un layer interpretativo aggiuntivo, non decisionale.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Anti-allucinazione</h4>
+          <ul className="list-disc list-inside space-y-1">
+            <li>Nessun valore fisico assoluto viene prodotto (nessuna °C, kPa, ecc.)</li>
+            <li>Stati estremi richiedono segnali multipli convergenti</li>
+            <li>Ogni inferenza è accompagnata da motivazione e livello di confidenza</li>
+            <li>I segnali contaminanti vengono dichiarati esplicitamente</li>
+            <li>Se i dati sono insufficienti o contraddittori, lo stato è UNKNOWN con confidenza bassa</li>
+          </ul>
+
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground py-8 space-y-1">
           <p>Documentazione generata dal codice sorgente — versione attuale del modello analitico.</p>
