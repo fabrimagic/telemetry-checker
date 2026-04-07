@@ -64,6 +64,8 @@ export interface RecommendedStrategy {
   cons?: string[];
   traffic_predictions?: TrafficPrediction[];
   analysis?: EnrichedStrategyAnalysis;
+  soft_sensor_adjustment?: StrategySoftSensorAdjustment;
+  soft_sensor_notes?: string[];
 }
 
 export interface AlternativeStrategy {
