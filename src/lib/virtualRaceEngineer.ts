@@ -133,6 +133,7 @@ export interface VirtualRaceEngineerResult {
   pace_loss_results: StintPaceLossResult[];
   custom_degradation_override: Record<string, number> | null;
   soft_sensors?: SoftSensorsContext;
+  soft_sensors_timeline?: SoftSensorsTimeline;
 }
 
 /* ── Helpers ── */
