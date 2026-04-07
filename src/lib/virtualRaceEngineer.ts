@@ -19,6 +19,8 @@ import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
 
+export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
+
 /* ── Types ── */
 
 export interface StintAnalysis {
@@ -143,6 +145,7 @@ export interface VirtualRaceEngineerResult {
   warmup_interpretation?: WarmupInterpretation;
   degradation_validation_context?: DegradationValidationContext;
   soft_sensor_scoring_gate?: SoftSensorScoringGate;
+  analysis_mode: AnalysisMode;
 }
 
 /* ── Helpers ── */
@@ -209,8 +212,13 @@ export function computeVirtualRaceEngineer(
   scenarioActivationLap: number | null = null,
   scenarioDurationLaps: number | null = null,
   customDegradationOverride: Record<string, number> | null = null,
+  analysisMode: AnalysisMode = "POST_RACE",
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
+
+  // RACE_ENGINEER mode forces REAL_CONTEXT
+  const effectiveScenarioId: ScenarioId = analysisMode === "RACE_ENGINEER" ? "REAL_CONTEXT" : scenarioId;
+  const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
 
   const weatherMap = classifyLapsWeather(laps, weather);
   const trackStatusMapRaw = classifyLapsTrackStatus(laps, raceControl);
@@ -385,10 +393,10 @@ export function computeVirtualRaceEngineer(
     return new Set(compounds).size >= 2;
   }
 
-  const scenarioDef = SCENARIO_DEFINITIONS[scenarioId];
-  const scenarioMods = buildTimedScenarioModifiers(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
-  const scenarioActivationWarning = validateScenarioActivationLap(scenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
-  const scenarioWindow = isSimulatedScenario(scenarioId) ? computeScenarioWindow(scenarioActivationLap, scenarioDurationLaps, totalLaps) : null;
+  const scenarioDef = SCENARIO_DEFINITIONS[effectiveScenarioId];
+  const scenarioMods = buildTimedScenarioModifiers(effectiveScenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioActivationWarning = validateScenarioActivationLap(effectiveScenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioWindow = isSimulatedScenario(effectiveScenarioId) ? computeScenarioWindow(scenarioActivationLap, scenarioDurationLaps, totalLaps) : null;
 
   // ── Risk mode base weights ──
   const RISK_BASE = {
@@ -408,8 +416,12 @@ export function computeVirtualRaceEngineer(
   /**
    * Returns the pit loss multiplier based on observed (real) track status at a given lap.
    * Only uses trackStatusMap (real data), never scenario-simulated neutralisations.
+   * In RACE_ENGINEER mode, returns 1.0 for simulated strategies (no future knowledge).
+   * Use forActualStrategy=true to always use real data (for actual strategy breakdown).
    */
-  function getObservedPitLossMultiplier(pitLap: number): number {
+  function getObservedPitLossMultiplier(pitLap: number, forActualStrategy: boolean = false): number {
+    // In RACE_ENGINEER mode, simulated strategies don't benefit from SC/VSC knowledge
+    if (isRaceEngineerMode && !forActualStrategy) return 1.0;
     const status = trackStatusMap.get(pitLap);
     if (status === "SC") return SC_PIT_LOSS_MULT;
     if (status === "VSC") return VSC_PIT_LOSS_MULT;
@@ -420,13 +432,13 @@ export function computeVirtualRaceEngineer(
 
   // Helper: check if a lap is inside the scenario window
   function isInScenarioWindow(lap: number): boolean {
-    if (!scenarioWindow) return isSimulatedScenario(scenarioId); // no window = full race
+    if (!scenarioWindow) return isSimulatedScenario(effectiveScenarioId); // no window = full race
     return lap >= scenarioWindow.start && lap <= scenarioWindow.end;
   }
 
   // Per-lap modifier for degradation based on scenario
   function lapDegradationMult(lap: number): number {
-    const base = isSimulatedScenario(scenarioId) && isInScenarioWindow(lap)
+    const base = isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(lap)
       ? riskBase.degradation * scenarioMods.degradation_weight
       : riskBase.degradation;
     return base * plDegAdj; // pace loss adjustment
@@ -447,7 +459,7 @@ export function computeVirtualRaceEngineer(
     }
 
     // No real neutralisation: apply scenario modifier if active
-    if (isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)) {
+    if (isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(pitLap)) {
       return pitLoss * baseMult * scenarioMods.pit_loss_multiplier;
     }
 
@@ -501,7 +513,7 @@ export function computeVirtualRaceEngineer(
     const pos = driverPositionAtLap.get(pitLap) ?? driverPositionAtLap.get(pitLap - 1) ?? 10;
     const positionFactor = precise ? 1.0 : (pos <= 3 ? 0.3 : pos <= 6 ? 0.7 : pos <= 14 ? 1.0 : 0.5);
 
-    const trafficMult = isSimulatedScenario(scenarioId) && isInScenarioWindow(pitLap)
+    const trafficMult = isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(pitLap)
       ? riskBase.traffic * scenarioMods.traffic_weight
       : riskBase.traffic;
 
@@ -560,7 +572,7 @@ export function computeVirtualRaceEngineer(
   }
 
   // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
-  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[]): number | null {
+  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[], forActualStrategy: boolean = false): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) return null;
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
@@ -577,14 +589,14 @@ export function computeVirtualRaceEngineer(
     }
     // Use neutralisation-aware pit loss for each pit lap
     for (const pl of pitLapsArr) {
-      total += pitLoss * getObservedPitLossMultiplier(pl);
+      total += pitLoss * getObservedPitLossMultiplier(pl, forActualStrategy);
     }
     return total;
   }
 
   const actualCompounds = stints.map(s => s.compound);
   const actualPitLaps = pitStops.map(p => p.lap_number);
-  const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds);
+  const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
 
   // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
@@ -929,10 +941,10 @@ export function computeVirtualRaceEngineer(
 
   // ── 4c. Strategy Breakdowns (with scenario/risk modifiers) ──
   const breakdownMods: import("./strategyBreakdown").BreakdownModifiers = {
-    degradation_mult: isSimulatedScenario(scenarioId) ? riskBase.degradation * scenarioMods.degradation_weight : riskBase.degradation,
-    pit_loss_mult: isSimulatedScenario(scenarioId) ? riskBase.pitLoss * scenarioMods.pit_loss_multiplier : riskBase.pitLoss,
-    traffic_mult: isSimulatedScenario(scenarioId) ? riskBase.traffic * scenarioMods.traffic_weight : riskBase.traffic,
-    neutralization_mult: isSimulatedScenario(scenarioId) ? scenarioMods.neutralization_weight : 1.0,
+    degradation_mult: isSimulatedScenario(effectiveScenarioId) ? riskBase.degradation * scenarioMods.degradation_weight : riskBase.degradation,
+    pit_loss_mult: isSimulatedScenario(effectiveScenarioId) ? riskBase.pitLoss * scenarioMods.pit_loss_multiplier : riskBase.pitLoss,
+    traffic_mult: isSimulatedScenario(effectiveScenarioId) ? riskBase.traffic * scenarioMods.traffic_weight : riskBase.traffic,
+    neutralization_mult: isSimulatedScenario(effectiveScenarioId) ? scenarioMods.neutralization_weight : 1.0,
   };
 
   const actualTraffic = predictTrafficForPitLaps(
@@ -978,7 +990,7 @@ export function computeVirtualRaceEngineer(
       alt.pit_laps, alt.compounds, alt.estimated_delta_vs_actual,
       totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
       pitLoss, trafficAvgBaseline, altTraffic,
-      riskMode, scenarioId,
+      riskMode, effectiveScenarioId,
       intervals, positions, stints, allDrivers, driverNumber,
       simulateStrategyCost, driverAvgPace, actualPitLaps,
     );
@@ -1038,7 +1050,7 @@ export function computeVirtualRaceEngineer(
       bestPitLaps, bestCompounds, recommendedStrategy.estimated_gain_seconds,
       totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
       pitLoss, trafficAvgBaseline, recTraffic,
-      riskMode, scenarioId,
+      riskMode, effectiveScenarioId,
       intervals, positions, stints, allDrivers, driverNumber,
       simulateStrategyCost, driverAvgPace, actualPitLaps,
     );
@@ -1234,6 +1246,13 @@ export function computeVirtualRaceEngineer(
   );
 
   const narrativeInsights: string[] = [];
+
+  // Analysis mode narrative
+  if (isRaceEngineerMode) {
+    narrativeInsights.push("🏁 Modalità Race Engineer (ex-ante): le strategie simulate non utilizzano conoscenza di eventi futuri (SC, VSC, meteo). Le decisioni sono valutate con le sole informazioni disponibili al momento.");
+  } else {
+    narrativeInsights.push("📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.");
+  }
 
   // ── 7.pre Degradation validation insights ──
   for (const dv of degradationValidations) {
@@ -1513,7 +1532,7 @@ export function computeVirtualRaceEngineer(
   const finalConfidence: Confidence = confScore >= 6 ? "HIGH" : confScore >= 3 ? "MEDIUM" : "LOW";
 
   // Add scenario note if simulated
-  if (isSimulatedScenario(scenarioId)) {
+  if (isSimulatedScenario(effectiveScenarioId)) {
     const lapNote = scenarioActivationLap != null ? ` dal giro ${scenarioActivationLap}` : "";
     const durNote = scenarioDurationLaps != null ? ` per ${scenarioDurationLaps} giri` : "";
     const windowNote = scenarioWindow ? ` (giri ${scenarioWindow.start}–${scenarioWindow.end})` : "";
@@ -1580,7 +1599,7 @@ export function computeVirtualRaceEngineer(
   }
 
   // ── 9. Scenario-adjusted neutral phase adjustments for scoring ──
-  const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(scenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
+  const scenarioPhaseAdj = applyScenarioToPhaseAdjustments(effectiveScenarioId, NEUTRAL_PHASE_ADJUSTMENTS, scenarioActivationLap, totalLaps, scenarioDurationLaps);
 
   // ── 9a. Compute Soft Sensors Timeline early (needed for scoring gate) ──
   const softSensorsTimeline = computeSoftSensorsTimeline(
@@ -1864,11 +1883,11 @@ export function computeVirtualRaceEngineer(
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,
-    scenario_id: scenarioId,
-    scenario_is_simulated: isSimulatedScenario(scenarioId),
+    scenario_id: effectiveScenarioId,
+    scenario_is_simulated: isSimulatedScenario(effectiveScenarioId),
     scenario_label: scenarioDef.label,
     scenario_description: (() => {
-      if (!isSimulatedScenario(scenarioId)) return scenarioDef.description;
+      if (!isSimulatedScenario(effectiveScenarioId)) return scenarioDef.description;
       const parts = [scenarioDef.description];
       if (scenarioActivationLap != null) parts.push(`dal giro ${scenarioActivationLap}`);
       if (scenarioDurationLaps != null) parts.push(`per ${scenarioDurationLaps} giri`);
@@ -1878,8 +1897,8 @@ export function computeVirtualRaceEngineer(
     scenario_modifiers_applied: Object.fromEntries(
       Object.entries(scenarioMods).filter(([, v]) => typeof v === "number" && v !== 1.0 && v !== 0)
     ) as Record<string, number>,
-    scenario_activation_lap: isSimulatedScenario(scenarioId) ? scenarioActivationLap : null,
-    scenario_duration_laps: isSimulatedScenario(scenarioId) ? scenarioDurationLaps : null,
+    scenario_activation_lap: isSimulatedScenario(effectiveScenarioId) ? scenarioActivationLap : null,
+    scenario_duration_laps: isSimulatedScenario(effectiveScenarioId) ? scenarioDurationLaps : null,
     scenario_window: scenarioWindow,
     scenario_activation_warning: scenarioActivationWarning,
     degradation_validations: degradationValidations,
@@ -1890,5 +1909,6 @@ export function computeVirtualRaceEngineer(
     warmup_interpretation: warmupInterpretation,
     degradation_validation_context: degradationValidationContext,
     soft_sensor_scoring_gate: softSensorScoringGate,
+    analysis_mode: analysisMode,
   };
 }
