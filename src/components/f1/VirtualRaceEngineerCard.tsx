@@ -802,6 +802,8 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
   );
 }
 
+export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
+
 interface Props {
   result: VirtualRaceEngineerResult;
   onRiskModeChange?: (mode: RiskMode) => void;
@@ -809,14 +811,17 @@ interface Props {
   onScenarioActivationLapChange?: (lap: number | null) => void;
   onScenarioDurationChange?: (duration: number | null) => void;
   onCustomDegradationChange?: (deg: Record<string, number> | null) => void;
+  onAnalysisModeChange?: (mode: AnalysisMode) => void;
   scenarioActivationLap?: number | null;
   scenarioDurationLaps?: number | null;
+  analysisMode?: AnalysisMode;
 }
 
-export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, scenarioActivationLap, scenarioDurationLaps }: Props) {
+export function VirtualRaceEngineerCard({ result, onRiskModeChange, onScenarioChange, onScenarioActivationLapChange, onScenarioDurationChange, onCustomDegradationChange, onAnalysisModeChange, scenarioActivationLap, scenarioDurationLaps, analysisMode = "RACE_ENGINEER" }: Props) {
   const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const [viewMode, setViewMode] = useState<ViewMode>("ENGINEER");
+  const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
 
   const scoredStrategies = useMemo(() => {
     const allStrats = [
