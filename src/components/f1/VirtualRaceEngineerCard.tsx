@@ -471,6 +471,29 @@ function SoftSensorImpactDetail({ adjustment }: { adjustment: StrategySoftSensor
   );
 }
 
+/* ── Soft Sensor Scoring Impact (scoring_with vs scoring_without) ── */
+function SoftSensorScoringImpact({ scoringWithout, scoringWith, delta, gate }: {
+  scoringWithout?: number;
+  scoringWith?: number;
+  delta?: number;
+  gate?: SoftSensorScoringGate;
+}) {
+  if (delta == null || Math.abs(delta) < 0.01) return null;
+  const isPositive = delta > 0;
+  return (
+    <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
+      <Scale className="h-3 w-3 shrink-0" />
+      <span>Scoring SS: <strong className={`font-mono ${isPositive ? "text-emerald-400" : "text-amber-400"}`}>{delta > 0 ? "+" : ""}{delta.toFixed(2)}s</strong></span>
+      {scoringWithout != null && scoringWith != null && (
+        <span className="text-[8px]">({scoringWithout.toFixed(1)} → {scoringWith.toFixed(1)})</span>
+      )}
+      {gate && !gate.soft_sensor_scoring_enabled && (
+        <span className="text-red-400 text-[8px]">gate chiuso</span>
+      )}
+    </div>
+  );
+}
+
 function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStrategy; recommended: RecommendedStrategy; riskMode?: RiskMode }) {
   const totalLaps = actual.stints.length > 0
     ? Math.max(...actual.stints.map((s) => s.lap_end))
