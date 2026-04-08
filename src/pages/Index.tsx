@@ -489,7 +489,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER");
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
