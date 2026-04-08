@@ -41,7 +41,12 @@ export function SessionPicker({ onSelect, isLoading }: Props) {
       })
       .then((data: Session[]) => {
         const now = new Date();
-        const past = data.filter((s) => new Date(s.date_start) < now);
+        const excludedCountries = ["bahrain", "saudi arabia"];
+        const past = data.filter((s) => {
+          if (new Date(s.date_start) >= now) return false;
+          const country = (s.country_name || "").toLowerCase();
+          return !excludedCountries.some((ex) => country.includes(ex));
+        });
         past.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime());
         setSessions(past);
       })
