@@ -1143,170 +1143,19 @@ export function VirtualRaceEngineerCard({ result, onCustomDegradationChange, ana
 
 
         {/* ═══════════════════════════════════════════════════════════════
-            RACE CONTEXT & SIMULATORE (controls)
-            Scenario selector only visible in POST_RACE mode
+            CONFIGURAZIONE AVANZATA (custom degradation only)
         ═══════════════════════════════════════════════════════════════ */}
-        {(
+        {degradation_validations?.some(dv => dv.status === "INVALID") && (
           <VRESection
-            title={isRaceEngineerMode ? "Configurazione" : "Race Context & Simulatore"}
+            title="Configurazione avanzata"
             icon={<Activity className="h-3.5 w-3.5 text-muted-foreground" />}
             defaultOpen={false}
           >
             <div className="space-y-3 pl-1">
-              {/* Scenario selector — only in POST_RACE mode */}
-              {!isRaceEngineerMode ? (
-                <div className="flex items-start gap-2">
-                  <span className="text-[11px] text-muted-foreground shrink-0 w-20 pt-2">Scenario:</span>
-                  <div className="flex-1 space-y-1">
-                    <Select
-                      value={scenario_id}
-                      onValueChange={(val) => onScenarioChange?.(val as ScenarioId)}
-                    >
-                      <SelectTrigger className="h-8 text-[11px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ALL_SCENARIO_IDS.map((sid) => {
-                          const def = SCENARIO_DEFINITIONS[sid];
-                          return (
-                            <SelectItem key={sid} value={sid} className="text-[11px]">
-                              <span className="flex items-center gap-1.5">
-                                {isSimulatedScenario(sid) && <FlaskConical className="h-3 w-3 text-amber-400" />}
-                                {def.label}
-                              </span>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[10px] text-muted-foreground">{scenario_description}</p>
-                    {scenario_is_simulated && (
-                      <>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-muted-foreground shrink-0">Giro:</span>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
-                            value={scenarioActivationLap ?? ""}
-                            placeholder="Tutti"
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              onScenarioActivationLapChange?.(val === "" ? null : parseInt(val, 10));
-                            }}
-                            className="h-7 w-16 text-[11px] font-mono"
-                          />
-                          <span className="text-[10px] text-muted-foreground shrink-0">Durata:</span>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={actual_strategy.stints.length > 0 ? Math.max(...actual_strategy.stints.map(s => s.lap_end)) : 99}
-                            value={scenarioDurationLaps ?? ""}
-                            placeholder="∞"
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              onScenarioDurationChange?.(val === "" ? null : parseInt(val, 10));
-                            }}
-                            className="h-7 w-16 text-[11px] font-mono"
-                          />
-                        </div>
-                        {scenario_window && (
-                          <p className="text-[10px] text-foreground/70 font-mono mt-0.5">
-                            📌 Finestra: giro {scenario_window.start} → {scenario_window.end}
-                          </p>
-                        )}
-                        {scenario_activation_warning && (
-                          <p className="text-[10px] text-amber-400 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" /> {scenario_activation_warning}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-md bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-[10px] text-blue-400 flex items-center gap-2">
-                  <Shield className="h-3.5 w-3.5 shrink-0" />
-                  <span>Scenario bloccato su <strong>Real Conditions</strong> — in Race Engineer Mode non è possibile selezionare scenari what-if.</span>
-                </div>
-              )}
-
-
-              {/* Risk appetite selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-muted-foreground shrink-0 w-20">Risk mode:</span>
-                <div className="flex rounded-md border border-border overflow-hidden">
-                  {(["CONSERVATIVE", "BALANCED", "AGGRESSIVE"] as RiskMode[]).map((mode) => {
-                    const info = RISK_MODES[mode];
-                    const isActive = risk_mode === mode;
-                    const icons: Record<RiskMode, React.ReactNode> = {
-                      CONSERVATIVE: <Shield className="h-3 w-3" />,
-                      BALANCED: <Scale className="h-3 w-3" />,
-                      AGGRESSIVE: <Zap className="h-3 w-3" />,
-                    };
-                    return (
-                      <button
-                        key={mode}
-                        onClick={() => onRiskModeChange?.(mode)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold transition-colors ${
-                          isActive
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        }`}
-                        title={info.description}
-                      >
-                        {icons[mode]}
-                        {info.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Risk mode note */}
-              <div className="rounded-md bg-muted/40 border border-border px-3 py-2 text-[10px] text-muted-foreground">
-                <p className="font-semibold text-foreground flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  {risk_mode === "CONSERVATIVE" && "Conservative: priorità a robustezza e track position"}
-                  {risk_mode === "BALANCED" && "Balanced: compromesso equilibrato"}
-                  {risk_mode === "AGGRESSIVE" && "Aggressive: massimizza guadagno, accetta più rischio"}
-                </p>
-                {risk_mode === "CONSERVATIVE" && (
-                  <p className="mt-0.5">Degrado +15%, traffico +30%, guadagno −20%. Favorisce scelte difensive.</p>
-                )}
-                {risk_mode === "BALANCED" && (
-                  <p className="mt-0.5">Tutti i pesi applicati senza modifiche. Profilo di riferimento standard.</p>
-                )}
-                {risk_mode === "AGGRESSIVE" && (
-                  <p className="mt-0.5">Degrado −10%, traffico −30%, guadagno +30%. Favorisce alto upside.</p>
-                )}
-              </div>
-
-              {topScoredName && risk_mode !== "BALANCED" && (
-                <p className="text-[10px] text-muted-foreground italic">
-                  💡 Top strategia con profilo <strong className="text-foreground">{RISK_MODES[risk_mode].label}</strong>: <strong className="text-foreground">{topScoredName}</strong>
-                  {topScoredReason && topScoredReason !== "Nessun aggiustamento" && (
-                    <span> ({topScoredReason})</span>
-                  )}
-                </p>
-              )}
-
-              {/* Race phase explanation */}
-              <details className="group">
-                <summary className="flex items-center gap-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <Info className="h-3 w-3 shrink-0" />
-                  <span>Come funziona la Race Phase</span>
-                  <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
-                </summary>
-                <p className="text-[10px] text-muted-foreground/70 mt-1 leading-relaxed pl-5">
-                  La Race Phase è il primo input del modello. Rileva automaticamente la fase corrente (partenza, stint iniziale, finestra pit, gestione centrale, attacco finale, ultimi giri, neutralizzazione, transizione meteo) e assegna pesi che modificano l'importanza relativa di degrado, traffico, posizione, rischio e opportunità da neutralizzazione.
-                </p>
-              </details>
-
               {/* Custom degradation override — per compound */}
-              {degradation_validations?.some(dv => dv.status === "INVALID") && (() => {
+              {(() => {
                 const invalidCompounds = Array.from(new Set(
-                  degradation_validations.filter(dv => dv.status === "INVALID").map(dv => dv.original.compound)
+                  degradation_validations!.filter(dv => dv.status === "INVALID").map(dv => dv.original.compound)
                 ));
                 const overrideMap: Record<string, number> = custom_degradation_override != null && typeof custom_degradation_override === "object" ? custom_degradation_override : {};
                 const hasAnyOverride = Object.keys(overrideMap).length > 0;
