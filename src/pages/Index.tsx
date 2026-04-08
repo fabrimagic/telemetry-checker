@@ -842,120 +842,26 @@ export default function Index() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
                 ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} analysisMode={vreAnalysisMode} onAnalysisModeChange={(mode) => {
-                    setVreAnalysisMode(mode);
-                    const effectiveScenario = mode === "RACE_ENGINEER" ? "REAL_CONTEXT" as const : vreScenario;
-                    const effectiveLap = mode === "RACE_ENGINEER" ? null : vreScenarioLap;
-                    const effectiveDuration = mode === "RACE_ENGINEER" ? null : vreScenarioDuration;
-                    if (mode === "RACE_ENGINEER") {
-                      setVreScenario("REAL_CONTEXT");
-                      setVreScenarioLap(null);
-                      setVreScenarioDuration(null);
-                    }
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, effectiveScenario, effectiveLap, effectiveDuration, vreCustomDeg,
-                        mode,
-                      );
-                      setVreResult(newVre);
-                      // Recompute KDM
-                      if (newVre) {
-                        try {
-                          const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
-                          const trackStatusMapForKdm = classifyLapsTrackStatus(args.laps, args.raceControl);
-                          const driverCumDevForKdm = args.cumDevResult?.drivers.find(d => d.driver_number === args.driverNumber) ?? null;
-                          const kdm = computeKeyDecisionMoments({
-                            laps: args.laps, stints: args.stints, pitStops: args.pits,
-                            weatherMap: weatherMapForKdm, trackStatusMap: trackStatusMapForKdm,
-                            trafficAnalysis: newVre.traffic_analysis, paceLossResults: newVre.pace_loss_results,
-                            degradationValidations: newVre.degradation_validations, diaryEvents: args.diaryEvents,
-                            driverCumDev: driverCumDevForKdm, positions: args.positions, intervals: args.intervals,
-                            driverNumber: args.driverNumber, driverAcronym: args.driverAcronym,
-                            sessionKey: args.sessionKey, totalLaps: Math.max(...args.laps.map(l => l.lap_number)),
-                            softSensorsTimeline: newVre.soft_sensors_timeline,
-                          });
-                          setKdmResult(kdm);
-                        } catch { setKdmResult(null); }
+                  <VirtualRaceEngineerCard
+                    result={vreResult}
+                    analysisMode={vreAnalysisMode}
+                    viewMode={vreViewMode}
+                    onCustomDegradationChange={(deg) => {
+                      setVreCustomDeg(deg);
+                      const args = vreArgsRef.current;
+                      if (args) {
+                        const newVre = computeVirtualRaceEngineer(
+                          args.driverNumber, args.driverAcronym, args.sessionKey,
+                          args.laps, args.stints, args.pits,
+                          args.weather, args.raceControl,
+                          args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
+                          args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, deg,
+                          vreAnalysisMode,
+                        );
+                        setVreResult(newVre);
                       }
-                    }
-                  }} onRiskModeChange={(mode) => {
-                    setVreRiskMode(mode);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onScenarioChange={(scenario) => {
-                    setVreScenario(scenario);
-                    const isReal = scenario === "REAL_CONTEXT";
-                    if (isReal) { setVreScenarioLap(null); setVreScenarioDuration(null); }
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onScenarioActivationLapChange={(lap) => {
-                    setVreScenarioLap(lap);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onScenarioDurationChange={(duration) => {
-                    setVreScenarioDuration(duration);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onCustomDegradationChange={(deg) => {
-                    setVreCustomDeg(deg);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, deg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} />
+                    }}
+                  />
                 ) : null}
 
                 {/* Key Decision Moments */}
