@@ -865,50 +865,6 @@ export function VirtualRaceEngineerCard({ result, onCustomDegradationChange, ana
           }
         </p>
 
-        {/* Analysis Mode Toggle */}
-        <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
-          {(["RACE_ENGINEER", "POST_RACE"] as AnalysisMode[]).map((mode) => {
-            const labels: Record<AnalysisMode, string> = { RACE_ENGINEER: "Race Engineer", POST_RACE: "Post-Race Analysis" };
-            const icons: Record<AnalysisMode, string> = { RACE_ENGINEER: "🔴", POST_RACE: "📊" };
-            const isActive = analysisMode === mode;
-            return (
-              <button
-                key={mode}
-                onClick={() => onAnalysisModeChange?.(mode)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold transition-colors ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                <span>{icons[mode]}</span>
-                {labels[mode]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* View Mode Selector */}
-        <div className="flex rounded-md border border-border overflow-hidden mt-2 w-fit">
-          {(["ENGINEER", "ANALYST", "BROADCAST"] as ViewMode[]).map((mode) => {
-            const labels: Record<ViewMode, string> = { ENGINEER: "Engineer", ANALYST: "Analyst", BROADCAST: "Broadcast" };
-            const isActive = viewMode === mode;
-            return (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 text-[10px] font-semibold transition-colors ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {labels[mode]}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Mode context indicator */}
         <div className={`mt-2 rounded-md px-3 py-1.5 flex items-center gap-2 text-[10px] ${
           isRaceEngineerMode
