@@ -1081,6 +1081,12 @@ export default function Index() {
                     scenarioWindow={vreResult?.scenario_window}
                     scenarioActivationWarning={vreResult?.scenario_activation_warning}
                     maxLap={vreResult?.actual_strategy?.stints?.length ? Math.max(...vreResult.actual_strategy.stints.map(s => s.lap_end)) : 99}
+                    degradationValidations={vreResult?.degradation_validations}
+                    customDegradationOverride={vreResult?.custom_degradation_override}
+                    onCustomDegradationChange={(deg) => {
+                      setVreCustomDeg(deg);
+                      recomputeVre({ customDeg: deg });
+                    }}
                   />
                 </div>
               </div>
