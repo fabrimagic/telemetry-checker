@@ -12,8 +12,9 @@ import { ALL_SCENARIO_IDS, SCENARIO_DEFINITIONS, isSimulatedScenario, type Scena
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Shield, Scale, Zap, FlaskConical, AlertTriangle, Settings2 } from "lucide-react";
+import { Shield, Scale, Zap, FlaskConical, AlertTriangle, Settings2, Gauge } from "lucide-react";
 import React from "react";
+import type { DegradationValidationResult } from "@/lib/degradationValidation";
 
 interface Props {
   analysisMode: AnalysisMode;
@@ -33,6 +34,9 @@ interface Props {
   scenarioWindow?: { start: number; end: number } | null;
   scenarioActivationWarning?: string | null;
   maxLap?: number;
+  degradationValidations?: DegradationValidationResult[];
+  customDegradationOverride?: Record<string, number> | null;
+  onCustomDegradationChange?: (deg: Record<string, number> | null) => void;
 }
 
 export function VRESetupCard({
@@ -44,6 +48,7 @@ export function VRESetupCard({
   scenarioDurationLaps, onScenarioDurationChange,
   scenarioDescription, scenarioIsSimulated, scenarioWindow,
   scenarioActivationWarning, maxLap = 99,
+  degradationValidations, customDegradationOverride, onCustomDegradationChange,
 }: Props) {
   const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
 
@@ -234,7 +239,119 @@ export function VRESetupCard({
           </p>
         </div>
 
+        {/* ── Custom Degradation Override ── */}
+        {degradationValidations?.some(dv => dv.status === "INVALID") && (
+          <CustomDegradationSection
+            degradationValidations={degradationValidations!}
+            overrideMap={customDegradationOverride != null && typeof customDegradationOverride === "object" ? customDegradationOverride : {}}
+            onChange={onCustomDegradationChange}
+          />
+        )}
+
       </CardContent>
     </Card>
+  );
+}
+
+/* ── Compound Badge (local) ── */
+const COMPOUND_COLORS: Record<string, string> = {
+  SOFT: "hsl(0 80% 50%)",
+  MEDIUM: "hsl(45 100% 50%)",
+  HARD: "hsl(0 0% 85%)",
+  INTERMEDIATE: "hsl(120 60% 45%)",
+  WET: "hsl(210 80% 50%)",
+};
+
+function CompoundBadge({ compound }: { compound: string }) {
+  const bg = COMPOUND_COLORS[compound] || "hsl(var(--muted))";
+  const isDark = compound === "HARD" || compound === "MEDIUM";
+  return (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+      style={{ backgroundColor: bg, color: isDark ? "#1a1a1a" : "#fff" }}
+    >
+      {compound}
+    </span>
+  );
+}
+
+/* ── Custom Degradation Section ── */
+function CustomDegradationSection({
+  degradationValidations,
+  overrideMap,
+  onChange,
+}: {
+  degradationValidations: DegradationValidationResult[];
+  overrideMap: Record<string, number>;
+  onChange?: (deg: Record<string, number> | null) => void;
+}) {
+  const invalidCompounds = Array.from(new Set(
+    degradationValidations.filter(dv => dv.status === "INVALID").map(dv => dv.original.compound)
+  ));
+  const hasAnyOverride = Object.keys(overrideMap).length > 0;
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+        <AlertTriangle className="h-3 w-3 text-amber-400" />
+        Degrado personalizzato
+      </label>
+      <p className="text-[9px] text-muted-foreground leading-relaxed">
+        Mescole con degrado <strong className="text-red-400">INVALID</strong>. Inserisci un valore manuale (s/giro) o lascia vuoto per il fallback.
+      </p>
+      <div className="space-y-1.5">
+        {invalidCompounds.map(compound => (
+          <div key={compound} className="flex items-center gap-1.5">
+            <CompoundBadge compound={compound} />
+            <Input
+              type="number"
+              step="0.001"
+              min="0.001"
+              max="0.300"
+              placeholder="es. 0.045"
+              className="flex-1 h-7 text-[11px] font-mono bg-background"
+              value={overrideMap[compound] != null ? overrideMap[compound] : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                const newMap = { ...overrideMap };
+                if (val === "" || val === null) {
+                  delete newMap[compound];
+                } else {
+                  const num = parseFloat(val);
+                  if (!isNaN(num) && num >= 0.001 && num <= 0.300) {
+                    newMap[compound] = num;
+                  } else {
+                    return;
+                  }
+                }
+                onChange?.(Object.keys(newMap).length > 0 ? newMap : null);
+              }}
+            />
+            {overrideMap[compound] != null && (
+              <button
+                onClick={() => {
+                  const newMap = { ...overrideMap };
+                  delete newMap[compound];
+                  onChange?.(Object.keys(newMap).length > 0 ? newMap : null);
+                }}
+                className="text-[9px] text-red-400 hover:text-red-300 underline whitespace-nowrap"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {hasAnyOverride && (
+        <div className="space-y-0.5">
+          {Object.entries(overrideMap).map(([comp, val]) => (
+            <p key={comp} className="text-[9px] text-amber-400/80 flex items-center gap-1">
+              <Gauge className="h-3 w-3" />
+              Override: {comp} → {val.toFixed(3)} s/giro
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
