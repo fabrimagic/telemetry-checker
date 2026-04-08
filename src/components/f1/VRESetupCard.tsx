@@ -297,7 +297,7 @@ function CustomDegradationSection({
         Degrado personalizzato
       </label>
       <p className="text-[9px] text-muted-foreground leading-relaxed">
-        Mescole con degrado <strong className="text-red-400">INVALID</strong>. Inserisci un valore manuale (s/giro) o lascia vuoto per il fallback.
+        Mescole con degrado <strong className="text-red-400">INVALID</strong>. L'inserimento è opzionale: se lasci i campi vuoti, verranno utilizzati automaticamente i valori di fallback stimati dal sistema.
       </p>
       <div className="space-y-1.5">
         {invalidCompounds.map(compound => (
