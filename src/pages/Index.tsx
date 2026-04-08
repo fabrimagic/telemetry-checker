@@ -106,6 +106,7 @@ export default function Index() {
   const [vreScenarioDuration, setVreScenarioDuration] = useState<number | null>(null);
   const [vreCustomDeg, setVreCustomDeg] = useState<Record<string, number> | null>(null);
   const [vreAnalysisMode, setVreAnalysisMode] = useState<AnalysisMode>("RACE_ENGINEER");
+  const [vreViewMode, setVreViewMode] = useState<ViewMode>("ENGINEER");
   const vreArgsRef = useRef<{
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
