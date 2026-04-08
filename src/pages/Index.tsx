@@ -683,7 +683,7 @@ export default function Index() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
-            <h1 className="text-lg font-bold tracking-tight">StrategyLab</h1>
+            <h1 className="text-lg font-bold tracking-tight">PitWall AI</h1>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted/50">
