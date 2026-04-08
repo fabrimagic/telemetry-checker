@@ -895,10 +895,6 @@ export default function Index() {
                           result={vreResult}
                           analysisMode={vreAnalysisMode}
                           viewMode={vreViewMode}
-                          onCustomDegradationChange={(deg) => {
-                            setVreCustomDeg(deg);
-                            recomputeVre({ customDeg: deg });
-                          }}
                         />
                       ) : null}
 
