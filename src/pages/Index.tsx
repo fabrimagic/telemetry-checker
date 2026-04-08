@@ -976,8 +976,9 @@ export default function Index() {
                           </div>
                           <TelemetryCharts
                             drivers={chartDrivers}
+                            cursorTime={cursorTime}
                             onCursorChange={setCursorTime}
-                            onClickTime={setClickedTime}
+                            onCursorClick={setClickedTime}
                           />
                         </section>
 
@@ -989,24 +990,29 @@ export default function Index() {
                             />
                           )}
                           {(() => {
-                            const zones = [...driverStates.values()]
+                            const analysisDrivers = [...driverStates.values()]
                               .filter((s) => s.carData.length > 0 && s.locationData.length > 0)
-                              .map((s) => computeDriverZones(s.driver.driver_number, s.driver.name_acronym, getColor(s.driver.driver_number), s.carData, s.locationData));
-                            if (!zones.length) return null;
-                            return <DrivingAnalysis zones={zones} />;
+                              .map((s) => ({
+                                driverNumber: s.driver.driver_number,
+                                acronym: s.driver.name_acronym,
+                                color: getColor(s.driver.driver_number),
+                                carData: s.carData,
+                              }));
+                            if (!analysisDrivers.length) return null;
+                            return <DrivingAnalysis drivers={analysisDrivers} />;
                           })()}
                           {weatherData && (
                             <WeatherCard weather={weatherData} />
                           )}
                           {(() => {
                             const driversForMiniSectors = [...driverStates.values()]
-                              .filter((s) => s.locationData.length > 0 && s.selectedLap)
-                              .map((s) => ({
-                                driverNumber: s.driver.driver_number,
-                                acronym: s.driver.name_acronym,
-                                color: getColor(s.driver.driver_number),
-                                locationData: s.locationData,
-                              }));
+                              .filter((s) => s.selectedLap != null)
+                              .map((s) => {
+                                const lap = s.laps.find((l) => l.lap_number === s.selectedLap);
+                                if (!lap) return null;
+                                return { driver: s.driver, lap, color: getColor(s.driver.driver_number) };
+                              })
+                              .filter((d): d is NonNullable<typeof d> => d != null);
                             if (!driversForMiniSectors.length) return null;
                             return <SectorMiniSectors drivers={driversForMiniSectors} />;
                           })()}
