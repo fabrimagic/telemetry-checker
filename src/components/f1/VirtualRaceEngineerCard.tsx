@@ -806,12 +806,11 @@ export type { AnalysisMode } from "@/lib/virtualRaceEngineer";
 
 interface Props {
   result: VirtualRaceEngineerResult;
-  onCustomDegradationChange?: (deg: Record<string, number> | null) => void;
   analysisMode?: AnalysisMode;
   viewMode?: ViewMode;
 }
 
-export function VirtualRaceEngineerCard({ result, onCustomDegradationChange, analysisMode = "RACE_ENGINEER", viewMode = "ENGINEER" }: Props) {
+export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER", viewMode = "ENGINEER" }: Props) {
   const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
