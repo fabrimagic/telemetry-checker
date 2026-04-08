@@ -58,6 +58,8 @@ import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel, type AnalysisMode } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
+import { VRESetupCard } from "@/components/f1/VRESetupCard";
+import type { ViewMode } from "@/components/f1/VREViewModes";
 import type { RiskMode } from "@/lib/riskAppetite";
 import { computeKeyDecisionMoments, type KeyDecisionMomentsResult } from "@/lib/keyDecisionMoments";
 import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
@@ -104,6 +106,7 @@ export default function Index() {
   const [vreScenarioDuration, setVreScenarioDuration] = useState<number | null>(null);
   const [vreCustomDeg, setVreCustomDeg] = useState<Record<string, number> | null>(null);
   const [vreAnalysisMode, setVreAnalysisMode] = useState<AnalysisMode>("RACE_ENGINEER");
+  const [vreViewMode, setVreViewMode] = useState<ViewMode>("ENGINEER");
   const vreArgsRef = useRef<{
     driverNumber: number; driverAcronym: string; sessionKey: number;
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
@@ -384,7 +387,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER");
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
   }, []);
 
   // Select lap for a driver
@@ -486,7 +489,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER");
+    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -735,349 +738,351 @@ export default function Index() {
           </div>
         )}
 
-        {/* ── DASHBOARD SUMMARY (Race/Sprint only, single driver) ── */}
-        {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (() => {
-          const state = driverStates.get(selectedDriverNumbers[0]);
-          if (!state || loadingVre) return loadingVre ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
-            </div>
-          ) : null;
-          return (
-            <DashboardSummary
-              vreResult={vreResult}
-              kdmResult={kdmResult}
-              diaryEvents={diaryEvents}
-              driverHeadshotUrl={state.driver.headshot_url}
-              driverAcronym={state.driver.name_acronym}
-              driverColor={getColor(state.driver.driver_number)}
-              sessionType={sessionType}
-            />
-          );
-        })()}
+        {/* ── LAYOUT: content + VRE Setup sidebar ── */}
+        {(() => {
+          const showVreSetup = selectedDriverNumbers.length === 1
+            && (sessionType === "Race" || sessionType === "Sprint")
+            && !loadingVre && vreResult != null;
 
-        {/* ── 4-TAB LAYOUT ── */}
-        {driversLaps.length > 0 && loadingLaps.size === 0 && (
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="w-full justify-start flex-wrap">
-              <TabsTrigger value="overview" className="text-xs gap-1">
-                <Eye className="h-3.5 w-3.5" /> Panoramica
-              </TabsTrigger>
-              {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (
-                <TabsTrigger value="strategy" className="text-xs gap-1">
-                  <Target className="h-3.5 w-3.5" /> Strategia
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="tyres" className="text-xs gap-1">
-                <Gauge className="h-3.5 w-3.5" /> Gomme & Performance
-              </TabsTrigger>
-              <TabsTrigger value="deep" className="text-xs gap-1">
-                <Wrench className="h-3.5 w-3.5" /> Analisi Tecnica
-              </TabsTrigger>
-            </TabsList>
+          const recomputeVre = (overrides: {
+            riskMode?: RiskMode; scenario?: import("@/lib/scenarioContext").ScenarioId;
+            scenarioLap?: number | null; scenarioDuration?: number | null;
+            analysisMode?: AnalysisMode; customDeg?: Record<string, number> | null;
+          }) => {
+            const args = vreArgsRef.current;
+            if (!args) return;
+            const rm = overrides.riskMode ?? vreRiskMode;
+            const sc = overrides.scenario ?? vreScenario;
+            const sl = overrides.scenarioLap !== undefined ? overrides.scenarioLap : vreScenarioLap;
+            const sd = overrides.scenarioDuration !== undefined ? overrides.scenarioDuration : vreScenarioDuration;
+            const am = overrides.analysisMode ?? vreAnalysisMode;
+            const cd = overrides.customDeg !== undefined ? overrides.customDeg : vreCustomDeg;
+            const newVre = computeVirtualRaceEngineer(
+              args.driverNumber, args.driverAcronym, args.sessionKey,
+              args.laps, args.stints, args.pits,
+              args.weather, args.raceControl,
+              args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
+              args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
+            );
+            setVreResult(newVre);
+            if (newVre) {
+              try {
+                const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
+                const trackStatusMapForKdm = classifyLapsTrackStatus(args.laps, args.raceControl);
+                const driverCumDevForKdm = args.cumDevResult?.drivers.find(d => d.driver_number === args.driverNumber) ?? null;
+                const kdm = computeKeyDecisionMoments({
+                  laps: args.laps, stints: args.stints, pitStops: args.pits,
+                  weatherMap: weatherMapForKdm, trackStatusMap: trackStatusMapForKdm,
+                  trafficAnalysis: newVre.traffic_analysis, paceLossResults: newVre.pace_loss_results,
+                  degradationValidations: newVre.degradation_validations, diaryEvents: args.diaryEvents,
+                  driverCumDev: driverCumDevForKdm, positions: args.positions, intervals: args.intervals,
+                  driverNumber: args.driverNumber, driverAcronym: args.driverAcronym,
+                  sessionKey: args.sessionKey, totalLaps: Math.max(...args.laps.map(l => l.lap_number)),
+                  softSensorsTimeline: newVre.soft_sensors_timeline,
+                });
+                setKdmResult(kdm);
+              } catch { setKdmResult(null); }
+            }
+          };
 
-            {/* ═══ TAB A: PANORAMICA ═══ */}
-            <TabsContent value="overview" className="mt-4 space-y-4">
-              {/* Summary cards */}
-              {(stintsData.length > 0 || pitStopsData.length > 0 || overtakesData.length > 0 || (sessionWeather.length > 0 && selectedDriverNumbers.length === 1)) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {stintsData.length > 0 && <StintsCard stints={stintsData} />}
-                  {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
-                    <PitStopsCard pitStops={pitStopsData} allDrivers={allDrivers} multiDriver={selectedDriverNumbers.length > 1} />
-                  )}
-                  {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
-                    <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
-                  )}
-                  {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
-                    <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
-                  )}
-                </div>
-              )}
-
-              {/* Lap Times Chart */}
-              <LapTimesChart
-                drivers={driversLaps.map((dl) => ({
-                  driverNumber: dl.driver.driver_number,
-                  acronym: dl.driver.name_acronym,
-                  color: getColor(dl.driver.driver_number),
-                  laps: dl.laps,
-                  stints: dl.stints,
-                }))}
-                sessionWeather={sessionWeather}
-                raceControlMessages={raceControlMessages}
-                selectedLaps={driversLaps.map((dl) => ({
-                  driverNumber: dl.driver.driver_number,
-                  lapNumber: dl.selectedLap,
-                }))}
-                onSelectLap={handleSelectLap}
-              />
-
-              {/* Race Diary */}
-              {selectedDriverNumbers.length === 1 &&
-                (sessionType === "Race" || sessionType === "Sprint") && (() => {
-                  const state = driverStates.get(selectedDriverNumbers[0]);
-                  if (!state) return null;
-                  return loadingDiary ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
-                    </div>
-                  ) : (
-                    <RaceDiaryCard
-                      events={diaryEvents}
-                      driverAcronym={state.driver.name_acronym}
-                      driverColor={getColor(state.driver.driver_number)}
-                    />
-                  );
-                })()}
-            </TabsContent>
-
-            {/* ═══ TAB B: STRATEGIA (Race/Sprint only) ═══ */}
-            {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (
-              <TabsContent value="strategy" className="mt-4 space-y-4">
-                {loadingVre ? (
+          const mainContent = (
+            <>
+              {/* ── DASHBOARD SUMMARY (Race/Sprint only, single driver) ── */}
+              {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (() => {
+                const state = driverStates.get(selectedDriverNumbers[0]);
+                if (!state || loadingVre) return loadingVre ? (
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                   </div>
-                ) : vreResult ? (
-                  <VirtualRaceEngineerCard result={vreResult} scenarioActivationLap={vreScenarioLap} scenarioDurationLaps={vreScenarioDuration} analysisMode={vreAnalysisMode} onAnalysisModeChange={(mode) => {
-                    setVreAnalysisMode(mode);
-                    const effectiveScenario = mode === "RACE_ENGINEER" ? "REAL_CONTEXT" as const : vreScenario;
-                    const effectiveLap = mode === "RACE_ENGINEER" ? null : vreScenarioLap;
-                    const effectiveDuration = mode === "RACE_ENGINEER" ? null : vreScenarioDuration;
-                    if (mode === "RACE_ENGINEER") {
-                      setVreScenario("REAL_CONTEXT");
-                      setVreScenarioLap(null);
-                      setVreScenarioDuration(null);
-                    }
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, effectiveScenario, effectiveLap, effectiveDuration, vreCustomDeg,
-                        mode,
-                      );
-                      setVreResult(newVre);
-                      // Recompute KDM
-                      if (newVre) {
-                        try {
-                          const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
-                          const trackStatusMapForKdm = classifyLapsTrackStatus(args.laps, args.raceControl);
-                          const driverCumDevForKdm = args.cumDevResult?.drivers.find(d => d.driver_number === args.driverNumber) ?? null;
-                          const kdm = computeKeyDecisionMoments({
-                            laps: args.laps, stints: args.stints, pitStops: args.pits,
-                            weatherMap: weatherMapForKdm, trackStatusMap: trackStatusMapForKdm,
-                            trafficAnalysis: newVre.traffic_analysis, paceLossResults: newVre.pace_loss_results,
-                            degradationValidations: newVre.degradation_validations, diaryEvents: args.diaryEvents,
-                            driverCumDev: driverCumDevForKdm, positions: args.positions, intervals: args.intervals,
-                            driverNumber: args.driverNumber, driverAcronym: args.driverAcronym,
-                            sessionKey: args.sessionKey, totalLaps: Math.max(...args.laps.map(l => l.lap_number)),
-                            softSensorsTimeline: newVre.soft_sensors_timeline,
-                          });
-                          setKdmResult(kdm);
-                        } catch { setKdmResult(null); }
-                      }
-                    }
-                  }} onRiskModeChange={(mode) => {
-                    setVreRiskMode(mode);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, mode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onScenarioChange={(scenario) => {
-                    setVreScenario(scenario);
-                    const isReal = scenario === "REAL_CONTEXT";
-                    if (isReal) { setVreScenarioLap(null); setVreScenarioDuration(null); }
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, scenario, isReal ? null : vreScenarioLap, isReal ? null : vreScenarioDuration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onScenarioActivationLapChange={(lap) => {
-                    setVreScenarioLap(lap);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, lap, vreScenarioDuration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onScenarioDurationChange={(duration) => {
-                    setVreScenarioDuration(duration);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, duration, vreCustomDeg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} onCustomDegradationChange={(deg) => {
-                    setVreCustomDeg(deg);
-                    const args = vreArgsRef.current;
-                    if (args) {
-                      const newVre = computeVirtualRaceEngineer(
-                        args.driverNumber, args.driverAcronym, args.sessionKey,
-                        args.laps, args.stints, args.pits,
-                        args.weather, args.raceControl,
-                        args.intervals, args.positions, args.allDrivers, args.practiceModels, vreRiskMode,
-                        args.diaryEvents, args.cumDevResult, vreScenario, vreScenarioLap, vreScenarioDuration, deg,
-                        vreAnalysisMode,
-                      );
-                      setVreResult(newVre);
-                    }
-                  }} />
-                ) : null}
+                ) : null;
+                return (
+                  <DashboardSummary
+                    vreResult={vreResult}
+                    kdmResult={kdmResult}
+                    diaryEvents={diaryEvents}
+                    driverHeadshotUrl={state.driver.headshot_url}
+                    driverAcronym={state.driver.name_acronym}
+                    driverColor={getColor(state.driver.driver_number)}
+                    sessionType={sessionType}
+                  />
+                );
+              })()}
 
-                {/* Key Decision Moments */}
-                {kdmResult && kdmResult.decision_points.length > 0 && (
-                  <KeyDecisionMomentsCard result={kdmResult} />
-                )}
-              </TabsContent>
-            )}
-
-            {/* ═══ TAB C: GOMME & PERFORMANCE ═══ */}
-            <TabsContent value="tyres" className="mt-4 space-y-4">
-              {/* Tyre Degradation */}
-              {degradationResults.length > 0 ? (
-                <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
-              ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
-                <div className="bg-card rounded-lg border border-border p-4">
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <TrendingDown className="h-3.5 w-3.5" />
-                    Degrado Gomme
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Dati insufficienti per calcolare il degrado. Non sono state rilevate simulazioni passo gara (long run) con giri validi sufficienti.
-                  </p>
-                  <details className="group">
-                    <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                      <Info className="h-3.5 w-3.5 shrink-0" />
-                      <span className="font-medium text-foreground/80">Come funziona il rilevamento Long Run</span>
-                      <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
-                    </summary>
-                    <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
-                      <ul className="space-y-1.5 pl-5 list-disc">
-                        <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint.</li>
-                        <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri anomali.</li>
-                        <li><span className="font-mono font-bold text-foreground/80">Score</span> — Basato su lunghezza, regolarità, trend di degrado.</li>
-                        <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile • 40–59: possibile • &lt;40: non long run.</li>
-                      </ul>
-                    </div>
-                  </details>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ═══ TAB D: ANALISI TECNICA ═══ */}
-            <TabsContent value="deep" className="mt-4 space-y-4">
-              {/* Lap Table */}
-              <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
-
-              {/* Telemetry load button */}
-              {hasLapsSelected && (
-                <Button
-                  onClick={handleLoadTelemetry}
-                  disabled={loadingTelemetry}
-                  className="gap-2"
-                >
-                  {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  Carica Telemetria
-                </Button>
-              )}
-
-              {loadingTelemetry && (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Caricamento telemetria…
-                </div>
-              )}
-
-              {chartDrivers.length > 0 && !loadingTelemetry && (
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-                  <section className="bg-card rounded-lg border border-border p-4 overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telemetria</h3>
-                      <div className="flex gap-3">
-                        {chartDrivers.map((d) => (
-                          <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `#${d.color}` }} />
-                            <span className="font-mono font-bold">{d.acronym}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <TelemetryCharts
-                      drivers={chartDrivers}
-                      cursorTime={clickedTime ?? cursorTime}
-                      onCursorChange={setCursorTime}
-                      onCursorClick={setClickedTime}
-                    />
-                    <SectorMiniSectors
-                      drivers={[...driverStates.values()]
-                        .filter((s) => s.selectedLap != null && s.carData.length > 0)
-                        .map((s) => {
-                          const lap = s.laps.find((l) => l.lap_number === s.selectedLap)!;
-                          return {
-                            driver: s.driver,
-                            lap,
-                            color: getColor(s.driver.driver_number),
-                          };
-                        })}
-                    />
-                    <DrivingAnalysis
-                      drivers={[...driverStates.values()]
-                        .filter((s) => s.carData.length > 0)
-                        .map((s) => ({
-                          driverNumber: s.driver.driver_number,
-                          acronym: s.driver.name_acronym,
-                          color: getColor(s.driver.driver_number),
-                          carData: s.carData,
-                        }))}
-                    />
-                  </section>
-                  <div className="space-y-6">
-                    <TrackMap
-                      drivers={mapDrivers}
-                      activeDate={activeDate}
-                      driverZones={[...driverStates.values()]
-                        .filter((s) => s.carData.length > 0)
-                        .map((s) => computeDriverZones(s.carData, s.driver.driver_number, getColor(s.driver.driver_number)))}
-                    />
-                    {weatherData && selectedDriverNumbers.length === 1 && (
-                      <WeatherCard weather={weatherData} />
+              {/* ── 4-TAB LAYOUT ── */}
+              {driversLaps.length > 0 && loadingLaps.size === 0 && (
+                <Tabs defaultValue="overview" className="w-full">
+                  <TabsList className="w-full justify-start flex-wrap">
+                    <TabsTrigger value="overview" className="text-xs gap-1">
+                      <Eye className="h-3.5 w-3.5" /> Panoramica
+                    </TabsTrigger>
+                    {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (
+                      <TabsTrigger value="strategy" className="text-xs gap-1">
+                        <Target className="h-3.5 w-3.5" /> Strategia
+                      </TabsTrigger>
                     )}
-                  </div>
-                </div>
+                    <TabsTrigger value="tyres" className="text-xs gap-1">
+                      <Gauge className="h-3.5 w-3.5" /> Gomme & Performance
+                    </TabsTrigger>
+                    <TabsTrigger value="deep" className="text-xs gap-1">
+                      <Wrench className="h-3.5 w-3.5" /> Analisi Tecnica
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* ═══ TAB A: PANORAMICA ═══ */}
+                  <TabsContent value="overview" className="mt-4 space-y-4">
+                    {/* Summary cards */}
+                    {(stintsData.length > 0 || pitStopsData.length > 0 || overtakesData.length > 0 || (sessionWeather.length > 0 && selectedDriverNumbers.length === 1)) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {stintsData.length > 0 && <StintsCard stints={stintsData} />}
+                        {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
+                          <PitStopsCard pitStops={pitStopsData} allDrivers={allDrivers} multiDriver={selectedDriverNumbers.length > 1} />
+                        )}
+                        {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                          <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+                        )}
+                        {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
+                          <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Lap Times Chart */}
+                    <LapTimesChart
+                      drivers={driversLaps.map((dl) => ({
+                        driverNumber: dl.driver.driver_number,
+                        acronym: dl.driver.name_acronym,
+                        color: getColor(dl.driver.driver_number),
+                        laps: dl.laps,
+                        stints: dl.stints,
+                      }))}
+                      sessionWeather={sessionWeather}
+                      raceControlMessages={raceControlMessages}
+                      selectedLaps={driversLaps.map((dl) => ({
+                        driverNumber: dl.driver.driver_number,
+                        lapNumber: dl.selectedLap,
+                      }))}
+                      onSelectLap={handleSelectLap}
+                    />
+
+                    {/* Race Diary */}
+                    {selectedDriverNumbers.length === 1 &&
+                      (sessionType === "Race" || sessionType === "Sprint") && (() => {
+                        const state = driverStates.get(selectedDriverNumbers[0]);
+                        if (!state) return null;
+                        return loadingDiary ? (
+                          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
+                          </div>
+                        ) : (
+                          <RaceDiaryCard
+                            events={diaryEvents}
+                            driverAcronym={state.driver.name_acronym}
+                            driverColor={getColor(state.driver.driver_number)}
+                          />
+                        );
+                      })()}
+                  </TabsContent>
+
+                  {/* ═══ TAB B: STRATEGIA (Race/Sprint only) ═══ */}
+                  {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (
+                    <TabsContent value="strategy" className="mt-4 space-y-4">
+                      {loadingVre ? (
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+                        </div>
+                      ) : vreResult ? (
+                        <VirtualRaceEngineerCard
+                          result={vreResult}
+                          analysisMode={vreAnalysisMode}
+                          viewMode={vreViewMode}
+                          onCustomDegradationChange={(deg) => {
+                            setVreCustomDeg(deg);
+                            recomputeVre({ customDeg: deg });
+                          }}
+                        />
+                      ) : null}
+
+                      {/* Key Decision Moments */}
+                      {kdmResult && kdmResult.decision_points.length > 0 && (
+                        <KeyDecisionMomentsCard result={kdmResult} />
+                      )}
+                    </TabsContent>
+                  )}
+
+                  {/* ═══ TAB C: GOMME & PERFORMANCE ═══ */}
+                  <TabsContent value="tyres" className="mt-4 space-y-4">
+                    {/* Tyre Degradation */}
+                    {degradationResults.length > 0 ? (
+                      <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
+                    ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
+                      <div className="bg-card rounded-lg border border-border p-4">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <TrendingDown className="h-3.5 w-3.5" />
+                          Degrado Gomme
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Dati insufficienti per calcolare il degrado. Non sono state rilevate simulazioni passo gara (long run) con giri validi sufficienti.
+                        </p>
+                        <details className="group">
+                          <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            <Info className="h-3.5 w-3.5 shrink-0" />
+                            <span className="font-medium text-foreground/80">Come funziona il rilevamento Long Run</span>
+                            <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
+                          </summary>
+                          <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
+                            <ul className="space-y-1.5 pl-5 list-disc">
+                              <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri anomali.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Basato su lunghezza, regolarità, trend di degrado.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile • 40–59: possibile • &lt;40: non long run.</li>
+                            </ul>
+                          </div>
+                        </details>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* ═══ TAB D: ANALISI TECNICA ═══ */}
+                  <TabsContent value="deep" className="mt-4 space-y-4">
+                    {/* Lap Table */}
+                    <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
+
+                    {/* Telemetry load button */}
+                    {hasLapsSelected && (
+                      <Button
+                        onClick={handleLoadTelemetry}
+                        disabled={loadingTelemetry}
+                        className="gap-2"
+                      >
+                        {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        Carica Telemetria
+                      </Button>
+                    )}
+
+                    {loadingTelemetry && (
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Caricamento telemetria…
+                      </div>
+                    )}
+
+                    {chartDrivers.length > 0 && !loadingTelemetry && (
+                      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+                        <section className="bg-card rounded-lg border border-border p-4 overflow-hidden">
+                          <div className="flex items-center gap-3 mb-2">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                              Telemetria
+                            </h2>
+                          </div>
+                          <TelemetryCharts
+                            drivers={chartDrivers}
+                            onCursorChange={setCursorTime}
+                            onClickTime={setClickedTime}
+                          />
+                        </section>
+
+                        <aside className="space-y-4">
+                          {mapDrivers.length > 0 && (
+                            <TrackMap
+                              drivers={mapDrivers}
+                              activeDate={activeDate}
+                            />
+                          )}
+                          {(() => {
+                            const zones = [...driverStates.values()]
+                              .filter((s) => s.carData.length > 0 && s.locationData.length > 0)
+                              .map((s) => computeDriverZones(s.driver.driver_number, s.driver.name_acronym, getColor(s.driver.driver_number), s.carData, s.locationData));
+                            if (!zones.length) return null;
+                            return <DrivingAnalysis zones={zones} />;
+                          })()}
+                          {weatherData && (
+                            <WeatherCard weather={weatherData} />
+                          )}
+                          {(() => {
+                            const driversForMiniSectors = [...driverStates.values()]
+                              .filter((s) => s.locationData.length > 0 && s.selectedLap)
+                              .map((s) => ({
+                                driverNumber: s.driver.driver_number,
+                                acronym: s.driver.name_acronym,
+                                color: getColor(s.driver.driver_number),
+                                locationData: s.locationData,
+                              }));
+                            if (!driversForMiniSectors.length) return null;
+                            return <SectorMiniSectors drivers={driversForMiniSectors} />;
+                          })()}
+                        </aside>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               )}
-            </TabsContent>
-          </Tabs>
-        )}
+            </>
+          );
+
+          if (showVreSetup) {
+            return (
+              <div className="flex gap-6 items-start">
+                <div className="flex-1 min-w-0 space-y-5">
+                  {mainContent}
+                </div>
+                <div className="w-[280px] shrink-0 sticky top-6 hidden lg:block">
+                  <VRESetupCard
+                    analysisMode={vreAnalysisMode}
+                    onAnalysisModeChange={(mode) => {
+                      setVreAnalysisMode(mode);
+                      if (mode === "RACE_ENGINEER") {
+                        setVreScenario("REAL_CONTEXT");
+                        setVreScenarioLap(null);
+                        setVreScenarioDuration(null);
+                      }
+                      recomputeVre({
+                        analysisMode: mode,
+                        scenario: mode === "RACE_ENGINEER" ? "REAL_CONTEXT" : undefined,
+                        scenarioLap: mode === "RACE_ENGINEER" ? null : undefined,
+                        scenarioDuration: mode === "RACE_ENGINEER" ? null : undefined,
+                      });
+                    }}
+                    viewMode={vreViewMode}
+                    onViewModeChange={setVreViewMode}
+                    riskMode={vreRiskMode}
+                    onRiskModeChange={(mode) => {
+                      setVreRiskMode(mode);
+                      recomputeVre({ riskMode: mode });
+                    }}
+                    scenarioId={vreScenario}
+                    onScenarioChange={(scenario) => {
+                      setVreScenario(scenario);
+                      const isReal = scenario === "REAL_CONTEXT";
+                      if (isReal) { setVreScenarioLap(null); setVreScenarioDuration(null); }
+                      recomputeVre({
+                        scenario,
+                        scenarioLap: isReal ? null : undefined,
+                        scenarioDuration: isReal ? null : undefined,
+                      });
+                    }}
+                    scenarioActivationLap={vreScenarioLap}
+                    onScenarioActivationLapChange={(lap) => {
+                      setVreScenarioLap(lap);
+                      recomputeVre({ scenarioLap: lap });
+                    }}
+                    scenarioDurationLaps={vreScenarioDuration}
+                    onScenarioDurationChange={(duration) => {
+                      setVreScenarioDuration(duration);
+                      recomputeVre({ scenarioDuration: duration });
+                    }}
+                    scenarioDescription={vreResult?.scenario_description}
+                    scenarioIsSimulated={vreResult?.scenario_is_simulated}
+                    scenarioWindow={vreResult?.scenario_window}
+                    scenarioActivationWarning={vreResult?.scenario_activation_warning}
+                    maxLap={vreResult?.actual_strategy?.stints?.length ? Math.max(...vreResult.actual_strategy.stints.map(s => s.lap_end)) : 99}
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          return <div className="space-y-5">{mainContent}</div>;
+        })()}
             </TabsContent>
           </Tabs>
         )}
