@@ -1078,7 +1078,8 @@ export default function Index() {
                       setVreCustomDeg(deg);
                       recomputeVre({ customDeg: deg });
                     }}
-            );
+                  />
+                );
 
             return (
               <>
