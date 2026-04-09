@@ -1022,12 +1022,7 @@ export default function Index() {
           );
 
           if (showVreSetup) {
-            return (
-              <div className="flex gap-6 items-start">
-                <div className="flex-1 min-w-0 space-y-5">
-                  {mainContent}
-                </div>
-                <div className="w-[280px] shrink-0 sticky top-6 hidden lg:block">
+            const setupCard = (
                   <VRESetupCard
                     analysisMode={vreAnalysisMode}
                     onAnalysisModeChange={(mode) => {
@@ -1084,8 +1079,20 @@ export default function Index() {
                       recomputeVre({ customDeg: deg });
                     }}
                   />
+                );
+
+            return (
+              <>
+                <div className="lg:hidden mb-5">{setupCard}</div>
+                <div className="flex gap-6 items-start">
+                  <div className="flex-1 min-w-0 space-y-5">
+                    {mainContent}
+                  </div>
+                  <div className="w-[280px] shrink-0 sticky top-6 hidden lg:block">
+                    {setupCard}
+                  </div>
                 </div>
-              </div>
+              </>
             );
           }
 
