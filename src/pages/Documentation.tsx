@@ -135,15 +135,15 @@ export default function Documentation() {
               <TocLink href="#getting-started">Come iniziare</TocLink>
               <TocLink href="#data-source">Fonte Dati — OpenF1 API</TocLink>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-3">Visualizzazione dati</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Visualizzazione dati</p>
               <TocLink href="#lap-times-chart">Grafico Tempi al Giro</TocLink>
               <TocLink href="#telemetry">Telemetria e Track Map</TocLink>
               <TocLink href="#sectors">Settori e Mini-Settori</TocLink>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-3">Report sessione</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Report sessione</p>
               <TocLink href="#session-report">Session Report</TocLink>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-3">Analisi pilota</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Analisi pilota</p>
               <TocLink href="#weather-card">Meteo</TocLink>
               <TocLink href="#pit-stops">Pit Stop</TocLink>
               <TocLink href="#stints">Stint</TocLink>
@@ -155,7 +155,7 @@ export default function Documentation() {
               <TocLink href="#soft-sensors">Soft Sensors</TocLink>
             </div>
             <div className="space-y-1">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-2">Virtual Race Engineer</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-2 mb-2 pb-1.5 border-b border-border/60">Virtual Race Engineer</p>
               <TocLink href="#vre-overview">Panoramica VRE</TocLink>
               <TocLink href="#vre-analysis-modes">Modalità di Analisi (Race Engineer / Post-Race)</TocLink>
               <TocLink href="#vre-ui">Interfaccia a 4 Sezioni</TocLink>
@@ -168,7 +168,7 @@ export default function Documentation() {
               <TocLink href="#vre-context">Contesto Integrato</TocLink>
               <TocLink href="#vre-delta-convention">Convenzione Delta</TocLink>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-3">Modelli di calcolo</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Modelli di calcolo</p>
               <TocLink href="#tyre-degradation">Degrado Gomme (Modello)</TocLink>
               <TocLink href="#corrected-degradation">Degrado Corretto (Two-Stage)</TocLink>
               <TocLink href="#degradation-validation">Validazione Degrado</TocLink>
@@ -182,7 +182,7 @@ export default function Documentation() {
               <TocLink href="#long-run">Long Run Detector</TocLink>
               <TocLink href="#scenario-engine">Scenario Engine</TocLink>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 mt-3">Principi</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Principi</p>
               <TocLink href="#anti-hallucination">Anti-Allucinazione</TocLink>
             </div>
           </div>
