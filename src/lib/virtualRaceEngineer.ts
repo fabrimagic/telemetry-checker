@@ -1018,7 +1018,8 @@ export function computeVirtualRaceEngineer(
     return validLaps.reduce((s, l) => s + l.lap_duration!, 0) / validLaps.length;
   })();
 
-  for (const alt of alternatives) {
+  for (let altIdx = 0; altIdx < alternatives.length; altIdx++) {
+    const alt = alternatives[altIdx];
     const altTraffic = alt.traffic_predictions ?? [];
     alt.analysis = enrichStrategyAnalysis(
       alt.pit_laps, alt.compounds, alt.estimated_delta_vs_actual,
