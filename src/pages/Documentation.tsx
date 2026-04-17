@@ -153,6 +153,11 @@ export default function Documentation() {
               <TocLink href="#tyre-degradation-card">Degrado Gomme (Card)</TocLink>
               <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
               <TocLink href="#soft-sensors">Soft Sensors</TocLink>
+
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Confronto piloti</p>
+              <TocLink href="#head-to-head-overview">Head-to-Head — Panoramica</TocLink>
+              <TocLink href="#head-to-head-ui">Head-to-Head — Interfaccia</TocLink>
+              <TocLink href="#head-to-head-engine">Head-to-Head — Motore di Confronto</TocLink>
             </div>
             <div className="space-y-1">
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-2 mb-2 pb-1.5 border-b border-border/60">Virtual Race Engineer</p>
@@ -426,6 +431,130 @@ export default function Documentation() {
           <p className="text-xs italic">
             Per il dettaglio del modello matematico, vedi le sezioni "Degrado Gomme — Modello" e "Validazione Degrado" più avanti.
           </p>
+        </DocSection>
+
+        {/* ═══════════════════════════════════════════════════════ */}
+        <SectionDivider title="Virtual Race Engineer" />
+        {/* ═══════════════════════════════════════════════════════ */}
+
+        {/* ═══════════════════════════════════════════════════════ */}
+        <SectionDivider title="Confronto piloti (Head-to-Head)" />
+        {/* ═══════════════════════════════════════════════════════ */}
+
+        <DocSection id="head-to-head-overview" title="Head-to-Head — Panoramica" icon={<Users className="h-4 w-4" />}>
+          <p>
+            La modalità <strong className="text-foreground">Head-to-Head</strong> permette di confrontare due piloti
+            della stessa sessione affiancando le loro analisi del Virtual Race Engineer, lo stint-by-stint, il pace
+            lap-by-lap e le decisioni strategiche.
+          </p>
+          <h4 className="font-semibold text-foreground mt-4">Come accedere</h4>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Nella pagina principale, seleziona <strong className="text-foreground">esattamente due piloti</strong> di una stessa sessione Race o Sprint.</li>
+            <li>Apparirà un pulsante <strong className="text-foreground">"Confronta head-to-head"</strong> che apre la pagina dedicata.</li>
+            <li>La selezione viene salvata nell'URL (parametri <code className="text-primary">session</code>, <code className="text-primary">driverA</code>, <code className="text-primary">driverB</code>) per condivisione e bookmark.</li>
+          </ol>
+          <h4 className="font-semibold text-foreground mt-4">Principio chiave</h4>
+          <p>
+            Il confronto <strong className="text-foreground">non duplica</strong> alcuna logica analitica: esegue il
+            VRE due volte, una per pilota, sugli stessi parametri di sessione, e applica una funzione pura di confronto
+            ai due risultati. Le metriche mostrate sono quindi <em>esattamente</em> quelle del VRE singolo pilota,
+            affiancate per garantire coerenza e ripetibilità.
+          </p>
+          <h4 className="font-semibold text-foreground mt-4">Caricamento e robustezza</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>I due piloti vengono caricati <strong className="text-foreground">in parallelo</strong>, il rate limiter del client gestisce automaticamente l'ordine delle richieste verso OpenF1.</li>
+            <li>Se l'analisi di uno dei due piloti fallisce, viene mostrato il pannello valido + un messaggio chiaro sull'altro, senza far crashare la pagina.</li>
+            <li>Se le due sessioni non coincidono (caso impossibile da UI ma protetto a livello di motore), viene sollevato un errore esplicito.</li>
+          </ul>
+        </DocSection>
+
+        <DocSection id="head-to-head-ui" title="Head-to-Head — Interfaccia" icon={<LayoutDashboard className="h-4 w-4" />}>
+          <p>L'interfaccia è organizzata in <strong className="text-foreground">quattro zone verticali</strong> (su desktop ≥1024px alcune si affiancano):</p>
+
+          <h4 className="font-semibold text-foreground mt-4">Zona 1 — Header comparativo</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Due card pilota affiancate con casco/colore team, acronimo, numero, team, posizione finale e gap dal leader.</li>
+            <li>Badge centrale <strong className="text-foreground">"vs"</strong> e badge <strong className="text-foreground">verdetto</strong> con il pilota più veloce e il delta totale in secondi.</li>
+            <li>Toggle <em>Swap sides</em> per invertire driver A e driver B.</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Zona 2 — Timeline strategica unificata</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Asse X: giri da 1 al totale.</li>
+            <li>Due righe parallele (una per pilota) con segmenti colorati per mescola (Soft rossa, Medium gialla, Hard bianca, Inter verde, Wet blu — convenzioni Pirelli).</li>
+            <li>Tick rossi sui pit stop e badge SC/VSC/RED sulle celle pertinenti.</li>
+            <li>Sotto: grafico a barre del <strong className="text-foreground">delta cumulativo</strong> (A − B): rosso = A più lento, verde = A più veloce, zero-line evidenziata.</li>
+            <li>Markers con icona sui <em>strategic divergence points</em> (tooltip con descrizione).</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Zona 3 — Metriche a confronto</h4>
+          <p>Griglia a due colonne, ogni metrica è una riga con <em>label · valore A · valore B · highlight</em> verde sul migliore. Metriche incluse:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Tempo totale di gara</li>
+            <li>Deviazione cumulativa finale (dal benchmark vincitore)</li>
+            <li>Numero di pit stop</li>
+            <li>Sequenza mescole</li>
+            <li>Risk mode suggerito</li>
+            <li>Confidenza dell'analisi</li>
+            <li>Eventi battaglia (count)</li>
+            <li>Giri trascorsi in neutralizzazione</li>
+            <li>Best lap time</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Zona 4 — Narrativa a due colonne</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Top insight narrativi del pilota A (sinistra) e del pilota B (destra), filtrati per rilevanza.</li>
+            <li>Una banda superiore <strong className="text-foreground">"Contesto condiviso"</strong> raggruppa i fatti comuni (Safety Car, pioggia, bandiera rossa) per evitare duplicazioni.</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Comportamento responsive</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Su mobile: priorità verticale, Zona 2 con scroll orizzontale, Zona 3 collassabile.</li>
+            <li>I colori del team di ciascun pilota sono usati come <em>accent</em> ovunque (bordi card, serie del grafico) per distinguere visivamente A e B.</li>
+            <li>Quando i due piloti appartengono allo stesso team, il colore del secondo viene schiarito automaticamente per garantire la leggibilità.</li>
+          </ul>
+        </DocSection>
+
+        <DocSection id="head-to-head-engine" title="Head-to-Head — Motore di Confronto" icon={<Scale className="h-4 w-4" />}>
+          <p>
+            Il motore di confronto è una funzione pura, deterministica: prende i due risultati VRE e i giri allineati
+            e produce un singolo oggetto risultato. <strong className="text-foreground">Non inventa metriche</strong>:
+            ogni campo deriva esclusivamente dagli input, e quando un dato manca (es. posizioni per il rilevamento
+            sorpassi) la sezione corrispondente viene semplicemente omessa anziché stimata.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Output del confronto</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">lap_by_lap_delta</strong> — Per ogni giro, delta A−B (positivo = A più lento) e delta cumulativo. Null se uno dei due giri non è valido (in/out lap, durata mancante).</li>
+            <li><strong className="text-foreground">stint_alignment</strong> — La gara è segmentata sull'unione dei breakpoint di pit di entrambi i piloti; ogni segmento riporta stint e mescola di A e di B.</li>
+            <li><strong className="text-foreground">strategic_divergence_points</strong> — Eventi di divergenza: <code className="text-primary">PIT_A_ONLY</code>, <code className="text-primary">PIT_B_ONLY</code>, <code className="text-primary">COMPOUND_DIVERGENCE</code> e (se le posizioni sono disponibili) <code className="text-primary">POSITION_SWAP</code>.</li>
+            <li><strong className="text-foreground">head_to_head_verdict</strong> — Pilota più veloce (A / B / TIE), delta totale in secondi e fino a 5 fattori chiave narrativi.</li>
+            <li><strong className="text-foreground">common_confidence</strong> — La confidenza minima fra le due analisi VRE: il confronto non è mai più affidabile del meno affidabile dei due.</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Criterio del verdetto</h4>
+          <Formula>
+            faster = TIE se |Σ delta valido| ≤ 0.5s · altrimenti A se Σ &lt; 0, B se Σ &gt; 0
+          </Formula>
+          <p className="text-xs italic">
+            La soglia di 0.5s evita di dichiarare un vincitore su differenze inferiori al rumore tipico di
+            cronometraggio + variazioni di pista.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Filtro giri comparabili</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Il giro deve avere <code className="text-primary">lap_duration</code> valida (&gt; 0).</li>
+            <li>Esclusi i pit-out lap (out-lap dopo un pit stop).</li>
+            <li>Non vengono applicati filtri meteo o track-status: il delta stesso assorbe naturalmente le neutralizzazioni condivise.</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-4">Edge case gestiti</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">DNF</strong>: i giri mancanti del pilota ritirato producono delta <code className="text-primary">null</code>; il delta cumulativo si congela all'ultimo valore valido.</li>
+            <li><strong className="text-foreground">Stint analyses incompleti</strong>: l'allineamento usa solo i breakpoint disponibili.</li>
+            <li><strong className="text-foreground">Session key mismatch</strong>: errore esplicito (caso impossibile dall'UI ma protetto a livello di motore).</li>
+            <li><strong className="text-foreground">Posizioni assenti</strong>: <code className="text-primary">POSITION_SWAP</code> viene omesso senza errori.</li>
+          </ul>
         </DocSection>
 
         {/* ═══════════════════════════════════════════════════════ */}
