@@ -253,7 +253,7 @@ export function CompareAlternativeStrategies({ comparison, driverA, driverB }: P
           <div>
             <CardTitle className="text-base">Strategia reale vs alternativa</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              L'alternativa è ricalcolata in modalità <span className="font-mono text-foreground">POST_RACE · BALANCED</span> usando gli stessi dati di gara.
+              L'alternativa è ricalcolata in modalità <span className="font-mono text-foreground">EX_ANTE · BALANCED</span> usando gli stessi dati di gara.
             </p>
           </div>
           <Badge variant="outline" className="text-[9px] font-mono uppercase shrink-0">
