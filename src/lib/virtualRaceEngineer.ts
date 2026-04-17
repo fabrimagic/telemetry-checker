@@ -872,15 +872,12 @@ export function computeVirtualRaceEngineer(
       }, "CLEAN" as TrafficLevel);
       if (worstTraffic === "HEAVY") {
         const text = `Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`;
-        alt.cons.push(text);
         narrativeCollector.add({ id: `traffic_heavy_alt${altIdx}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { traffic_loss: trafficLoss, level: "HEAVY" }, prerendered_text: text });
       } else if (worstTraffic === "LIGHT") {
         const text = `Rientro in traffico leggero (−${trafficLoss.toFixed(1)}s stimati)`;
-        alt.cons.push(text);
         narrativeCollector.add({ id: `traffic_light_alt${altIdx}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { traffic_loss: trafficLoss, level: "LIGHT" }, prerendered_text: text });
       } else if (worstTraffic === "CLEAN") {
         const text = "Rientro in aria pulita";
-        alt.pros.push(text);
         narrativeCollector.add({ id: `traffic_clean_alt${altIdx}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { level: "CLEAN" }, prerendered_text: text });
       }
 
@@ -889,14 +886,12 @@ export function computeVirtualRaceEngineer(
         // Release classification (CLEAN / TRAFFIC / PACK)
         if (tp.release_classification === "PACK") {
           const text = `Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti, ${tp.pack_size_behind ?? "?"} dietro)`;
-          alt.cons.push(text);
           narrativeCollector.add({ id: `traffic_pack_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, pack_size_ahead: tp.pack_size_ahead, pack_size_behind: tp.pack_size_behind, release_classification: "PACK" }, prerendered_text: text });
           break;
         }
         if (tp.release_classification === "TRAFFIC") {
           if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
             const text = `Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`;
-            alt.cons.push(text);
             narrativeCollector.add({ id: `traffic_release_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, release_quality: tp.release_quality, compressed_train_risk: tp.compressed_train_risk }, prerendered_text: text });
             break;
           }
@@ -905,14 +900,12 @@ export function computeVirtualRaceEngineer(
         const persistLaps = tp.traffic_persistence_laps ?? tp.estimated_traffic_laps;
         if (persistLaps > 3) {
           const text = `Traffico persistente: ~${persistLaps} giri bloccato in aria sporca dopo il pit al giro ${tp.pit_lap}`;
-          alt.cons.push(text);
           narrativeCollector.add({ id: `traffic_persist_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, persist_laps: persistLaps }, prerendered_text: text });
           break;
         }
         // Stuck risk
         if ((tp.stuck_risk_score ?? 0) > 0.7) {
           const text = `Rischio elevato di restare bloccato dopo il pit al giro ${tp.pit_lap} (stuck score: ${((tp.stuck_risk_score ?? 0) * 100).toFixed(0)}%)`;
-          alt.cons.push(text);
           narrativeCollector.add({ id: `traffic_stuck_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, stuck_risk_score: tp.stuck_risk_score ?? 0 }, prerendered_text: text });
           break;
         }
@@ -922,7 +915,6 @@ export function computeVirtualRaceEngineer(
       const lowConfTraffic = altTraffic.filter(tp => tp.prediction_confidence === "LOW");
       if (lowConfTraffic.length > 0) {
         const text = "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti";
-        alt.cons.push(text);
         narrativeCollector.add({ id: `traffic_low_conf_alt${altIdx}`, category: "traffic", priority: "context", target: "alternative", target_index: altIdx, side: "con", data: { low_conf_count: lowConfTraffic.length }, prerendered_text: text });
       }
     }
@@ -935,13 +927,11 @@ export function computeVirtualRaceEngineer(
     }
     if (altWarmupTotal > 2.5) {
       const text = `Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`;
-      alt.cons.push(text);
       narrativeCollector.add({ id: `warmup_high_alt${altIdx}`, category: "warmup", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { warmup_total: altWarmupTotal }, prerendered_text: text });
     }
     const hasHard = alt.compounds.some(c => c.toUpperCase() === "HARD");
     if (hasHard && altWarmupTotal > 1.5) {
       const text = "Mescola Hard: warmup lento riduce efficacia undercut";
-      alt.cons.push(text);
       narrativeCollector.add({ id: `warmup_hard_undercut_alt${altIdx}`, category: "warmup", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { warmup_total: altWarmupTotal, has_hard: true }, prerendered_text: text });
     }
   }
@@ -1034,11 +1024,9 @@ export function computeVirtualRaceEngineer(
     // Enrich pros/cons based on analysis
     if (alt.analysis.robustness.robustness_label === "FRAGILE") {
       const text = "Strategia fragile — sensibile a variazioni di degrado/traffico";
-      alt.cons.push(text);
       narrativeCollector.add({ id: `robustness_fragile_alt${altIdx}`, category: "robustness", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { robustness_label: "FRAGILE" }, prerendered_text: text });
     } else if (alt.analysis.robustness.robustness_label === "ROBUST") {
       const text = "Strategia robusta — poco sensibile a variazioni";
-      alt.pros.push(text);
       narrativeCollector.add({ id: `robustness_robust_alt${altIdx}`, category: "robustness", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { robustness_label: "ROBUST" }, prerendered_text: text });
     }
 
@@ -1046,42 +1034,35 @@ export function computeVirtualRaceEngineer(
       const cc = alt.analysis.competitor_context;
       if (cc.undercut_opportunity > 0.5) {
         const text = "Opportunità undercut significativa";
-        alt.pros.push(text);
         narrativeCollector.add({ id: `competitor_undercut_opp_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { undercut_opportunity: cc.undercut_opportunity }, prerendered_text: text });
       }
       if (cc.undercut_risk > 0.5) {
         const text = "Rischio undercut da rivali";
-        alt.cons.push(text);
         narrativeCollector.add({ id: `competitor_undercut_risk_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { undercut_risk: cc.undercut_risk }, prerendered_text: text });
       }
       // Release classification-based insights
       if (cc.release_classification === "PACK" && cc.rejoin_in_pack) {
         const text = `Rientro strutturalmente dentro un pack — sorpasso multiplo necessario`;
-        alt.cons.push(text);
         narrativeCollector.add({ id: `competitor_pack_rejoin_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { release_classification: "PACK", rejoin_in_pack: true }, prerendered_text: text });
       }
       if ((cc.traffic_persistence_laps ?? 0) > 4) {
         const text = `Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`;
-        alt.cons.push(text);
         narrativeCollector.add({ id: `competitor_traffic_persist_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { traffic_persistence_laps: cc.traffic_persistence_laps }, prerendered_text: text });
       }
     }
 
     if (alt.analysis.overtake_difficulty && alt.analysis.overtake_difficulty.expected_laps_stuck > 3) {
       const text = `Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${alt.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`;
-      alt.cons.push(text);
       narrativeCollector.add({ id: `overtake_diff_alt${altIdx}`, category: "overtake_difficulty", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { expected_laps_stuck: alt.analysis.overtake_difficulty.expected_laps_stuck, dirty_air_penalty: alt.analysis.overtake_difficulty.dirty_air_penalty }, prerendered_text: text });
     }
 
     if (alt.analysis.stint_extension && alt.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
       const text = `Rischio cliff se si estende lo stint (${Math.round(alt.analysis.stint_extension.cliff_risk_if_extend * 100)}%)`;
-      alt.cons.push(text);
       narrativeCollector.add({ id: `cliff_alt${altIdx}`, category: "cliff", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { cliff_risk_if_extend: alt.analysis.stint_extension.cliff_risk_if_extend }, prerendered_text: text });
     }
 
     if (alt.analysis.pit_window && alt.analysis.pit_window.window_robustness === "FRAGILE") {
       const text = "Finestra pit fragile — il giro esatto è critico";
-      alt.cons.push(text);
       narrativeCollector.add({ id: `pit_window_alt${altIdx}`, category: "pit_window", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { window_robustness: "FRAGILE" }, prerendered_text: text });
     }
   }
