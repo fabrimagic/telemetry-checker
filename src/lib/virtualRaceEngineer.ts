@@ -19,6 +19,7 @@ import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
 import { NarrativeCollector } from "./narrative/collector";
+import { renderNarrative } from "./narrative/renderer";
 
 export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
 
@@ -1318,11 +1319,9 @@ export function computeVirtualRaceEngineer(
   // Analysis mode narrative
   if (isRaceEngineerMode) {
     const text = "🏁 Modalità Race Engineer (ex-ante): le strategie simulate non utilizzano conoscenza di eventi futuri (SC, VSC, meteo). Le decisioni sono valutate con le sole informazioni disponibili al momento.";
-    narrativeInsights.push(text);
     narrativeCollector.add({ id: "mode_race_engineer", category: "mode_context", priority: "context", target: "global", data: { mode: "RACE_ENGINEER" }, prerendered_text: text });
   } else {
     const text = "📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.";
-    narrativeInsights.push(text);
     narrativeCollector.add({ id: "mode_post_race", category: "mode_context", priority: "context", target: "global", data: { mode: "POST_RACE" }, prerendered_text: text });
   }
 
@@ -1333,21 +1332,17 @@ export function computeVirtualRaceEngineer(
         ? ` Il modello ha corretto per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} (slope grezza: ${dv.slope_raw.toFixed(3)}, corretta: ${dv.slope_corrected.toFixed(3)}), ma la stima resta non attendibile.`
         : "";
       const text = `La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}) è stata classificata come non attendibile e non è stata usata nel modello strategico.${corrNote} ${dv.fallback_description ?? ""}`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: `deg_quality_invalid_stint${dv.original.stint}`, category: "degradation_quality", priority: "critical", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, status: "INVALID", model_corrected: dv.model_corrected, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used, fallback_description: dv.fallback_description ?? null }, prerendered_text: text });
     } else if (dv.model_corrected && dv.slope_raw < 0 && dv.slope_corrected > 0 && dv.status === "VALID") {
       const text = `Stint ${dv.original.stint} (${dv.original.compound}): la slope grezza era negativa (${dv.slope_raw.toFixed(3)}) ma dopo correzione per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} il degrado stimato è diventato positivo (${dv.slope_corrected.toFixed(3)} sec/giro). Il modello usa il valore corretto.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: `deg_quality_neg_to_pos_stint${dv.original.stint}`, category: "degradation_quality", priority: "supporting", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used }, prerendered_text: text });
     } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
       const text = `Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope${dv.model_corrected ? " corretta" : ""}: ${dv.slope_corrected.toFixed(3)}). Usato con cautela nel modello.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: `deg_quality_neutral_stint${dv.original.stint}`, category: "degradation_quality", priority: "supporting", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, status: "NEUTRAL", model_corrected: dv.model_corrected, slope_corrected: dv.slope_corrected }, prerendered_text: text });
     }
   }
   if (invalidDegCount > 0 && validDegCount === 0 && neutralDegCount === 0) {
     const text = "⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.";
-    narrativeInsights.push(text);
     narrativeCollector.add({ id: "deg_quality_no_reliable", category: "degradation_quality", priority: "critical", target: "global", data: { invalid_count: invalidDegCount, valid_count: validDegCount, neutral_count: neutralDegCount }, prerendered_text: text });
   }
 
@@ -1359,7 +1354,6 @@ export function computeVirtualRaceEngineer(
     if (lowAgreementStints.length > 0) {
       for (const la of lowAgreementStints) {
         const text = `Stint ${la.stint} (${la.compound}): divergenza significativa tra degrado grezzo (${la.rawSlope.toFixed(3)} s/giro) e corretto (${la.corrSlope.toFixed(3)} s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: `raw_vs_corrected_low_stint${la.stint}`, category: "raw_vs_corrected", priority: "supporting", target: "global", data: { stint: la.stint, compound: la.compound, raw_slope: la.rawSlope, corr_slope: la.corrSlope, agreement: "LOW" }, prerendered_text: text });
       }
       confScore -= lowAgreementStints.length;
@@ -1386,14 +1380,12 @@ export function computeVirtualRaceEngineer(
         );
         if (battleNearPit) {
           const text = `Battaglia in corso vicino alla finestra pit consigliata (giro ${recPitLap}): il pit potrebbe essere stato condizionato dalla posizione in pista.`;
-          narrativeInsights.push(text);
           narrativeCollector.add({ id: "battle_near_rec_pit", category: "battle_context", priority: "supporting", target: "global", lap: recPitLap, data: { rec_pit_lap: recPitLap }, prerendered_text: text });
         }
       }
 
       if (bc.defending_episodes > 0 && bc.longest_episode) {
         const text = `Fase difensiva rilevata (${bc.defending_episodes} episodi, il più lungo: ${Math.round(bc.longest_episode.durationSeconds)}s vs ${bc.longest_episode.opponent}). La strategia potrebbe aver risentito della pressione.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "battle_defending_phase", category: "battle_context", priority: "supporting", target: "global", data: { defending_episodes: bc.defending_episodes, longest_seconds: Math.round(bc.longest_episode.durationSeconds), opponent: bc.longest_episode.opponent }, prerendered_text: text });
       }
 
@@ -1419,26 +1411,22 @@ export function computeVirtualRaceEngineer(
 
     if (cd.loss_trend_start_lap != null) {
       const text = `La strategia reale ha iniziato a perdere terreno in modo cumulativo dal giro ${cd.loss_trend_start_lap} rispetto al benchmark del vincitore (${cd.winner_code ?? "P1"}).`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "cum_dev_loss_trend_start", category: "cumulative_deviation", priority: "supporting", target: "global", lap: cd.loss_trend_start_lap, data: { loss_trend_start_lap: cd.loss_trend_start_lap, winner_code: cd.winner_code ?? "P1" }, prerendered_text: text });
       
       // Check if pit was before or after the loss trend started
       if (actualPitLaps.length > 0 && actualPitLaps[0] > cd.loss_trend_start_lap) {
         const text2 = `Il pit reale (giro ${actualPitLaps[0]}) è avvenuto dopo l'inizio della perdita cumulativa (giro ${cd.loss_trend_start_lap}): un pit anticipato avrebbe potuto mitigare la perdita.`;
-        narrativeInsights.push(text2);
         narrativeCollector.add({ id: "cum_dev_pit_after_loss", category: "cumulative_deviation", priority: "supporting", target: "global", lap: actualPitLaps[0], data: { actual_pit_lap: actualPitLaps[0], loss_trend_start_lap: cd.loss_trend_start_lap }, prerendered_text: text2 });
       }
     }
 
     if (cd.max_deviation != null && cd.max_deviation > 5) {
       const text = `Deviazione cumulativa massima osservata: +${cd.max_deviation.toFixed(1)}s al giro ${cd.max_deviation_lap}.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "cum_dev_max", category: "cumulative_deviation", priority: "supporting", target: "global", lap: cd.max_deviation_lap ?? undefined, data: { max_deviation: cd.max_deviation, max_deviation_lap: cd.max_deviation_lap }, prerendered_text: text });
     }
 
     if (cd.driver_final_delta != null && cd.driver_final_delta > 10) {
       const text = `Al termine della gara, il pilota ha accumulato +${cd.driver_final_delta.toFixed(1)}s rispetto al benchmark del vincitore.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "cum_dev_final_delta", category: "cumulative_deviation", priority: "supporting", target: "global", data: { driver_final_delta: cd.driver_final_delta }, prerendered_text: text });
     }
   }
@@ -1451,15 +1439,12 @@ export function computeVirtualRaceEngineer(
     if (worstPL && worstPL.stint_pace_loss_rate != null) {
       if (worstPL.pace_loss_status === "CLIFF_RISK") {
         const text = `⚠️ Perdita di passo critica nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): possibile segnale di tyre cliff. Il modello ha aumentato l'urgenza del pit e la penalità per stint lunghi.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "pace_loss_cliff_risk", category: "pace_loss", priority: "critical", target: "global", data: { stint: worstPL.stint_number, rate: worstPL.stint_pace_loss_rate, status: "CLIFF_RISK" }, prerendered_text: text });
       } else if (worstPL.pace_loss_status === "HIGH_LOSS") {
         const text = `Perdita di passo significativa nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): il modello ha aumentato il peso del degrado nella simulazione strategica.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "pace_loss_high", category: "pace_loss", priority: "supporting", target: "global", data: { stint: worstPL.stint_number, rate: worstPL.stint_pace_loss_rate, status: "HIGH_LOSS" }, prerendered_text: text });
       } else if (worstPL.pace_loss_status === "NORMAL_LOSS") {
         const text = `Perdita di passo moderata nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro), coerente con un degrado normale.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "pace_loss_normal", category: "pace_loss", priority: "context", target: "global", data: { stint: worstPL.stint_number, rate: worstPL.stint_pace_loss_rate, status: "NORMAL_LOSS" }, prerendered_text: text });
       }
     }
@@ -1470,12 +1455,10 @@ export function computeVirtualRaceEngineer(
       if (dv && pl.stint_pace_loss_rate != null) {
         if (dv.effective_slope < 0.02 && pl.pace_loss_status === "HIGH_LOSS") {
           const text = `Stint ${pl.stint_number}: il degrado stimato è basso (${dv.effective_slope.toFixed(3)} s/giro) ma la perdita di passo osservata è alta (${pl.stint_pace_loss_rate.toFixed(3)}). Possibile incoerenza — il verdetto è stato reso più prudente.`;
-          narrativeInsights.push(text);
           narrativeCollector.add({ id: "pace_loss_incoherence_low_deg_high_loss", category: "pace_loss", priority: "supporting", target: "global", data: { stint: pl.stint_number, effective_slope: dv.effective_slope, rate: pl.stint_pace_loss_rate }, prerendered_text: text });
           confScore -= 1;
         } else if (dv.effective_slope > 0.06 && pl.pace_loss_status === "STABLE") {
           const text = `Stint ${pl.stint_number}: il degrado stimato è elevato (${dv.effective_slope.toFixed(3)} s/giro) ma il passo osservato è stabile. Il degrado potrebbe essere sovrastimato.`;
-          narrativeInsights.push(text);
           narrativeCollector.add({ id: "pace_loss_incoherence_high_deg_stable", category: "pace_loss", priority: "supporting", target: "global", data: { stint: pl.stint_number, effective_slope: dv.effective_slope }, prerendered_text: text });
         }
       }
@@ -1485,7 +1468,6 @@ export function computeVirtualRaceEngineer(
     const unreliablePL = paceLossResults.filter(r => r.pace_loss_status === "UNRELIABLE" && r.pace_loss_contamination_flags.battle);
     if (unreliablePL.length > 0) {
       const text = `La metrica di pace loss per ${unreliablePL.length} stint è stata ridimensionata a causa di traffico e battaglie ravvicinate. Non è stata usata come driver strategico.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "pace_loss_unreliable", category: "pace_loss", priority: "context", target: "global", data: { count: unreliablePL.length }, prerendered_text: text });
     }
 
@@ -1505,13 +1487,11 @@ export function computeVirtualRaceEngineer(
     if (dc.strategy_relevant_events.length > 0) {
       for (const ev of dc.strategy_relevant_events.slice(0, 3)) {
         const text = `Giro ${ev.lap}: ${ev.description}`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: `diary_event_lap${ev.lap}`, category: "diary", priority: "context", target: "global", lap: ev.lap, data: { lap: ev.lap, description: ev.description }, prerendered_text: text });
       }
     }
     if (dc.overtakes_received > dc.overtakes_done && dc.overtakes_received >= 3) {
       const text = `Il pilota ha subito più sorpassi (${dc.overtakes_received}) di quanti ne ha effettuati (${dc.overtakes_done}), indicando una possibile strategia difensiva o ritmo insufficiente.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "diary_defensive_pattern", category: "diary", priority: "supporting", target: "global", data: { overtakes_received: dc.overtakes_received, overtakes_done: dc.overtakes_done }, prerendered_text: text });
     }
   }
@@ -1522,7 +1502,6 @@ export function computeVirtualRaceEngineer(
     confScore -= 1; // Weather change reduces confidence
     if (wc.first_non_dry_lap != null) {
       const text = `Condizioni meteo variabili rilevate dal giro ${wc.first_non_dry_lap} (${wc.wet_laps} giri bagnati, ${wc.mixed_laps} misti). Il modello di degrado esclude questi giri.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "weather_change_detected", category: "weather", priority: "supporting", target: "global", lap: wc.first_non_dry_lap, data: { first_non_dry_lap: wc.first_non_dry_lap, wet_laps: wc.wet_laps, mixed_laps: wc.mixed_laps }, prerendered_text: text });
     }
   }
@@ -1535,14 +1514,12 @@ export function computeVirtualRaceEngineer(
       const pitUnderSC = pitStopAnalyses.some(p => p.neutralisation_type === "SC");
       if (pitUnderSC) {
         const text = "Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.";
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "neutral_pit_under_sc", category: "neutralization", priority: "supporting", target: "global", data: { type: "SC" }, prerendered_text: text });
       } else if (ts.neutralized_laps.some(nl => {
         // Check if SC was near recommended window
         return recommendedWindows.some(w => Math.abs(nl - w.ideal_lap) <= 3);
       })) {
         const text = "Una Safety Car è apparsa vicino alla finestra pit consigliata: un pit sotto neutralizzazione avrebbe offerto un vantaggio di ~10s.";
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "neutral_sc_near_window", category: "neutralization", priority: "supporting", target: "global", data: { type: "SC", proximity: "near_window" }, prerendered_text: text });
       }
     }
@@ -1561,7 +1538,6 @@ export function computeVirtualRaceEngineer(
       if (totalNeutralBenefit > 1.0) {
         const types = actualPitsUnderNeutral.map(p => `giro ${p.lap_number} (${p.neutralisation_type})`).join(", ");
         const text = `Strategia reale favorita da pit sotto neutralizzazione (${types}): pit loss ridotto di ~${totalNeutralBenefit.toFixed(1)}s rispetto a un pit in green.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "neutral_actual_benefit", category: "neutralization", priority: "supporting", target: "global", data: { types, benefit_seconds: totalNeutralBenefit }, prerendered_text: text });
       }
 
@@ -1605,7 +1581,6 @@ export function computeVirtualRaceEngineer(
     // Check if recommended strategy has significant warmup cost
     if (recWarmup > 2.0) {
       const text = `La strategia raccomandata include ${recWarmup.toFixed(1)}s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "warmup_rec_significant", category: "warmup", priority: "supporting", target: "global", data: { rec_warmup: recWarmup }, prerendered_text: text });
     }
 
@@ -1626,7 +1601,6 @@ export function computeVirtualRaceEngineer(
 
       if (warmupSpread > 1.5) {
         const text = `Differenza warmup tra strategie: ${warmupSpread.toFixed(1)}s (${maxWarmupAlt.name}: ${maxWarmupAlt.warmup.toFixed(1)}s vs ${minWarmupAlt.name}: ${minWarmupAlt.warmup.toFixed(1)}s). Strategie con meno soste o mescole morbide sono favorite dal warmup.`;
-        narrativeInsights.push(text);
         narrativeCollector.add({ id: "warmup_spread", category: "warmup", priority: "supporting", target: "global", data: { spread: warmupSpread, max_name: maxWarmupAlt.name, max_warmup: maxWarmupAlt.warmup, min_name: minWarmupAlt.name, min_warmup: minWarmupAlt.warmup }, prerendered_text: text });
       }
     }
@@ -1635,14 +1609,12 @@ export function computeVirtualRaceEngineer(
     const recHasHard = bestCompounds.some(c => c.toUpperCase() === "HARD");
     if (recHasHard && recWarmup > 1.5) {
       const text = `La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "warmup_rec_hard", category: "warmup", priority: "supporting", target: "global", data: { rec_warmup: recWarmup, has_hard: true }, prerendered_text: text });
     }
 
     // Multi-stop warmup accumulation
     if (bestPitLaps.length >= 2 && recWarmup > 3.0) {
       const text = `Strategia a ${bestPitLaps.length} soste: il warmup cumulato (${recWarmup.toFixed(1)}s) è significativo. Ogni pit stop aggiuntivo introduce una fase di riscaldamento che riduce il vantaggio netto della sosta.`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "warmup_multi_stop", category: "warmup", priority: "supporting", target: "global", data: { num_stops: bestPitLaps.length, rec_warmup: recWarmup }, prerendered_text: text });
     }
   }
@@ -1667,9 +1639,17 @@ export function computeVirtualRaceEngineer(
     narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}${durNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
     if (scenarioActivationWarning) {
       const text = `⚠️ ${scenarioActivationWarning}`;
-      narrativeInsights.push(text);
       narrativeCollector.add({ id: "scenario_activation_warning", category: "scenario", priority: "critical", target: "global", data: { warning: scenarioActivationWarning }, prerendered_text: text });
     }
+  }
+
+
+  // ── Narrative cutover (Phase 1: global insights only) ──
+  // Render structured collector events into the legacy narrativeInsights array.
+  // alt.pros/cons and recommended pros/cons remain legacy (Phases 2-3).
+  {
+    const __rendered = renderNarrative(narrativeCollector.getAll());
+    narrativeInsights.push(...__rendered.insights);
   }
 
   // ── 8. Verdict ──
