@@ -364,5 +364,4 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     common_confidence: confidenceMin(resultA.confidence, resultB.confidence),
   };
 }
-  };
-}
+
