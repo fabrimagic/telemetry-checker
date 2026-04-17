@@ -249,6 +249,30 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     );
     out.vreResult = vre;
 
+    // ── Optional: alternative VRE pass in POST_RACE + BALANCED ──
+    // Re-uses every dataset already fetched above (no extra API calls).
+    // Skipped if the primary pass is already POST_RACE+BALANCED, in which case
+    // the recommended_strategy on `vre` is already the "ex-ante balanced" alternative.
+    if (computeAlternative && vre) {
+      const alreadyAlternative = analysisMode === "POST_RACE" && riskMode === "BALANCED";
+      if (alreadyAlternative) {
+        out.alternativeVreResult = vre;
+      } else {
+        try {
+          const altVre = computeVirtualRaceEngineer(
+            driverNumber, driver.name_acronym, sessionKey,
+            laps, stints, pits,
+            sessionWeather, raceControlMessages,
+            intervals, positions, allDrivers, practiceModels, "BALANCED",
+            diary, cumDev,
+            "REAL_CONTEXT", null, null, null,
+            "POST_RACE",
+          );
+          out.alternativeVreResult = altVre;
+        } catch { /* optional — alternative is best-effort */ }
+      }
+    }
+
     // KDM
     if (vre) {
       try {
