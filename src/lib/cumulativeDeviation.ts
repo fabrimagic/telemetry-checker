@@ -35,16 +35,25 @@ function getSessionWinner(results: SessionResult[]): number | null {
 }
 
 /**
- * Filter valid laps for benchmark: exclude pit out laps, null durations, outliers.
+ * Structural-only filter: exclude null/zero durations, pit out laps and the formation lap.
+ * No statistical outlier removal — safe for chaotic drivers (incidents, spins).
  */
-function getValidLaps(laps: Lap[]): Lap[] {
-  const valid = laps.filter(
+function getValidLapsStructural(laps: Lap[]): Lap[] {
+  return laps.filter(
     (l) =>
       l.lap_duration != null &&
       l.lap_duration > 0 &&
       !l.is_pit_out_lap &&
       l.lap_number > 1 // exclude formation/first lap
   );
+}
+
+/**
+ * Filter valid laps for benchmark: structural filters + statistical outlier removal (> 1.5× median).
+ * Used only for the winner's reference average to keep the benchmark clean.
+ */
+function getValidLapsForBenchmark(laps: Lap[]): Lap[] {
+  const valid = getValidLapsStructural(laps);
 
   if (valid.length < 3) return valid;
 
