@@ -10,8 +10,14 @@ export interface LapWeather {
 /* ── Configuration ─────────────────────────────────────────────── */
 
 const CONFIG = {
-  /** Minimum rainfall value (mm) to count as active rain */
-  RAIN_THRESHOLD: 0,
+  /**
+   * OpenF1 `rainfall` is empirically a binary flag (int 0 or 1), not a continuous
+   * measurement in mm. Verified across Belgium 2023 (key=9141), Canada 2024 (key=9531)
+   * and Bahrain 2024 (key=9472): only values {0, 1} observed, type `int`.
+   * Doc says "Whether there is rainfall" — confirmed binary.
+   * A sample is considered "active rain" when rainfall > RAIN_FLAG_ACTIVE.
+   */
+  RAIN_FLAG_ACTIVE: 0,
   /** Lookback window (ms) for recent-rain persistence signal */
   PERSISTENCE_LOOKBACK_MS: 5 * 60_000, // 5 minutes
   /** Half-life (ms) of wet persistence decay — how fast track dries */
