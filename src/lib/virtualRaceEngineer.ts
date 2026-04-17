@@ -1268,11 +1268,7 @@ export function computeVirtualRaceEngineer(
   );
 
   const narrativeInsights: string[] = [];
-  // Narrative collector — accumulates structured events for migrated categories.
-  // During the incremental refactor, migrated sites push BOTH to narrativeInsights
-  // (preserving exact output order) AND to the collector. Once all categories
-  // are migrated, narrativeInsights will be replaced by renderNarrative output.
-  const narrativeCollector = new NarrativeCollector();
+
 
   // Analysis mode narrative
   if (isRaceEngineerMode) {
