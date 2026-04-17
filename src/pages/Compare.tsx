@@ -14,10 +14,12 @@ import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
+  getAllLaps, getSessionResult,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
 } from "@/lib/openf1";
 import { loadVreForDriver, type VreLoaderOutput } from "@/lib/vreLoader";
 import { computeHeadToHead, type ComparisonResult } from "@/lib/headToHeadComparison";
+import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DualState {
   outA: VreLoaderOutput | null;
@@ -109,41 +111,62 @@ export default function Compare() {
     setDual({ outA: null, outB: null, loading: true });
     setError(null);
 
-    Promise.all([
-      loadVreForDriver({
-        driverNumber: driverObjA.driver_number,
-        driver: driverObjA,
-        sessionKey,
-        meetingKey,
-        sessionWeather,
-        raceControlMessages,
-        allDrivers,
-        riskMode: "BALANCED",
-        analysisMode: "RACE_ENGINEER",
-        computeAlternative: true,
-      }),
-      loadVreForDriver({
-        driverNumber: driverObjB.driver_number,
-        driver: driverObjB,
-        sessionKey,
-        meetingKey,
-        sessionWeather,
-        raceControlMessages,
-        allDrivers,
-        riskMode: "BALANCED",
-        analysisMode: "RACE_ENGINEER",
-        computeAlternative: true,
-      }),
-    ])
-      .then(([outA, outB]) => {
+    // Fetch session-scoped cumulative-deviation data ONCE and share between
+    // both loaders. Without this, each loader fetches /laps?session_key and
+    // /session_result independently → 4 extra requests in parallel that often
+    // collide with OpenF1's rate limit (15/10s) and produce asymmetric results
+    // where one driver's cumulative_deviation_context is "non disponibile".
+    (async () => {
+      let sharedCumDev: CumulativeDeviationResult | null = null;
+      try {
+        const [sessionAllLaps, sessionResults] = await Promise.all([
+          getAllLaps(sessionKey),
+          getSessionResult(sessionKey),
+        ]);
+        if (sessionAllLaps.length && sessionResults.length) {
+          sharedCumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
+        }
+      } catch { /* optional — loaders will fall back to their own fetch */ }
+
+      if (cancelled) return;
+
+      try {
+        const [outA, outB] = await Promise.all([
+          loadVreForDriver({
+            driverNumber: driverObjA.driver_number,
+            driver: driverObjA,
+            sessionKey,
+            meetingKey,
+            sessionWeather,
+            raceControlMessages,
+            allDrivers,
+            riskMode: "BALANCED",
+            analysisMode: "RACE_ENGINEER",
+            computeAlternative: true,
+            precomputedCumDev: sharedCumDev,
+          }),
+          loadVreForDriver({
+            driverNumber: driverObjB.driver_number,
+            driver: driverObjB,
+            sessionKey,
+            meetingKey,
+            sessionWeather,
+            raceControlMessages,
+            allDrivers,
+            riskMode: "BALANCED",
+            analysisMode: "RACE_ENGINEER",
+            computeAlternative: true,
+            precomputedCumDev: sharedCumDev,
+          }),
+        ]);
         if (cancelled) return;
         setDual({ outA, outB, loading: false });
-      })
-      .catch((e) => {
+      } catch (e: any) {
         if (cancelled) return;
         setError(e?.message ?? "Errore caricamento confronto");
         setDual({ outA: null, outB: null, loading: false });
-      });
+      }
+    })();
 
     return () => { cancelled = true; };
   }, [sessionKey, isRace, driverObjA, driverObjB, meetingKey, sessionWeather, raceControlMessages, allDrivers]);
