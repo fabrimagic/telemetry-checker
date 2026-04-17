@@ -295,6 +295,7 @@ export default function Compare() {
           <div className="space-y-5">
             <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
             <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
             <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
             <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
           </div>
