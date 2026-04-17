@@ -70,7 +70,7 @@ function getValidLapsForBenchmark(laps: Lap[]): Lap[] {
  */
 function getWinnerReferenceAvg(allLaps: Lap[], winnerNumber: number): number | null {
   const winnerLaps = allLaps.filter((l) => l.driver_number === winnerNumber);
-  const valid = getValidLaps(winnerLaps);
+  const valid = getValidLapsForBenchmark(winnerLaps);
   if (valid.length === 0) return null;
 
   const sum = valid.reduce((acc, l) => acc + l.lap_duration!, 0);
