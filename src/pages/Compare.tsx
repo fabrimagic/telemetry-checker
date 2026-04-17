@@ -120,6 +120,7 @@ export default function Compare() {
         allDrivers,
         riskMode: "BALANCED",
         analysisMode: "RACE_ENGINEER",
+        computeAlternative: true,
       }),
       loadVreForDriver({
         driverNumber: driverObjB.driver_number,
@@ -131,6 +132,7 @@ export default function Compare() {
         allDrivers,
         riskMode: "BALANCED",
         analysisMode: "RACE_ENGINEER",
+        computeAlternative: true,
       }),
     ])
       .then(([outA, outB]) => {
