@@ -1097,11 +1097,9 @@ export function computeVirtualRaceEngineer(
     // Robustness
     if (recommendedStrategy.analysis.robustness.robustness_label === "ROBUST") {
       const text = "Strategia robusta — poco sensibile a variazioni";
-      recPros.push(text);
       narrativeCollector.add({ id: "robustness_robust_rec", category: "robustness", priority: "supporting", target: "recommended", side: "pro", data: { robustness_label: "ROBUST" }, prerendered_text: text });
     } else if (recommendedStrategy.analysis.robustness.robustness_label === "FRAGILE") {
       const text = "Strategia fragile — sensibile a variazioni di degrado/traffico";
-      recCons.push(text);
       narrativeCollector.add({ id: "robustness_fragile_rec", category: "robustness", priority: "supporting", target: "recommended", side: "con", data: { robustness_label: "FRAGILE" }, prerendered_text: text });
     }
 
@@ -1110,22 +1108,18 @@ export function computeVirtualRaceEngineer(
       const cc = recommendedStrategy.analysis.competitor_context;
       if (cc.undercut_opportunity > 0.5) {
         const text = "Opportunità undercut significativa";
-        recPros.push(text);
         narrativeCollector.add({ id: "competitor_undercut_opp_rec", category: "competitor", priority: "supporting", target: "recommended", side: "pro", data: { undercut_opportunity: cc.undercut_opportunity }, prerendered_text: text });
       }
       if (cc.undercut_risk > 0.5) {
         const text = "Rischio undercut da rivali";
-        recCons.push(text);
         narrativeCollector.add({ id: "competitor_undercut_risk_rec", category: "competitor", priority: "supporting", target: "recommended", side: "con", data: { undercut_risk: cc.undercut_risk }, prerendered_text: text });
       }
       if (cc.release_classification === "PACK" && cc.rejoin_in_pack) {
         const text = "Rientro strutturalmente dentro un pack — sorpasso multiplo necessario";
-        recCons.push(text);
         narrativeCollector.add({ id: "competitor_pack_rejoin_rec", category: "competitor", priority: "supporting", target: "recommended", side: "con", data: { release_classification: "PACK", rejoin_in_pack: true }, prerendered_text: text });
       }
       if ((cc.traffic_persistence_laps ?? 0) > 4) {
         const text = `Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`;
-        recCons.push(text);
         narrativeCollector.add({ id: "competitor_traffic_persist_rec", category: "competitor", priority: "supporting", target: "recommended", side: "con", data: { traffic_persistence_laps: cc.traffic_persistence_laps }, prerendered_text: text });
       }
     }
@@ -1133,21 +1127,18 @@ export function computeVirtualRaceEngineer(
     // Overtake difficulty
     if (recommendedStrategy.analysis.overtake_difficulty && recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck > 3) {
       const text = `Difficoltà sorpasso: ~${recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${recommendedStrategy.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`;
-      recCons.push(text);
       narrativeCollector.add({ id: "overtake_diff_rec", category: "overtake_difficulty", priority: "supporting", target: "recommended", side: "con", data: { expected_laps_stuck: recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck, dirty_air_penalty: recommendedStrategy.analysis.overtake_difficulty.dirty_air_penalty }, prerendered_text: text });
     }
 
     // Stint extension / cliff
     if (recommendedStrategy.analysis.stint_extension && recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
       const text = `Rischio cliff se si estende lo stint (${Math.round(recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend * 100)}%)`;
-      recCons.push(text);
       narrativeCollector.add({ id: "cliff_rec", category: "cliff", priority: "supporting", target: "recommended", side: "con", data: { cliff_risk_if_extend: recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend }, prerendered_text: text });
     }
 
     // Pit window robustness
     if (recommendedStrategy.analysis.pit_window && recommendedStrategy.analysis.pit_window.window_robustness === "FRAGILE") {
       const text = "Finestra pit fragile — il giro esatto è critico";
-      recCons.push(text);
       narrativeCollector.add({ id: "pit_window_rec", category: "pit_window", priority: "supporting", target: "recommended", side: "con", data: { window_robustness: "FRAGILE" }, prerendered_text: text });
     }
 
@@ -1162,15 +1153,12 @@ export function computeVirtualRaceEngineer(
 
       if (worstTraffic === "HEAVY") {
         const text = `Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`;
-        recCons.push(text);
         narrativeCollector.add({ id: "traffic_heavy_rec", category: "traffic", priority: "supporting", target: "recommended", side: "con", data: { traffic_loss: trafficLoss, level: "HEAVY" }, prerendered_text: text });
       } else if (worstTraffic === "LIGHT") {
         const text = `Rientro in traffico leggero (−${trafficLoss.toFixed(1)}s stimati)`;
-        recCons.push(text);
         narrativeCollector.add({ id: "traffic_light_rec", category: "traffic", priority: "supporting", target: "recommended", side: "con", data: { traffic_loss: trafficLoss, level: "LIGHT" }, prerendered_text: text });
       } else if (worstTraffic === "CLEAN") {
         const text = "Rientro in aria pulita";
-        recPros.push(text);
         narrativeCollector.add({ id: "traffic_clean_rec", category: "traffic", priority: "supporting", target: "recommended", side: "pro", data: { level: "CLEAN" }, prerendered_text: text });
       }
 
@@ -1178,14 +1166,12 @@ export function computeVirtualRaceEngineer(
       for (const tp of recTraffic) {
         if (tp.release_classification === "PACK") {
           const text = `Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti, ${tp.pack_size_behind ?? "?"} dietro)`;
-          recCons.push(text);
           narrativeCollector.add({ id: `traffic_pack_rec_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "recommended", side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, pack_size_ahead: tp.pack_size_ahead, pack_size_behind: tp.pack_size_behind, release_classification: "PACK" }, prerendered_text: text });
           break;
         }
         if (tp.release_classification === "TRAFFIC") {
           if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
             const text = `Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`;
-            recCons.push(text);
             narrativeCollector.add({ id: `traffic_release_rec_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "recommended", side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, release_quality: tp.release_quality, compressed_train_risk: tp.compressed_train_risk }, prerendered_text: text });
             break;
           }
@@ -1193,13 +1179,11 @@ export function computeVirtualRaceEngineer(
         const persistLaps = tp.traffic_persistence_laps ?? tp.estimated_traffic_laps;
         if (persistLaps > 3) {
           const text = `Traffico persistente: ~${persistLaps} giri bloccato in aria sporca dopo il pit al giro ${tp.pit_lap}`;
-          recCons.push(text);
           narrativeCollector.add({ id: `traffic_persist_rec_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "recommended", side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, persist_laps: persistLaps }, prerendered_text: text });
           break;
         }
         if ((tp.stuck_risk_score ?? 0) > 0.7) {
           const text = `Rischio elevato di restare bloccato dopo il pit al giro ${tp.pit_lap} (stuck score: ${((tp.stuck_risk_score ?? 0) * 100).toFixed(0)}%)`;
-          recCons.push(text);
           narrativeCollector.add({ id: `traffic_stuck_rec_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "recommended", side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, stuck_risk_score: tp.stuck_risk_score ?? 0 }, prerendered_text: text });
           break;
         }
@@ -1208,7 +1192,6 @@ export function computeVirtualRaceEngineer(
       const lowConfTraffic = recTraffic.filter(tp => tp.prediction_confidence === "LOW");
       if (lowConfTraffic.length > 0) {
         const text = "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti";
-        recCons.push(text);
         narrativeCollector.add({ id: "traffic_low_conf_rec", category: "traffic", priority: "context", target: "recommended", side: "con", data: { low_conf_count: lowConfTraffic.length }, prerendered_text: text });
       }
     }
@@ -1221,13 +1204,11 @@ export function computeVirtualRaceEngineer(
     }
     if (recWarmupForPC > 2.5) {
       const text = `Warmup elevato: ${recWarmupForPC.toFixed(1)}s persi per riscaldamento gomme`;
-      recCons.push(text);
       narrativeCollector.add({ id: "warmup_high_rec", category: "warmup", priority: "supporting", target: "recommended", side: "con", data: { warmup_total: recWarmupForPC }, prerendered_text: text });
     }
     const recHasHardPC = bestCompounds.some(c => c.toUpperCase() === "HARD");
     if (recHasHardPC && recWarmupForPC > 1.5) {
       const text = "Mescola Hard: warmup lento riduce efficacia undercut";
-      recCons.push(text);
       narrativeCollector.add({ id: "warmup_hard_rec", category: "warmup", priority: "supporting", target: "recommended", side: "con", data: { warmup_total: recWarmupForPC, has_hard: true }, prerendered_text: text });
     }
 
@@ -1236,12 +1217,10 @@ export function computeVirtualRaceEngineer(
       const bd = recommendedStrategy.breakdown;
       if (bd.traffic_loss != null && bd.traffic_loss < 0.5) {
         const text = "Impatto traffico minimo nella simulazione";
-        recPros.push(text);
         narrativeCollector.add({ id: "breakdown_traffic_low_rec", category: "traffic", priority: "supporting", target: "recommended", side: "pro", data: { breakdown_traffic_loss: bd.traffic_loss }, prerendered_text: text });
       }
       if (bd.warmup_cost != null && bd.warmup_cost < 1.0 && bestPitLaps.length > 0) {
         const text = "Warmup contenuto";
-        recPros.push(text);
         narrativeCollector.add({ id: "breakdown_warmup_low_rec", category: "warmup", priority: "supporting", target: "recommended", side: "pro", data: { breakdown_warmup_cost: bd.warmup_cost }, prerendered_text: text });
       }
     }
