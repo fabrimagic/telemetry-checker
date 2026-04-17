@@ -45,15 +45,42 @@ export interface HeadToHeadVerdict {
   key_factors: string[];
 }
 
+/**
+ * Counterfactual analysis: what would have happened if BOTH drivers had executed
+ * their respective "ex-ante balanced" alternative strategies (POST_RACE + BALANCED VRE).
+ *
+ * Numbers come from the alternative VRE's `recommended_strategy.time_delta_vs_actual`
+ * (motorsport convention: negative = faster than actual). The counterfactual h2h delta is:
+ *   counterfactual_h2h_delta = real_h2h_delta + (gain_A − gain_B)
+ *
+ * This assumes per-driver simulated gains are independent — a strong simplification.
+ * The `disclaimer` field is mandatory for UI rendering.
+ */
+export interface CounterfactualAnalysis {
+  gain_a_seconds: number | null;
+  gain_b_seconds: number | null;
+  real_h2h_delta_seconds: number;
+  counterfactual_h2h_delta_seconds: number | null;
+  counterfactual_faster: "A" | "B" | "TIE" | null;
+  outcome_changed: boolean;
+  confidence: Confidence;
+  disclaimer: string;
+}
+
 export interface ComparisonResult {
   driver_a: VirtualRaceEngineerResult;
   driver_b: VirtualRaceEngineerResult;
+  /** Optional alternative VRE results (POST_RACE + BALANCED). Null when not requested or unavailable. */
+  alternative_a: VirtualRaceEngineerResult | null;
+  alternative_b: VirtualRaceEngineerResult | null;
   session_key: number;
   total_laps: number;
   lap_by_lap_delta: LapDeltaPoint[];
   stint_alignment: StintAlignmentSegment[];
   strategic_divergence_points: DivergencePoint[];
   head_to_head_verdict: HeadToHeadVerdict;
+  /** Counterfactual analysis. Null when no alternatives provided. */
+  counterfactual_analysis: CounterfactualAnalysis | null;
   common_confidence: Confidence;
 }
 
