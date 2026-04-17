@@ -104,6 +104,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     riskMode = "BALANCED",
     analysisMode = "RACE_ENGINEER",
     computeAlternative = false,
+    precomputedCumDev,
   } = input;
 
   const out: VreLoaderOutput = {
