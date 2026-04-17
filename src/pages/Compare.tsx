@@ -12,6 +12,7 @@ import { CompareTimeline } from "@/components/f1/compare/CompareTimeline";
 import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
+import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
   getAllLaps, getSessionResult,
@@ -321,12 +322,39 @@ export default function Compare() {
         )}
 
         {comparison && driverObjA && driverObjB && (
-          <div className="space-y-5">
-            <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
-            <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+          <div className="space-y-6">
+            {/* ═══ STRATEGIA REALE ═══ */}
+            <section className="space-y-5">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground px-2">
+                  Strategia reale eseguita
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
+              <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+              <CompareDriverContext
+                driverA={driverObjA}
+                driverB={driverObjB}
+                resultA={dual.outA?.vreResult ?? null}
+                resultB={dual.outB?.vreResult ?? null}
+              />
+              <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+              <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            </section>
+
+            {/* ═══ STRATEGIA ALTERNATIVA ═══ */}
+            <section className="space-y-5">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--f1-red))] px-2">
+                  Strategia alternativa (ex-ante · balanced)
+                </span>
+                <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
+              </div>
+              <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            </section>
           </div>
         )}
       </main>
