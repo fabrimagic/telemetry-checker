@@ -802,6 +802,218 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
   );
 }
 
+/* ── Global Analysis Section (shared, contesto comune a tutte le strategie) ── */
+export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerResult }) {
+  const {
+    integrated_context, narrative_insights, weather_impact, neutralisation_impact,
+    traffic_analysis, pace_loss_results, confidence_factors, practice_compounds_used,
+  } = result;
+
+  return (
+    <VRESection
+      title="Analisi globale gara"
+      icon={<Globe className="h-3.5 w-3.5 text-muted-foreground" />}
+      defaultOpen={false}
+      badge={<Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">CONTESTO</Badge>}
+    >
+      <div className="space-y-4 pl-1">
+
+        {/* Context summary badges */}
+        {integrated_context && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {integrated_context.battle_context && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Battaglie</p>
+                <p className="text-sm font-bold text-foreground">{integrated_context.battle_context.total_episodes}</p>
+                <p className="text-[9px] text-muted-foreground">{integrated_context.battle_context.total_battle_laps} giri</p>
+              </div>
+            )}
+            {integrated_context.weather_context?.had_weather_change && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Meteo</p>
+                <p className="text-sm font-bold text-foreground">🌧️ Variabile</p>
+                <p className="text-[9px] text-muted-foreground">{integrated_context.weather_context.wet_laps + integrated_context.weather_context.mixed_laps} giri non-dry</p>
+              </div>
+            )}
+            {integrated_context.track_status_context && integrated_context.track_status_context.total_neutralized_laps > 0 && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Neutralizzazioni</p>
+                <p className="text-sm font-bold text-foreground">{integrated_context.track_status_context.total_neutralized_laps}</p>
+                <p className="text-[9px] text-muted-foreground">
+                  {[
+                    integrated_context.track_status_context.had_safety_car && "SC",
+                    integrated_context.track_status_context.had_vsc && "VSC",
+                    integrated_context.track_status_context.had_red_flag && "Red",
+                  ].filter(Boolean).join(", ") || "giri"}
+                </p>
+              </div>
+            )}
+            {integrated_context.cumulative_deviation_context?.available && integrated_context.cumulative_deviation_context.driver_final_delta != null && (
+              <div className="rounded-lg bg-muted/30 border border-border p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Dev. Cumulativa</p>
+                <p className={`text-sm font-bold font-mono ${integrated_context.cumulative_deviation_context.driver_final_delta > 5 ? "text-red-400" : integrated_context.cumulative_deviation_context.driver_final_delta > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                  {integrated_context.cumulative_deviation_context.driver_final_delta > 0 ? "+" : ""}{integrated_context.cumulative_deviation_context.driver_final_delta.toFixed(1)}s
+                </p>
+                <p className="text-[9px] text-muted-foreground">vs {integrated_context.cumulative_deviation_context.winner_code ?? "P1"}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Narrative insights (global context) */}
+        {narrative_insights && narrative_insights.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              💡 Insight contestuali
+            </h4>
+            <ul className="space-y-1.5">
+              {narrative_insights.map((insight, i) => (
+                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                  <span className="text-foreground/60 mt-0.5 shrink-0">•</span>
+                  <span>{insight}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Weather & neutralisation impact */}
+        {(weather_impact || neutralisation_impact) && (
+          <div className="space-y-1">
+            {weather_impact && (
+              <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                <span>🌧️</span> {weather_impact}
+              </p>
+            )}
+            {neutralisation_impact && (
+              <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                <span>🏴</span> {neutralisation_impact}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Data gaps */}
+        {integrated_context?.data_gaps && integrated_context.data_gaps.length > 0 && (
+          <p className="text-[10px] text-muted-foreground italic">
+            ⚠️ Dati parziali: {integrated_context.data_gaps.join("; ")}
+          </p>
+        )}
+
+        {/* Traffic Release Analysis (global — shared context) */}
+        {traffic_analysis.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <Navigation className="h-3.5 w-3.5" /> Traffic Release Analysis
+              <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">GLOBALE</Badge>
+            </h4>
+            <TrafficPredictionsTable predictions={traffic_analysis} />
+          </div>
+        )}
+
+        {/* Pace Loss per Stint (global — shared context) */}
+        {pace_loss_results && pace_loss_results.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" /> Pace Loss per Stint
+              <span className="text-[9px] font-normal text-muted-foreground ml-1">(da deviazione cumulativa)</span>
+            </h4>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Indicatore ausiliario di perdita di passo nello stint. Non è una misura diretta del degrado gomme.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left py-1.5 pr-2">Stint</th>
+                    <th className="text-right py-1.5 pr-2">Rate</th>
+                    <th className="text-center py-1.5 pr-2">Status</th>
+                    <th className="text-center py-1.5 pr-2">Conf.</th>
+                    <th className="text-center py-1.5 pr-2">Usato</th>
+                    <th className="text-left py-1.5">Nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pace_loss_results.map((pl) => {
+                    const statusStyles: Record<string, string> = {
+                      STABLE: "bg-emerald-500/20 text-emerald-400",
+                      NORMAL_LOSS: "bg-muted text-muted-foreground",
+                      HIGH_LOSS: "bg-amber-500/20 text-amber-400",
+                      CLIFF_RISK: "bg-red-500/20 text-red-400",
+                      UNRELIABLE: "bg-muted text-muted-foreground/50",
+                    };
+                    const confStyles: Record<string, string> = {
+                      HIGH: "text-emerald-400",
+                      MEDIUM: "text-amber-400",
+                      LOW: "text-red-400",
+                    };
+                    return (
+                      <tr key={pl.stint_number} className="border-b border-border/50">
+                        <td className="py-1.5 pr-2 font-mono">{pl.stint_number}</td>
+                        <td className="py-1.5 pr-2 text-right font-mono">
+                          {pl.stint_pace_loss_rate != null
+                            ? <span className={pl.stint_pace_loss_rate > 0.1 ? "text-amber-400" : pl.stint_pace_loss_rate > 0.2 ? "text-red-400" : ""}>{pl.stint_pace_loss_rate > 0 ? "+" : ""}{pl.stint_pace_loss_rate.toFixed(3)}</span>
+                            : "—"}
+                        </td>
+                        <td className="py-1.5 pr-2 text-center">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[pl.pace_loss_status]}`}>
+                            {pl.pace_loss_status}
+                          </span>
+                        </td>
+                        <td className={`py-1.5 pr-2 text-center text-[10px] font-semibold ${confStyles[pl.pace_loss_confidence] || ""}`}>
+                          {pl.pace_loss_confidence}
+                        </td>
+                        <td className="py-1.5 pr-2 text-center">
+                          {pl.pace_loss_used_for_strategy ? "✓" : "—"}
+                        </td>
+                        <td className="py-1.5 text-[10px] text-muted-foreground max-w-[200px] truncate" title={pl.pace_loss_reason}>
+                          {pl.pace_loss_reason}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {pace_loss_results.some(r => r.pace_loss_contamination_flags.battle || r.pace_loss_contamination_flags.weather || r.pace_loss_contamination_flags.neutralization) && (
+              <p className="text-[9px] text-muted-foreground italic mt-1.5">
+                ⚠️ Giri contaminati da {[
+                  pace_loss_results.some(r => r.pace_loss_contamination_flags.battle) && "battaglie",
+                  pace_loss_results.some(r => r.pace_loss_contamination_flags.weather) && "meteo",
+                  pace_loss_results.some(r => r.pace_loss_contamination_flags.neutralization) && "neutralizzazioni",
+                ].filter(Boolean).join(", ")} esclusi o ridimensionati nell'analisi.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Confidence factors */}
+        <div className="rounded-md bg-muted/40 border border-border px-3 py-2.5 space-y-1 text-[11px] text-muted-foreground">
+          <p className="font-medium text-foreground/80 flex items-center gap-1">
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            Fattori di confidenza
+          </p>
+          <ul className="space-y-1 pl-5 list-disc">
+            {confidence_factors.map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+          <p className="pt-1.5 italic text-[10px]">
+            ⚠️ Stima basata sui dati OpenF1 disponibili, non sostituisce l'analisi di un team di F1.
+          </p>
+        </div>
+
+        {practice_compounds_used && practice_compounds_used.length > 0 && (
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <Info className="h-3 w-3 shrink-0" />
+            Degrado da Practice: {practice_compounds_used.map((c) => (
+              <CompoundBadge key={c} compound={c} />
+            ))}
+          </p>
+        )}
+      </div>
+    </VRESection>
+  );
+}
+
 export type { AnalysisMode } from "@/lib/virtualRaceEngineer";
 
 interface Props {
