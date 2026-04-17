@@ -95,7 +95,7 @@ function computeWetPersistenceScore(
   // Determine drying speed multiplier from track temperature
   // Conservative default: when track temp is unknown, assume slow drying (cold track)
   // so the system leans toward MIXED/WET rather than optimistic DRY.
-  let dryingFactor = CONFIG.SLOW_DRY_FACTOR;
+  let dryingFactor: number = CONFIG.SLOW_DRY_FACTOR;
   if (trackTemp != null) {
     if (trackTemp >= CONFIG.FAST_DRY_TRACK_TEMP) {
       dryingFactor = CONFIG.FAST_DRY_FACTOR;
