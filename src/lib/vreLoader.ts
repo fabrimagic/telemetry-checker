@@ -234,17 +234,21 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
       } catch { /* optional */ }
     }
 
-    // Cumulative deviation (winner-benchmark)
-    let cumDev: CumulativeDeviationResult | null = null;
-    try {
-      const [sessionAllLaps, sessionResults] = await Promise.all([
-        getAllLaps(sessionKey),
-        getSessionResult(sessionKey),
-      ]);
-      if (sessionAllLaps.length && sessionResults.length) {
-        cumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
-      }
-    } catch { /* optional */ }
+    // Cumulative deviation (winner-benchmark) — reuse precomputed value when provided
+    // (head-to-head loads two drivers in parallel; fetching session-scoped data twice
+    //  doubles 429 risk and can produce asymmetric "non disponibile" gaps).
+    let cumDev: CumulativeDeviationResult | null = precomputedCumDev ?? null;
+    if (cumDev == null) {
+      try {
+        const [sessionAllLaps, sessionResults] = await Promise.all([
+          getAllLaps(sessionKey),
+          getSessionResult(sessionKey),
+        ]);
+        if (sessionAllLaps.length && sessionResults.length) {
+          cumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
+        }
+      } catch { /* optional */ }
+    }
     out.cumDevResult = cumDev;
 
     // VRE
