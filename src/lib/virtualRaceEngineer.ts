@@ -1515,7 +1515,8 @@ export function computeVirtualRaceEngineer(
       }
 
       // Check each alternative: does it pit on a neutralised lap or in green?
-      for (const alt of alternatives) {
+      for (let altIdx = 0; altIdx < alternatives.length; altIdx++) {
+        const alt = alternatives[altIdx];
         const altNeutralBenefit = alt.pit_laps.reduce((sum, pl) => {
           const mult = getObservedPitLossMultiplier(pl);
           return sum + pitLoss * (1.0 - mult);
@@ -1525,15 +1526,15 @@ export function computeVirtualRaceEngineer(
           // Alternative pits mostly in green while actual benefited from neutralisation
           const greenPits = alt.pit_laps.filter(pl => getObservedPitLossMultiplier(pl) >= 1.0);
           if (greenPits.length > 0) {
-            alt.cons.push(
-              `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`
-            );
+            const text = `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`;
+            alt.cons.push(text);
+            narrativeCollector.add({ id: `neutral_alt${altIdx}_green_penalty`, category: "neutralization", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { green_pits: greenPits, penalty_seconds: totalNeutralBenefit - altNeutralBenefit }, prerendered_text: text });
           }
         } else if (altNeutralBenefit > totalNeutralBenefit + 1.0) {
           // Alternative benefits MORE from neutralisation than actual
-          alt.pros.push(
-            `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`
-          );
+          const text = `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`;
+          alt.pros.push(text);
+          narrativeCollector.add({ id: `neutral_alt${altIdx}_extra_benefit`, category: "neutralization", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { benefit_seconds: altNeutralBenefit }, prerendered_text: text });
         }
       }
     }
