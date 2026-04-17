@@ -93,7 +93,9 @@ function computeWetPersistenceScore(
   const lookbackStart = atTime - CONFIG.PERSISTENCE_LOOKBACK_MS;
 
   // Determine drying speed multiplier from track temperature
-  let dryingFactor = 1.0;
+  // Conservative default: when track temp is unknown, assume slow drying (cold track)
+  // so the system leans toward MIXED/WET rather than optimistic DRY.
+  let dryingFactor: number = CONFIG.SLOW_DRY_FACTOR;
   if (trackTemp != null) {
     if (trackTemp >= CONFIG.FAST_DRY_TRACK_TEMP) {
       dryingFactor = CONFIG.FAST_DRY_FACTOR;
