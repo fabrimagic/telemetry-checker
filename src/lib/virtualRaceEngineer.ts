@@ -217,6 +217,14 @@ export function computeVirtualRaceEngineer(
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
+  // Narrative collector — accumulates structured events for migrated categories.
+  // Declared early because alt.* migrations (categories: traffic, neutralization,
+  // warmup, robustness, ...) live in upstream blocks. Render is invoked at the
+  // end of the pipeline. Dual-push approach: migrated sites push both to the
+  // legacy array (narrativeInsights / alt.pros|cons) AND to the collector to
+  // keep snapshot output bit-identical during the incremental refactor.
+  const narrativeCollector = new NarrativeCollector();
+
   // RACE_ENGINEER mode forces REAL_CONTEXT
   const effectiveScenarioId: ScenarioId = analysisMode === "RACE_ENGINEER" ? "REAL_CONTEXT" : scenarioId;
   const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
@@ -847,7 +855,8 @@ export function computeVirtualRaceEngineer(
   const allLapsMap = allLapsMapEarly;
 
   // Attach traffic predictions and warmup analysis to alternatives
-  for (const alt of alternatives) {
+  for (let altIdx = 0; altIdx < alternatives.length; altIdx++) {
+    const alt = alternatives[altIdx];
     if (alt.pit_laps.length > 0) {
       const altTraffic = predictTrafficForPitLaps(
         driverNumber, alt.pit_laps, pitLoss, totalLaps,
@@ -861,35 +870,49 @@ export function computeVirtualRaceEngineer(
         return worst;
       }, "CLEAN" as TrafficLevel);
       if (worstTraffic === "HEAVY") {
-        alt.cons.push(`Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`);
+        const text = `Rientro in traffico pesante (−${trafficLoss.toFixed(1)}s stimati)`;
+        alt.cons.push(text);
+        narrativeCollector.add({ id: `traffic_heavy_alt${altIdx}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { traffic_loss: trafficLoss, level: "HEAVY" }, prerendered_text: text });
       } else if (worstTraffic === "LIGHT") {
-        alt.cons.push(`Rientro in traffico leggero (−${trafficLoss.toFixed(1)}s stimati)`);
+        const text = `Rientro in traffico leggero (−${trafficLoss.toFixed(1)}s stimati)`;
+        alt.cons.push(text);
+        narrativeCollector.add({ id: `traffic_light_alt${altIdx}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { traffic_loss: trafficLoss, level: "LIGHT" }, prerendered_text: text });
       } else if (worstTraffic === "CLEAN") {
-        alt.pros.push("Rientro in aria pulita");
+        const text = "Rientro in aria pulita";
+        alt.pros.push(text);
+        narrativeCollector.add({ id: `traffic_clean_alt${altIdx}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { level: "CLEAN" }, prerendered_text: text });
       }
 
       // Traffic metadata enrichment: release classification, pack risk, persistence
       for (const tp of altTraffic) {
         // Release classification (CLEAN / TRAFFIC / PACK)
         if (tp.release_classification === "PACK") {
-          alt.cons.push(`Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti, ${tp.pack_size_behind ?? "?"} dietro)`);
+          const text = `Rientro dentro un pack al giro ${tp.pit_lap} (${tp.pack_size_ahead ?? "?"} vetture davanti, ${tp.pack_size_behind ?? "?"} dietro)`;
+          alt.cons.push(text);
+          narrativeCollector.add({ id: `traffic_pack_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, pack_size_ahead: tp.pack_size_ahead, pack_size_behind: tp.pack_size_behind, release_classification: "PACK" }, prerendered_text: text });
           break;
         }
         if (tp.release_classification === "TRAFFIC") {
           if (tp.release_quality === "POOR" || tp.release_quality === "MARGINAL") {
-            alt.cons.push(`Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`);
+            const text = `Qualità release al giro ${tp.pit_lap}: ${tp.release_quality === "POOR" ? "scarsa" : "marginale"}${tp.compressed_train_risk === "HIGH" ? " — rischio trenino compresso" : ""}`;
+            alt.cons.push(text);
+            narrativeCollector.add({ id: `traffic_release_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, release_quality: tp.release_quality, compressed_train_risk: tp.compressed_train_risk }, prerendered_text: text });
             break;
           }
         }
         // Traffic persistence
         const persistLaps = tp.traffic_persistence_laps ?? tp.estimated_traffic_laps;
         if (persistLaps > 3) {
-          alt.cons.push(`Traffico persistente: ~${persistLaps} giri bloccato in aria sporca dopo il pit al giro ${tp.pit_lap}`);
+          const text = `Traffico persistente: ~${persistLaps} giri bloccato in aria sporca dopo il pit al giro ${tp.pit_lap}`;
+          alt.cons.push(text);
+          narrativeCollector.add({ id: `traffic_persist_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, persist_laps: persistLaps }, prerendered_text: text });
           break;
         }
         // Stuck risk
         if ((tp.stuck_risk_score ?? 0) > 0.7) {
-          alt.cons.push(`Rischio elevato di restare bloccato dopo il pit al giro ${tp.pit_lap} (stuck score: ${((tp.stuck_risk_score ?? 0) * 100).toFixed(0)}%)`);
+          const text = `Rischio elevato di restare bloccato dopo il pit al giro ${tp.pit_lap} (stuck score: ${((tp.stuck_risk_score ?? 0) * 100).toFixed(0)}%)`;
+          alt.cons.push(text);
+          narrativeCollector.add({ id: `traffic_stuck_alt${altIdx}_lap${tp.pit_lap}`, category: "traffic", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", lap: tp.pit_lap, data: { pit_lap: tp.pit_lap, stuck_risk_score: tp.stuck_risk_score ?? 0 }, prerendered_text: text });
           break;
         }
       }
@@ -897,7 +920,9 @@ export function computeVirtualRaceEngineer(
       // Prediction confidence warning
       const lowConfTraffic = altTraffic.filter(tp => tp.prediction_confidence === "LOW");
       if (lowConfTraffic.length > 0) {
-        alt.cons.push("Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti");
+        const text = "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti";
+        alt.cons.push(text);
+        narrativeCollector.add({ id: `traffic_low_conf_alt${altIdx}`, category: "traffic", priority: "context", target: "alternative", target_index: altIdx, side: "con", data: { low_conf_count: lowConfTraffic.length }, prerendered_text: text });
       }
     }
 
@@ -1251,11 +1276,7 @@ export function computeVirtualRaceEngineer(
   );
 
   const narrativeInsights: string[] = [];
-  // Narrative collector — accumulates structured events for migrated categories.
-  // During the incremental refactor, migrated sites push BOTH to narrativeInsights
-  // (preserving exact output order) AND to the collector. Once all categories
-  // are migrated, narrativeInsights will be replaced by renderNarrative output.
-  const narrativeCollector = new NarrativeCollector();
+
 
   // Analysis mode narrative
   if (isRaceEngineerMode) {
@@ -1494,7 +1515,8 @@ export function computeVirtualRaceEngineer(
       }
 
       // Check each alternative: does it pit on a neutralised lap or in green?
-      for (const alt of alternatives) {
+      for (let altIdx = 0; altIdx < alternatives.length; altIdx++) {
+        const alt = alternatives[altIdx];
         const altNeutralBenefit = alt.pit_laps.reduce((sum, pl) => {
           const mult = getObservedPitLossMultiplier(pl);
           return sum + pitLoss * (1.0 - mult);
@@ -1504,15 +1526,15 @@ export function computeVirtualRaceEngineer(
           // Alternative pits mostly in green while actual benefited from neutralisation
           const greenPits = alt.pit_laps.filter(pl => getObservedPitLossMultiplier(pl) >= 1.0);
           if (greenPits.length > 0) {
-            alt.cons.push(
-              `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`
-            );
+            const text = `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`;
+            alt.cons.push(text);
+            narrativeCollector.add({ id: `neutral_alt${altIdx}_green_penalty`, category: "neutralization", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { green_pits: greenPits, penalty_seconds: totalNeutralBenefit - altNeutralBenefit }, prerendered_text: text });
           }
         } else if (altNeutralBenefit > totalNeutralBenefit + 1.0) {
           // Alternative benefits MORE from neutralisation than actual
-          alt.pros.push(
-            `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`
-          );
+          const text = `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`;
+          alt.pros.push(text);
+          narrativeCollector.add({ id: `neutral_alt${altIdx}_extra_benefit`, category: "neutralization", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { benefit_seconds: altNeutralBenefit }, prerendered_text: text });
         }
       }
     }
