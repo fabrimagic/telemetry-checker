@@ -173,10 +173,19 @@ export interface HeadToHeadInput {
   lapsB: Lap[];
   /** Optional: shared session positions for swap detection. Pass null to skip. */
   positions?: PositionData[] | null;
+  /** Optional: alternative VRE result for driver A (POST_RACE + BALANCED). */
+  alternativeA?: VirtualRaceEngineerResult | null;
+  /** Optional: alternative VRE result for driver B (POST_RACE + BALANCED). */
+  alternativeB?: VirtualRaceEngineerResult | null;
 }
 
 export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
-  const { resultA, resultB, lapsA, lapsB, positions = null } = input;
+  const {
+    resultA, resultB, lapsA, lapsB,
+    positions = null,
+    alternativeA = null,
+    alternativeB = null,
+  } = input;
 
   if (resultA.session_key !== resultB.session_key) {
     throw new Error(
