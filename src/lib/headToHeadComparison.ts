@@ -311,9 +311,45 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     if (niB) factors.push(`${resultB.driver_acronym}: ${niB}`);
   }
 
+  // Counterfactual analysis (only when both alternatives are provided)
+  let counterfactual: CounterfactualAnalysis | null = null;
+  if (alternativeA && alternativeB) {
+    // recommended_strategy.time_delta_vs_actual: negative = faster than actual (motorsport convention)
+    const gainA = Number.isFinite(alternativeA.recommended_strategy.time_delta_vs_actual)
+      ? alternativeA.recommended_strategy.time_delta_vs_actual : null;
+    const gainB = Number.isFinite(alternativeB.recommended_strategy.time_delta_vs_actual)
+      ? alternativeB.recommended_strategy.time_delta_vs_actual : null;
+
+    const realDelta = totalDelta; // signed (A − B); negative = A faster
+    let cfDelta: number | null = null;
+    let cfFaster: "A" | "B" | "TIE" | null = null;
+    let outcomeChanged = false;
+
+    if (gainA != null && gainB != null) {
+      // If A switches to alt → A's time changes by gainA. B switches → B's by gainB.
+      // New (A − B) = realDelta + (gainA − gainB)
+      cfDelta = realDelta + (gainA - gainB);
+      cfFaster = Math.abs(cfDelta) <= 0.5 ? "TIE" : (cfDelta < 0 ? "A" : "B");
+      outcomeChanged = cfFaster !== faster;
+    }
+
+    counterfactual = {
+      gain_a_seconds: gainA,
+      gain_b_seconds: gainB,
+      real_h2h_delta_seconds: realDelta,
+      counterfactual_h2h_delta_seconds: cfDelta,
+      counterfactual_faster: cfFaster,
+      outcome_changed: outcomeChanged,
+      confidence: confidenceMin(alternativeA.confidence, alternativeB.confidence),
+      disclaimer: "Stima teorica: assume che entrambe le alternative siano applicate simultaneamente e indipendentemente. Non considera le reazioni avversarie, l'effetto undercut/overcut sui rivali esterni al confronto, né la disponibilità reale di mescole nuove.",
+    };
+  }
+
   return {
     driver_a: resultA,
     driver_b: resultB,
+    alternative_a: alternativeA,
+    alternative_b: alternativeB,
     session_key: sessionKey,
     total_laps: totalLaps,
     lap_by_lap_delta: deltas,
@@ -324,6 +360,9 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
       delta_total_seconds: Math.abs(totalDelta),
       key_factors: factors.slice(0, 5),
     },
+    counterfactual_analysis: counterfactual,
     common_confidence: confidenceMin(resultA.confidence, resultB.confidence),
+  };
+}
   };
 }
