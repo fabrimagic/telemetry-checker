@@ -35,16 +35,25 @@ function getSessionWinner(results: SessionResult[]): number | null {
 }
 
 /**
- * Filter valid laps for benchmark: exclude pit out laps, null durations, outliers.
+ * Structural-only filter: exclude null/zero durations, pit out laps and the formation lap.
+ * No statistical outlier removal — safe for chaotic drivers (incidents, spins).
  */
-function getValidLaps(laps: Lap[]): Lap[] {
-  const valid = laps.filter(
+function getValidLapsStructural(laps: Lap[]): Lap[] {
+  return laps.filter(
     (l) =>
       l.lap_duration != null &&
       l.lap_duration > 0 &&
       !l.is_pit_out_lap &&
       l.lap_number > 1 // exclude formation/first lap
   );
+}
+
+/**
+ * Filter valid laps for benchmark: structural filters + statistical outlier removal (> 1.5× median).
+ * Used only for the winner's reference average to keep the benchmark clean.
+ */
+function getValidLapsForBenchmark(laps: Lap[]): Lap[] {
+  const valid = getValidLapsStructural(laps);
 
   if (valid.length < 3) return valid;
 
@@ -61,7 +70,7 @@ function getValidLaps(laps: Lap[]): Lap[] {
  */
 function getWinnerReferenceAvg(allLaps: Lap[], winnerNumber: number): number | null {
   const winnerLaps = allLaps.filter((l) => l.driver_number === winnerNumber);
-  const valid = getValidLaps(winnerLaps);
+  const valid = getValidLapsForBenchmark(winnerLaps);
   if (valid.length === 0) return null;
 
   const sum = valid.reduce((acc, l) => acc + l.lap_duration!, 0);
@@ -80,7 +89,7 @@ function buildDriverDeviation(
 ): DriverCumulativeDeviation {
   const driverLaps = allLaps.filter((l) => l.driver_number === driverNumber);
   // Use the SAME filtering as the benchmark to ensure the winner ends at ~0
-  const validLaps = getValidLaps(driverLaps).sort((a, b) => a.lap_number - b.lap_number);
+  const validLaps = getValidLapsStructural(driverLaps).sort((a, b) => a.lap_number - b.lap_number);
 
   let cumulative = 0;
   const laps: LapDeviation[] = [];
