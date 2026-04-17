@@ -211,13 +211,19 @@ export default function Compare() {
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         <section className="flex flex-wrap gap-6 items-start">
-          <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+          <SessionPicker
+            onSelect={handleSessionSubmit}
+            isLoading={loadingDrivers}
+            sessionTypeFilter={["Race", "Sprint"]}
+          />
         </section>
 
+        {/* Defensive guard: SessionPicker is filtered to Race/Sprint only,
+            but if a stale URL or upstream change ever surfaces another type, warn the user. */}
         {sessionKey && !isRace && (
           <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground flex gap-2 items-start">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>Il confronto head-to-head è disponibile solo per sessioni Race o Sprint. Seleziona una sessione di gara.</span>
+            <span>Il confronto head-to-head è disponibile solo per sessioni Race o Sprint.</span>
           </div>
         )}
 
