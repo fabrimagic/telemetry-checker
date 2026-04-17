@@ -49,28 +49,19 @@ function getValidLapsStructural(laps: Lap[]): Lap[] {
 }
 
 /**
- * Filter valid laps for benchmark: structural filters + statistical outlier removal (> 1.5× median).
- * Used only for the winner's reference average to keep the benchmark clean.
- */
-function getValidLapsForBenchmark(laps: Lap[]): Lap[] {
-  const valid = getValidLapsStructural(laps);
-
-  if (valid.length < 3) return valid;
-
-  // Remove statistical outliers (> 1.5x median)
-  const times = valid.map((l) => l.lap_duration!).sort((a, b) => a - b);
-  const median = times[Math.floor(times.length / 2)];
-  const threshold = median * 1.5;
-
-  return valid.filter((l) => l.lap_duration! <= threshold);
-}
-
-/**
- * Calculate winner's reference average lap time using only valid laps.
+ * Calculate winner's reference average lap time.
+ *
+ * IMPORTANT: must use the SAME filtering as the per-driver deviation
+ * (structural-only). If the benchmark removed statistical outliers (e.g. SC/VSC
+ * laps) but the per-driver cumulative kept them, the winner would not converge
+ * to ~0 — every neutralized lap would inflate every driver's (and the winner's)
+ * cumulative delta. Keeping both filters identical guarantees the winner's
+ * final cumulative_delta ≈ 0 by construction, which is the entire premise of
+ * "deviation vs winner".
  */
 function getWinnerReferenceAvg(allLaps: Lap[], winnerNumber: number): number | null {
   const winnerLaps = allLaps.filter((l) => l.driver_number === winnerNumber);
-  const valid = getValidLapsForBenchmark(winnerLaps);
+  const valid = getValidLapsStructural(winnerLaps);
   if (valid.length === 0) return null;
 
   const sum = valid.reduce((acc, l) => acc + l.lap_duration!, 0);
