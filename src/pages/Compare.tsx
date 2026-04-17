@@ -14,10 +14,12 @@ import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
+  getAllLaps, getSessionResult,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
 } from "@/lib/openf1";
 import { loadVreForDriver, type VreLoaderOutput } from "@/lib/vreLoader";
 import { computeHeadToHead, type ComparisonResult } from "@/lib/headToHeadComparison";
+import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 
 interface DualState {
   outA: VreLoaderOutput | null;
