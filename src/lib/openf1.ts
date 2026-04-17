@@ -101,23 +101,41 @@ export interface IntervalData {
   session_key: number;
 }
 
-// Simple queue to enforce max 2 requests/second.
-// Uses an atomic slot-reservation approach (sync read+write of nextAvailableTime)
-// so parallel callers (e.g. Promise.all) get progressively spaced slots instead of all firing at t=0.
+// Atomic slot-reservation rate limiter for OpenF1.
+// Parallel callers (Promise.all, head-to-head loaders) get progressively spaced slots.
+// On 429: exponential backoff + push the global queue forward so siblings also slow down.
 let nextAvailableTime: number = 0;
-const MIN_INTERVAL = 500; // ms between requests
+const MIN_INTERVAL = 600; // ms between requests (~1.6 req/s, safe under OpenF1 limits)
+const MAX_RETRIES = 4;
 
-async function fetchApi<T>(path: string, retries = 2): Promise<T> {
+async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
   // Reserve a slot atomically (JS single-thread guarantees this read+write pair is uninterrupted).
   const scheduledTime = Math.max(Date.now(), nextAvailableTime);
   nextAvailableTime = scheduledTime + MIN_INTERVAL;
   const delay = scheduledTime - Date.now();
   if (delay > 0) await new Promise((r) => setTimeout(r, delay));
 
-  const res = await fetch(`${BASE}${path}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`);
+  } catch (networkErr) {
+    // Transient network error: retry with backoff
+    if (retries > 0) {
+      const attempt = MAX_RETRIES - retries;
+      const backoff = 800 * Math.pow(2, attempt); // 800, 1600, 3200, 6400
+      await new Promise((r) => setTimeout(r, backoff));
+      return fetchApi<T>(path, retries - 1);
+    }
+    throw networkErr;
+  }
+
   if (res.status === 429 && retries > 0) {
-    // Do not advance nextAvailableTime here: this request already owns its slot.
-    await new Promise((r) => setTimeout(r, 1500));
+    // Exponential backoff: 1.5s, 3s, 6s, 12s
+    const attempt = MAX_RETRIES - retries;
+    const backoff = 1500 * Math.pow(2, attempt);
+    // Push the entire queue forward so concurrent siblings also wait — prevents thrashing.
+    nextAvailableTime = Math.max(nextAvailableTime, Date.now() + backoff);
+    await new Promise((r) => setTimeout(r, backoff));
     return fetchApi<T>(path, retries - 1);
   }
   if (!res.ok) throw new Error(`OpenF1 API error: ${res.status}`);
