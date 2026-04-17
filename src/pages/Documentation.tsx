@@ -207,10 +207,10 @@ export default function Documentation() {
               (Practice 1–3, Qualifying, Sprint, Race). Il picker carica automaticamente gli eventi disponibili dall'API OpenF1.
             </li>
             <li>
-              <strong className="text-foreground">Seleziona uno o più piloti</strong> — Una volta caricata la sessione,
-              compare l'elenco dei piloti con nome, acronimo e colore del team.
-              Puoi selezionare <strong className="text-foreground">più piloti</strong> per confronti multi-driver
-              oppure <strong className="text-foreground">un singolo pilota</strong> per attivare l'analisi individuale e il Virtual Race Engineer.
+              <strong className="text-foreground">Seleziona un pilota</strong> — Una volta caricata la sessione,
+              compare l'elenco dei piloti con nome, acronimo e colore del team. Nella pagina principale è possibile
+              selezionare <strong className="text-foreground">un solo pilota</strong> per volta, così da focalizzare
+              l'analisi individuale e attivare il Virtual Race Engineer.
             </li>
             <li>
               <strong className="text-foreground">Esplora i dati</strong> — Il sistema carica automaticamente tempi al giro, stint, pit stop,
@@ -220,8 +220,8 @@ export default function Documentation() {
 
           <h4 className="font-semibold text-foreground mt-3">Modalità di visualizzazione</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Multi-pilota</strong> — Confronto tempi al giro, posizioni, gap, deviazione cumulativa. Ideale per analisi comparative.</li>
-            <li><strong className="text-foreground">Singolo pilota</strong> — Telemetria dettagliata, track map, analisi stint, pit stop, sorpassi, diario di gara, degrado gomme e <strong className="text-foreground">Virtual Race Engineer</strong> (solo per Race/Sprint).</li>
+            <li><strong className="text-foreground">Singolo pilota</strong> (pagina principale) — Telemetria dettagliata, track map, analisi stint, pit stop, sorpassi, diario di gara, degrado gomme, Soft Sensors, Key Decision Moments e <strong className="text-foreground">Virtual Race Engineer</strong> (solo per Race/Sprint).</li>
+            <li><strong className="text-foreground">Head-to-Head</strong> (pagina dedicata <code className="text-primary">/compare</code>) — Confronto strutturato fra <strong className="text-foreground">due piloti</strong> della stessa sessione Race o Sprint. Si raggiunge tramite il pulsante <em>Head-to-Head</em> presente nell'header dell'app: sessione e piloti vengono scelti direttamente lì, senza dover passare dalla pagina principale.</li>
           </ul>
         </DocSection>
 
