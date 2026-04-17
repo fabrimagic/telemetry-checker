@@ -38,14 +38,14 @@ function buildMetrics(c: ComparisonResult): MetricRow[] {
   const compA = a.actual_strategy.stints.map((s) => s.compound).join(" → ") || "—";
   const compB = b.actual_strategy.stints.map((s) => s.compound).join(" → ") || "—";
 
-  const cumDevA = a.integrated_context?.cumulative_deviation_summary?.driver_final_cumulative_delta ?? null;
-  const cumDevB = b.integrated_context?.cumulative_deviation_summary?.driver_final_cumulative_delta ?? null;
+  const cumDevA = a.integrated_context?.cumulative_deviation_context?.driver_final_delta ?? null;
+  const cumDevB = b.integrated_context?.cumulative_deviation_context?.driver_final_delta ?? null;
 
-  const battlesA = a.integrated_context?.battle_context?.battle_count ?? 0;
-  const battlesB = b.integrated_context?.battle_context?.battle_count ?? 0;
+  const battlesA = a.integrated_context?.battle_context?.total_episodes ?? 0;
+  const battlesB = b.integrated_context?.battle_context?.total_episodes ?? 0;
 
-  const neutLapsA = a.integrated_context?.track_status_summary?.neutralised_lap_count ?? 0;
-  const neutLapsB = b.integrated_context?.track_status_summary?.neutralised_lap_count ?? 0;
+  const neutLapsA = a.integrated_context?.track_status_context?.total_neutralized_laps ?? 0;
+  const neutLapsB = b.integrated_context?.track_status_context?.total_neutralized_laps ?? 0;
 
   const validLapsA = a.actual_strategy.stints.flatMap((s) => [s.avg_lap_time]).filter((v): v is number => v != null);
   const validLapsB = b.actual_strategy.stints.flatMap((s) => [s.avg_lap_time]).filter((v): v is number => v != null);
