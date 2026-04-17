@@ -1872,6 +1872,24 @@ export function computeVirtualRaceEngineer(
       }
     }
 
+    // ── Narrative cutover Phase 2: populate alt.pros/cons & rec.pros/cons from renderer ──
+    // Must happen BEFORE alternatives.sort (target_index uses original positions)
+    // and BEFORE the promotion check (which reassigns recommendedStrategy.pros/cons
+    // to promoAlt.pros/cons — that array is now populated by this render).
+    // The battle-context inline push at L1390 already executed and stays inline (TODO).
+    {
+      const __renderedAltRec = renderNarrative(narrativeCollector.getAll());
+      for (let __i = 0; __i < alternatives.length; __i++) {
+        const __bucket = __renderedAltRec.alternatives.get(__i);
+        if (__bucket) {
+          alternatives[__i].pros.push(...__bucket.pros);
+          alternatives[__i].cons.push(...__bucket.cons);
+        }
+      }
+      recommendedStrategy.pros.push(...__renderedAltRec.recommended_pros);
+      recommendedStrategy.cons.push(...__renderedAltRec.recommended_cons);
+    }
+
     // Reorder alternatives by risk-aware adjusted_score (descending)
     alternatives.sort((a, b) => {
       const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
