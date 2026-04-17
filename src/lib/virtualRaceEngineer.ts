@@ -558,7 +558,7 @@ export function computeVirtualRaceEngineer(
         totalCost += baseLap + degLap + warmupPenalty;
       }
       // Cliff risk for this stint
-      totalCost += cliffPenalty(stintLength);
+      totalCost += cliffPenalty(stintLength, sb.compound);
     }
 
     // Pit costs with per-lap scenario modifier
