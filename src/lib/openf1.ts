@@ -101,18 +101,22 @@ export interface IntervalData {
   session_key: number;
 }
 
-// Simple queue to enforce max 2 requests/second
-let lastRequestTime = 0;
+// Simple queue to enforce max 2 requests/second.
+// Uses an atomic slot-reservation approach (sync read+write of nextAvailableTime)
+// so parallel callers (e.g. Promise.all) get progressively spaced slots instead of all firing at t=0.
+let nextAvailableTime: number = 0;
 const MIN_INTERVAL = 500; // ms between requests
 
 async function fetchApi<T>(path: string, retries = 2): Promise<T> {
-  const now = Date.now();
-  const wait = Math.max(0, MIN_INTERVAL - (now - lastRequestTime));
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastRequestTime = Date.now();
+  // Reserve a slot atomically (JS single-thread guarantees this read+write pair is uninterrupted).
+  const scheduledTime = Math.max(Date.now(), nextAvailableTime);
+  nextAvailableTime = scheduledTime + MIN_INTERVAL;
+  const delay = scheduledTime - Date.now();
+  if (delay > 0) await new Promise((r) => setTimeout(r, delay));
 
   const res = await fetch(`${BASE}${path}`);
   if (res.status === 429 && retries > 0) {
+    // Do not advance nextAvailableTime here: this request already owns its slot.
     await new Promise((r) => setTimeout(r, 1500));
     return fetchApi<T>(path, retries - 1);
   }
