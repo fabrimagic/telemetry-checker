@@ -57,11 +57,20 @@ export interface VreLoaderInput {
   allDrivers: Driver[];
   riskMode?: RiskMode;
   analysisMode?: AnalysisMode;
+  /**
+   * If true, computes a SECOND VRE pass with analysisMode="POST_RACE" + riskMode="BALANCED"
+   * to expose the "ex-ante / balanced" alternative strategy without re-fetching any data.
+   * The primary `vreResult` still uses the requested mode; the alternative is exposed via
+   * `alternativeVreResult` and is intended ONLY for the head-to-head comparison.
+   */
+  computeAlternative?: boolean;
 }
 
 export interface VreLoaderOutput {
   driverNumber: number;
   vreResult: VirtualRaceEngineerResult | null;
+  /** Optional second VRE pass in POST_RACE + BALANCED. Null when not requested or insufficient data. */
+  alternativeVreResult: VirtualRaceEngineerResult | null;
   kdmResult: KeyDecisionMomentsResult | null;
   diaryEvents: DiaryEvent[];
   laps: Lap[];
