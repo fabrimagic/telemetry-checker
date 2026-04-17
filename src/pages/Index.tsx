@@ -728,6 +728,21 @@ export default function Index() {
                 onRemove={handleRemoveDriver}
               />
 
+              {selectedDriverNumbers.length === 2 && sessionKey && (sessionType === "Race" || sessionType === "Sprint") && (
+                <div className="rounded-md border border-[hsl(var(--f1-red))]/40 bg-[hsl(var(--f1-red))]/5 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <div className="font-semibold">Confronta i due piloti selezionati</div>
+                    <div className="text-xs text-muted-foreground">Apri la vista head-to-head con timeline strategica e delta cumulativo.</div>
+                  </div>
+                  <Link
+                    to={`/compare?session=${sessionKey}&driverA=${selectedDriverNumbers[0]}&driverB=${selectedDriverNumbers[1]}`}
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--f1-red))] text-white text-xs font-bold px-3 py-2 hover:opacity-90 transition-opacity"
+                  >
+                    Confronta head-to-head →
+                  </Link>
+                </div>
+              )}
+
         {error && (
           <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
         )}
