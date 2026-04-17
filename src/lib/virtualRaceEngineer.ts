@@ -217,6 +217,14 @@ export function computeVirtualRaceEngineer(
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
+  // Narrative collector — accumulates structured events for migrated categories.
+  // Declared early because alt.* migrations (categories: traffic, neutralization,
+  // warmup, robustness, ...) live in upstream blocks. Render is invoked at the
+  // end of the pipeline. Dual-push approach: migrated sites push both to the
+  // legacy array (narrativeInsights / alt.pros|cons) AND to the collector to
+  // keep snapshot output bit-identical during the incremental refactor.
+  const narrativeCollector = new NarrativeCollector();
+
   // RACE_ENGINEER mode forces REAL_CONTEXT
   const effectiveScenarioId: ScenarioId = analysisMode === "RACE_ENGINEER" ? "REAL_CONTEXT" : scenarioId;
   const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
