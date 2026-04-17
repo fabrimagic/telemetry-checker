@@ -933,11 +933,15 @@ export function computeVirtualRaceEngineer(
       altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0);
     }
     if (altWarmupTotal > 2.5) {
-      alt.cons.push(`Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`);
+      const text = `Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`;
+      alt.cons.push(text);
+      narrativeCollector.add({ id: `warmup_high_alt${altIdx}`, category: "warmup", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { warmup_total: altWarmupTotal }, prerendered_text: text });
     }
     const hasHard = alt.compounds.some(c => c.toUpperCase() === "HARD");
     if (hasHard && altWarmupTotal > 1.5) {
-      alt.cons.push("Mescola Hard: warmup lento riduce efficacia undercut");
+      const text = "Mescola Hard: warmup lento riduce efficacia undercut";
+      alt.cons.push(text);
+      narrativeCollector.add({ id: `warmup_hard_undercut_alt${altIdx}`, category: "warmup", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { warmup_total: altWarmupTotal, has_hard: true }, prerendered_text: text });
     }
   }
 
@@ -1295,15 +1299,23 @@ export function computeVirtualRaceEngineer(
       const corrNote = dv.model_corrected
         ? ` Il modello ha corretto per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} (slope grezza: ${dv.slope_raw.toFixed(3)}, corretta: ${dv.slope_corrected.toFixed(3)}), ma la stima resta non attendibile.`
         : "";
-      narrativeInsights.push(`La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}) è stata classificata come non attendibile e non è stata usata nel modello strategico.${corrNote} ${dv.fallback_description ?? ""}`);
+      const text = `La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}) è stata classificata come non attendibile e non è stata usata nel modello strategico.${corrNote} ${dv.fallback_description ?? ""}`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: `deg_quality_invalid_stint${dv.original.stint}`, category: "degradation_quality", priority: "critical", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, status: "INVALID", model_corrected: dv.model_corrected, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used, fallback_description: dv.fallback_description ?? null }, prerendered_text: text });
     } else if (dv.model_corrected && dv.slope_raw < 0 && dv.slope_corrected > 0 && dv.status === "VALID") {
-      narrativeInsights.push(`Stint ${dv.original.stint} (${dv.original.compound}): la slope grezza era negativa (${dv.slope_raw.toFixed(3)}) ma dopo correzione per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} il degrado stimato è diventato positivo (${dv.slope_corrected.toFixed(3)} sec/giro). Il modello usa il valore corretto.`);
+      const text = `Stint ${dv.original.stint} (${dv.original.compound}): la slope grezza era negativa (${dv.slope_raw.toFixed(3)}) ma dopo correzione per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} il degrado stimato è diventato positivo (${dv.slope_corrected.toFixed(3)} sec/giro). Il modello usa il valore corretto.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: `deg_quality_neg_to_pos_stint${dv.original.stint}`, category: "degradation_quality", priority: "supporting", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used }, prerendered_text: text });
     } else if (dv.status === "NEUTRAL" && dv.fallback_applied) {
-      narrativeInsights.push(`Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope${dv.model_corrected ? " corretta" : ""}: ${dv.slope_corrected.toFixed(3)}). Usato con cautela nel modello.`);
+      const text = `Lo stint ${dv.original.stint} (${dv.original.compound}) presenta un degrado troppo debole per essere significativo (slope${dv.model_corrected ? " corretta" : ""}: ${dv.slope_corrected.toFixed(3)}). Usato con cautela nel modello.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: `deg_quality_neutral_stint${dv.original.stint}`, category: "degradation_quality", priority: "supporting", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, status: "NEUTRAL", model_corrected: dv.model_corrected, slope_corrected: dv.slope_corrected }, prerendered_text: text });
     }
   }
   if (invalidDegCount > 0 && validDegCount === 0 && neutralDegCount === 0) {
-    narrativeInsights.push("⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.");
+    const text = "⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.";
+    narrativeInsights.push(text);
+    narrativeCollector.add({ id: "deg_quality_no_reliable", category: "degradation_quality", priority: "critical", target: "global", data: { invalid_count: invalidDegCount, valid_count: validDegCount, neutral_count: neutralDegCount }, prerendered_text: text });
   }
 
   // ── 7.pre2 Raw vs Corrected degradation comparison ──
@@ -1313,7 +1325,9 @@ export function computeVirtualRaceEngineer(
 
     if (lowAgreementStints.length > 0) {
       for (const la of lowAgreementStints) {
-        narrativeInsights.push(`Stint ${la.stint} (${la.compound}): divergenza significativa tra degrado grezzo (${la.rawSlope.toFixed(3)} s/giro) e corretto (${la.corrSlope.toFixed(3)} s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.`);
+        const text = `Stint ${la.stint} (${la.compound}): divergenza significativa tra degrado grezzo (${la.rawSlope.toFixed(3)} s/giro) e corretto (${la.corrSlope.toFixed(3)} s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: `raw_vs_corrected_low_stint${la.stint}`, category: "raw_vs_corrected", priority: "supporting", target: "global", data: { stint: la.stint, compound: la.compound, raw_slope: la.rawSlope, corr_slope: la.corrSlope, agreement: "LOW" }, prerendered_text: text });
       }
       confScore -= lowAgreementStints.length;
       confidenceFactors.push(`⚠️ Divergenza raw/corrected in ${lowAgreementStints.length} stint — correzione non-tyre molto ampia`);
@@ -1457,11 +1471,15 @@ export function computeVirtualRaceEngineer(
     const dc = integratedContext.diary_context;
     if (dc.strategy_relevant_events.length > 0) {
       for (const ev of dc.strategy_relevant_events.slice(0, 3)) {
-        narrativeInsights.push(`Giro ${ev.lap}: ${ev.description}`);
+        const text = `Giro ${ev.lap}: ${ev.description}`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: `diary_event_lap${ev.lap}`, category: "diary", priority: "context", target: "global", lap: ev.lap, data: { lap: ev.lap, description: ev.description }, prerendered_text: text });
       }
     }
     if (dc.overtakes_received > dc.overtakes_done && dc.overtakes_received >= 3) {
-      narrativeInsights.push(`Il pilota ha subito più sorpassi (${dc.overtakes_received}) di quanti ne ha effettuati (${dc.overtakes_done}), indicando una possibile strategia difensiva o ritmo insufficiente.`);
+      const text = `Il pilota ha subito più sorpassi (${dc.overtakes_received}) di quanti ne ha effettuati (${dc.overtakes_done}), indicando una possibile strategia difensiva o ritmo insufficiente.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "diary_defensive_pattern", category: "diary", priority: "supporting", target: "global", data: { overtakes_received: dc.overtakes_received, overtakes_done: dc.overtakes_done }, prerendered_text: text });
     }
   }
 
