@@ -159,6 +159,8 @@ export default function Compare() {
         lapsA: dual.outA.laps,
         lapsB: dual.outB.laps,
         positions,
+        alternativeA: dual.outA.alternativeVreResult,
+        alternativeB: dual.outB.alternativeVreResult,
       });
     } catch (e: any) {
       setError(e?.message ?? "Errore comparazione");
