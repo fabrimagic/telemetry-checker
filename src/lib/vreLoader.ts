@@ -94,11 +94,13 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     sessionWeather, raceControlMessages, allDrivers,
     riskMode = "BALANCED",
     analysisMode = "RACE_ENGINEER",
+    computeAlternative = false,
   } = input;
 
   const out: VreLoaderOutput = {
     driverNumber,
     vreResult: null,
+    alternativeVreResult: null,
     kdmResult: null,
     diaryEvents: [],
     laps: [],
