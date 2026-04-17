@@ -1317,18 +1317,24 @@ export function computeVirtualRaceEngineer(
           Math.abs(ep.startLap - recPitLap) <= 3 || Math.abs(ep.endLap - recPitLap) <= 3
         );
         if (battleNearPit) {
-          narrativeInsights.push(`Battaglia in corso vicino alla finestra pit consigliata (giro ${recPitLap}): il pit potrebbe essere stato condizionato dalla posizione in pista.`);
+          const text = `Battaglia in corso vicino alla finestra pit consigliata (giro ${recPitLap}): il pit potrebbe essere stato condizionato dalla posizione in pista.`;
+          narrativeInsights.push(text);
+          narrativeCollector.add({ id: "battle_near_rec_pit", category: "battle_context", priority: "supporting", target: "global", lap: recPitLap, data: { rec_pit_lap: recPitLap }, prerendered_text: text });
         }
       }
 
       if (bc.defending_episodes > 0 && bc.longest_episode) {
-        narrativeInsights.push(`Fase difensiva rilevata (${bc.defending_episodes} episodi, il più lungo: ${Math.round(bc.longest_episode.durationSeconds)}s vs ${bc.longest_episode.opponent}). La strategia potrebbe aver risentito della pressione.`);
+        const text = `Fase difensiva rilevata (${bc.defending_episodes} episodi, il più lungo: ${Math.round(bc.longest_episode.durationSeconds)}s vs ${bc.longest_episode.opponent}). La strategia potrebbe aver risentito della pressione.`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "battle_defending_phase", category: "battle_context", priority: "supporting", target: "global", data: { defending_episodes: bc.defending_episodes, longest_seconds: Math.round(bc.longest_episode.durationSeconds), opponent: bc.longest_episode.opponent }, prerendered_text: text });
       }
 
       // Penalize alternatives that pit during battle laps
       for (const alt of alternatives) {
         const pitDuringBattle = alt.pit_laps.some(pl => bc.battle_laps.has(pl));
         if (pitDuringBattle) {
+          // TODO(narrative-refactor): side effect on alt.estimated_delta_vs_actual / alt.time_delta_vs_actual.
+          // Keep inline until collector supports targeted side-effect events.
           alt.cons.push("Pit durante fase di battaglia — rischio di perdere posizione");
           alt.estimated_delta_vs_actual -= 0.5; // Small penalty
           alt.time_delta_vs_actual += 0.5;      // Keep in sync (opposite sign)
@@ -1344,20 +1350,28 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push("Deviazione cumulativa disponibile come metrica di supporto");
 
     if (cd.loss_trend_start_lap != null) {
-      narrativeInsights.push(`La strategia reale ha iniziato a perdere terreno in modo cumulativo dal giro ${cd.loss_trend_start_lap} rispetto al benchmark del vincitore (${cd.winner_code ?? "P1"}).`);
+      const text = `La strategia reale ha iniziato a perdere terreno in modo cumulativo dal giro ${cd.loss_trend_start_lap} rispetto al benchmark del vincitore (${cd.winner_code ?? "P1"}).`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "cum_dev_loss_trend_start", category: "cumulative_deviation", priority: "supporting", target: "global", lap: cd.loss_trend_start_lap, data: { loss_trend_start_lap: cd.loss_trend_start_lap, winner_code: cd.winner_code ?? "P1" }, prerendered_text: text });
       
       // Check if pit was before or after the loss trend started
       if (actualPitLaps.length > 0 && actualPitLaps[0] > cd.loss_trend_start_lap) {
-        narrativeInsights.push(`Il pit reale (giro ${actualPitLaps[0]}) è avvenuto dopo l'inizio della perdita cumulativa (giro ${cd.loss_trend_start_lap}): un pit anticipato avrebbe potuto mitigare la perdita.`);
+        const text2 = `Il pit reale (giro ${actualPitLaps[0]}) è avvenuto dopo l'inizio della perdita cumulativa (giro ${cd.loss_trend_start_lap}): un pit anticipato avrebbe potuto mitigare la perdita.`;
+        narrativeInsights.push(text2);
+        narrativeCollector.add({ id: "cum_dev_pit_after_loss", category: "cumulative_deviation", priority: "supporting", target: "global", lap: actualPitLaps[0], data: { actual_pit_lap: actualPitLaps[0], loss_trend_start_lap: cd.loss_trend_start_lap }, prerendered_text: text2 });
       }
     }
 
     if (cd.max_deviation != null && cd.max_deviation > 5) {
-      narrativeInsights.push(`Deviazione cumulativa massima osservata: +${cd.max_deviation.toFixed(1)}s al giro ${cd.max_deviation_lap}.`);
+      const text = `Deviazione cumulativa massima osservata: +${cd.max_deviation.toFixed(1)}s al giro ${cd.max_deviation_lap}.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "cum_dev_max", category: "cumulative_deviation", priority: "supporting", target: "global", lap: cd.max_deviation_lap ?? undefined, data: { max_deviation: cd.max_deviation, max_deviation_lap: cd.max_deviation_lap }, prerendered_text: text });
     }
 
     if (cd.driver_final_delta != null && cd.driver_final_delta > 10) {
-      narrativeInsights.push(`Al termine della gara, il pilota ha accumulato +${cd.driver_final_delta.toFixed(1)}s rispetto al benchmark del vincitore.`);
+      const text = `Al termine della gara, il pilota ha accumulato +${cd.driver_final_delta.toFixed(1)}s rispetto al benchmark del vincitore.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "cum_dev_final_delta", category: "cumulative_deviation", priority: "supporting", target: "global", data: { driver_final_delta: cd.driver_final_delta }, prerendered_text: text });
     }
   }
 
@@ -1368,11 +1382,17 @@ export function computeVirtualRaceEngineer(
 
     if (worstPL && worstPL.stint_pace_loss_rate != null) {
       if (worstPL.pace_loss_status === "CLIFF_RISK") {
-        narrativeInsights.push(`⚠️ Perdita di passo critica nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): possibile segnale di tyre cliff. Il modello ha aumentato l'urgenza del pit e la penalità per stint lunghi.`);
+        const text = `⚠️ Perdita di passo critica nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): possibile segnale di tyre cliff. Il modello ha aumentato l'urgenza del pit e la penalità per stint lunghi.`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "pace_loss_cliff_risk", category: "pace_loss", priority: "critical", target: "global", data: { stint: worstPL.stint_number, rate: worstPL.stint_pace_loss_rate, status: "CLIFF_RISK" }, prerendered_text: text });
       } else if (worstPL.pace_loss_status === "HIGH_LOSS") {
-        narrativeInsights.push(`Perdita di passo significativa nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): il modello ha aumentato il peso del degrado nella simulazione strategica.`);
+        const text = `Perdita di passo significativa nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro): il modello ha aumentato il peso del degrado nella simulazione strategica.`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "pace_loss_high", category: "pace_loss", priority: "supporting", target: "global", data: { stint: worstPL.stint_number, rate: worstPL.stint_pace_loss_rate, status: "HIGH_LOSS" }, prerendered_text: text });
       } else if (worstPL.pace_loss_status === "NORMAL_LOSS") {
-        narrativeInsights.push(`Perdita di passo moderata nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro), coerente con un degrado normale.`);
+        const text = `Perdita di passo moderata nello stint ${worstPL.stint_number} (${worstPL.stint_pace_loss_rate.toFixed(3)} s/giro), coerente con un degrado normale.`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "pace_loss_normal", category: "pace_loss", priority: "context", target: "global", data: { stint: worstPL.stint_number, rate: worstPL.stint_pace_loss_rate, status: "NORMAL_LOSS" }, prerendered_text: text });
       }
     }
 
@@ -1381,10 +1401,14 @@ export function computeVirtualRaceEngineer(
       const dv = degradationValidations.find(v => v.original.stint === pl.stint_number);
       if (dv && pl.stint_pace_loss_rate != null) {
         if (dv.effective_slope < 0.02 && pl.pace_loss_status === "HIGH_LOSS") {
-          narrativeInsights.push(`Stint ${pl.stint_number}: il degrado stimato è basso (${dv.effective_slope.toFixed(3)} s/giro) ma la perdita di passo osservata è alta (${pl.stint_pace_loss_rate.toFixed(3)}). Possibile incoerenza — il verdetto è stato reso più prudente.`);
+          const text = `Stint ${pl.stint_number}: il degrado stimato è basso (${dv.effective_slope.toFixed(3)} s/giro) ma la perdita di passo osservata è alta (${pl.stint_pace_loss_rate.toFixed(3)}). Possibile incoerenza — il verdetto è stato reso più prudente.`;
+          narrativeInsights.push(text);
+          narrativeCollector.add({ id: "pace_loss_incoherence_low_deg_high_loss", category: "pace_loss", priority: "supporting", target: "global", data: { stint: pl.stint_number, effective_slope: dv.effective_slope, rate: pl.stint_pace_loss_rate }, prerendered_text: text });
           confScore -= 1;
         } else if (dv.effective_slope > 0.06 && pl.pace_loss_status === "STABLE") {
-          narrativeInsights.push(`Stint ${pl.stint_number}: il degrado stimato è elevato (${dv.effective_slope.toFixed(3)} s/giro) ma il passo osservato è stabile. Il degrado potrebbe essere sovrastimato.`);
+          const text = `Stint ${pl.stint_number}: il degrado stimato è elevato (${dv.effective_slope.toFixed(3)} s/giro) ma il passo osservato è stabile. Il degrado potrebbe essere sovrastimato.`;
+          narrativeInsights.push(text);
+          narrativeCollector.add({ id: "pace_loss_incoherence_high_deg_stable", category: "pace_loss", priority: "supporting", target: "global", data: { stint: pl.stint_number, effective_slope: dv.effective_slope }, prerendered_text: text });
         }
       }
     }
@@ -1392,7 +1416,9 @@ export function computeVirtualRaceEngineer(
     // Unreliable pace loss: note for transparency
     const unreliablePL = paceLossResults.filter(r => r.pace_loss_status === "UNRELIABLE" && r.pace_loss_contamination_flags.battle);
     if (unreliablePL.length > 0) {
-      narrativeInsights.push(`La metrica di pace loss per ${unreliablePL.length} stint è stata ridimensionata a causa di traffico e battaglie ravvicinate. Non è stata usata come driver strategico.`);
+      const text = `La metrica di pace loss per ${unreliablePL.length} stint è stata ridimensionata a causa di traffico e battaglie ravvicinate. Non è stata usata come driver strategico.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "pace_loss_unreliable", category: "pace_loss", priority: "context", target: "global", data: { count: unreliablePL.length }, prerendered_text: text });
     }
 
     // Confidence impact
