@@ -18,6 +18,7 @@ import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMu
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
+import { NarrativeCollector } from "./narrative/collector";
 
 export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
 
@@ -1250,12 +1251,21 @@ export function computeVirtualRaceEngineer(
   );
 
   const narrativeInsights: string[] = [];
+  // Narrative collector — accumulates structured events for migrated categories.
+  // During the incremental refactor, migrated sites push BOTH to narrativeInsights
+  // (preserving exact output order) AND to the collector. Once all categories
+  // are migrated, narrativeInsights will be replaced by renderNarrative output.
+  const narrativeCollector = new NarrativeCollector();
 
   // Analysis mode narrative
   if (isRaceEngineerMode) {
-    narrativeInsights.push("🏁 Modalità Race Engineer (ex-ante): le strategie simulate non utilizzano conoscenza di eventi futuri (SC, VSC, meteo). Le decisioni sono valutate con le sole informazioni disponibili al momento.");
+    const text = "🏁 Modalità Race Engineer (ex-ante): le strategie simulate non utilizzano conoscenza di eventi futuri (SC, VSC, meteo). Le decisioni sono valutate con le sole informazioni disponibili al momento.";
+    narrativeInsights.push(text);
+    narrativeCollector.add({ id: "mode_race_engineer", category: "mode_context", priority: "context", target: "global", data: { mode: "RACE_ENGINEER" }, prerendered_text: text });
   } else {
-    narrativeInsights.push("📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.");
+    const text = "📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.";
+    narrativeInsights.push(text);
+    narrativeCollector.add({ id: "mode_post_race", category: "mode_context", priority: "context", target: "global", data: { mode: "POST_RACE" }, prerendered_text: text });
   }
 
   // ── 7.pre Degradation validation insights ──
@@ -1413,7 +1423,9 @@ export function computeVirtualRaceEngineer(
     const wc = integratedContext.weather_context;
     confScore -= 1; // Weather change reduces confidence
     if (wc.first_non_dry_lap != null) {
-      narrativeInsights.push(`Condizioni meteo variabili rilevate dal giro ${wc.first_non_dry_lap} (${wc.wet_laps} giri bagnati, ${wc.mixed_laps} misti). Il modello di degrado esclude questi giri.`);
+      const text = `Condizioni meteo variabili rilevate dal giro ${wc.first_non_dry_lap} (${wc.wet_laps} giri bagnati, ${wc.mixed_laps} misti). Il modello di degrado esclude questi giri.`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "weather_change_detected", category: "weather", priority: "supporting", target: "global", lap: wc.first_non_dry_lap, data: { first_non_dry_lap: wc.first_non_dry_lap, wet_laps: wc.wet_laps, mixed_laps: wc.mixed_laps }, prerendered_text: text });
     }
   }
 
@@ -1424,12 +1436,16 @@ export function computeVirtualRaceEngineer(
       // Check if actual pit was during SC (advantage)
       const pitUnderSC = pitStopAnalyses.some(p => p.neutralisation_type === "SC");
       if (pitUnderSC) {
-        narrativeInsights.push("Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.");
+        const text = "Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.";
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "neutral_pit_under_sc", category: "neutralization", priority: "supporting", target: "global", data: { type: "SC" }, prerendered_text: text });
       } else if (ts.neutralized_laps.some(nl => {
         // Check if SC was near recommended window
         return recommendedWindows.some(w => Math.abs(nl - w.ideal_lap) <= 3);
       })) {
-        narrativeInsights.push("Una Safety Car è apparsa vicino alla finestra pit consigliata: un pit sotto neutralizzazione avrebbe offerto un vantaggio di ~10s.");
+        const text = "Una Safety Car è apparsa vicino alla finestra pit consigliata: un pit sotto neutralizzazione avrebbe offerto un vantaggio di ~10s.";
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "neutral_sc_near_window", category: "neutralization", priority: "supporting", target: "global", data: { type: "SC", proximity: "near_window" }, prerendered_text: text });
       }
     }
   }
@@ -1446,9 +1462,9 @@ export function computeVirtualRaceEngineer(
 
       if (totalNeutralBenefit > 1.0) {
         const types = actualPitsUnderNeutral.map(p => `giro ${p.lap_number} (${p.neutralisation_type})`).join(", ");
-        narrativeInsights.push(
-          `Strategia reale favorita da pit sotto neutralizzazione (${types}): pit loss ridotto di ~${totalNeutralBenefit.toFixed(1)}s rispetto a un pit in green.`
-        );
+        const text = `Strategia reale favorita da pit sotto neutralizzazione (${types}): pit loss ridotto di ~${totalNeutralBenefit.toFixed(1)}s rispetto a un pit in green.`;
+        narrativeInsights.push(text);
+        narrativeCollector.add({ id: "neutral_actual_benefit", category: "neutralization", priority: "supporting", target: "global", data: { types, benefit_seconds: totalNeutralBenefit }, prerendered_text: text });
       }
 
       // Check each alternative: does it pit on a neutralised lap or in green?
