@@ -1546,13 +1546,11 @@ export function computeVirtualRaceEngineer(
           const greenPits = alt.pit_laps.filter(pl => getObservedPitLossMultiplier(pl) >= 1.0);
           if (greenPits.length > 0) {
             const text = `Pit in green (giro ${greenPits.join(", ")}): +${(totalNeutralBenefit - altNeutralBenefit).toFixed(1)}s di pit loss rispetto alla strategia reale sotto neutralizzazione`;
-            alt.cons.push(text);
             narrativeCollector.add({ id: `neutral_alt${altIdx}_green_penalty`, category: "neutralization", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { green_pits: greenPits, penalty_seconds: totalNeutralBenefit - altNeutralBenefit }, prerendered_text: text });
           }
         } else if (altNeutralBenefit > totalNeutralBenefit + 1.0) {
           // Alternative benefits MORE from neutralisation than actual
           const text = `Pit su neutralizzazione reale (beneficio stimato: −${altNeutralBenefit.toFixed(1)}s di pit loss)`;
-          alt.pros.push(text);
           narrativeCollector.add({ id: `neutral_alt${altIdx}_extra_benefit`, category: "neutralization", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { benefit_seconds: altNeutralBenefit }, prerendered_text: text });
         }
       }
