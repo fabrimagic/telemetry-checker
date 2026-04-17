@@ -1643,15 +1643,6 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-
-  // ── Narrative cutover (Phase 1: global insights only) ──
-  // Render structured collector events into the legacy narrativeInsights array.
-  // alt.pros/cons and recommended pros/cons remain legacy (Phases 2-3).
-  {
-    const __rendered = renderNarrative(narrativeCollector.getAll());
-    narrativeInsights.push(...__rendered.insights);
-  }
-
   // ── 8. Verdict ──
   let verdictLabel: string;
   let verdictSummary: string;
@@ -1780,8 +1771,16 @@ export function computeVirtualRaceEngineer(
 
   // Enhanced narrative insights from soft sensors
   const sensorNarrativeInsights = extractSoftSensorNarrativeInsights(softSensorsTimeline, stintAnalyses);
-  for (const insight of sensorNarrativeInsights) {
-    narrativeInsights.push(insight);
+  for (let __ssi = 0; __ssi < sensorNarrativeInsights.length; __ssi++) {
+    const insight = sensorNarrativeInsights[__ssi];
+    narrativeCollector.add({
+      id: `soft_sensor_scoring_narrative_${__ssi}`,
+      category: "soft_sensor_scoring",
+      priority: "supporting",
+      target: "global",
+      data: { source: "extractSoftSensorNarrativeInsights", index: __ssi },
+      prerendered_text: insight,
+    });
   }
 
   // ── 9b. Multi-criteria risk-aware ranking via riskAppetite.scoreStrategies ──
@@ -1922,15 +1921,42 @@ export function computeVirtualRaceEngineer(
           recommendedStrategy.pros = promoAlt.pros;
           recommendedStrategy.cons = promoAlt.cons;
 
-          narrativeInsights.push(
-            `Strategia raccomandata aggiornata: "${promoAlt.name}" promossa dal ranking multi-criterio (${riskMode}). Score risk-adjusted: ${bestAltScored.adjusted_score.toFixed(1)} vs ${recScored.adjusted_score.toFixed(1)} della precedente raccomandata. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? bestAltScored.adjustment_reason : ""}`
-          );
+          {
+            const __text = `Strategia raccomandata aggiornata: "${promoAlt.name}" promossa dal ranking multi-criterio (${riskMode}). Score risk-adjusted: ${bestAltScored.adjusted_score.toFixed(1)} vs ${recScored.adjusted_score.toFixed(1)} della precedente raccomandata. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? bestAltScored.adjustment_reason : ""}`;
+            narrativeCollector.add({
+              id: "risk_scoring_promotion",
+              category: "risk_scoring",
+              priority: "critical",
+              target: "global",
+              data: {
+                promoted_name: promoAlt.name,
+                risk_mode: riskMode,
+                best_alt_adjusted_score: bestAltScored.adjusted_score,
+                rec_adjusted_score: recScored.adjusted_score,
+                adjustment_reason: bestAltScored.adjustment_reason,
+              },
+              prerendered_text: __text,
+            });
+          }
         }
       }
     } else if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 0.5) {
-      narrativeInsights.push(
-        `Risk scoring (${riskMode}): "${bestAltScored.name}" ha un punteggio risk-adjusted migliore della raccomandata di ${(bestAltScored.adjusted_score - recScored.adjusted_score).toFixed(1)}s. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? `(${bestAltScored.adjustment_reason})` : ""}`.trim()
-      );
+      {
+        const __text = `Risk scoring (${riskMode}): "${bestAltScored.name}" ha un punteggio risk-adjusted migliore della raccomandata di ${(bestAltScored.adjusted_score - recScored.adjusted_score).toFixed(1)}s. ${bestAltScored.adjustment_reason !== "Nessun aggiustamento" ? `(${bestAltScored.adjustment_reason})` : ""}`.trim();
+        narrativeCollector.add({
+          id: "risk_scoring_alt_better",
+          category: "risk_scoring",
+          priority: "supporting",
+          target: "global",
+          data: {
+            best_alt_name: bestAltScored.name,
+            risk_mode: riskMode,
+            score_delta: bestAltScored.adjusted_score - recScored.adjusted_score,
+            adjustment_reason: bestAltScored.adjustment_reason,
+          },
+          prerendered_text: __text,
+        });
+      }
     }
 
     if (recScored && recScored.adjustment_reason !== "Nessun aggiustamento") {
@@ -1941,11 +1967,35 @@ export function computeVirtualRaceEngineer(
     if (softSensorScoringGate.soft_sensor_scoring_enabled) {
       const anySSEffect = recSSScoringDelta !== 0 || altSSScoringDeltas.some(d => d !== 0);
       if (anySSEffect) {
-        narrativeInsights.push(`Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.`);
+        narrativeCollector.add({
+          id: "soft_sensor_scoring_enabled",
+          category: "soft_sensor_scoring",
+          priority: "supporting",
+          target: "global",
+          data: { gate_enabled: true, max_effect_seconds: 1.0 },
+          prerendered_text: `Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.`,
+        });
       }
     } else if (softSensorScoringGate.soft_sensor_block_reason) {
-      narrativeInsights.push(`Soft sensors esclusi dallo scoring: ${softSensorScoringGate.soft_sensor_block_reason}`);
+      narrativeCollector.add({
+        id: "soft_sensor_scoring_blocked",
+        category: "soft_sensor_scoring",
+        priority: "supporting",
+        target: "global",
+        data: { gate_enabled: false, block_reason: softSensorScoringGate.soft_sensor_block_reason },
+        prerendered_text: `Soft sensors esclusi dallo scoring: ${softSensorScoringGate.soft_sensor_block_reason}`,
+      });
     }
+  }
+
+  // ── Narrative cutover (Phase 1: global insights only) ──
+  // Render structured collector events into the legacy narrativeInsights array.
+  // Placed AFTER all global push sites (including risk_scoring & soft_sensor_scoring)
+  // so the renderer captures the full set. alt.pros/cons and recommended pros/cons
+  // remain legacy (Phases 2-3).
+  {
+    const __rendered = renderNarrative(narrativeCollector.getAll());
+    narrativeInsights.push(...__rendered.insights);
   }
 
   // Reduce confidence if degradation is unreliable
