@@ -45,15 +45,42 @@ export interface HeadToHeadVerdict {
   key_factors: string[];
 }
 
+/**
+ * Counterfactual analysis: what would have happened if BOTH drivers had executed
+ * their respective "ex-ante balanced" alternative strategies (POST_RACE + BALANCED VRE).
+ *
+ * Numbers come from the alternative VRE's `recommended_strategy.time_delta_vs_actual`
+ * (motorsport convention: negative = faster than actual). The counterfactual h2h delta is:
+ *   counterfactual_h2h_delta = real_h2h_delta + (gain_A − gain_B)
+ *
+ * This assumes per-driver simulated gains are independent — a strong simplification.
+ * The `disclaimer` field is mandatory for UI rendering.
+ */
+export interface CounterfactualAnalysis {
+  gain_a_seconds: number | null;
+  gain_b_seconds: number | null;
+  real_h2h_delta_seconds: number;
+  counterfactual_h2h_delta_seconds: number | null;
+  counterfactual_faster: "A" | "B" | "TIE" | null;
+  outcome_changed: boolean;
+  confidence: Confidence;
+  disclaimer: string;
+}
+
 export interface ComparisonResult {
   driver_a: VirtualRaceEngineerResult;
   driver_b: VirtualRaceEngineerResult;
+  /** Optional alternative VRE results (POST_RACE + BALANCED). Null when not requested or unavailable. */
+  alternative_a: VirtualRaceEngineerResult | null;
+  alternative_b: VirtualRaceEngineerResult | null;
   session_key: number;
   total_laps: number;
   lap_by_lap_delta: LapDeltaPoint[];
   stint_alignment: StintAlignmentSegment[];
   strategic_divergence_points: DivergencePoint[];
   head_to_head_verdict: HeadToHeadVerdict;
+  /** Counterfactual analysis. Null when no alternatives provided. */
+  counterfactual_analysis: CounterfactualAnalysis | null;
   common_confidence: Confidence;
 }
 
@@ -146,10 +173,19 @@ export interface HeadToHeadInput {
   lapsB: Lap[];
   /** Optional: shared session positions for swap detection. Pass null to skip. */
   positions?: PositionData[] | null;
+  /** Optional: alternative VRE result for driver A (POST_RACE + BALANCED). */
+  alternativeA?: VirtualRaceEngineerResult | null;
+  /** Optional: alternative VRE result for driver B (POST_RACE + BALANCED). */
+  alternativeB?: VirtualRaceEngineerResult | null;
 }
 
 export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
-  const { resultA, resultB, lapsA, lapsB, positions = null } = input;
+  const {
+    resultA, resultB, lapsA, lapsB,
+    positions = null,
+    alternativeA = null,
+    alternativeB = null,
+  } = input;
 
   if (resultA.session_key !== resultB.session_key) {
     throw new Error(
@@ -275,9 +311,45 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     if (niB) factors.push(`${resultB.driver_acronym}: ${niB}`);
   }
 
+  // Counterfactual analysis (only when both alternatives are provided)
+  let counterfactual: CounterfactualAnalysis | null = null;
+  if (alternativeA && alternativeB) {
+    // recommended_strategy.time_delta_vs_actual: negative = faster than actual (motorsport convention)
+    const gainA = Number.isFinite(alternativeA.recommended_strategy.time_delta_vs_actual)
+      ? alternativeA.recommended_strategy.time_delta_vs_actual : null;
+    const gainB = Number.isFinite(alternativeB.recommended_strategy.time_delta_vs_actual)
+      ? alternativeB.recommended_strategy.time_delta_vs_actual : null;
+
+    const realDelta = totalDelta; // signed (A − B); negative = A faster
+    let cfDelta: number | null = null;
+    let cfFaster: "A" | "B" | "TIE" | null = null;
+    let outcomeChanged = false;
+
+    if (gainA != null && gainB != null) {
+      // If A switches to alt → A's time changes by gainA. B switches → B's by gainB.
+      // New (A − B) = realDelta + (gainA − gainB)
+      cfDelta = realDelta + (gainA - gainB);
+      cfFaster = Math.abs(cfDelta) <= 0.5 ? "TIE" : (cfDelta < 0 ? "A" : "B");
+      outcomeChanged = cfFaster !== faster;
+    }
+
+    counterfactual = {
+      gain_a_seconds: gainA,
+      gain_b_seconds: gainB,
+      real_h2h_delta_seconds: realDelta,
+      counterfactual_h2h_delta_seconds: cfDelta,
+      counterfactual_faster: cfFaster,
+      outcome_changed: outcomeChanged,
+      confidence: confidenceMin(alternativeA.confidence, alternativeB.confidence),
+      disclaimer: "Stima teorica: assume che entrambe le alternative siano applicate simultaneamente e indipendentemente. Non considera le reazioni avversarie, l'effetto undercut/overcut sui rivali esterni al confronto, né la disponibilità reale di mescole nuove.",
+    };
+  }
+
   return {
     driver_a: resultA,
     driver_b: resultB,
+    alternative_a: alternativeA,
+    alternative_b: alternativeB,
     session_key: sessionKey,
     total_laps: totalLaps,
     lap_by_lap_delta: deltas,
@@ -288,6 +360,8 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
       delta_total_seconds: Math.abs(totalDelta),
       key_factors: factors.slice(0, 5),
     },
+    counterfactual_analysis: counterfactual,
     common_confidence: confidenceMin(resultA.confidence, resultB.confidence),
   };
 }
+

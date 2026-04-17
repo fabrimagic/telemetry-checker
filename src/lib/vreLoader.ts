@@ -57,11 +57,20 @@ export interface VreLoaderInput {
   allDrivers: Driver[];
   riskMode?: RiskMode;
   analysisMode?: AnalysisMode;
+  /**
+   * If true, computes a SECOND VRE pass with analysisMode="POST_RACE" + riskMode="BALANCED"
+   * to expose the "ex-ante / balanced" alternative strategy without re-fetching any data.
+   * The primary `vreResult` still uses the requested mode; the alternative is exposed via
+   * `alternativeVreResult` and is intended ONLY for the head-to-head comparison.
+   */
+  computeAlternative?: boolean;
 }
 
 export interface VreLoaderOutput {
   driverNumber: number;
   vreResult: VirtualRaceEngineerResult | null;
+  /** Optional second VRE pass in POST_RACE + BALANCED. Null when not requested or insufficient data. */
+  alternativeVreResult: VirtualRaceEngineerResult | null;
   kdmResult: KeyDecisionMomentsResult | null;
   diaryEvents: DiaryEvent[];
   laps: Lap[];
@@ -85,11 +94,13 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     sessionWeather, raceControlMessages, allDrivers,
     riskMode = "BALANCED",
     analysisMode = "RACE_ENGINEER",
+    computeAlternative = false,
   } = input;
 
   const out: VreLoaderOutput = {
     driverNumber,
     vreResult: null,
+    alternativeVreResult: null,
     kdmResult: null,
     diaryEvents: [],
     laps: [],
@@ -237,6 +248,30 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
       analysisMode,
     );
     out.vreResult = vre;
+
+    // ── Optional: alternative VRE pass in POST_RACE + BALANCED ──
+    // Re-uses every dataset already fetched above (no extra API calls).
+    // Skipped if the primary pass is already POST_RACE+BALANCED, in which case
+    // the recommended_strategy on `vre` is already the "ex-ante balanced" alternative.
+    if (computeAlternative && vre) {
+      const alreadyAlternative = analysisMode === "POST_RACE" && riskMode === "BALANCED";
+      if (alreadyAlternative) {
+        out.alternativeVreResult = vre;
+      } else {
+        try {
+          const altVre = computeVirtualRaceEngineer(
+            driverNumber, driver.name_acronym, sessionKey,
+            laps, stints, pits,
+            sessionWeather, raceControlMessages,
+            intervals, positions, allDrivers, practiceModels, "BALANCED",
+            diary, cumDev,
+            "REAL_CONTEXT", null, null, null,
+            "POST_RACE",
+          );
+          out.alternativeVreResult = altVre;
+        } catch { /* optional — alternative is best-effort */ }
+      }
+    }
 
     // KDM
     if (vre) {

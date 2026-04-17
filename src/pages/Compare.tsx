@@ -11,6 +11,7 @@ import { CompareHeader } from "@/components/f1/compare/CompareHeader";
 import { CompareTimeline } from "@/components/f1/compare/CompareTimeline";
 import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
+import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
@@ -119,6 +120,7 @@ export default function Compare() {
         allDrivers,
         riskMode: "BALANCED",
         analysisMode: "RACE_ENGINEER",
+        computeAlternative: true,
       }),
       loadVreForDriver({
         driverNumber: driverObjB.driver_number,
@@ -130,6 +132,7 @@ export default function Compare() {
         allDrivers,
         riskMode: "BALANCED",
         analysisMode: "RACE_ENGINEER",
+        computeAlternative: true,
       }),
     ])
       .then(([outA, outB]) => {
@@ -156,6 +159,8 @@ export default function Compare() {
         lapsA: dual.outA.laps,
         lapsB: dual.outB.laps,
         positions,
+        alternativeA: dual.outA.alternativeVreResult,
+        alternativeB: dual.outB.alternativeVreResult,
       });
     } catch (e: any) {
       setError(e?.message ?? "Errore comparazione");
@@ -290,6 +295,7 @@ export default function Compare() {
           <div className="space-y-5">
             <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
             <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
             <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
             <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
           </div>
