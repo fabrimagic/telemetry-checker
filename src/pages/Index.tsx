@@ -696,13 +696,6 @@ export default function Index() {
             >
               ⚔︎ Head-to-Head
             </Link>
-            <Link
-              to="/competitors"
-              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-[hsl(var(--f1-red))]/10 text-[hsl(var(--f1-red))] border border-[hsl(var(--f1-red))]/30 hover:bg-[hsl(var(--f1-red))]/20 transition-colors"
-              title="Confronta le strategie di più piloti nella stessa sessione"
-            >
-              ▦ Competitors
-            </Link>
             <Link to="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted/50">
               📖 Docs
             </Link>
