@@ -157,6 +157,7 @@ export default function Documentation() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Confronto piloti</p>
               <TocLink href="#head-to-head-overview">Head-to-Head — Panoramica</TocLink>
               <TocLink href="#head-to-head-ui">Head-to-Head — Interfaccia</TocLink>
+              <TocLink href="#head-to-head-driver-context">Head-to-Head — Contesto per pilota</TocLink>
               <TocLink href="#head-to-head-engine">Head-to-Head — Motore di Confronto</TocLink>
               <TocLink href="#head-to-head-alternative">Head-to-Head — Strategia alternativa</TocLink>
             </div>
