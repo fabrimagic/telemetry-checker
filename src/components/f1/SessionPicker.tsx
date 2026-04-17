@@ -23,13 +23,22 @@ interface Session {
 interface Props {
   onSelect: (sessionKey: number, sessionType: string, meetingKey: number) => void;
   isLoading: boolean;
+  /**
+   * Optional whitelist of `session_type` values to keep in the dropdown.
+   * When omitted, all session types are shown. When provided, only sessions whose
+   * `session_type` matches one of these values (case-insensitive) are listed.
+   */
+  sessionTypeFilter?: string[];
 }
 
-export function SessionPicker({ onSelect, isLoading }: Props) {
+export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState("");
+
+  // Stable filter signature so the effect doesn't rerun on every render
+  const filterSig = sessionTypeFilter ? sessionTypeFilter.map(s => s.toLowerCase()).sort().join("|") : "";
 
   useEffect(() => {
     const year = new Date().getFullYear();
@@ -42,17 +51,20 @@ export function SessionPicker({ onSelect, isLoading }: Props) {
       .then((data: Session[]) => {
         const now = new Date();
         const excludedCountries = ["bahrain", "saudi arabia"];
+        const allowedTypes = filterSig ? new Set(filterSig.split("|")) : null;
         const past = data.filter((s) => {
           if (new Date(s.date_start) >= now) return false;
           const country = (s.country_name || "").toLowerCase();
-          return !excludedCountries.some((ex) => country.includes(ex));
+          if (excludedCountries.some((ex) => country.includes(ex))) return false;
+          if (allowedTypes && !allowedTypes.has((s.session_type || "").toLowerCase())) return false;
+          return true;
         });
         past.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime());
         setSessions(past);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [filterSig]);
 
   // Group sessions by event (country)
   const grouped = useMemo(() => {

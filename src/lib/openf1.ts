@@ -102,10 +102,12 @@ export interface IntervalData {
 }
 
 // Atomic slot-reservation rate limiter for OpenF1.
-// Parallel callers (Promise.all, head-to-head loaders) get progressively spaced slots.
+// OpenF1 enforces 15 requests per 10 seconds (= 1.5 req/s). We schedule one slot
+// every 700 ms (~1.43 req/s) to stay safely under the limit even when multiple
+// callers (Promise.all, head-to-head loaders) reserve concurrently.
 // On 429: exponential backoff + push the global queue forward so siblings also slow down.
 let nextAvailableTime: number = 0;
-const MIN_INTERVAL = 600; // ms between requests (~1.6 req/s, safe under OpenF1 limits)
+const MIN_INTERVAL = 700; // ms between requests (~1.43 req/s, under OpenF1's 15/10s limit)
 const MAX_RETRIES = 4;
 
 async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {

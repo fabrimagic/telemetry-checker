@@ -689,6 +689,13 @@ export default function Index() {
             <h1 className="text-lg font-bold tracking-tight">PitWall AI</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              to="/compare"
+              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-[hsl(var(--f1-red))]/10 text-[hsl(var(--f1-red))] border border-[hsl(var(--f1-red))]/30 hover:bg-[hsl(var(--f1-red))]/20 transition-colors"
+              title="Apri la modalità head-to-head per confrontare due piloti"
+            >
+              ⚔︎ Head-to-Head
+            </Link>
             <Link to="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted/50">
               📖 Docs
             </Link>
@@ -726,22 +733,8 @@ export default function Index() {
                 selected={selectedDriverNumbers}
                 onAdd={handleAddDriver}
                 onRemove={handleRemoveDriver}
+                max={1}
               />
-
-              {selectedDriverNumbers.length === 2 && sessionKey && (sessionType === "Race" || sessionType === "Sprint") && (
-                <div className="rounded-md border border-[hsl(var(--f1-red))]/40 bg-[hsl(var(--f1-red))]/5 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm">
-                    <div className="font-semibold">Confronta i due piloti selezionati</div>
-                    <div className="text-xs text-muted-foreground">Apri la vista head-to-head con timeline strategica e delta cumulativo.</div>
-                  </div>
-                  <Link
-                    to={`/compare?session=${sessionKey}&driverA=${selectedDriverNumbers[0]}&driverB=${selectedDriverNumbers[1]}`}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--f1-red))] text-white text-xs font-bold px-3 py-2 hover:opacity-90 transition-opacity"
-                  >
-                    Confronta head-to-head →
-                  </Link>
-                </div>
-              )}
 
         {error && (
           <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
