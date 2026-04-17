@@ -483,11 +483,15 @@ export function computeVirtualRaceEngineer(
     ? trafficAnalysis.reduce((s, t) => s + t.estimated_traffic_time_loss, 0) / trafficAnalysis.length
     : 1.0;
 
-  // Tyre cliff risk penalty: penalizes stint length beyond a threshold
-  const CLIFF_THRESHOLD = 18;
-  function cliffPenalty(stintLength: number): number {
-    if (stintLength <= CLIFF_THRESHOLD) return 0;
-    const excessLaps = stintLength - CLIFF_THRESHOLD;
+  // Tyre cliff risk penalty: penalizes stint length beyond a per-compound threshold
+  // Soft cliffa prima (~14 giri), Hard regge molto più a lungo (~28 giri)
+  const CLIFF_THRESHOLDS: Record<string, number> = { SOFT: 14, MEDIUM: 20, HARD: 28 };
+  const CLIFF_THRESHOLD_DEFAULT = 18;
+  function cliffPenalty(stintLength: number, compound: string): number {
+    const key = (compound ?? "").toUpperCase();
+    const threshold = CLIFF_THRESHOLDS[key] ?? CLIFF_THRESHOLD_DEFAULT;
+    if (stintLength <= threshold) return 0;
+    const excessLaps = stintLength - threshold;
     return excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
   }
 
