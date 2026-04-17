@@ -64,6 +64,15 @@ export interface VreLoaderInput {
    * `alternativeVreResult` and is intended ONLY for the head-to-head comparison.
    */
   computeAlternative?: boolean;
+  /**
+   * Optional precomputed cumulative-deviation result. When provided, the loader SKIPS
+   * its internal `getAllLaps` + `getSessionResult` fetch + `computeCumulativeDeviation`
+   * and reuses this value. Recommended for head-to-head where two drivers run in parallel:
+   * the data is session-scoped, so fetching it twice doubles API pressure and is the
+   * typical cause of 429-induced gaps where one driver's `cumulative_deviation_context`
+   * becomes "non disponibile" while the other works.
+   */
+  precomputedCumDev?: CumulativeDeviationResult | null;
 }
 
 export interface VreLoaderOutput {
