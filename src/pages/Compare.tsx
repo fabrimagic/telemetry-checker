@@ -11,6 +11,7 @@ import { CompareHeader } from "@/components/f1/compare/CompareHeader";
 import { CompareTimeline } from "@/components/f1/compare/CompareTimeline";
 import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
+import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
