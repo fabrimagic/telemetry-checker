@@ -104,7 +104,7 @@ export default function Documentation() {
         {/* INTRO */}
         {/* ═══════════════════════════════════════════════ */}
         <div className="bg-card rounded-lg border border-border p-5 space-y-3">
-          <p className="text-foreground font-semibold text-lg">F1 Telemetry Checker</p>
+          <p className="text-foreground font-semibold text-lg">PitWall AI</p>
           <p className="text-sm text-muted-foreground">
             Applicazione web per l'analisi strategica e telemetrica delle sessioni di Formula 1,
             basata interamente su dati pubblici provenienti dall'API <strong className="text-foreground">OpenF1</strong>.
@@ -157,6 +157,7 @@ export default function Documentation() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Confronto piloti</p>
               <TocLink href="#head-to-head-overview">Head-to-Head — Panoramica</TocLink>
               <TocLink href="#head-to-head-ui">Head-to-Head — Interfaccia</TocLink>
+              <TocLink href="#head-to-head-driver-context">Head-to-Head — Contesto per pilota</TocLink>
               <TocLink href="#head-to-head-engine">Head-to-Head — Motore di Confronto</TocLink>
               <TocLink href="#head-to-head-alternative">Head-to-Head — Strategia alternativa</TocLink>
             </div>
@@ -207,10 +208,10 @@ export default function Documentation() {
               (Practice 1–3, Qualifying, Sprint, Race). Il picker carica automaticamente gli eventi disponibili dall'API OpenF1.
             </li>
             <li>
-              <strong className="text-foreground">Seleziona uno o più piloti</strong> — Una volta caricata la sessione,
-              compare l'elenco dei piloti con nome, acronimo e colore del team.
-              Puoi selezionare <strong className="text-foreground">più piloti</strong> per confronti multi-driver
-              oppure <strong className="text-foreground">un singolo pilota</strong> per attivare l'analisi individuale e il Virtual Race Engineer.
+              <strong className="text-foreground">Seleziona un pilota</strong> — Una volta caricata la sessione,
+              compare l'elenco dei piloti con nome, acronimo e colore del team. Nella pagina principale è possibile
+              selezionare <strong className="text-foreground">un solo pilota</strong> per volta, così da focalizzare
+              l'analisi individuale e attivare il Virtual Race Engineer.
             </li>
             <li>
               <strong className="text-foreground">Esplora i dati</strong> — Il sistema carica automaticamente tempi al giro, stint, pit stop,
@@ -220,8 +221,8 @@ export default function Documentation() {
 
           <h4 className="font-semibold text-foreground mt-3">Modalità di visualizzazione</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Multi-pilota</strong> — Confronto tempi al giro, posizioni, gap, deviazione cumulativa. Ideale per analisi comparative.</li>
-            <li><strong className="text-foreground">Singolo pilota</strong> — Telemetria dettagliata, track map, analisi stint, pit stop, sorpassi, diario di gara, degrado gomme e <strong className="text-foreground">Virtual Race Engineer</strong> (solo per Race/Sprint).</li>
+            <li><strong className="text-foreground">Singolo pilota</strong> (pagina principale) — Telemetria dettagliata, track map, analisi stint, pit stop, sorpassi, diario di gara, degrado gomme, Soft Sensors, Key Decision Moments e <strong className="text-foreground">Virtual Race Engineer</strong> (solo per Race/Sprint).</li>
+            <li><strong className="text-foreground">Head-to-Head</strong> (pagina dedicata <code className="text-primary">/compare</code>) — Confronto strutturato fra <strong className="text-foreground">due piloti</strong> della stessa sessione Race o Sprint. Si raggiunge tramite il pulsante <em>Head-to-Head</em> presente nell'header dell'app: sessione e piloti vengono scelti direttamente lì, senza dover passare dalla pagina principale.</li>
           </ul>
         </DocSection>
 
@@ -446,74 +447,111 @@ export default function Documentation() {
           <p>
             La modalità <strong className="text-foreground">Head-to-Head</strong> permette di confrontare due piloti
             della stessa sessione affiancando le loro analisi del Virtual Race Engineer, lo stint-by-stint, il pace
-            lap-by-lap e le decisioni strategiche.
+            lap-by-lap, le decisioni strategiche e — sotto a ciascun pilota — la sua analisi globale di gara
+            e i suoi Soft Sensors.
           </p>
           <h4 className="font-semibold text-foreground mt-4">Come accedere</h4>
           <ol className="list-decimal pl-5 space-y-1">
-            <li>Nella pagina principale, seleziona <strong className="text-foreground">esattamente due piloti</strong> di una stessa sessione Race o Sprint.</li>
-            <li>Apparirà un pulsante <strong className="text-foreground">"Confronta head-to-head"</strong> che apre la pagina dedicata.</li>
+            <li>Clicca sul pulsante <strong className="text-foreground">"Head-to-Head"</strong> presente nell'header dell'app (visibile sia dalla pagina principale, sia dalla documentazione).</li>
+            <li>Nella pagina dedicata <code className="text-primary">/compare</code> selezioni direttamente la sessione (filtrata su <strong className="text-foreground">Race</strong> e <strong className="text-foreground">Sprint</strong>) e i due piloti tramite menu a tendina; non è necessario averli pre-selezionati altrove.</li>
             <li>La selezione viene salvata nell'URL (parametri <code className="text-primary">session</code>, <code className="text-primary">driverA</code>, <code className="text-primary">driverB</code>) per condivisione e bookmark.</li>
           </ol>
           <h4 className="font-semibold text-foreground mt-4">Principio chiave</h4>
           <p>
             Il confronto <strong className="text-foreground">non duplica</strong> alcuna logica analitica: esegue il
             VRE due volte, una per pilota, sugli stessi parametri di sessione, e applica una funzione pura di confronto
-            ai due risultati. Le metriche mostrate sono quindi <em>esattamente</em> quelle del VRE singolo pilota,
-            affiancate per garantire coerenza e ripetibilità.
+            ai due risultati. Le metriche e le sezioni di contesto mostrate sono <em>esattamente</em> quelle del VRE
+            singolo pilota, semplicemente affiancate per garantire coerenza e ripetibilità.
           </p>
           <h4 className="font-semibold text-foreground mt-4">Caricamento e robustezza</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li>I due piloti vengono caricati <strong className="text-foreground">in parallelo</strong>, il rate limiter del client gestisce automaticamente l'ordine delle richieste verso OpenF1.</li>
-            <li>Se l'analisi di uno dei due piloti fallisce, viene mostrato il pannello valido + un messaggio chiaro sull'altro, senza far crashare la pagina.</li>
-            <li>Se le due sessioni non coincidono (caso impossibile da UI ma protetto a livello di motore), viene sollevato un errore esplicito.</li>
+            <li>I dati di sessione condivisi (<code className="text-primary">laps</code> e <code className="text-primary">session_result</code> usati per la deviazione cumulativa) vengono <strong className="text-foreground">scaricati una sola volta</strong> e iniettati in entrambi i loader. Questo evita richieste duplicate e riduce la pressione sul rate limit di OpenF1 (15 req / 10 s), che altrimenti potrebbe far fallire silenziosamente il calcolo per uno dei due piloti.</li>
+            <li>I due piloti vengono poi caricati <strong className="text-foreground">in parallelo</strong>; il rate limiter del client gestisce comunque l'ordinamento delle richieste residue.</li>
+            <li>Se l'analisi di uno dei due piloti fallisce, viene mostrato un messaggio chiaro su quel pilota senza far crashare l'intera pagina; le sezioni che richiedono entrambi i risultati restano nascoste.</li>
+            <li>Se le due sessioni non coincidono (caso impossibile dall'UI ma protetto a livello di motore), viene sollevato un errore esplicito.</li>
           </ul>
         </DocSection>
 
         <DocSection id="head-to-head-ui" title="Head-to-Head — Interfaccia" icon={<LayoutDashboard className="h-4 w-4" />}>
-          <p>L'interfaccia è organizzata in <strong className="text-foreground">quattro zone verticali</strong> (su desktop ≥1024px alcune si affiancano):</p>
+          <p>
+            L'interfaccia è organizzata in <strong className="text-foreground">due macro-sezioni</strong>, separate da
+            divisori orizzontali etichettati, in modo da non confondere mai ciò che è <em>realmente accaduto in pista</em>
+            con ciò che il VRE <em>avrebbe consigliato</em>:
+          </p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li><strong className="text-foreground">Strategia reale eseguita</strong> — fotografa la gara come si è svolta.</li>
+            <li><strong className="text-foreground">Strategia alternativa (ex-ante · balanced)</strong> — riporta la strategia consigliata dal VRE per ciascun pilota nelle stesse condizioni.</li>
+          </ol>
 
-          <h4 className="font-semibold text-foreground mt-4">Zona 1 — Header comparativo</h4>
+          <h4 className="font-semibold text-foreground mt-4">Sezione 1 — Strategia reale eseguita</h4>
+          <p>Internamente è suddivisa in 5 blocchi verticali (alcuni si affiancano su desktop ≥1024px):</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Due card pilota affiancate con casco/colore team, acronimo, numero, team, posizione finale e gap dal leader.</li>
-            <li>Badge centrale <strong className="text-foreground">"vs"</strong> e badge <strong className="text-foreground">verdetto</strong> con il pilota più veloce e il delta totale in secondi.</li>
-            <li>Toggle <em>Swap sides</em> per invertire driver A e driver B.</li>
+            <li><strong className="text-foreground">Header comparativo</strong> — Due card pilota affiancate (casco/colore team, acronimo, numero, team, posizione finale, gap dal leader), badge centrale <em>vs</em>, verdetto con il pilota più veloce e delta totale, toggle <em>Swap sides</em>.</li>
+            <li><strong className="text-foreground">Timeline strategica unificata</strong> — Asse X giri da 1 al totale; due righe parallele con segmenti colorati per mescola (Soft rossa, Medium gialla, Hard bianca, Inter verde, Wet blu — convenzioni Pirelli); tick rossi sui pit stop e badge SC/VSC/RED sulle celle pertinenti; sotto, grafico a barre del <strong className="text-foreground">delta cumulativo</strong> A−B (rosso = A più lento, verde = A più veloce); markers sui <em>strategic divergence points</em>.</li>
+            <li><strong className="text-foreground">Contesto gara per pilota</strong> — vedi sezione dedicata sotto.</li>
+            <li><strong className="text-foreground">Metriche a confronto</strong> — Griglia a due colonne: tempo totale, deviazione cumulativa finale, numero pit, sequenza mescole, risk mode suggerito, confidenza, eventi battaglia, giri in neutralizzazione, best lap. Riga per riga viene evidenziato il valore migliore.</li>
+            <li><strong className="text-foreground">Narrativa a due colonne</strong> — Top insight di A (sinistra) e di B (destra); banda superiore <em>"Contesto condiviso"</em> per fatti comuni (Safety Car, pioggia, bandiera rossa) per evitare duplicazioni.</li>
           </ul>
 
-          <h4 className="font-semibold text-foreground mt-4">Zona 2 — Timeline strategica unificata</h4>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Asse X: giri da 1 al totale.</li>
-            <li>Due righe parallele (una per pilota) con segmenti colorati per mescola (Soft rossa, Medium gialla, Hard bianca, Inter verde, Wet blu — convenzioni Pirelli).</li>
-            <li>Tick rossi sui pit stop e badge SC/VSC/RED sulle celle pertinenti.</li>
-            <li>Sotto: grafico a barre del <strong className="text-foreground">delta cumulativo</strong> (A − B): rosso = A più lento, verde = A più veloce, zero-line evidenziata.</li>
-            <li>Markers con icona sui <em>strategic divergence points</em> (tooltip con descrizione).</li>
-          </ul>
-
-          <h4 className="font-semibold text-foreground mt-4">Zona 3 — Metriche a confronto</h4>
-          <p>Griglia a due colonne, ogni metrica è una riga con <em>label · valore A · valore B · highlight</em> verde sul migliore. Metriche incluse:</p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Tempo totale di gara</li>
-            <li>Deviazione cumulativa finale (dal benchmark vincitore)</li>
-            <li>Numero di pit stop</li>
-            <li>Sequenza mescole</li>
-            <li>Risk mode suggerito</li>
-            <li>Confidenza dell'analisi</li>
-            <li>Eventi battaglia (count)</li>
-            <li>Giri trascorsi in neutralizzazione</li>
-            <li>Best lap time</li>
-          </ul>
-
-          <h4 className="font-semibold text-foreground mt-4">Zona 4 — Narrativa a due colonne</h4>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Top insight narrativi del pilota A (sinistra) e del pilota B (destra), filtrati per rilevanza.</li>
-            <li>Una banda superiore <strong className="text-foreground">"Contesto condiviso"</strong> raggruppa i fatti comuni (Safety Car, pioggia, bandiera rossa) per evitare duplicazioni.</li>
-          </ul>
+          <h4 className="font-semibold text-foreground mt-4">Sezione 2 — Strategia alternativa</h4>
+          <p>
+            Una sola card per pilota, etichettata in modo coerente: vedi
+            <a href="#head-to-head-alternative" className="text-primary hover:underline"> Head-to-Head — Strategia alternativa</a>.
+          </p>
 
           <h4 className="font-semibold text-foreground mt-4">Comportamento responsive</h4>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Su mobile: priorità verticale, Zona 2 con scroll orizzontale, Zona 3 collassabile.</li>
+            <li>Su mobile: priorità verticale, timeline con scroll orizzontale, griglie collassano in singola colonna.</li>
             <li>I colori del team di ciascun pilota sono usati come <em>accent</em> ovunque (bordi card, serie del grafico) per distinguere visivamente A e B.</li>
             <li>Quando i due piloti appartengono allo stesso team, il colore del secondo viene schiarito automaticamente per garantire la leggibilità.</li>
           </ul>
+        </DocSection>
+
+        <DocSection id="head-to-head-driver-context" title="Head-to-Head — Contesto per pilota" icon={<Activity className="h-4 w-4" />}>
+          <p>
+            Sotto la timeline, una card a due colonne ("<strong className="text-foreground">Contesto gara per pilota</strong>")
+            mostra per ciascun pilota le stesse sezioni che vede in modalità singolo pilota,
+            <strong className="text-foreground"> senza alcun ricalcolo</strong>:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Analisi globale gara</strong> — Riassunto del VRE: scenario reale, eventi chiave, sintesi del verdetto.</li>
+            <li><strong className="text-foreground">Soft Sensors</strong> — Stato termico, stress e grip latenti delle gomme con timeline e contesto di validazione del degrado.</li>
+          </ul>
+          <p>
+            Ogni pannello è incorniciato da un'intestazione con il colore del team, l'acronimo e il numero del pilota,
+            così l'attribuzione è sempre evidente. Il badge <em>"reale"</em> sull'header della card chiarisce che i dati
+            si riferiscono alla strategia <strong className="text-foreground">effettivamente eseguita</strong>, non a quella alternativa.
+          </p>
+          <p className="text-xs italic">
+            Riuso totale dei componenti del VRE singolo pilota (<code className="text-primary">SoftSensorsSection</code> e
+            <code className="text-primary"> GlobalAnalysisSection</code>): se il <code className="text-primary">vreResult</code> di
+            un pilota non è disponibile viene mostrato un placeholder neutro, mai un valore inventato.
+          </p>
+        </DocSection>
+
+        <DocSection id="head-to-head-alternative" title="Head-to-Head — Strategia alternativa" icon={<Lightbulb className="h-4 w-4" />}>
+          <p>
+            La seconda macro-sezione mostra, una accanto all'altra, la <strong className="text-foreground">strategia alternativa</strong>
+            calcolata dal VRE per ciascun pilota. È pensata per rispondere alla domanda: <em>"Cosa avrebbe consigliato
+            il Virtual Race Engineer in quelle stesse condizioni?"</em>.
+          </p>
+          <h4 className="font-semibold text-foreground mt-4">Modalità di calcolo</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Modalità di analisi: <code className="text-primary">EX_ANTE</code> (Race Engineer Mode) — nessuna conoscenza di SC/VSC futuri.</li>
+            <li>Risk mode: <code className="text-primary">BALANCED</code>.</li>
+            <li>Stessa sessione, stesso meteo, stesso track status, stessi messaggi di Race Control.</li>
+            <li>Il chip e l'header della card riportano sempre la dicitura coerente <strong className="text-foreground">"EX_ANTE · BALANCED"</strong>.</li>
+          </ul>
+          <h4 className="font-semibold text-foreground mt-4">Contenuto della card per pilota</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Sequenza mescole consigliata e numero di pit stop alternativi.</li>
+            <li>Delta atteso (positivo / negativo) rispetto alla strategia reale eseguita dal pilota stesso.</li>
+            <li>Motivazione narrativa principale del consiglio.</li>
+          </ul>
+          <p className="text-xs italic">
+            Anti-allucinazione: se la strategia alternativa per un pilota non è disponibile (degrado non validato,
+            dati insufficienti, ecc.) la sua colonna riporta uno stato "non disponibile" senza fabbricare numeri.
+          </p>
         </DocSection>
 
         <DocSection id="head-to-head-engine" title="Head-to-Head — Motore di Confronto" icon={<Scale className="h-4 w-4" />}>
