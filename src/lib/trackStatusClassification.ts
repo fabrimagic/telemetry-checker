@@ -76,12 +76,18 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
     ) {
       detected = "VSC";
     }
-    // DOUBLE YELLOW
-    else if (flag === "DOUBLE YELLOW" || text.includes("DOUBLE YELLOW")) {
+    // DOUBLE YELLOW (track-wide only — sector/driver scope is not race-wide)
+    else if (
+      (flag === "DOUBLE YELLOW" || text.includes("DOUBLE YELLOW")) &&
+      scope !== "SECTOR" && scope !== "DRIVER"
+    ) {
       detected = "DOUBLE_YELLOW";
     }
-    // YELLOW (track-wide)
-    else if (flag === "YELLOW" && (scope === "" || scope === "TRACK" || scope === "SECTOR")) {
+    // YELLOW (track-wide only — sector/driver scope does not contaminate full-lap pace)
+    else if (
+      flag === "YELLOW" &&
+      scope !== "SECTOR" && scope !== "DRIVER"
+    ) {
       detected = "YELLOW";
     }
     // GREEN / CLEAR
