@@ -1031,30 +1031,44 @@ export function computeVirtualRaceEngineer(
 
     // Enrich pros/cons based on analysis
     if (alt.analysis.robustness.robustness_label === "FRAGILE") {
-      alt.cons.push("Strategia fragile — sensibile a variazioni di degrado/traffico");
+      const text = "Strategia fragile — sensibile a variazioni di degrado/traffico";
+      alt.cons.push(text);
+      narrativeCollector.add({ id: `robustness_fragile_alt${altIdx}`, category: "robustness", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { robustness_label: "FRAGILE" }, prerendered_text: text });
     } else if (alt.analysis.robustness.robustness_label === "ROBUST") {
-      alt.pros.push("Strategia robusta — poco sensibile a variazioni");
+      const text = "Strategia robusta — poco sensibile a variazioni";
+      alt.pros.push(text);
+      narrativeCollector.add({ id: `robustness_robust_alt${altIdx}`, category: "robustness", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { robustness_label: "ROBUST" }, prerendered_text: text });
     }
 
     if (alt.analysis.competitor_context) {
       const cc = alt.analysis.competitor_context;
       if (cc.undercut_opportunity > 0.5) {
-        alt.pros.push("Opportunità undercut significativa");
+        const text = "Opportunità undercut significativa";
+        alt.pros.push(text);
+        narrativeCollector.add({ id: `competitor_undercut_opp_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "pro", data: { undercut_opportunity: cc.undercut_opportunity }, prerendered_text: text });
       }
       if (cc.undercut_risk > 0.5) {
-        alt.cons.push("Rischio undercut da rivali");
+        const text = "Rischio undercut da rivali";
+        alt.cons.push(text);
+        narrativeCollector.add({ id: `competitor_undercut_risk_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { undercut_risk: cc.undercut_risk }, prerendered_text: text });
       }
       // Release classification-based insights
       if (cc.release_classification === "PACK" && cc.rejoin_in_pack) {
-        alt.cons.push(`Rientro strutturalmente dentro un pack — sorpasso multiplo necessario`);
+        const text = `Rientro strutturalmente dentro un pack — sorpasso multiplo necessario`;
+        alt.cons.push(text);
+        narrativeCollector.add({ id: `competitor_pack_rejoin_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { release_classification: "PACK", rejoin_in_pack: true }, prerendered_text: text });
       }
       if ((cc.traffic_persistence_laps ?? 0) > 4) {
-        alt.cons.push(`Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`);
+        const text = `Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`;
+        alt.cons.push(text);
+        narrativeCollector.add({ id: `competitor_traffic_persist_alt${altIdx}`, category: "competitor", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { traffic_persistence_laps: cc.traffic_persistence_laps }, prerendered_text: text });
       }
     }
 
     if (alt.analysis.overtake_difficulty && alt.analysis.overtake_difficulty.expected_laps_stuck > 3) {
-      alt.cons.push(`Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${alt.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`);
+      const text = `Difficoltà sorpasso: ~${alt.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${alt.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`;
+      alt.cons.push(text);
+      narrativeCollector.add({ id: `overtake_diff_alt${altIdx}`, category: "overtake_difficulty", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { expected_laps_stuck: alt.analysis.overtake_difficulty.expected_laps_stuck, dirty_air_penalty: alt.analysis.overtake_difficulty.dirty_air_penalty }, prerendered_text: text });
     }
 
     if (alt.analysis.stint_extension && alt.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
@@ -1095,27 +1109,45 @@ export function computeVirtualRaceEngineer(
 
     // Robustness
     if (recommendedStrategy.analysis.robustness.robustness_label === "ROBUST") {
-      recPros.push("Strategia robusta — poco sensibile a variazioni");
+      const text = "Strategia robusta — poco sensibile a variazioni";
+      recPros.push(text);
+      narrativeCollector.add({ id: "robustness_robust_rec", category: "robustness", priority: "supporting", target: "recommended", side: "pro", data: { robustness_label: "ROBUST" }, prerendered_text: text });
     } else if (recommendedStrategy.analysis.robustness.robustness_label === "FRAGILE") {
-      recCons.push("Strategia fragile — sensibile a variazioni di degrado/traffico");
+      const text = "Strategia fragile — sensibile a variazioni di degrado/traffico";
+      recCons.push(text);
+      narrativeCollector.add({ id: "robustness_fragile_rec", category: "robustness", priority: "supporting", target: "recommended", side: "con", data: { robustness_label: "FRAGILE" }, prerendered_text: text });
     }
 
     // Competitor context
     if (recommendedStrategy.analysis.competitor_context) {
       const cc = recommendedStrategy.analysis.competitor_context;
-      if (cc.undercut_opportunity > 0.5) recPros.push("Opportunità undercut significativa");
-      if (cc.undercut_risk > 0.5) recCons.push("Rischio undercut da rivali");
+      if (cc.undercut_opportunity > 0.5) {
+        const text = "Opportunità undercut significativa";
+        recPros.push(text);
+        narrativeCollector.add({ id: "competitor_undercut_opp_rec", category: "competitor", priority: "supporting", target: "recommended", side: "pro", data: { undercut_opportunity: cc.undercut_opportunity }, prerendered_text: text });
+      }
+      if (cc.undercut_risk > 0.5) {
+        const text = "Rischio undercut da rivali";
+        recCons.push(text);
+        narrativeCollector.add({ id: "competitor_undercut_risk_rec", category: "competitor", priority: "supporting", target: "recommended", side: "con", data: { undercut_risk: cc.undercut_risk }, prerendered_text: text });
+      }
       if (cc.release_classification === "PACK" && cc.rejoin_in_pack) {
-        recCons.push("Rientro strutturalmente dentro un pack — sorpasso multiplo necessario");
+        const text = "Rientro strutturalmente dentro un pack — sorpasso multiplo necessario";
+        recCons.push(text);
+        narrativeCollector.add({ id: "competitor_pack_rejoin_rec", category: "competitor", priority: "supporting", target: "recommended", side: "con", data: { release_classification: "PACK", rejoin_in_pack: true }, prerendered_text: text });
       }
       if ((cc.traffic_persistence_laps ?? 0) > 4) {
-        recCons.push(`Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`);
+        const text = `Traffico persistente stimato: ~${cc.traffic_persistence_laps} giri prima di sbloccarsi`;
+        recCons.push(text);
+        narrativeCollector.add({ id: "competitor_traffic_persist_rec", category: "competitor", priority: "supporting", target: "recommended", side: "con", data: { traffic_persistence_laps: cc.traffic_persistence_laps }, prerendered_text: text });
       }
     }
 
     // Overtake difficulty
     if (recommendedStrategy.analysis.overtake_difficulty && recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck > 3) {
-      recCons.push(`Difficoltà sorpasso: ~${recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${recommendedStrategy.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`);
+      const text = `Difficoltà sorpasso: ~${recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck} giri bloccato in aria sporca (dirty air: −${recommendedStrategy.analysis.overtake_difficulty.dirty_air_penalty.toFixed(1)}s)`;
+      recCons.push(text);
+      narrativeCollector.add({ id: "overtake_diff_rec", category: "overtake_difficulty", priority: "supporting", target: "recommended", side: "con", data: { expected_laps_stuck: recommendedStrategy.analysis.overtake_difficulty.expected_laps_stuck, dirty_air_penalty: recommendedStrategy.analysis.overtake_difficulty.dirty_air_penalty }, prerendered_text: text });
     }
 
     // Stint extension / cliff
@@ -1633,7 +1665,9 @@ export function computeVirtualRaceEngineer(
     confidenceFactors.push(`🔮 Scenario simulato attivo: ${scenarioDef.label}${lapNote}${durNote}${windowNote} — ${scenarioDef.description}`);
     narrativeInsights.unshift(`⚠️ What-if scenario attivo: "${scenarioDef.label}"${lapNote}${durNote}. I risultati seguenti riflettono i modificatori dello scenario, non solo i dati osservati.`);
     if (scenarioActivationWarning) {
-      narrativeInsights.push(`⚠️ ${scenarioActivationWarning}`);
+      const text = `⚠️ ${scenarioActivationWarning}`;
+      narrativeInsights.push(text);
+      narrativeCollector.add({ id: "scenario_activation_warning", category: "scenario", priority: "critical", target: "global", data: { warning: scenarioActivationWarning }, prerendered_text: text });
     }
   }
 
