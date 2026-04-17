@@ -124,7 +124,7 @@ function computeWetPersistenceScore(
   for (const s of timeline) {
     if (s.time > atTime) break;
     if (s.time < lookbackStart) continue;
-    if (s.rainfall <= CONFIG.RAIN_THRESHOLD) continue;
+    if (s.rainfall <= CONFIG.RAIN_FLAG_ACTIVE) continue;
 
     const age = atTime - s.time;
     // Exponential decay: score = e^(-ln2 * age / halfLife)
@@ -176,7 +176,7 @@ function computeLapRainSignals(
 
   let rainCount = 0;
   for (const s of inLapSamples) {
-    if (s.rainfall > CONFIG.RAIN_THRESHOLD) rainCount++;
+    if (s.rainfall > CONFIG.RAIN_FLAG_ACTIVE) rainCount++;
   }
 
   const activeRainFraction =
