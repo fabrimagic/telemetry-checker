@@ -89,7 +89,7 @@ function buildDriverDeviation(
 ): DriverCumulativeDeviation {
   const driverLaps = allLaps.filter((l) => l.driver_number === driverNumber);
   // Use the SAME filtering as the benchmark to ensure the winner ends at ~0
-  const validLaps = getValidLaps(driverLaps).sort((a, b) => a.lap_number - b.lap_number);
+  const validLaps = getValidLapsStructural(driverLaps).sort((a, b) => a.lap_number - b.lap_number);
 
   let cumulative = 0;
   const laps: LapDeviation[] = [];
