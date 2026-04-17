@@ -104,7 +104,7 @@ export default function Documentation() {
         {/* INTRO */}
         {/* ═══════════════════════════════════════════════ */}
         <div className="bg-card rounded-lg border border-border p-5 space-y-3">
-          <p className="text-foreground font-semibold text-lg">F1 Telemetry Checker</p>
+          <p className="text-foreground font-semibold text-lg">PitWall AI</p>
           <p className="text-sm text-muted-foreground">
             Applicazione web per l'analisi strategica e telemetrica delle sessioni di Formula 1,
             basata interamente su dati pubblici provenienti dall'API <strong className="text-foreground">OpenF1</strong>.
