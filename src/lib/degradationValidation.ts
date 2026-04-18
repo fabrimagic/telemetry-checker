@@ -434,6 +434,7 @@ export function validateDegradationEstimate(
     plausibility_flags: plausibilityFlags,
     context_flags: contextFlags,
     compound_profile_used: compound,
+    t_stat: tStat,
   };
 }
 
