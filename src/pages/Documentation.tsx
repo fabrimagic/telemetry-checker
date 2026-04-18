@@ -173,6 +173,7 @@ export default function Documentation() {
               <TocLink href="#vre-breakdown">Scomposizione del Giudizio</TocLink>
               <TocLink href="#vre-verdict">Verdetto e Confidenza</TocLink>
               <TocLink href="#vre-context">Contesto Integrato</TocLink>
+              <TocLink href="#vre-narrative-chapters">Capitoli Narrativi</TocLink>
               <TocLink href="#vre-delta-convention">Convenzione Delta</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Modelli di calcolo</p>
@@ -1079,6 +1080,36 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="vre-narrative-chapters" title="VRE — Capitoli Narrativi" icon={<BookOpen className="h-4 w-4" />}>
+          <p>
+            Oltre alle insight puntuali, il VRE organizza la narrazione della gara in <strong className="text-foreground">capitoli</strong>:
+            blocchi tematici espandibili che raggruppano gli eventi per fase, in modo da rendere la lettura
+            scorrevole anche su gare lunghe e ricche di episodi.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Le quattro fasi</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">OPENING</strong> — primi giri: contesto iniziale, condizioni meteo di partenza, posizionamento, pace iniziale. Aperto di default.</li>
+            <li><strong className="text-foreground">DEVELOPMENT</strong> — fase centrale: evoluzione stint, finestre pit, dinamica del passo. Chiuso di default.</li>
+            <li><strong className="text-foreground">CRITICAL</strong> — momenti decisivi: neutralizzazioni, decisioni strategiche, picchi di degrado, battaglie chiave. Aperto di default per visibilità immediata.</li>
+            <li><strong className="text-foreground">CLOSING</strong> — finale di gara: gestione gomma negli ultimi giri, esito strategico, deviazione cumulativa finale. Chiuso di default.</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Come vengono costruiti</h4>
+          <p>
+            Ogni evento prodotto dai moduli analitici (degrado, pace loss, neutralizzazioni, meteo, pit, battaglie)
+            viene attribuito automaticamente a una fase in base al giro in cui avviene rispetto alla durata totale della gara
+            e alla sua categoria. I capitoli sono <strong className="text-foreground">additivi</strong> rispetto alle insight tradizionali:
+            non sostituiscono la lista lineare, la organizzano. Capitoli senza eventi non vengono mostrati.
+          </p>
+
+          <p className="text-xs italic">
+            Anti-allucinazione: nessun evento viene inventato per riempire un capitolo.
+            Se una fase non ha contenuti significativi, semplicemente non compare.
+          </p>
+        </DocSection>
+
+
         <DocSection id="vre-delta-convention" title="VRE — Convenzione Delta Tempo" icon={<Info className="h-4 w-4" />}>
           <p>Il VRE utilizza una <strong className="text-foreground">doppia convenzione</strong> per i delta temporali:</p>
           <div className="overflow-x-auto">
@@ -1157,11 +1188,55 @@ export default function Documentation() {
           <h4 className="font-semibold text-foreground mt-3">Stadio A — Rimozione effetti non-gomma</h4>
           <Formula>lap_time = β₀ + β₁·fuel_proxy_centered + β₂·track_temp_centered + β₃·air_temp_centered + residuo</Formula>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">fuel_proxy</strong> — approssimazione tramite <code className="text-primary">laps_remaining = totalLaps - lapNumber</code>. NON è il carico reale</li>
+            <li><strong className="text-foreground">fuel_proxy</strong> — proxy del consumo carburante; sono supportati 4 tipi alternativi (vedi tabella sotto). Il default è <code className="text-primary">laps_remaining</code> per garantire stabilità storica</li>
             <li><strong className="text-foreground">track_temp / air_temp</strong> — temperature associate per timestamp più vicino (tolleranza 5 min)</li>
-            <li>Variabili centrate per stabilità numerica</li>
-            <li>Se varianza temperature &lt; 0.3°C → solo fuel proxy</li>
+            <li>Variabili centrate e scalate per stabilità numerica</li>
+            <li>Se la varianza temperature è insufficiente → modello a sola fuel proxy</li>
           </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Tipi di fuel proxy</h4>
+          <p className="text-xs">
+            Il fuel proxy non è il carico reale (OpenF1 non lo espone): è una grandezza che si comporta
+            in modo monotonicamente decrescente lungo la gara, in modo che la regressione possa separare
+            l'effetto carburante dall'effetto gomma.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded mt-1">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="px-2 py-1.5 text-left font-semibold text-foreground">Tipo</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-foreground">Cosa misura</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-foreground">Quando usarlo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">laps_remaining</td>
+                  <td className="px-2 py-1.5">Giri rimanenti al traguardo</td>
+                  <td className="px-2 py-1.5">Default — sempre disponibile, robusto. Limite: collineare con tyre_life sullo stesso stint.</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">lap_number</td>
+                  <td className="px-2 py-1.5">Numero progressivo del giro</td>
+                  <td className="px-2 py-1.5">Equivalente a <code>laps_remaining</code> a meno del segno; uso storico/diagnostico.</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">st_speed</td>
+                  <td className="px-2 py-1.5">Velocità di soglia in fondo al rettilineo</td>
+                  <td className="px-2 py-1.5">Risponde al carico carburante in modo indiretto; varianza informativa modesta.</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">throttle_integral</td>
+                  <td className="px-2 py-1.5">Lavoro stimato ∫(throttle×rpm)dt da CarData</td>
+                  <td className="px-2 py-1.5">Proxy fisicamente motivato: lavoro residuo decresce monotonamente. Richiede CarData (più traffico API).</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs italic">
+            Per ogni stint la qualità del fuel proxy viene valutata (LOW / MEDIUM / HIGH) e, se LOW,
+            il modello corretto viene saltato a favore della regressione semplice.
+          </p>
 
           <h4 className="font-semibold text-foreground mt-3">Stadio B — Degrado isolato</h4>
           <Formula>residuo = α + γ·tyre_life + errore</Formula>
@@ -1202,15 +1277,31 @@ export default function Documentation() {
                   <th className="px-3 py-1.5 text-right font-semibold text-foreground">Neutral tol.</th>
                   <th className="px-3 py-1.5 text-right font-semibold text-foreground">Max slope</th>
                   <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min giri VALID</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min R²</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min |t|</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">−0.01</td><td className="px-3 py-1.5 text-right">0.015</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">5</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">−0.02</td><td className="px-3 py-1.5 text-right">0.01</td><td className="px-3 py-1.5 text-right">0.20</td><td className="px-3 py-1.5 text-right">6</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">−0.025</td><td className="px-3 py-1.5 text-right">0.008</td><td className="px-3 py-1.5 text-right">0.15</td><td className="px-3 py-1.5 text-right">7</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">−0.01</td><td className="px-3 py-1.5 text-right">0.015</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">5</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">2.0</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">−0.02</td><td className="px-3 py-1.5 text-right">0.01</td><td className="px-3 py-1.5 text-right">0.20</td><td className="px-3 py-1.5 text-right">6</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">2.0</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">−0.025</td><td className="px-3 py-1.5 text-right">0.008</td><td className="px-3 py-1.5 text-right">0.15</td><td className="px-3 py-1.5 text-right">7</td><td className="px-3 py-1.5 text-right">0.30</td><td className="px-3 py-1.5 text-right">2.0</td></tr>
               </tbody>
             </table>
           </div>
+
+          <h4 className="font-semibold text-foreground mt-3">Significatività statistica (t-stat)</h4>
+          <p>
+            Oltre al fit (R²), per ogni stima viene calcolato il <strong className="text-foreground">t-stat della pendenza</strong>:
+            <Formula>t = |slope| / errore_standard_slope</Formula>
+            Una pendenza con t-stat sotto la soglia (default 2.0, equivalente a ≈95% di significatività)
+            viene <strong className="text-foreground">declassata a NEUTRAL</strong> anche se R² e numero di giri sembrano accettabili.
+            Quando l'errore standard non è disponibile (es. troppi pochi giri), il check viene saltato silenziosamente
+            per non penalizzare ingiustamente la stima.
+          </p>
+          <p className="text-xs italic">
+            R² e t-stat sono filtri complementari: R² misura quanto bene il modello spiega la varianza,
+            t-stat misura se la pendenza stimata è distinguibile da zero al netto del rumore.
+          </p>
 
           <h4 className="font-semibold text-foreground mt-3">Confidence multi-fattore</h4>
           <ul className="list-disc pl-5 space-y-1">
