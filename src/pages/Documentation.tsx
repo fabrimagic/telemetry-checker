@@ -1157,11 +1157,55 @@ export default function Documentation() {
           <h4 className="font-semibold text-foreground mt-3">Stadio A — Rimozione effetti non-gomma</h4>
           <Formula>lap_time = β₀ + β₁·fuel_proxy_centered + β₂·track_temp_centered + β₃·air_temp_centered + residuo</Formula>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">fuel_proxy</strong> — approssimazione tramite <code className="text-primary">laps_remaining = totalLaps - lapNumber</code>. NON è il carico reale</li>
+            <li><strong className="text-foreground">fuel_proxy</strong> — proxy del consumo carburante; sono supportati 4 tipi alternativi (vedi tabella sotto). Il default è <code className="text-primary">laps_remaining</code> per garantire stabilità storica</li>
             <li><strong className="text-foreground">track_temp / air_temp</strong> — temperature associate per timestamp più vicino (tolleranza 5 min)</li>
-            <li>Variabili centrate per stabilità numerica</li>
-            <li>Se varianza temperature &lt; 0.3°C → solo fuel proxy</li>
+            <li>Variabili centrate e scalate per stabilità numerica</li>
+            <li>Se la varianza temperature è insufficiente → modello a sola fuel proxy</li>
           </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Tipi di fuel proxy</h4>
+          <p className="text-xs">
+            Il fuel proxy non è il carico reale (OpenF1 non lo espone): è una grandezza che si comporta
+            in modo monotonicamente decrescente lungo la gara, in modo che la regressione possa separare
+            l'effetto carburante dall'effetto gomma.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded mt-1">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="px-2 py-1.5 text-left font-semibold text-foreground">Tipo</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-foreground">Cosa misura</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-foreground">Quando usarlo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">laps_remaining</td>
+                  <td className="px-2 py-1.5">Giri rimanenti al traguardo</td>
+                  <td className="px-2 py-1.5">Default — sempre disponibile, robusto. Limite: collineare con tyre_life sullo stesso stint.</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">lap_number</td>
+                  <td className="px-2 py-1.5">Numero progressivo del giro</td>
+                  <td className="px-2 py-1.5">Equivalente a <code>laps_remaining</code> a meno del segno; uso storico/diagnostico.</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">st_speed</td>
+                  <td className="px-2 py-1.5">Velocità di soglia in fondo al rettilineo</td>
+                  <td className="px-2 py-1.5">Risponde al carico carburante in modo indiretto; varianza informativa modesta.</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono text-primary">throttle_integral</td>
+                  <td className="px-2 py-1.5">Lavoro stimato ∫(throttle×rpm)dt da CarData</td>
+                  <td className="px-2 py-1.5">Proxy fisicamente motivato: lavoro residuo decresce monotonamente. Richiede CarData (più traffico API).</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs italic">
+            Per ogni stint la qualità del fuel proxy viene valutata (LOW / MEDIUM / HIGH) e, se LOW,
+            il modello corretto viene saltato a favore della regressione semplice.
+          </p>
 
           <h4 className="font-semibold text-foreground mt-3">Stadio B — Degrado isolato</h4>
           <Formula>residuo = α + γ·tyre_life + errore</Formula>
