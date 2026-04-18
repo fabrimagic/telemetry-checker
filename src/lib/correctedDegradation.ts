@@ -29,7 +29,7 @@ import type { TrackStatus } from "./trackStatusClassification";
  * ══════════════════════════════════════════════════════════════════ */
 
 export interface CorrectedDegradationConfig {
-  fuel_proxy_type: "laps_remaining" | "lap_number";
+  fuel_proxy_type: "laps_remaining" | "lap_number" | "st_speed";
   min_laps: number;
   min_laps_corrected: number;
   outlier_threshold: number;
@@ -126,6 +126,8 @@ export interface CorrectedDegradationResult extends DegradationResult {
   rawVsCorrectedAgreement?: "HIGH" | "MEDIUM" | "LOW";
   /** Whether corrected model was accepted conservatively */
   correctedModelAcceptedConservatively?: boolean;
+  /** Coverage of fuel proxy when type === "st_speed" (0..1). Undefined for other types. */
+  st_speed_coverage?: number;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -175,30 +177,37 @@ export function associateWeatherToLaps(
  * ══════════════════════════════════════════════════════════════════ */
 
 export function buildFuelProxy(
-  lapNumber: number,
+  lap: Lap,
   totalLaps: number,
   type: CorrectedDegradationConfig["fuel_proxy_type"],
-): number {
-  if (type === "laps_remaining") return totalLaps - lapNumber;
-  return lapNumber;
+): number | null {
+  if (type === "laps_remaining") return totalLaps - lap.lap_number;
+  if (type === "lap_number") return lap.lap_number;
+  // "st_speed"
+  return lap.st_speed;
 }
 
-/** Assess the quality of fuel proxy data for a stint */
+/** Assess the quality of fuel proxy data for a stint (type-aware) */
 function assessFuelProxyQuality(
   fuelProxies: number[],
   stintLength: number,
+  type: CorrectedDegradationConfig["fuel_proxy_type"],
 ): "LOW" | "MEDIUM" | "HIGH" {
   if (fuelProxies.length < 4) return "LOW";
 
   const fuelStd = stdDev(fuelProxies);
   const fuelRange = Math.max(...fuelProxies) - Math.min(...fuelProxies);
 
-  // Very little variance → fuel proxy is uninformative
+  if (type === "st_speed") {
+    // st_speed is in km/h; expected per-stint variation is small but informative
+    if (fuelStd < 1.0 || fuelRange < 2.0) return "LOW";
+    if (fuelRange >= 5.0 && fuelStd > 2.0) return "HIGH";
+    return "MEDIUM";
+  }
+
+  // Legacy proxies (laps_remaining / lap_number): scale with stint length
   if (fuelStd < 0.5 || fuelRange < 2) return "LOW";
-
-  // Reasonable range and variance
   if (fuelRange >= stintLength * 0.5 && fuelStd > 1.0) return "HIGH";
-
   return "MEDIUM";
 }
 
@@ -639,36 +648,54 @@ export function calculateCorrectedTyreDegradation(
     if (stintLaps.length < config.min_laps) continue;
 
     // ── Step 4: Build features ──
+    // tyreLifes/lapTimes/points are aligned to ALL filtered laps (used by rawReg).
+    // The "_mv" parallel arrays are the subset where fuel proxy is non-null
+    // (used by twoStageDegradation, which requires equal-length inputs).
     const tyreLifes: number[] = [];
-    const fuelProxies: number[] = [];
-    const trackTemps: number[] = [];
-    const airTemps: number[] = [];
     const lapTimes: number[] = [];
     const points: { tyreLife: number; lapTime: number }[] = [];
+
+    const tyreLifes_mv: number[] = [];
+    const lapTimes_mv: number[] = [];
+    const fuelProxies_mv: number[] = [];
+    const trackTemps_mv: number[] = [];
+    const airTemps_mv: number[] = [];
     let weatherComplete = true;
 
     for (const l of stintLaps) {
       const tyreLife = (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start);
-      const fuelProxy = buildFuelProxy(l.lap_number, totalSessionLaps, config.fuel_proxy_type);
-      const wData = lapWeather.get(l.lap_number);
-
       tyreLifes.push(tyreLife);
-      fuelProxies.push(fuelProxy);
       lapTimes.push(l.lap_duration!);
       points.push({ tyreLife, lapTime: l.lap_duration! });
 
-      if (wData?.track_temperature != null && wData?.air_temperature != null) {
-        trackTemps.push(wData.track_temperature);
-        airTemps.push(wData.air_temperature);
+      const fuelProxy = buildFuelProxy(l, totalSessionLaps, config.fuel_proxy_type);
+      const wData = lapWeather.get(l.lap_number);
+
+      if (fuelProxy !== null) {
+        tyreLifes_mv.push(tyreLife);
+        lapTimes_mv.push(l.lap_duration!);
+        fuelProxies_mv.push(fuelProxy);
+        if (wData?.track_temperature != null && wData?.air_temperature != null) {
+          trackTemps_mv.push(wData.track_temperature);
+          airTemps_mv.push(wData.air_temperature);
+        } else {
+          weatherComplete = false;
+        }
       } else {
+        // A null fuel proxy means we cannot use this lap in the multivariate fit
+        // and the weather alignment is broken for that lap → disable weather stage.
         weatherComplete = false;
       }
     }
 
-    // ── Step 5: Assess fuel proxy quality ──
-    const fuelProxyQuality = assessFuelProxyQuality(fuelProxies, stint.lap_end - stint.lap_start + 1);
+    // ── Step 5: Assess fuel proxy quality (type-aware) ──
+    const fuelProxyQuality = assessFuelProxyQuality(
+      fuelProxies_mv,
+      stint.lap_end - stint.lap_start + 1,
+      config.fuel_proxy_type,
+    );
 
-    // ── Step 6: Raw regression (always computed) ──
+    // ── Step 6: Raw regression (always computed, on full filtered set) ──
     const rawReg = simpleLinearRegression(tyreLifes, lapTimes);
     if (!rawReg) continue;
 
@@ -690,12 +717,12 @@ export function calculateCorrectedTyreDegradation(
 
     const hasFuelVariance = fuelProxyQuality !== "LOW";
 
-    if (hasFuelVariance && stintLaps.length >= config.min_laps_corrected) {
+    if (hasFuelVariance && lapTimes_mv.length >= config.min_laps_corrected) {
       const twoStage = twoStageDegradation(
-        tyreLifes, fuelProxies,
-        weatherComplete ? trackTemps : null,
-        weatherComplete ? airTemps : null,
-        lapTimes,
+        tyreLifes_mv, fuelProxies_mv,
+        weatherComplete ? trackTemps_mv : null,
+        weatherComplete ? airTemps_mv : null,
+        lapTimes_mv,
       );
 
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
@@ -708,9 +735,9 @@ export function calculateCorrectedTyreDegradation(
         conditionWarning = twoStage.conditionWarning;
         correctedRmse = twoStage.rmse_stage_b;
       }
-    } else if (hasFuelVariance && stintLaps.length >= config.min_laps + 1) {
+    } else if (hasFuelVariance && lapTimes_mv.length >= config.min_laps + 1) {
       const twoStage = twoStageDegradation(
-        tyreLifes, fuelProxies, null, null, lapTimes,
+        tyreLifes_mv, fuelProxies_mv, null, null, lapTimes_mv,
       );
 
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
@@ -773,6 +800,10 @@ export function calculateCorrectedTyreDegradation(
       correctionMagnitude: round3(correctionMagnitude),
       rawVsCorrectedAgreement: quality.agreement,
       correctedModelAcceptedConservatively: quality.acceptedConservatively,
+      st_speed_coverage:
+        config.fuel_proxy_type === "st_speed"
+          ? (stintLaps.length > 0 ? fuelProxies_mv.length / stintLaps.length : 0)
+          : undefined,
     });
   }
 
