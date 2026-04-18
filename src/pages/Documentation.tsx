@@ -1079,6 +1079,36 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="vre-narrative-chapters" title="VRE — Capitoli Narrativi" icon={<BookOpen className="h-4 w-4" />}>
+          <p>
+            Oltre alle insight puntuali, il VRE organizza la narrazione della gara in <strong className="text-foreground">capitoli</strong>:
+            blocchi tematici espandibili che raggruppano gli eventi per fase, in modo da rendere la lettura
+            scorrevole anche su gare lunghe e ricche di episodi.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-3">Le quattro fasi</h4>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">OPENING</strong> — primi giri: contesto iniziale, condizioni meteo di partenza, posizionamento, pace iniziale. Aperto di default.</li>
+            <li><strong className="text-foreground">DEVELOPMENT</strong> — fase centrale: evoluzione stint, finestre pit, dinamica del passo. Chiuso di default.</li>
+            <li><strong className="text-foreground">CRITICAL</strong> — momenti decisivi: neutralizzazioni, decisioni strategiche, picchi di degrado, battaglie chiave. Aperto di default per visibilità immediata.</li>
+            <li><strong className="text-foreground">CLOSING</strong> — finale di gara: gestione gomma negli ultimi giri, esito strategico, deviazione cumulativa finale. Chiuso di default.</li>
+          </ul>
+
+          <h4 className="font-semibold text-foreground mt-3">Come vengono costruiti</h4>
+          <p>
+            Ogni evento prodotto dai moduli analitici (degrado, pace loss, neutralizzazioni, meteo, pit, battaglie)
+            viene attribuito automaticamente a una fase in base al giro in cui avviene rispetto alla durata totale della gara
+            e alla sua categoria. I capitoli sono <strong className="text-foreground">additivi</strong> rispetto alle insight tradizionali:
+            non sostituiscono la lista lineare, la organizzano. Capitoli senza eventi non vengono mostrati.
+          </p>
+
+          <p className="text-xs italic">
+            Anti-allucinazione: nessun evento viene inventato per riempire un capitolo.
+            Se una fase non ha contenuti significativi, semplicemente non compare.
+          </p>
+        </DocSection>
+
+
         <DocSection id="vre-delta-convention" title="VRE — Convenzione Delta Tempo" icon={<Info className="h-4 w-4" />}>
           <p>Il VRE utilizza una <strong className="text-foreground">doppia convenzione</strong> per i delta temporali:</p>
           <div className="overflow-x-auto">
