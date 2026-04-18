@@ -138,6 +138,8 @@ export interface CorrectedDegradationResult extends DegradationResult {
   correctedModelAcceptedConservatively?: boolean;
   /** Coverage of fuel proxy when type === "st_speed" (0..1). Undefined for other types. */
   st_speed_coverage?: number;
+  /** Standard error of the corrected slope (from stage B regression, if computed). */
+  slope_corrected_std_error?: number | null;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -316,7 +318,7 @@ function excludeWarmupCorrected(
 function simpleLinearRegression(
   xs: number[],
   ys: number[],
-): { slope: number; intercept: number; rSquared: number; rmse: number } | null {
+): { slope: number; intercept: number; rSquared: number; rmse: number; slopeStdError: number | null } | null {
   const n = xs.length;
   if (n < 2) return null;
   let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -335,7 +337,21 @@ function simpleLinearRegression(
   }
   const rSquared = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
   const rmse = Math.sqrt(ssRes / n);
-  return { slope, intercept, rSquared, rmse };
+
+  // Standard error of the slope (OLS): sqrt( s² / Σ(xi - x̄)² ), s² = ssRes / (n - 2)
+  let slopeStdError: number | null = null;
+  if (n > 2) {
+    const meanX = sumX / n;
+    let ssX = 0;
+    for (let i = 0; i < n; i++) ssX += (xs[i] - meanX) ** 2;
+    const s2 = ssRes / (n - 2);
+    if (ssX > 0 && s2 >= 0 && Number.isFinite(s2)) {
+      const se = Math.sqrt(s2 / ssX);
+      slopeStdError = Number.isFinite(se) ? se : null;
+    }
+  }
+
+  return { slope, intercept, rSquared, rmse, slopeStdError };
 }
 
 /** Multivariate OLS with conditioning check */
@@ -419,6 +435,7 @@ function twoStageDegradation(
   lapTimes: number[],
 ): {
   slope_corrected: number;
+  slope_corrected_std_error: number | null;
   r_squared_stage_a: number;
   r_squared_stage_b: number;
   rmse_stage_b: number;
@@ -500,6 +517,7 @@ function twoStageDegradation(
 
   return {
     slope_corrected: stageBResult.slope,
+    slope_corrected_std_error: stageBResult.slopeStdError,
     r_squared_stage_a: stageAResult.rSquared,
     r_squared_stage_b: stageBResult.rSquared,
     rmse_stage_b: stageBResult.rmse,
@@ -730,6 +748,7 @@ export function calculateCorrectedTyreDegradation(
     // ── Step 7: Attempt two-stage corrected model ──
     let modelType: CorrectedDegradationResult["model_type"] = "simple_fallback";
     let slopeCorrected = rawReg.slope;
+    let slopeCorrectedStdError: number | null = rawReg.slopeStdError;
     let rSquaredCorrected = rawReg.rSquared;
     let rSquaredStageA: number | null = null;
     let weatherCorrectionUsed = false;
@@ -756,6 +775,7 @@ export function calculateCorrectedTyreDegradation(
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
         modelType = twoStage.model_type;
         slopeCorrected = twoStage.slope_corrected;
+        slopeCorrectedStdError = twoStage.slope_corrected_std_error;
         rSquaredCorrected = twoStage.r_squared_stage_b;
         rSquaredStageA = twoStage.r_squared_stage_a;
         weatherCorrectionUsed = twoStage.weather_used;
@@ -771,6 +791,7 @@ export function calculateCorrectedTyreDegradation(
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
         modelType = twoStage.model_type;
         slopeCorrected = twoStage.slope_corrected;
+        slopeCorrectedStdError = twoStage.slope_corrected_std_error;
         rSquaredCorrected = twoStage.r_squared_stage_b;
         rSquaredStageA = twoStage.r_squared_stage_a;
         coefficients = twoStage.coefficients;
@@ -832,6 +853,7 @@ export function calculateCorrectedTyreDegradation(
         config.fuel_proxy_type === "st_speed"
           ? (stintLaps.length > 0 ? fuelProxies_mv.length / stintLaps.length : 0)
           : undefined,
+      slope_corrected_std_error: slopeCorrectedStdError,
     });
   }
 

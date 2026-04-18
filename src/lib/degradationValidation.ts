@@ -36,6 +36,13 @@ export interface CompoundValidationProfile {
   min_r_squared: number;
   /** Maximum correction magnitude ratio before cautionary flag */
   max_correction_ratio: number;
+  /**
+   * Minimum |t-stat| (= |slope| / slopeStdError) required for VALID.
+   * Below → cap at NEUTRAL. Set to 0 to disable the check for this compound.
+   * Standard threshold ≈ 2.0 (~95% significance).
+   * Skipped silently when slopeStdError is unavailable (n ≤ 2).
+   */
+  min_t_stat_valid: number;
 }
 
 /**
@@ -55,6 +62,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     min_laps_valid: 5,
     min_r_squared: 0.10,
     max_correction_ratio: 3.0,
+    min_t_stat_valid: 2.0,
   },
   MEDIUM: {
     negative_tolerance: -0.02,
@@ -65,6 +73,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     min_laps_valid: 6,
     min_r_squared: 0.10,
     max_correction_ratio: 3.0,
+    min_t_stat_valid: 2.0,
   },
   HARD: {
     negative_tolerance: -0.025,
@@ -75,6 +84,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     min_laps_valid: 7,
     min_r_squared: 0.12,
     max_correction_ratio: 2.5,
+    min_t_stat_valid: 2.0,
   },
 };
 
@@ -161,6 +171,8 @@ export interface DegradationValidationResult {
   context_flags?: string[];
   /** Compound profile used for validation */
   compound_profile_used?: string;
+  /** T-statistic of the slope (|slope| / slopeStdError). Null if std error unavailable. */
+  t_stat?: number | null;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -186,6 +198,7 @@ function getProfile(compound: string, config: DegradationValidationConfig): Comp
     min_laps_valid: config.min_valid_laps + 2,
     min_r_squared: config.min_r_squared,
     max_correction_ratio: 3.0,
+    min_t_stat_valid: 2.0,
   };
 }
 
@@ -208,10 +221,34 @@ export function validateDegradationEstimate(
   const compound = result.compound?.toUpperCase() ?? "UNKNOWN";
   const profile = getProfile(compound, config);
 
+  // ── Statistical significance check (t-stat) ──
+  // Use the std error matching the slope being validated:
+  //   - corrected models → slope_corrected_std_error (stage B), fallback to raw slopeStdError
+  //   - simple models   → slopeStdError
+  // Defensive: treat negative / NaN std errors as missing (skip the check).
+  const cResult = corrected ? (result as CorrectedDegradationResult) : null;
+  const stdErrCandidate = cResult
+    ? (cResult.slope_corrected_std_error ?? result.slopeStdError ?? null)
+    : (result.slopeStdError ?? null);
+  const stdErr =
+    stdErrCandidate != null && Number.isFinite(stdErrCandidate) && stdErrCandidate > 0
+      ? stdErrCandidate
+      : null;
+  const tStat = stdErr != null ? Math.abs(slope) / stdErr : null;
+  // Skip the check entirely when min_t_stat_valid <= 0 (escape hatch) or t-stat unavailable.
+  const tStatInsufficient =
+    tStat != null && profile.min_t_stat_valid > 0 && tStat < profile.min_t_stat_valid;
+
   // ── Flags ──
   const statisticalFlags: string[] = [];
   const plausibilityFlags: string[] = [];
   const contextFlags: string[] = [];
+
+  if (tStatInsufficient) {
+    statisticalFlags.push(
+      `Slope non statisticamente significativa (t=${tStat!.toFixed(2)} < ${profile.min_t_stat_valid})`,
+    );
+  }
 
   // ── Fit quality (same thresholds, independent of compound) ──
   const fitQuality: DegradationValidationResult["fit_quality"] =
@@ -319,6 +356,17 @@ export function validateDegradationEstimate(
     reasonCategory = "MIXED";
   }
 
+  // 7. Statistical significance: cap at NEUTRAL if t-stat insufficient.
+  // Never escalates to INVALID (only existing physical/statistical criteria do).
+  // Skipped silently when std error is unavailable (n ≤ 2 or zero variance in x).
+  if (status === "VALID" && tStatInsufficient) {
+    status = "NEUTRAL";
+    reasons.push(
+      `Slope non statisticamente significativa (t=${tStat!.toFixed(2)}, minimo ${profile.min_t_stat_valid})`,
+    );
+    reasonCategory = "STATISTICAL";
+  }
+
   const reason = reasons.length > 0 ? reasons.join("; ") : "Stima valida";
 
   // ── Effective slope & fallback ──
@@ -386,6 +434,7 @@ export function validateDegradationEstimate(
     plausibility_flags: plausibilityFlags,
     context_flags: contextFlags,
     compound_profile_used: compound,
+    t_stat: tStat,
   };
 }
 
