@@ -433,6 +433,7 @@ function twoStageDegradation(
   lapTimes: number[],
 ): {
   slope_corrected: number;
+  slope_corrected_std_error: number | null;
   r_squared_stage_a: number;
   r_squared_stage_b: number;
   rmse_stage_b: number;
