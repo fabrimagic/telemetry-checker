@@ -800,6 +800,10 @@ export function calculateCorrectedTyreDegradation(
       correctionMagnitude: round3(correctionMagnitude),
       rawVsCorrectedAgreement: quality.agreement,
       correctedModelAcceptedConservatively: quality.acceptedConservatively,
+      st_speed_coverage:
+        config.fuel_proxy_type === "st_speed"
+          ? (stintLaps.length > 0 ? fuelProxies_mv.length / stintLaps.length : 0)
+          : undefined,
     });
   }
 
