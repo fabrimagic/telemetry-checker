@@ -173,6 +173,7 @@ export default function Documentation() {
               <TocLink href="#vre-breakdown">Scomposizione del Giudizio</TocLink>
               <TocLink href="#vre-verdict">Verdetto e Confidenza</TocLink>
               <TocLink href="#vre-context">Contesto Integrato</TocLink>
+              <TocLink href="#vre-narrative-chapters">Capitoli Narrativi</TocLink>
               <TocLink href="#vre-delta-convention">Convenzione Delta</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Modelli di calcolo</p>
