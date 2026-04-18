@@ -127,7 +127,7 @@ export const DEFAULT_VALIDATION_CONFIG: DegradationValidationConfig = {
   negative_tolerance: -0.02,
   neutral_tolerance: 0.01,
   min_valid_laps: 4,
-  min_r_squared: 0.1,
+  min_r_squared: 0.25,
   neutral_fallback_slope: 0.03,
   max_plausible_slope: 0.30,
   compound_profiles: COMPOUND_PROFILES,
