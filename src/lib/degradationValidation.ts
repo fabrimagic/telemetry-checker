@@ -62,6 +62,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     min_laps_valid: 5,
     min_r_squared: 0.10,
     max_correction_ratio: 3.0,
+    min_t_stat_valid: 2.0,
   },
   MEDIUM: {
     negative_tolerance: -0.02,
@@ -72,6 +73,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     min_laps_valid: 6,
     min_r_squared: 0.10,
     max_correction_ratio: 3.0,
+    min_t_stat_valid: 2.0,
   },
   HARD: {
     negative_tolerance: -0.025,
@@ -82,6 +84,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     min_laps_valid: 7,
     min_r_squared: 0.12,
     max_correction_ratio: 2.5,
+    min_t_stat_valid: 2.0,
   },
 };
 
