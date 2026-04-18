@@ -748,6 +748,7 @@ export function calculateCorrectedTyreDegradation(
     // ── Step 7: Attempt two-stage corrected model ──
     let modelType: CorrectedDegradationResult["model_type"] = "simple_fallback";
     let slopeCorrected = rawReg.slope;
+    let slopeCorrectedStdError: number | null = rawReg.slopeStdError;
     let rSquaredCorrected = rawReg.rSquared;
     let rSquaredStageA: number | null = null;
     let weatherCorrectionUsed = false;
@@ -774,6 +775,7 @@ export function calculateCorrectedTyreDegradation(
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
         modelType = twoStage.model_type;
         slopeCorrected = twoStage.slope_corrected;
+        slopeCorrectedStdError = twoStage.slope_corrected_std_error;
         rSquaredCorrected = twoStage.r_squared_stage_b;
         rSquaredStageA = twoStage.r_squared_stage_a;
         weatherCorrectionUsed = twoStage.weather_used;
@@ -789,6 +791,7 @@ export function calculateCorrectedTyreDegradation(
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
         modelType = twoStage.model_type;
         slopeCorrected = twoStage.slope_corrected;
+        slopeCorrectedStdError = twoStage.slope_corrected_std_error;
         rSquaredCorrected = twoStage.r_squared_stage_b;
         rSquaredStageA = twoStage.r_squared_stage_a;
         coefficients = twoStage.coefficients;
