@@ -20,6 +20,7 @@ import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strateg
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
 import { NarrativeCollector } from "./narrative/collector";
 import { renderNarrative } from "./narrative/renderer";
+import type { NarrativeChapter } from "./narrative/types";
 
 export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
 
@@ -130,6 +131,7 @@ export interface VirtualRaceEngineerResult {
   risk_mode: RiskMode;
   integrated_context?: IntegratedStrategyContext;
   narrative_insights: string[];
+  narrative_chapters: NarrativeChapter[];
   scenario_id: ScenarioId;
   scenario_is_simulated: boolean;
   scenario_label: string;
@@ -1878,7 +1880,7 @@ export function computeVirtualRaceEngineer(
     // to promoAlt.pros/cons — that array is now populated by this render).
     // The battle-context inline push at L1390 already executed and stays inline (TODO).
     {
-      const __renderedAltRec = renderNarrative(narrativeCollector.getAll());
+      const __renderedAltRec = renderNarrative(narrativeCollector.getAll(), { totalLaps, actualPitLaps });
       for (let __i = 0; __i < alternatives.length; __i++) {
         const __bucket = __renderedAltRec.alternatives.get(__i);
         if (__bucket) {
@@ -2001,9 +2003,11 @@ export function computeVirtualRaceEngineer(
   // Placed AFTER all global push sites (including risk_scoring & soft_sensor_scoring)
   // so the renderer captures the full set. alt.pros/cons and recommended pros/cons
   // remain legacy (Phases 2-3).
+  let __narrativeChapters: NarrativeChapter[] = [];
   {
-    const __rendered = renderNarrative(narrativeCollector.getAll());
+    const __rendered = renderNarrative(narrativeCollector.getAll(), { totalLaps, actualPitLaps });
     narrativeInsights.push(...__rendered.insights);
+    __narrativeChapters = __rendered.chapters;
   }
 
   // Reduce confidence if degradation is unreliable
@@ -2081,6 +2085,7 @@ export function computeVirtualRaceEngineer(
     risk_mode: riskMode,
     integrated_context: integratedContext,
     narrative_insights: narrativeInsights,
+    narrative_chapters: __narrativeChapters,
     scenario_id: effectiveScenarioId,
     scenario_is_simulated: isSimulatedScenario(effectiveScenarioId),
     scenario_label: scenarioDef.label,

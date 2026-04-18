@@ -59,4 +59,21 @@ export interface RenderedNarrative {
   recommended_reason_suffix: string;
   recommended_description_suffix: string;
   alternatives: Map<number, { pros: string[]; cons: string[] }>;
+  chapters: NarrativeChapter[];
+}
+
+/* ── Lever 1: narrative chapters (additive) ────────────────────── */
+
+export type NarrativePhase = "OPENING" | "DEVELOPMENT" | "CRITICAL" | "CLOSING";
+
+export interface NarrativeChapter {
+  id: string;
+  phase: NarrativePhase;
+  title: string;
+  lap_range: [number, number] | null;
+  /** Max 120 chars. */
+  headline: string;
+  events: NarrativeEvent[];
+  outcome: string | null;
+  priority_max: NarrativePriority;
 }
