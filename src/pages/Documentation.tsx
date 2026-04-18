@@ -1246,15 +1246,31 @@ export default function Documentation() {
                   <th className="px-3 py-1.5 text-right font-semibold text-foreground">Neutral tol.</th>
                   <th className="px-3 py-1.5 text-right font-semibold text-foreground">Max slope</th>
                   <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min giri VALID</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min R²</th>
+                  <th className="px-3 py-1.5 text-right font-semibold text-foreground">Min |t|</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">−0.01</td><td className="px-3 py-1.5 text-right">0.015</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">5</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">−0.02</td><td className="px-3 py-1.5 text-right">0.01</td><td className="px-3 py-1.5 text-right">0.20</td><td className="px-3 py-1.5 text-right">6</td></tr>
-                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">−0.025</td><td className="px-3 py-1.5 text-right">0.008</td><td className="px-3 py-1.5 text-right">0.15</td><td className="px-3 py-1.5 text-right">7</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-red-400">SOFT</td><td className="px-3 py-1.5 text-right">−0.01</td><td className="px-3 py-1.5 text-right">0.015</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">5</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">2.0</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-yellow-400">MEDIUM</td><td className="px-3 py-1.5 text-right">−0.02</td><td className="px-3 py-1.5 text-right">0.01</td><td className="px-3 py-1.5 text-right">0.20</td><td className="px-3 py-1.5 text-right">6</td><td className="px-3 py-1.5 text-right">0.25</td><td className="px-3 py-1.5 text-right">2.0</td></tr>
+                <tr className="border-t border-border"><td className="px-3 py-1.5 font-mono text-white">HARD</td><td className="px-3 py-1.5 text-right">−0.025</td><td className="px-3 py-1.5 text-right">0.008</td><td className="px-3 py-1.5 text-right">0.15</td><td className="px-3 py-1.5 text-right">7</td><td className="px-3 py-1.5 text-right">0.30</td><td className="px-3 py-1.5 text-right">2.0</td></tr>
               </tbody>
             </table>
           </div>
+
+          <h4 className="font-semibold text-foreground mt-3">Significatività statistica (t-stat)</h4>
+          <p>
+            Oltre al fit (R²), per ogni stima viene calcolato il <strong className="text-foreground">t-stat della pendenza</strong>:
+            <Formula>t = |slope| / errore_standard_slope</Formula>
+            Una pendenza con t-stat sotto la soglia (default 2.0, equivalente a ≈95% di significatività)
+            viene <strong className="text-foreground">declassata a NEUTRAL</strong> anche se R² e numero di giri sembrano accettabili.
+            Quando l'errore standard non è disponibile (es. troppi pochi giri), il check viene saltato silenziosamente
+            per non penalizzare ingiustamente la stima.
+          </p>
+          <p className="text-xs italic">
+            R² e t-stat sono filtri complementari: R² misura quanto bene il modello spiega la varianza,
+            t-stat misura se la pendenza stimata è distinguibile da zero al netto del rumore.
+          </p>
 
           <h4 className="font-semibold text-foreground mt-3">Confidence multi-fattore</h4>
           <ul className="list-disc pl-5 space-y-1">
