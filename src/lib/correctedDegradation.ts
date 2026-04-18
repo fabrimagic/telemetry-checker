@@ -515,6 +515,7 @@ function twoStageDegradation(
 
   return {
     slope_corrected: stageBResult.slope,
+    slope_corrected_std_error: stageBResult.slopeStdError,
     r_squared_stage_a: stageAResult.rSquared,
     r_squared_stage_b: stageBResult.rSquared,
     rmse_stage_b: stageBResult.rmse,
