@@ -221,10 +221,34 @@ export function validateDegradationEstimate(
   const compound = result.compound?.toUpperCase() ?? "UNKNOWN";
   const profile = getProfile(compound, config);
 
+  // ── Statistical significance check (t-stat) ──
+  // Use the std error matching the slope being validated:
+  //   - corrected models → slope_corrected_std_error (stage B), fallback to raw slopeStdError
+  //   - simple models   → slopeStdError
+  // Defensive: treat negative / NaN std errors as missing (skip the check).
+  const cResult = corrected ? (result as CorrectedDegradationResult) : null;
+  const stdErrCandidate = cResult
+    ? (cResult.slope_corrected_std_error ?? result.slopeStdError ?? null)
+    : (result.slopeStdError ?? null);
+  const stdErr =
+    stdErrCandidate != null && Number.isFinite(stdErrCandidate) && stdErrCandidate > 0
+      ? stdErrCandidate
+      : null;
+  const tStat = stdErr != null ? Math.abs(slope) / stdErr : null;
+  // Skip the check entirely when min_t_stat_valid <= 0 (escape hatch) or t-stat unavailable.
+  const tStatInsufficient =
+    tStat != null && profile.min_t_stat_valid > 0 && tStat < profile.min_t_stat_valid;
+
   // ── Flags ──
   const statisticalFlags: string[] = [];
   const plausibilityFlags: string[] = [];
   const contextFlags: string[] = [];
+
+  if (tStatInsufficient) {
+    statisticalFlags.push(
+      `Slope non statisticamente significativa (t=${tStat!.toFixed(2)} < ${profile.min_t_stat_valid})`,
+    );
+  }
 
   // ── Fit quality (same thresholds, independent of compound) ──
   const fitQuality: DegradationValidationResult["fit_quality"] =
