@@ -853,6 +853,7 @@ export function calculateCorrectedTyreDegradation(
         config.fuel_proxy_type === "st_speed"
           ? (stintLaps.length > 0 ? fuelProxies_mv.length / stintLaps.length : 0)
           : undefined,
+      slope_corrected_std_error: slopeCorrectedStdError,
     });
   }
 
