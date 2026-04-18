@@ -29,7 +29,7 @@ import type { TrackStatus } from "./trackStatusClassification";
  * ══════════════════════════════════════════════════════════════════ */
 
 export interface CorrectedDegradationConfig {
-  fuel_proxy_type: "laps_remaining" | "lap_number";
+  fuel_proxy_type: "laps_remaining" | "lap_number" | "st_speed";
   min_laps: number;
   min_laps_corrected: number;
   outlier_threshold: number;
@@ -126,6 +126,8 @@ export interface CorrectedDegradationResult extends DegradationResult {
   rawVsCorrectedAgreement?: "HIGH" | "MEDIUM" | "LOW";
   /** Whether corrected model was accepted conservatively */
   correctedModelAcceptedConservatively?: boolean;
+  /** Coverage of fuel proxy when type === "st_speed" (0..1). Undefined for other types. */
+  st_speed_coverage?: number;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -175,30 +177,37 @@ export function associateWeatherToLaps(
  * ══════════════════════════════════════════════════════════════════ */
 
 export function buildFuelProxy(
-  lapNumber: number,
+  lap: Lap,
   totalLaps: number,
   type: CorrectedDegradationConfig["fuel_proxy_type"],
-): number {
-  if (type === "laps_remaining") return totalLaps - lapNumber;
-  return lapNumber;
+): number | null {
+  if (type === "laps_remaining") return totalLaps - lap.lap_number;
+  if (type === "lap_number") return lap.lap_number;
+  // "st_speed"
+  return lap.st_speed;
 }
 
-/** Assess the quality of fuel proxy data for a stint */
+/** Assess the quality of fuel proxy data for a stint (type-aware) */
 function assessFuelProxyQuality(
   fuelProxies: number[],
   stintLength: number,
+  type: CorrectedDegradationConfig["fuel_proxy_type"],
 ): "LOW" | "MEDIUM" | "HIGH" {
   if (fuelProxies.length < 4) return "LOW";
 
   const fuelStd = stdDev(fuelProxies);
   const fuelRange = Math.max(...fuelProxies) - Math.min(...fuelProxies);
 
-  // Very little variance → fuel proxy is uninformative
+  if (type === "st_speed") {
+    // st_speed is in km/h; expected per-stint variation is small but informative
+    if (fuelStd < 1.0 || fuelRange < 2.0) return "LOW";
+    if (fuelRange >= 5.0 && fuelStd > 2.0) return "HIGH";
+    return "MEDIUM";
+  }
+
+  // Legacy proxies (laps_remaining / lap_number): scale with stint length
   if (fuelStd < 0.5 || fuelRange < 2) return "LOW";
-
-  // Reasonable range and variance
   if (fuelRange >= stintLength * 0.5 && fuelStd > 1.0) return "HIGH";
-
   return "MEDIUM";
 }
 
