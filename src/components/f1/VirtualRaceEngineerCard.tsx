@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers, Globe, Flag, Repeat, Thermometer } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { AnalystView, BroadcastView, type ViewMode } from "./VREViewModes";
+import { NarrativeChapters } from "./NarrativeChapters";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -805,7 +806,7 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
 /* ── Global Analysis Section (shared, contesto comune a tutte le strategie) ── */
 export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerResult }) {
   const {
-    integrated_context, narrative_insights, weather_impact, neutralisation_impact,
+    integrated_context, narrative_insights, narrative_chapters, weather_impact, neutralisation_impact,
     traffic_analysis, pace_loss_results, confidence_factors, practice_compounds_used,
   } = result;
 
@@ -860,22 +861,12 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
           </div>
         )}
 
-        {/* Narrative insights (global context) */}
-        {narrative_insights && narrative_insights.length > 0 && (
-          <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
-              💡 Insight contestuali
-            </h4>
-            <ul className="space-y-1.5">
-              {narrative_insights.map((insight, i) => (
-                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
-                  <span className="text-foreground/60 mt-0.5 shrink-0">•</span>
-                  <span>{insight}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* Narrative chapters (Lever 1) — falls back to flat insights when chapters empty */}
+        <NarrativeChapters
+          chapters={narrative_chapters ?? []}
+          insightsFallback={narrative_insights ?? []}
+        />
+
 
         {/* Weather & neutralisation impact */}
         {(weather_impact || neutralisation_impact) && (
