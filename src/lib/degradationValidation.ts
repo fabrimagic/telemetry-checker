@@ -171,6 +171,8 @@ export interface DegradationValidationResult {
   context_flags?: string[];
   /** Compound profile used for validation */
   compound_profile_used?: string;
+  /** T-statistic of the slope (|slope| / slopeStdError). Null if std error unavailable. */
+  t_stat?: number | null;
 }
 
 /* ══════════════════════════════════════════════════════════════════
