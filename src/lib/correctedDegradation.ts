@@ -648,36 +648,54 @@ export function calculateCorrectedTyreDegradation(
     if (stintLaps.length < config.min_laps) continue;
 
     // ── Step 4: Build features ──
+    // tyreLifes/lapTimes/points are aligned to ALL filtered laps (used by rawReg).
+    // The "_mv" parallel arrays are the subset where fuel proxy is non-null
+    // (used by twoStageDegradation, which requires equal-length inputs).
     const tyreLifes: number[] = [];
-    const fuelProxies: number[] = [];
-    const trackTemps: number[] = [];
-    const airTemps: number[] = [];
     const lapTimes: number[] = [];
     const points: { tyreLife: number; lapTime: number }[] = [];
+
+    const tyreLifes_mv: number[] = [];
+    const lapTimes_mv: number[] = [];
+    const fuelProxies_mv: number[] = [];
+    const trackTemps_mv: number[] = [];
+    const airTemps_mv: number[] = [];
     let weatherComplete = true;
 
     for (const l of stintLaps) {
       const tyreLife = (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start);
-      const fuelProxy = buildFuelProxy(l.lap_number, totalSessionLaps, config.fuel_proxy_type);
-      const wData = lapWeather.get(l.lap_number);
-
       tyreLifes.push(tyreLife);
-      fuelProxies.push(fuelProxy);
       lapTimes.push(l.lap_duration!);
       points.push({ tyreLife, lapTime: l.lap_duration! });
 
-      if (wData?.track_temperature != null && wData?.air_temperature != null) {
-        trackTemps.push(wData.track_temperature);
-        airTemps.push(wData.air_temperature);
+      const fuelProxy = buildFuelProxy(l, totalSessionLaps, config.fuel_proxy_type);
+      const wData = lapWeather.get(l.lap_number);
+
+      if (fuelProxy !== null) {
+        tyreLifes_mv.push(tyreLife);
+        lapTimes_mv.push(l.lap_duration!);
+        fuelProxies_mv.push(fuelProxy);
+        if (wData?.track_temperature != null && wData?.air_temperature != null) {
+          trackTemps_mv.push(wData.track_temperature);
+          airTemps_mv.push(wData.air_temperature);
+        } else {
+          weatherComplete = false;
+        }
       } else {
+        // A null fuel proxy means we cannot use this lap in the multivariate fit
+        // and the weather alignment is broken for that lap → disable weather stage.
         weatherComplete = false;
       }
     }
 
-    // ── Step 5: Assess fuel proxy quality ──
-    const fuelProxyQuality = assessFuelProxyQuality(fuelProxies, stint.lap_end - stint.lap_start + 1);
+    // ── Step 5: Assess fuel proxy quality (type-aware) ──
+    const fuelProxyQuality = assessFuelProxyQuality(
+      fuelProxies_mv,
+      stint.lap_end - stint.lap_start + 1,
+      config.fuel_proxy_type,
+    );
 
-    // ── Step 6: Raw regression (always computed) ──
+    // ── Step 6: Raw regression (always computed, on full filtered set) ──
     const rawReg = simpleLinearRegression(tyreLifes, lapTimes);
     if (!rawReg) continue;
 
@@ -699,12 +717,12 @@ export function calculateCorrectedTyreDegradation(
 
     const hasFuelVariance = fuelProxyQuality !== "LOW";
 
-    if (hasFuelVariance && stintLaps.length >= config.min_laps_corrected) {
+    if (hasFuelVariance && lapTimes_mv.length >= config.min_laps_corrected) {
       const twoStage = twoStageDegradation(
-        tyreLifes, fuelProxies,
-        weatherComplete ? trackTemps : null,
-        weatherComplete ? airTemps : null,
-        lapTimes,
+        tyreLifes_mv, fuelProxies_mv,
+        weatherComplete ? trackTemps_mv : null,
+        weatherComplete ? airTemps_mv : null,
+        lapTimes_mv,
       );
 
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
@@ -717,9 +735,9 @@ export function calculateCorrectedTyreDegradation(
         conditionWarning = twoStage.conditionWarning;
         correctedRmse = twoStage.rmse_stage_b;
       }
-    } else if (hasFuelVariance && stintLaps.length >= config.min_laps + 1) {
+    } else if (hasFuelVariance && lapTimes_mv.length >= config.min_laps + 1) {
       const twoStage = twoStageDegradation(
-        tyreLifes, fuelProxies, null, null, lapTimes,
+        tyreLifes_mv, fuelProxies_mv, null, null, lapTimes_mv,
       );
 
       if (twoStage && Math.abs(twoStage.slope_corrected) <= config.max_plausible_slope) {
