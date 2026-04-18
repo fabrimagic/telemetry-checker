@@ -53,6 +53,20 @@ export interface CompoundValidationProfile {
  * HARD: Lower expected degradation, slower to emerge, needs longer stints for credible fit.
  */
 export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
+// CHANGELOG:
+// - Previous min_r_squared: SOFT/MEDIUM=0.10, HARD=0.12 (too permissive: a model
+//   explaining only 10% of variance was accepted as usable).
+// - New min_r_squared: SOFT/MEDIUM=0.25, HARD=0.30 (statistically defensible for
+//   typical F1 stint length 8-15 laps).
+// - Works in tandem with t-stat significance check: R² controls explanatory power,
+//   t-stat controls coefficient significance.
+/**
+ * min_r_squared thresholds (tightened from previous 0.10-0.12):
+ * - 0.25 for SOFT/MEDIUM: minimum R² for a linear trend to be credibly distinguishable from noise on stint data.
+ * - 0.30 for HARD: slightly higher because HARD stints tend to be longer with cleaner trends; weak fits here are more likely artefacts.
+ * Below these values the fit is "INSUFFICIENT" → status INVALID.
+ * Between min_r_squared and 0.30 the fit is "POOR" (used with caution downstream).
+ */
   SOFT: {
     negative_tolerance: -0.01,
     neutral_tolerance: 0.015,
@@ -60,7 +74,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     neutral_fallback_slope: 0.05,
     min_laps_invalid: 3,
     min_laps_valid: 5,
-    min_r_squared: 0.10,
+    min_r_squared: 0.25,
     max_correction_ratio: 3.0,
     min_t_stat_valid: 2.0,
   },
@@ -71,7 +85,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     neutral_fallback_slope: 0.035,
     min_laps_invalid: 4,
     min_laps_valid: 6,
-    min_r_squared: 0.10,
+    min_r_squared: 0.25,
     max_correction_ratio: 3.0,
     min_t_stat_valid: 2.0,
   },
@@ -82,7 +96,7 @@ export const COMPOUND_PROFILES: Record<string, CompoundValidationProfile> = {
     neutral_fallback_slope: 0.025,
     min_laps_invalid: 5,
     min_laps_valid: 7,
-    min_r_squared: 0.12,
+    min_r_squared: 0.30,
     max_correction_ratio: 2.5,
     min_t_stat_valid: 2.0,
   },
@@ -113,7 +127,7 @@ export const DEFAULT_VALIDATION_CONFIG: DegradationValidationConfig = {
   negative_tolerance: -0.02,
   neutral_tolerance: 0.01,
   min_valid_laps: 4,
-  min_r_squared: 0.1,
+  min_r_squared: 0.25,
   neutral_fallback_slope: 0.03,
   max_plausible_slope: 0.30,
   compound_profiles: COMPOUND_PROFILES,
