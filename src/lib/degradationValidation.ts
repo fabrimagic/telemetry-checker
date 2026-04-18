@@ -356,6 +356,17 @@ export function validateDegradationEstimate(
     reasonCategory = "MIXED";
   }
 
+  // 7. Statistical significance: cap at NEUTRAL if t-stat insufficient.
+  // Never escalates to INVALID (only existing physical/statistical criteria do).
+  // Skipped silently when std error is unavailable (n ≤ 2 or zero variance in x).
+  if (status === "VALID" && tStatInsufficient) {
+    status = "NEUTRAL";
+    reasons.push(
+      `Slope non statisticamente significativa (t=${tStat!.toFixed(2)}, minimo ${profile.min_t_stat_valid})`,
+    );
+    reasonCategory = "STATISTICAL";
+  }
+
   const reason = reasons.length > 0 ? reasons.join("; ") : "Stima valida";
 
   // ── Effective slope & fallback ──
