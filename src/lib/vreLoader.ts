@@ -23,6 +23,7 @@ import {
   getPositions,
   getAllLaps,
   getSessionResult,
+  getCarData,
   type Driver,
   type Lap,
   type StintData,
@@ -32,7 +33,9 @@ import {
   type IntervalData,
   type PositionData,
   type SessionInfo,
+  type CarData,
 } from "./openf1";
+import { estimateLapWork, estimateTotalWork, type LapWorkEstimate } from "./fuelEstimator";
 import {
   computeVirtualRaceEngineer,
   type VirtualRaceEngineerResult,
@@ -251,6 +254,29 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     }
     out.cumDevResult = cumDev;
 
+    // ── Fuel proxy: throttle×rpm integral via CarData ──
+    // Single getCarData call per driver/session (rate-limit friendly).
+    // If it fails or coverage is insufficient, we fall back silently — the
+    // primary degradation path uses the configured default proxy regardless.
+    let lapWorkEstimates: LapWorkEstimate[] | undefined;
+    let totalEstimatedWork: number | undefined;
+    try {
+      const lapDates = laps.map((l) => l.date_start).filter((d): d is string => !!d).sort();
+      if (lapDates.length >= 2) {
+        const sessionStart = lapDates[0];
+        // Pad end by 5 minutes to capture the final lap's samples.
+        const sessionEndMs = new Date(lapDates[lapDates.length - 1]).getTime() + 5 * 60 * 1000;
+        const sessionEnd = new Date(sessionEndMs).toISOString();
+        const carData: CarData[] = await getCarData(sessionKey, driverNumber, sessionStart, sessionEnd);
+        if (carData.length) {
+          lapWorkEstimates = estimateLapWork(laps, carData);
+          const totalLapsForEstimate = Math.max(...laps.map((l) => l.lap_number));
+          const total = estimateTotalWork(lapWorkEstimates, totalLapsForEstimate);
+          if (total != null) totalEstimatedWork = total;
+        }
+      }
+    } catch { /* optional — fuel proxy is best-effort */ }
+
     // VRE
     const vre = computeVirtualRaceEngineer(
       driverNumber, driver.name_acronym, sessionKey,
@@ -260,6 +286,8 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
       diary, cumDev,
       "REAL_CONTEXT", null, null, null,
       analysisMode,
+      lapWorkEstimates,
+      totalEstimatedWork,
     );
     out.vreResult = vre;
 
@@ -281,6 +309,8 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
             diary, cumDev,
             "REAL_CONTEXT", null, null, null,
             "POST_RACE",
+            lapWorkEstimates,
+            totalEstimatedWork,
           );
           out.alternativeVreResult = altVre;
         } catch { /* optional — alternative is best-effort */ }

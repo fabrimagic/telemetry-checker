@@ -23,13 +23,23 @@ import type { Lap, StintData, WeatherData } from "./openf1";
 import type { DegradationResult } from "./tyreDegradation";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
+import { buildThrottleIntegralProxy, type LapWorkEstimate } from "./fuelEstimator";
+
+/**
+ * Optional context for `buildFuelProxy` / `calculateCorrectedTyreDegradation`,
+ * used by the "throttle_integral" proxy. Pure-data, no side effects.
+ */
+export interface FuelProxyContext {
+  lapWorkEstimates?: LapWorkEstimate[];
+  totalEstimatedWork?: number;
+}
 
 /* ══════════════════════════════════════════════════════════════════
  * CONFIGURATION
  * ══════════════════════════════════════════════════════════════════ */
 
 export interface CorrectedDegradationConfig {
-  fuel_proxy_type: "laps_remaining" | "lap_number" | "st_speed";
+  fuel_proxy_type: "laps_remaining" | "lap_number" | "st_speed" | "throttle_integral";
   min_laps: number;
   min_laps_corrected: number;
   outlier_threshold: number;
@@ -180,11 +190,17 @@ export function buildFuelProxy(
   lap: Lap,
   totalLaps: number,
   type: CorrectedDegradationConfig["fuel_proxy_type"],
+  context?: FuelProxyContext,
 ): number | null {
   if (type === "laps_remaining") return totalLaps - lap.lap_number;
   if (type === "lap_number") return lap.lap_number;
-  // "st_speed"
-  return lap.st_speed;
+  if (type === "st_speed") return lap.st_speed;
+  // "throttle_integral" — requires precomputed lap-work series + total estimate.
+  if (type === "throttle_integral") {
+    if (!context?.lapWorkEstimates || context.totalEstimatedWork == null) return null;
+    return buildThrottleIntegralProxy(lap, context.lapWorkEstimates, context.totalEstimatedWork);
+  }
+  return null;
 }
 
 /** Assess the quality of fuel proxy data for a stint (type-aware) */
@@ -202,6 +218,17 @@ function assessFuelProxyQuality(
     // st_speed is in km/h; expected per-stint variation is small but informative
     if (fuelStd < 1.0 || fuelRange < 2.0) return "LOW";
     if (fuelRange >= 5.0 && fuelStd > 2.0) return "HIGH";
+    return "MEDIUM";
+  }
+
+  if (type === "throttle_integral") {
+    // Work-remaining decreases monotonically; absolute scale is circuit-dependent.
+    // Use range relative to the mean as a scale-invariant signal-strength gauge.
+    const mean = fuelProxies.reduce((a, b) => a + b, 0) / fuelProxies.length;
+    const denom = Math.abs(mean) > 1 ? Math.abs(mean) : 1;
+    const relativeRange = fuelRange / denom;
+    if (relativeRange < 0.05) return "LOW";
+    if (relativeRange >= 0.15) return "HIGH";
     return "MEDIUM";
   }
 
@@ -585,6 +612,7 @@ export function calculateCorrectedTyreDegradation(
   weatherMap?: Map<number, WeatherCondition>,
   trackStatusMap?: Map<number, TrackStatus>,
   config: CorrectedDegradationConfig = DEFAULT_CORRECTED_CONFIG,
+  context?: FuelProxyContext,
 ): CorrectedDegradationResult[] {
   if (!stints.length || !laps.length) return [];
 
@@ -668,7 +696,7 @@ export function calculateCorrectedTyreDegradation(
       lapTimes.push(l.lap_duration!);
       points.push({ tyreLife, lapTime: l.lap_duration! });
 
-      const fuelProxy = buildFuelProxy(l, totalSessionLaps, config.fuel_proxy_type);
+      const fuelProxy = buildFuelProxy(l, totalSessionLaps, config.fuel_proxy_type, context);
       const wData = lapWeather.get(l.lap_number);
 
       if (fuelProxy !== null) {

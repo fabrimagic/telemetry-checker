@@ -6,6 +6,7 @@ import { classifyLapsWeather, type WeatherCondition } from "./weatherClassificat
 import { classifyLapsTrackStatus, type TrackStatus } from "./trackStatusClassification";
 import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
 import { calculateCorrectedTyreDegradation, type CorrectedDegradationResult } from "./correctedDegradation";
+import type { LapWorkEstimate } from "./fuelEstimator";
 import { validateAllDegradationEstimates, resolveDegradationForStrategy, type DegradationValidationResult, type DegradationStatus, DEFAULT_VALIDATION_CONFIG } from "./degradationValidation";
 import { predictTrafficForPitLaps, type TrafficPrediction, type TrafficLevel } from "./trafficPredictor";
 import { computeStrategyBreakdown, type StrategyBreakdown } from "./strategyBreakdown";
@@ -217,6 +218,8 @@ export function computeVirtualRaceEngineer(
   scenarioDurationLaps: number | null = null,
   customDegradationOverride: Record<string, number> | null = null,
   analysisMode: AnalysisMode = "POST_RACE",
+  lapWorkEstimates?: LapWorkEstimate[],
+  totalEstimatedWork?: number,
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) return null;
 
@@ -257,6 +260,10 @@ export function computeVirtualRaceEngineer(
   const degResults: DegradationResult[] = calculateCorrectedTyreDegradation(
     driverNumber, driverAcronym, "ffffff", laps, stints,
     weather, totalLaps, weatherMap, trackStatusMap,
+    undefined,
+    (lapWorkEstimates && totalEstimatedWork != null)
+      ? { lapWorkEstimates, totalEstimatedWork }
+      : undefined,
   );
 
   // ── Raw vs Corrected comparison (used for confidence/narrative) ──
