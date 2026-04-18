@@ -36,6 +36,13 @@ export interface CompoundValidationProfile {
   min_r_squared: number;
   /** Maximum correction magnitude ratio before cautionary flag */
   max_correction_ratio: number;
+  /**
+   * Minimum |t-stat| (= |slope| / slopeStdError) required for VALID.
+   * Below → cap at NEUTRAL. Set to 0 to disable the check for this compound.
+   * Standard threshold ≈ 2.0 (~95% significance).
+   * Skipped silently when slopeStdError is unavailable (n ≤ 2).
+   */
+  min_t_stat_valid: number;
 }
 
 /**
