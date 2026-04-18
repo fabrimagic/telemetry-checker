@@ -138,6 +138,8 @@ export interface CorrectedDegradationResult extends DegradationResult {
   correctedModelAcceptedConservatively?: boolean;
   /** Coverage of fuel proxy when type === "st_speed" (0..1). Undefined for other types. */
   st_speed_coverage?: number;
+  /** Standard error of the corrected slope (from stage B regression, if computed). */
+  slope_corrected_std_error?: number | null;
 }
 
 /* ══════════════════════════════════════════════════════════════════
