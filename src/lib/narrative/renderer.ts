@@ -10,11 +10,22 @@
  *   • Events without `prerendered_text` are silently skipped (template engine
  *     will be introduced in a later phase). This is safe because the migration
  *     always populates `prerendered_text` with the original literal.
+ *   • Lever 1: when `opts` provides race shape (totalLaps, actualPitLaps) the
+ *     renderer also produces `chapters`. Otherwise `chapters` is [].
  */
 
 import type { NarrativeEvent, RenderedNarrative } from "./types";
+import { buildChapters } from "./chapters";
 
-export function renderNarrative(events: NarrativeEvent[]): RenderedNarrative {
+export interface RenderNarrativeOptions {
+  totalLaps?: number;
+  actualPitLaps?: number[];
+}
+
+export function renderNarrative(
+  events: NarrativeEvent[],
+  opts?: RenderNarrativeOptions,
+): RenderedNarrative {
   const insights: string[] = [];
   const recommended_pros: string[] = [];
   const recommended_cons: string[] = [];
@@ -40,6 +51,11 @@ export function renderNarrative(events: NarrativeEvent[]): RenderedNarrative {
     }
   }
 
+  const chapters =
+    opts && typeof opts.totalLaps === "number" && Array.isArray(opts.actualPitLaps)
+      ? buildChapters(events, opts.totalLaps, opts.actualPitLaps)
+      : [];
+
   return {
     insights,
     recommended_pros,
@@ -47,5 +63,6 @@ export function renderNarrative(events: NarrativeEvent[]): RenderedNarrative {
     recommended_reason_suffix: "",
     recommended_description_suffix: "",
     alternatives,
+    chapters,
   };
 }
