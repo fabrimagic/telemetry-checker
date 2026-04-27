@@ -1887,7 +1887,7 @@ export function computeVirtualRaceEngineer(
     // to promoAlt.pros/cons — that array is now populated by this render).
     // The battle-context inline push at L1390 already executed and stays inline (TODO).
     {
-      const __renderedAltRec = renderNarrative(narrativeCollector.getAll(), { totalLaps, actualPitLaps });
+      const __renderedAltRec = renderNarrative(narrativeCollector.getAll(), { totalLaps, actualPitLaps, session_key: sessionKey });
       for (let __i = 0; __i < alternatives.length; __i++) {
         const __bucket = __renderedAltRec.alternatives.get(__i);
         if (__bucket) {
@@ -2012,7 +2012,7 @@ export function computeVirtualRaceEngineer(
   // remain legacy (Phases 2-3).
   let __narrativeChapters: NarrativeChapter[] = [];
   {
-    const __rendered = renderNarrative(narrativeCollector.getAll(), { totalLaps, actualPitLaps });
+    const __rendered = renderNarrative(narrativeCollector.getAll(), { totalLaps, actualPitLaps, session_key: sessionKey });
     narrativeInsights.push(...__rendered.insights);
     __narrativeChapters = __rendered.chapters;
   }

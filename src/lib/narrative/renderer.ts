@@ -19,10 +19,14 @@
 
 import type { NarrativeEvent, RenderedNarrative } from "./types";
 import { buildChapters } from "./chapters";
+import { selectTemplate } from "./templates";
 
 export interface RenderNarrativeOptions {
   totalLaps?: number;
   actualPitLaps?: number[];
+  /** Lever 3: enables template-based variant selection. When omitted, all
+   *  events keep their original prerendered_text (backward-compatible). */
+  session_key?: number;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -77,11 +81,26 @@ export function renderNarrative(
 
   // Build annotated event list (preserves order); chapters reuse it so the
   // causal annotation appears inside chapter rendering as well.
+  // Lever 3 + Lever 2 pipeline:
+  //   1. Pick a templated variant if session_key is provided and the category
+  //      is supported. Fallback to prerendered_text on any mismatch.
+  //   2. Append the causal annotation (Lever 2) to the resulting text.
   const annotatedEvents: NarrativeEvent[] = events.map((ev) => {
     if (ev.prerendered_text == null) return ev;
+    let baseText = ev.prerendered_text;
+    if (opts?.session_key != null && ev.id) {
+      const templated = selectTemplate(ev.category, {
+        data: ev.data,
+        lap: ev.lap,
+        session_key: opts.session_key,
+        event_id: ev.id,
+      });
+      if (templated != null) baseText = templated;
+    }
     const annotation = buildCausalAnnotation(ev, byId);
-    if (!annotation) return ev;
-    return { ...ev, prerendered_text: ev.prerendered_text + annotation };
+    const finalText = annotation ? baseText + annotation : baseText;
+    if (finalText === ev.prerendered_text) return ev;
+    return { ...ev, prerendered_text: finalText };
   });
 
   for (const ev of annotatedEvents) {
