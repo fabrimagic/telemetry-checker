@@ -44,6 +44,11 @@ export interface CompoundValidationProfile {
    * Skipped silently when slopeStdError is unavailable (n ≤ 2).
    */
   min_t_stat_valid: number;
+  /**
+   * Threshold of |corrected − raw| above which a sign flip is considered "large"
+   * → cap to NEUTRAL regardless of stint length. ~50% of max_plausible_slope.
+   */
+  sign_flip_large_correction_threshold: number;
 }
 
 /**
@@ -76,6 +81,7 @@ function deriveValidationProfile(compound: string): CompoundValidationProfile {
     min_r_squared: c.validation.min_r_squared,
     max_correction_ratio: c.validation.max_correction_ratio,
     min_t_stat_valid: c.validation.min_t_stat_valid ?? 0,
+    sign_flip_large_correction_threshold: c.validation.sign_flip_large_correction_threshold,
   };
 }
 
