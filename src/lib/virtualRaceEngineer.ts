@@ -1067,7 +1067,7 @@ export function computeVirtualRaceEngineer(
 
     if (alt.analysis.stint_extension && alt.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
       const text = `Rischio cliff se si estende lo stint (${Math.round(alt.analysis.stint_extension.cliff_risk_if_extend * 100)}%)`;
-      narrativeCollector.add({ id: `cliff_alt${altIdx}`, category: "cliff", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { cliff_risk_if_extend: alt.analysis.stint_extension.cliff_risk_if_extend }, prerendered_text: text });
+      narrativeCollector.add({ id: `cliff_alt${altIdx}`, category: "cliff", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { cliff_risk_if_extend: alt.analysis.stint_extension.cliff_risk_if_extend }, prerendered_text: text, because_of: ["pace_loss_cliff_risk"] });
     }
 
     if (alt.analysis.pit_window && alt.analysis.pit_window.window_robustness === "FRAGILE") {
@@ -1142,7 +1142,7 @@ export function computeVirtualRaceEngineer(
     // Stint extension / cliff
     if (recommendedStrategy.analysis.stint_extension && recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend > 0.5) {
       const text = `Rischio cliff se si estende lo stint (${Math.round(recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend * 100)}%)`;
-      narrativeCollector.add({ id: "cliff_rec", category: "cliff", priority: "supporting", target: "recommended", side: "con", data: { cliff_risk_if_extend: recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend }, prerendered_text: text });
+      narrativeCollector.add({ id: "cliff_rec", category: "cliff", priority: "supporting", target: "recommended", side: "con", data: { cliff_risk_if_extend: recommendedStrategy.analysis.stint_extension.cliff_risk_if_extend }, prerendered_text: text, because_of: ["pace_loss_cliff_risk"] });
     }
 
     // Pit window robustness
@@ -1333,7 +1333,7 @@ export function computeVirtualRaceEngineer(
         ? ` Il modello ha corretto per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} (slope grezza: ${dv.slope_raw.toFixed(3)}, corretta: ${dv.slope_corrected.toFixed(3)}), ma la stima resta non attendibile.`
         : "";
       const text = `La stima di degrado per lo stint ${dv.original.stint} (${dv.original.compound}) è stata classificata come non attendibile e non è stata usata nel modello strategico.${corrNote} ${dv.fallback_description ?? ""}`;
-      narrativeCollector.add({ id: `deg_quality_invalid_stint${dv.original.stint}`, category: "degradation_quality", priority: "critical", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, status: "INVALID", model_corrected: dv.model_corrected, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used, fallback_description: dv.fallback_description ?? null }, prerendered_text: text });
+      narrativeCollector.add({ id: `deg_quality_invalid_stint${dv.original.stint}`, category: "degradation_quality", priority: "critical", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, status: "INVALID", model_corrected: dv.model_corrected, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used, fallback_description: dv.fallback_description ?? null }, prerendered_text: text, because_of: ["weather_change_detected"] });
     } else if (dv.model_corrected && dv.slope_raw < 0 && dv.slope_corrected > 0 && dv.status === "VALID") {
       const text = `Stint ${dv.original.stint} (${dv.original.compound}): la slope grezza era negativa (${dv.slope_raw.toFixed(3)}) ma dopo correzione per fuel proxy${dv.weather_correction_used ? " e temperatura" : ""} il degrado stimato è diventato positivo (${dv.slope_corrected.toFixed(3)} sec/giro). Il modello usa il valore corretto.`;
       narrativeCollector.add({ id: `deg_quality_neg_to_pos_stint${dv.original.stint}`, category: "degradation_quality", priority: "supporting", target: "global", data: { stint: dv.original.stint, compound: dv.original.compound, slope_raw: dv.slope_raw, slope_corrected: dv.slope_corrected, weather_correction_used: dv.weather_correction_used }, prerendered_text: text });
@@ -1417,13 +1417,13 @@ export function computeVirtualRaceEngineer(
       // Check if pit was before or after the loss trend started
       if (actualPitLaps.length > 0 && actualPitLaps[0] > cd.loss_trend_start_lap) {
         const text2 = `Il pit reale (giro ${actualPitLaps[0]}) è avvenuto dopo l'inizio della perdita cumulativa (giro ${cd.loss_trend_start_lap}): un pit anticipato avrebbe potuto mitigare la perdita.`;
-        narrativeCollector.add({ id: "cum_dev_pit_after_loss", category: "cumulative_deviation", priority: "supporting", target: "global", lap: actualPitLaps[0], data: { actual_pit_lap: actualPitLaps[0], loss_trend_start_lap: cd.loss_trend_start_lap }, prerendered_text: text2 });
+        narrativeCollector.add({ id: "cum_dev_pit_after_loss", category: "cumulative_deviation", priority: "supporting", target: "global", lap: actualPitLaps[0], data: { actual_pit_lap: actualPitLaps[0], loss_trend_start_lap: cd.loss_trend_start_lap }, prerendered_text: text2, because_of: ["cum_dev_loss_trend_start"] });
       }
     }
 
     if (cd.max_deviation != null && cd.max_deviation > 5) {
       const text = `Deviazione cumulativa massima osservata: +${cd.max_deviation.toFixed(1)}s al giro ${cd.max_deviation_lap}.`;
-      narrativeCollector.add({ id: "cum_dev_max", category: "cumulative_deviation", priority: "supporting", target: "global", lap: cd.max_deviation_lap ?? undefined, data: { max_deviation: cd.max_deviation, max_deviation_lap: cd.max_deviation_lap }, prerendered_text: text });
+      narrativeCollector.add({ id: "cum_dev_max", category: "cumulative_deviation", priority: "supporting", target: "global", lap: cd.max_deviation_lap ?? undefined, data: { max_deviation: cd.max_deviation, max_deviation_lap: cd.max_deviation_lap }, prerendered_text: text, because_of: ["deg_quality_invalid_stint1", "deg_quality_invalid_stint2", "deg_quality_invalid_stint3"] });
     }
 
     if (cd.driver_final_delta != null && cd.driver_final_delta > 10) {
@@ -1539,7 +1539,7 @@ export function computeVirtualRaceEngineer(
       if (totalNeutralBenefit > 1.0) {
         const types = actualPitsUnderNeutral.map(p => `giro ${p.lap_number} (${p.neutralisation_type})`).join(", ");
         const text = `Strategia reale favorita da pit sotto neutralizzazione (${types}): pit loss ridotto di ~${totalNeutralBenefit.toFixed(1)}s rispetto a un pit in green.`;
-        narrativeCollector.add({ id: "neutral_actual_benefit", category: "neutralization", priority: "supporting", target: "global", data: { types, benefit_seconds: totalNeutralBenefit }, prerendered_text: text });
+        narrativeCollector.add({ id: "neutral_actual_benefit", category: "neutralization", priority: "supporting", target: "global", data: { types, benefit_seconds: totalNeutralBenefit }, prerendered_text: text, because_of: ["neutral_pit_under_sc"] });
       }
 
       // Check each alternative: does it pit on a neutralised lap or in green?
