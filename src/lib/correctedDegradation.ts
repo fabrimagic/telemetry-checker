@@ -662,18 +662,9 @@ export function calculateCorrectedTyreDegradation(
 
     if (stintLaps.length < config.min_laps) continue;
 
-    // ── Step 2: MAD-based outlier removal (aligned with base module) ──
-    const { kept: afterMAD, removedCount: madRemoved } =
-      filterOutliersMADCorrected(stintLaps, compoundProfile.madMultiplier);
-
-    if (madRemoved > 0) {
-      filterSummary.push(`MAD outlier filter: ${madRemoved} laps removed`);
-    }
-    stintLaps = afterMAD;
-
-    if (stintLaps.length < config.min_laps) continue;
-
-    // ── Step 3: Warmup exclusion (aligned with base module) ──
+    // ── Step 2: Warmup exclusion (must precede MAD: warmup laps are physically
+    //           different from in-regime laps; running MAD with them present
+    //           inflates median/MAD and removes legitimate core laps.) ──
     const { kept: afterWarmup, excluded: warmupExcluded } =
       excludeWarmupCorrected(stintLaps, compoundProfile.warmupExclusionLaps, compoundProfile.minCoreLapsTechnical);
 
@@ -681,6 +672,17 @@ export function calculateCorrectedTyreDegradation(
       filterSummary.push(`Warmup exclusion: ${warmupExcluded} initial laps`);
     }
     stintLaps = afterWarmup;
+
+    if (stintLaps.length < config.min_laps) continue;
+
+    // ── Step 3: MAD-based outlier removal (operates on warmup-free core) ──
+    const { kept: afterMAD, removedCount: madRemoved } =
+      filterOutliersMADCorrected(stintLaps, compoundProfile.madMultiplier);
+
+    if (madRemoved > 0) {
+      filterSummary.push(`MAD outlier filter: ${madRemoved} laps removed`);
+    }
+    stintLaps = afterMAD;
 
     if (stintLaps.length < config.min_laps) continue;
 
