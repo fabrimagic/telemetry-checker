@@ -15,18 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import { calculateTyreDegradation } from "../tyreDegradation";
-import type { Lap, StintData, Driver } from "../openf1";
-
-const DRIVER: Driver = {
-  driver_number: 16,
-  broadcast_name: "C. LECLERC",
-  full_name: "Charles Leclerc",
-  name_acronym: "LEC",
-  team_name: "Ferrari",
-  team_colour: "E80020",
-  headshot_url: null,
-  session_key: 9999,
-};
+import type { Lap, StintData } from "../openf1";
 
 function lap(driver: number, lap_number: number, lap_duration: number, opts: Partial<Lap> = {}): Lap {
   return {
@@ -61,7 +50,7 @@ function stint(driver: number, stint_number: number, compound: string, lap_start
 }
 
 function runDeg(laps: Lap[], stints: StintData[]) {
-  return calculateTyreDegradation(laps, stints, [DRIVER]);
+  return calculateTyreDegradation(16, "LEC", "E80020", laps, stints);
 }
 
 describe("Filter order: warmup BEFORE MAD", () => {
