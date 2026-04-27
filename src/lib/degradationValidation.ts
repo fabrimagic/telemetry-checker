@@ -209,6 +209,7 @@ function getProfile(compound: string, config: DegradationValidationConfig): Comp
     min_r_squared: config.min_r_squared,
     max_correction_ratio: 3.0,
     min_t_stat_valid: 2.0,
+    sign_flip_large_correction_threshold: 0.03,
   };
 }
 
