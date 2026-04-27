@@ -174,6 +174,7 @@ export default function Documentation() {
               <TocLink href="#vre-verdict">Verdetto e Confidenza</TocLink>
               <TocLink href="#vre-context">Contesto Integrato</TocLink>
               <TocLink href="#vre-narrative-chapters">Capitoli Narrativi</TocLink>
+              <TocLink href="#vre-narrative-system">Sistema Narrativo (Catene & Varianti)</TocLink>
               <TocLink href="#vre-delta-convention">Convenzione Delta</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Modelli di calcolo</p>
@@ -1107,6 +1108,67 @@ export default function Documentation() {
             Anti-allucinazione: nessun evento viene inventato per riempire un capitolo.
             Se una fase non ha contenuti significativi, semplicemente non compare.
           </p>
+        </DocSection>
+
+        <DocSection id="vre-narrative-system" title="VRE — Sistema Narrativo (Catene Causali & Varianti Linguistiche)" icon={<BookOpen className="h-4 w-4" />}>
+          <p>
+            La narrativa del VRE è costruita da un motore <strong className="text-foreground">strutturato a eventi</strong>:
+            ogni osservazione del modello (degrado, pace loss, neutralizzazione, meteo, traffico, ecc.) viene
+            registrata come evento atomico con categoria, priorità, giro e dati. Sopra a questo layer di base
+            operano due meccanismi che migliorano la leggibilità senza alterare i fatti.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">1. Catene causali esplicite</h4>
+          <p>
+            Quando due eventi sono fisicamente legati (es. una fase di calo passo che culmina in un cliff,
+            un cambio meteo che invalida il fit di degrado di uno stint, una neutralizzazione che riduce il
+            pit loss reale), il sistema annota esplicitamente la relazione di causa.
+            Nel testo finale compare un'inline note del tipo <em>"(conseguenza di calo di passo dal giro 28)"</em>.
+          </p>
+          <p>Le cinque catene canoniche oggi attive:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Calo di passo → rischio cliff</strong> — un trend di pace loss che precede l'individuazione di un cliff o di una raccomandazione di pit anticipato.</li>
+            <li><strong className="text-foreground">Inizio perdita cumulativa → pit dopo la perdita</strong> — l'evento di pit motivato dall'inizio del trend negativo nella deviazione cumulativa.</li>
+            <li><strong className="text-foreground">Cambio meteo → degrado stint invalidato</strong> — la transizione meteo spiega perché la stima di degrado di uno stint è stata declassata.</li>
+            <li><strong className="text-foreground">Pit sotto SC → beneficio reale di neutralizzazione</strong> — il guadagno osservato sul pit loss viene legato all'evento di neutralizzazione attiva.</li>
+            <li><strong className="text-foreground">Stint con degrado invalido → max deviazione cumulativa</strong> — la perdita di pace cumulativa è ricondotta agli stint la cui stima di degrado è stata classificata INVALID.</li>
+          </ul>
+          <p className="text-xs italic">
+            Anti-allucinazione: se l'evento "causa" non è effettivamente presente nel batch (es. perché filtrato
+            da una soglia o non rilevante in quella gara), l'annotazione non viene inserita. Mai catene fittizie.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">2. Varianti linguistiche deterministiche</h4>
+          <p>
+            Per le sei categorie narrative più frequenti — <strong className="text-foreground">traffic</strong>,
+            <strong className="text-foreground"> warmup</strong>,
+            <strong className="text-foreground"> neutralization</strong>,
+            <strong className="text-foreground"> cumulative deviation</strong>,
+            <strong className="text-foreground"> pace loss</strong>,
+            <strong className="text-foreground"> degradation quality</strong> —
+            il sistema sceglie tra <strong className="text-foreground">tre varianti testuali equivalenti</strong>
+            invece di usare sempre la stessa frase. La scelta è:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Deterministica</strong> — funzione hash su <code className="text-primary">session_key</code> + <code className="text-primary">event_id</code>. La stessa gara produce sempre la stessa formulazione (cache-friendly e riproducibile).</li>
+            <li><strong className="text-foreground">Calibrata sull'intensità</strong> — i dati dell'evento (es. quanti secondi di traffico, quanti giri di warmup, ampiezza della deviazione) determinano un bucket <em>mild / moderate / strong</em>; ogni bucket ha le proprie tre varianti, così le parole rispecchiano la gravità reale.</li>
+            <li><strong className="text-foreground">Semanticamente identica</strong> — le tre varianti veicolano gli stessi numeri e gli stessi fatti, cambia solo la formulazione. Nessuna variante aggiunge informazioni che il modello non ha calcolato.</li>
+          </ul>
+          <p className="text-xs italic">
+            Fallback: se uno dei placeholder non può essere riempito (campo dati assente o non numerico),
+            il sistema torna automaticamente al testo originale, mai un'output con segnaposto non sostituiti.
+            Per eventi con dettagli tecnici specifici (es. menzione esplicita di una mescola Hard, flag
+            <code className="text-primary"> model_corrected</code>) il templating viene saltato per non perdere
+            informazione.
+          </p>
+
+          <h4 className="font-semibold text-foreground mt-4">Ordine di applicazione</h4>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>Generazione eventi grezzi dai moduli analitici.</li>
+            <li>Selezione della variante linguistica (se applicabile).</li>
+            <li>Annotazione causale inline (se la catena è completa).</li>
+            <li>Distribuzione negli slot di rendering (insights, pros/cons, capitoli).</li>
+          </ol>
         </DocSection>
 
 
