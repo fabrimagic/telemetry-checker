@@ -65,6 +65,10 @@ function bucketFor(
       return null; // template not provided for sub-types (release/persist/stuck)
     }
     case "warmup": {
+      // Skip templating for hard-compound-specific warmup events: the original
+      // text carries domain-specific information (compound implications) that
+      // generic warmup templates do not preserve.
+      if (data.has_hard === true) return null;
       const w = data.warmup_total;
       if (typeof w !== "number") return null;
       if (w > 5) return "strong";
