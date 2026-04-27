@@ -43,6 +43,13 @@ export interface CanonicalCompoundProfile {
     max_correction_ratio: number;
     /** Optional: present only when the t-stat significance check is configured. */
     min_t_stat_valid?: number;
+    /**
+     * Threshold of |corrected − raw| above which a sign flip is considered "large"
+     * → cap to NEUTRAL regardless of stint length. Set as ~50% of max_plausible_slope
+     * for each compound: a correction that flips the sign AND moves the slope by more
+     * than half the plausible range is a strong overfitting signal.
+     */
+    sign_flip_large_correction_threshold: number;
   };
 }
 
