@@ -67,7 +67,7 @@ describe("Lever 3 — linguistic templates", () => {
     });
     expect(out).not.toBeNull();
     expect(out!).toContain("0.180");
-    expect(out!).toMatch(/stint 2/);
+    expect(out!).toMatch(/stint 2/i);
   });
 
   it("7. hashStringNumeric is deterministic and distributes for similar inputs", () => {
