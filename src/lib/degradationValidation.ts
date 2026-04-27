@@ -276,10 +276,16 @@ export function validateDegradationEstimate(
     statisticalFlags.push(`Correzione raw→corrected molto ampia (Δ=${correctionMagnitude.toFixed(3)})`);
   }
 
-  // ── Raw-to-corrected sign flip caution ──
-  const signFlip = corrected && slopeRaw < 0 && slopeCorrected > 0;
+  // ── Raw-to-corrected sign flip caution (bidirectional) ──
+  // Both directions of flip (negative→positive, positive→negative) signal
+  // that the multivariate correction is unstable. The strict-zero exclusion
+  // avoids treating exact-zero slopes (where Math.sign returns 0) as flips.
+  const signFlip = !!corrected
+    && slopeRaw !== 0 && slopeCorrected !== 0
+    && Math.sign(slopeRaw) !== Math.sign(slopeCorrected);
   if (signFlip) {
-    contextFlags.push(`Slope grezza negativa (${slopeRaw.toFixed(3)}) corretta a positiva (${slopeCorrected.toFixed(3)})`);
+    const direction = slopeRaw < 0 ? "negativa→positiva" : "positiva→negativa";
+    contextFlags.push(`Slope ${direction} dopo correzione (raw=${slopeRaw.toFixed(3)}, corrected=${slopeCorrected.toFixed(3)})`);
   }
 
   // ── Few laps flag ──
@@ -358,6 +364,19 @@ export function validateDegradationEstimate(
     reasons.push(`Correzione inverte il segno della slope su stint non lungo (${laps} giri): prudenza`);
     reasonCategory = "CONTEXTUAL";
     contextFlags.push("Sign flip raw→corrected con stint non lungo: fiducia ridotta");
+  }
+
+  // 5b. Sign flip + large correction magnitude → conservative NEUTRAL regardless of stint length.
+  // A multivariate correction that flips the slope sign AND moves it by more than the threshold
+  // is a strong overfitting signal: fuel/weather coefficients are likely absorbing tyre-life signal.
+  if (status === "VALID" && signFlip &&
+      correctionMagnitude > profile.sign_flip_large_correction_threshold) {
+    status = "NEUTRAL";
+    reasons.push(
+      `Correzione inverte il segno della slope con magnitudine ampia (Δ=${correctionMagnitude.toFixed(3)} > ${profile.sign_flip_large_correction_threshold}): possibile overfitting`,
+    );
+    reasonCategory = "MIXED";
+    statisticalFlags.push("Sign flip + large correction → likely overfitting");
   }
 
   // 6. Large correction + borderline → downgrade to NEUTRAL
