@@ -120,7 +120,7 @@ exports[`VRE narrative baseline (pre-refactor snapshot) > scenario B — Safety 
     "La stima di degrado per lo stint 1 (SOFT) è stata classificata come non attendibile e non è stata usata nel modello strategico. Il modello ha corretto per fuel proxy (slope grezza: 0.050, corretta: 0.000), ma la stima resta non attendibile. Nessun riferimento credibile — fallback conservativo SOFT (0.05 s/giro)",
     "⚠️ Nessuna stima di degrado attendibile disponibile. Il modello strategico usa fallback conservativi — i risultati hanno confidenza ridotta.",
     "Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.",
-    "Strategia reale favorita da pit sotto neutralizzazione (giro 15 (SC)): pit loss ridotto di ~8.4s rispetto a un pit in green.",
+    "Strategia reale favorita da pit sotto neutralizzazione (giro 15 (SC)): pit loss ridotto di ~8.4s rispetto a un pit in green. (conseguenza di neutralizzazione)",
     "La strategia raccomandata include 3.2s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.",
     "La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.",
     "Warmup più lungo del previsto nello stint 2 (thermal WARMING_UP fino al giro 6 vs 4 previsti)",
