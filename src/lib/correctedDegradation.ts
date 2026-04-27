@@ -24,6 +24,7 @@ import type { DegradationResult } from "./tyreDegradation";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
 import { buildThrottleIntegralProxy, type LapWorkEstimate } from "./fuelEstimator";
+import { getCanonicalProfile } from "./tyreCompoundProfiles";
 
 /**
  * Optional context for `buildFuelProxy` / `calculateCorrectedTyreDegradation`,
@@ -63,33 +64,23 @@ interface CorrectedCompoundProfile {
   maxCorrectionMagnitude: number;
 }
 
+function deriveCorrectedProfile(compound: string | null): CorrectedCompoundProfile {
+  const c = getCanonicalProfile(compound);
+  return {
+    madMultiplier: c.filtering.madMultiplier,
+    warmupExclusionLaps: c.filtering.warmupExclusionLaps,
+    minCoreLapsTechnical: c.filtering.minCoreLapsTechnical,
+    maxCorrectionMagnitude: c.correction.maxCorrectionMagnitude,
+  };
+}
+
 const CORRECTED_COMPOUND_PROFILES: Record<string, CorrectedCompoundProfile> = {
-  SOFT: {
-    madMultiplier: 3.0,
-    warmupExclusionLaps: 1,
-    minCoreLapsTechnical: 3,
-    maxCorrectionMagnitude: 0.15,
-  },
-  MEDIUM: {
-    madMultiplier: 3.0,
-    warmupExclusionLaps: 1,
-    minCoreLapsTechnical: 3,
-    maxCorrectionMagnitude: 0.12,
-  },
-  HARD: {
-    madMultiplier: 3.5,
-    warmupExclusionLaps: 2,
-    minCoreLapsTechnical: 4,
-    maxCorrectionMagnitude: 0.10,
-  },
+  SOFT: deriveCorrectedProfile("SOFT"),
+  MEDIUM: deriveCorrectedProfile("MEDIUM"),
+  HARD: deriveCorrectedProfile("HARD"),
 };
 
-const DEFAULT_CORRECTED_COMPOUND: CorrectedCompoundProfile = {
-  madMultiplier: 3.0,
-  warmupExclusionLaps: 1,
-  minCoreLapsTechnical: 3,
-  maxCorrectionMagnitude: 0.12,
-};
+const DEFAULT_CORRECTED_COMPOUND: CorrectedCompoundProfile = deriveCorrectedProfile(null);
 
 function getCorrectedCompoundProfile(compound: string): CorrectedCompoundProfile {
   return CORRECTED_COMPOUND_PROFILES[compound?.toUpperCase()] ?? DEFAULT_CORRECTED_COMPOUND;
