@@ -12,6 +12,9 @@
  *     always populates `prerendered_text` with the original literal.
  *   • Lever 1: when `opts` provides race shape (totalLaps, actualPitLaps) the
  *     renderer also produces `chapters`. Otherwise `chapters` is [].
+ *   • Lever 2: events with `because_of` get an inline annotation
+ *     " (conseguenza di [descrizione])" appended to their text, when the source
+ *     event is present in the same batch. Broken chains are silent.
  */
 
 import type { NarrativeEvent, RenderedNarrative } from "./types";
@@ -20,6 +23,41 @@ import { buildChapters } from "./chapters";
 export interface RenderNarrativeOptions {
   totalLaps?: number;
   actualPitLaps?: number[];
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  pace_loss: "calo di passo",
+  cumulative_deviation: "deviazione cumulativa",
+  weather: "cambio meteo",
+  neutralization: "neutralizzazione",
+  degradation_quality: "degrado anomalo",
+};
+
+/**
+ * Pure, deterministic. Builds a short Italian phrase describing the cause
+ * event. Never throws. Used for Lever 2 inline causal annotations.
+ */
+export function describeCause(sourceEvent: NarrativeEvent): string {
+  const label = CATEGORY_LABEL[sourceEvent.category] ?? sourceEvent.category;
+  if (typeof sourceEvent.lap === "number" && Number.isFinite(sourceEvent.lap)) {
+    return `${label} dal giro ${sourceEvent.lap}`;
+  }
+  return label;
+}
+
+/** Builds the inline annotation text or returns null if chain is broken. */
+function buildCausalAnnotation(
+  ev: NarrativeEvent,
+  byId: Map<string, NarrativeEvent>,
+): string | null {
+  if (!ev.because_of || ev.because_of.length === 0) return null;
+  for (const causeId of ev.because_of) {
+    const cause = byId.get(causeId);
+    if (cause) {
+      return ` (conseguenza di ${describeCause(cause)})`;
+    }
+  }
+  return null;
 }
 
 export function renderNarrative(
@@ -31,9 +69,18 @@ export function renderNarrative(
   const recommended_cons: string[] = [];
   const alternatives = new Map<number, { pros: string[]; cons: string[] }>();
 
+  // Lever 2: build id → event lookup once.
+  const byId = new Map<string, NarrativeEvent>();
   for (const ev of events) {
-    const text = ev.prerendered_text;
-    if (text == null) continue; // templates not implemented in this phase
+    if (ev.id) byId.set(ev.id, ev);
+  }
+
+  for (const ev of events) {
+    const base = ev.prerendered_text;
+    if (base == null) continue; // templates not implemented in this phase
+
+    const annotation = buildCausalAnnotation(ev, byId);
+    const text = annotation ? base + annotation : base;
 
     if (ev.target === "global") {
       insights.push(text);
