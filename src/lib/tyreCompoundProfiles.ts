@@ -79,6 +79,7 @@ export const CANONICAL_COMPOUND_PROFILES: Record<"SOFT" | "MEDIUM" | "HARD", Can
       min_r_squared: 0.25,
       max_correction_ratio: 3.0,
       min_t_stat_valid: 2.0,
+      sign_flip_large_correction_threshold: 0.04,
     },
   },
   MEDIUM: {
@@ -106,6 +107,7 @@ export const CANONICAL_COMPOUND_PROFILES: Record<"SOFT" | "MEDIUM" | "HARD", Can
       min_r_squared: 0.25,
       max_correction_ratio: 3.0,
       min_t_stat_valid: 2.0,
+      sign_flip_large_correction_threshold: 0.03,
     },
   },
   HARD: {
@@ -133,6 +135,7 @@ export const CANONICAL_COMPOUND_PROFILES: Record<"SOFT" | "MEDIUM" | "HARD", Can
       min_r_squared: 0.30,
       max_correction_ratio: 2.5,
       min_t_stat_valid: 2.0,
+      sign_flip_large_correction_threshold: 0.025,
     },
   },
 };
