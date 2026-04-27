@@ -18,6 +18,7 @@
  */
 
 import type { Lap, StintData } from "./openf1";
+import { getCanonicalProfile } from "./tyreCompoundProfiles";
 
 /* ══════════════════════════════════════════════════════════════════
  * TYPES
@@ -72,45 +73,26 @@ interface CompoundDegradationProfile {
   cliffWorseningThreshold: number;
 }
 
+function deriveLegacyProfile(compound: string | null): CompoundDegradationProfile {
+  const c = getCanonicalProfile(compound);
+  return {
+    warmupExclusionLaps: c.filtering.warmupExclusionLaps,
+    madMultiplier: c.filtering.madMultiplier,
+    minCoreLapsTechnical: c.filtering.minCoreLapsTechnical,
+    minCoreLapsReliable: c.filtering.minCoreLapsReliable,
+    cliffResidualMultiplier: c.cliff.residualMultiplier,
+    cliffMinConsecutive: c.cliff.minConsecutive,
+    cliffWorseningThreshold: c.cliff.worseningThreshold,
+  };
+}
+
 const COMPOUND_DEGRADATION_PROFILES: Record<string, CompoundDegradationProfile> = {
-  SOFT: {
-    warmupExclusionLaps: 1,
-    madMultiplier: 3.0,
-    minCoreLapsTechnical: 3,
-    minCoreLapsReliable: 6,
-    cliffResidualMultiplier: 1.8,
-    cliffMinConsecutive: 1,
-    cliffWorseningThreshold: 0.3,
-  },
-  MEDIUM: {
-    warmupExclusionLaps: 1,
-    madMultiplier: 3.0,
-    minCoreLapsTechnical: 3,
-    minCoreLapsReliable: 6,
-    cliffResidualMultiplier: 2.0,
-    cliffMinConsecutive: 2,
-    cliffWorseningThreshold: 0.4,
-  },
-  HARD: {
-    warmupExclusionLaps: 2,
-    madMultiplier: 3.5,
-    minCoreLapsTechnical: 4,
-    minCoreLapsReliable: 7,
-    cliffResidualMultiplier: 2.2,
-    cliffMinConsecutive: 2,
-    cliffWorseningThreshold: 0.5,
-  },
+  SOFT: deriveLegacyProfile("SOFT"),
+  MEDIUM: deriveLegacyProfile("MEDIUM"),
+  HARD: deriveLegacyProfile("HARD"),
 };
 
-const DEFAULT_PROFILE: CompoundDegradationProfile = {
-  warmupExclusionLaps: 1,
-  madMultiplier: 3.0,
-  minCoreLapsTechnical: 3,
-  minCoreLapsReliable: 6,
-  cliffResidualMultiplier: 2.0,
-  cliffMinConsecutive: 2,
-  cliffWorseningThreshold: 0.4,
-};
+const DEFAULT_PROFILE: CompoundDegradationProfile = deriveLegacyProfile(null);
 
 function getCompoundProfile(compound: string): CompoundDegradationProfile {
   return COMPOUND_DEGRADATION_PROFILES[compound?.toUpperCase()] ?? DEFAULT_PROFILE;
