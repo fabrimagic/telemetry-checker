@@ -489,18 +489,10 @@ export function calculateTyreDegradation(
       tyreLife: (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start),
     }));
 
-    // ── Step 2: MAD-based outlier removal ──
-    const { kept: afterOutlier, removedCount: outlierRemoved } =
-      filterOutliersMAD(annotated, profile.madMultiplier);
-
-    if (outlierRemoved > 0) {
-      filterSummary.push(`MAD outlier filter: ${outlierRemoved} laps removed (${profile.madMultiplier}σ)`);
-    }
-    annotated = afterOutlier;
-
-    if (annotated.length < MIN_STRUCTURAL_LAPS) continue;
-
-    // ── Step 3: Warmup exclusion ──
+    // ── Step 2: Warmup exclusion (must precede MAD: warmup laps are physically
+    //           different — cold tyres — not statistical outliers. Running MAD on
+    //           a dataset that still contains them inflates median/MAD and ejects
+    //           legitimate core laps.)
     const warmupResult = excludeWarmupLaps(
       annotated,
       profile.warmupExclusionLaps,
@@ -512,6 +504,17 @@ export function calculateTyreDegradation(
       coreWindowReasons.push(`warmup_excluded:${warmupResult.reason}`);
     }
     annotated = warmupResult.kept;
+
+    if (annotated.length < MIN_STRUCTURAL_LAPS) continue;
+
+    // ── Step 3: MAD-based outlier removal (operates on warmup-free core) ──
+    const { kept: afterOutlier, removedCount: outlierRemoved } =
+      filterOutliersMAD(annotated, profile.madMultiplier);
+
+    if (outlierRemoved > 0) {
+      filterSummary.push(`MAD outlier filter: ${outlierRemoved} laps removed (${profile.madMultiplier}σ)`);
+    }
+    annotated = afterOutlier;
 
     if (annotated.length < profile.minCoreLapsTechnical) continue;
 
