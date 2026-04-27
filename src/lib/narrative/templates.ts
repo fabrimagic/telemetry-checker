@@ -104,6 +104,10 @@ function bucketFor(
     }
     case "degradation_quality": {
       const s = data.status;
+      // Skip templating when the original carries domain-specific augmentations
+      // (correction note, fallback description) that generic templates do not preserve.
+      if (data.model_corrected === true) return null;
+      if (typeof data.fallback_description === "string" && data.fallback_description.length > 0) return null;
       if (s === "INVALID") return "strong";
       if (s === "NEUTRAL") return "moderate";
       return "mild";
