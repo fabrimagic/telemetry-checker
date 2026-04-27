@@ -50,6 +50,10 @@ export interface NarrativeEvent {
   prerendered_text?: string;
   /** For target = "recommended" or "alternative": classifies as pro or con. */
   side?: "pro" | "con";
+  /** Lever 2: IDs of preceding events that caused this one. Renderer uses the first found in collector. */
+  because_of?: string[];
+  /** Lever 2: IDs of subsequent events caused by this one (informational, not used by renderer). */
+  triggers?: string[];
 }
 
 export interface RenderedNarrative {
