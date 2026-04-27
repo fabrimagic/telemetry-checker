@@ -89,16 +89,20 @@ describe("Filter order: warmup BEFORE MAD", () => {
     expect(r[0].warmupLapsExcluded ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  it("3) only warmup (no outlier) → warmup excluded, no MAD removal", () => {
+  it("3) only warmup (no outlier) → warmup detected and excluded", () => {
+    // HARD compound (warmupExclusionLaps=2, minCoreLapsTechnical=4).
+    // Pit-out laps are stripped by Step 1, so we simulate warmup with non-pit-out
+    // laps that are simply slower (cold-tyre proxy): laps 1-2 at +2.5s vs core.
     const laps: Lap[] = [];
-    laps.push(lap(16, 1, 92.5, { is_pit_out_lap: true }));
-    for (let i = 2; i <= 10; i++) {
-      laps.push(lap(16, i, 90 + (i - 2) * 0.04));
+    laps.push(lap(16, 1, 92.5));
+    laps.push(lap(16, 2, 92.0));
+    for (let i = 3; i <= 12; i++) {
+      laps.push(lap(16, i, 90 + (i - 3) * 0.04));
     }
-    const r = runDeg(laps, [stint(16, 1, "MEDIUM", 1, 10)]);
+    const r = runDeg(laps, [stint(16, 1, "HARD", 1, 12)]);
     expect(r).toHaveLength(1);
     expect(r[0].warmupLapsExcluded ?? 0).toBeGreaterThanOrEqual(1);
-    expect(r[0].lapsUsed).toBeLessThanOrEqual(9);
+    expect(r[0].lapsUsed).toBeLessThanOrEqual(11);
   });
 
   it("4) only outlier (no warmup) → outlier behavior unchanged across orders", () => {
