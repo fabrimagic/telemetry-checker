@@ -161,6 +161,7 @@ describe("validateDegradationEstimate — t-stat significance check", () => {
             min_r_squared: 0.10,
             max_correction_ratio: 3.0,
             min_t_stat_valid: 0, // disabled
+            sign_flip_large_correction_threshold: 0.03,
           },
         },
       },

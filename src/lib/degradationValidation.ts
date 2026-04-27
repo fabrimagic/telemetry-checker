@@ -44,6 +44,11 @@ export interface CompoundValidationProfile {
    * Skipped silently when slopeStdError is unavailable (n ≤ 2).
    */
   min_t_stat_valid: number;
+  /**
+   * Threshold of |corrected − raw| above which a sign flip is considered "large"
+   * → cap to NEUTRAL regardless of stint length. ~50% of max_plausible_slope.
+   */
+  sign_flip_large_correction_threshold: number;
 }
 
 /**
@@ -76,6 +81,7 @@ function deriveValidationProfile(compound: string): CompoundValidationProfile {
     min_r_squared: c.validation.min_r_squared,
     max_correction_ratio: c.validation.max_correction_ratio,
     min_t_stat_valid: c.validation.min_t_stat_valid ?? 0,
+    sign_flip_large_correction_threshold: c.validation.sign_flip_large_correction_threshold,
   };
 }
 
@@ -203,6 +209,7 @@ function getProfile(compound: string, config: DegradationValidationConfig): Comp
     min_r_squared: config.min_r_squared,
     max_correction_ratio: 3.0,
     min_t_stat_valid: 2.0,
+    sign_flip_large_correction_threshold: 0.03,
   };
 }
 
@@ -269,10 +276,16 @@ export function validateDegradationEstimate(
     statisticalFlags.push(`Correzione raw→corrected molto ampia (Δ=${correctionMagnitude.toFixed(3)})`);
   }
 
-  // ── Raw-to-corrected sign flip caution ──
-  const signFlip = corrected && slopeRaw < 0 && slopeCorrected > 0;
+  // ── Raw-to-corrected sign flip caution (bidirectional) ──
+  // Both directions of flip (negative→positive, positive→negative) signal
+  // that the multivariate correction is unstable. The strict-zero exclusion
+  // avoids treating exact-zero slopes (where Math.sign returns 0) as flips.
+  const signFlip = !!corrected
+    && slopeRaw !== 0 && slopeCorrected !== 0
+    && Math.sign(slopeRaw) !== Math.sign(slopeCorrected);
   if (signFlip) {
-    contextFlags.push(`Slope grezza negativa (${slopeRaw.toFixed(3)}) corretta a positiva (${slopeCorrected.toFixed(3)})`);
+    const direction = slopeRaw < 0 ? "negativa→positiva" : "positiva→negativa";
+    contextFlags.push(`Slope ${direction} dopo correzione (raw=${slopeRaw.toFixed(3)}, corrected=${slopeCorrected.toFixed(3)})`);
   }
 
   // ── Few laps flag ──
@@ -351,6 +364,19 @@ export function validateDegradationEstimate(
     reasons.push(`Correzione inverte il segno della slope su stint non lungo (${laps} giri): prudenza`);
     reasonCategory = "CONTEXTUAL";
     contextFlags.push("Sign flip raw→corrected con stint non lungo: fiducia ridotta");
+  }
+
+  // 5b. Sign flip + large correction magnitude → conservative NEUTRAL regardless of stint length.
+  // A multivariate correction that flips the slope sign AND moves it by more than the threshold
+  // is a strong overfitting signal: fuel/weather coefficients are likely absorbing tyre-life signal.
+  if (status === "VALID" && signFlip &&
+      correctionMagnitude > profile.sign_flip_large_correction_threshold) {
+    status = "NEUTRAL";
+    reasons.push(
+      `Correzione inverte il segno della slope con magnitudine ampia (Δ=${correctionMagnitude.toFixed(3)} > ${profile.sign_flip_large_correction_threshold}): possibile overfitting`,
+    );
+    reasonCategory = "MIXED";
+    statisticalFlags.push("Sign flip + large correction → likely overfitting");
   }
 
   // 6. Large correction + borderline → downgrade to NEUTRAL

@@ -43,6 +43,13 @@ export interface CanonicalCompoundProfile {
     max_correction_ratio: number;
     /** Optional: present only when the t-stat significance check is configured. */
     min_t_stat_valid?: number;
+    /**
+     * Threshold of |corrected − raw| above which a sign flip is considered "large"
+     * → cap to NEUTRAL regardless of stint length. Set as ~50% of max_plausible_slope
+     * for each compound: a correction that flips the sign AND moves the slope by more
+     * than half the plausible range is a strong overfitting signal.
+     */
+    sign_flip_large_correction_threshold: number;
   };
 }
 
@@ -72,6 +79,7 @@ export const CANONICAL_COMPOUND_PROFILES: Record<"SOFT" | "MEDIUM" | "HARD", Can
       min_r_squared: 0.25,
       max_correction_ratio: 3.0,
       min_t_stat_valid: 2.0,
+      sign_flip_large_correction_threshold: 0.04,
     },
   },
   MEDIUM: {
@@ -99,6 +107,7 @@ export const CANONICAL_COMPOUND_PROFILES: Record<"SOFT" | "MEDIUM" | "HARD", Can
       min_r_squared: 0.25,
       max_correction_ratio: 3.0,
       min_t_stat_valid: 2.0,
+      sign_flip_large_correction_threshold: 0.03,
     },
   },
   HARD: {
@@ -126,6 +135,7 @@ export const CANONICAL_COMPOUND_PROFILES: Record<"SOFT" | "MEDIUM" | "HARD", Can
       min_r_squared: 0.30,
       max_correction_ratio: 2.5,
       min_t_stat_valid: 2.0,
+      sign_flip_large_correction_threshold: 0.025,
     },
   },
 };
@@ -161,6 +171,7 @@ export const CANONICAL_DEFAULT_COMPOUND: CanonicalCompoundProfile = {
     min_r_squared: 0.25,
     max_correction_ratio: 3.0,
     min_t_stat_valid: 2.0,
+    sign_flip_large_correction_threshold: 0.03,
   },
 };
 
