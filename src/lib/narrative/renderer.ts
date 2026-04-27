@@ -75,12 +75,18 @@ export function renderNarrative(
     if (ev.id) byId.set(ev.id, ev);
   }
 
-  for (const ev of events) {
-    const base = ev.prerendered_text;
-    if (base == null) continue; // templates not implemented in this phase
-
+  // Build annotated event list (preserves order); chapters reuse it so the
+  // causal annotation appears inside chapter rendering as well.
+  const annotatedEvents: NarrativeEvent[] = events.map((ev) => {
+    if (ev.prerendered_text == null) return ev;
     const annotation = buildCausalAnnotation(ev, byId);
-    const text = annotation ? base + annotation : base;
+    if (!annotation) return ev;
+    return { ...ev, prerendered_text: ev.prerendered_text + annotation };
+  });
+
+  for (const ev of annotatedEvents) {
+    const text = ev.prerendered_text;
+    if (text == null) continue;
 
     if (ev.target === "global") {
       insights.push(text);
@@ -100,7 +106,7 @@ export function renderNarrative(
 
   const chapters =
     opts && typeof opts.totalLaps === "number" && Array.isArray(opts.actualPitLaps)
-      ? buildChapters(events, opts.totalLaps, opts.actualPitLaps)
+      ? buildChapters(annotatedEvents, opts.totalLaps, opts.actualPitLaps)
       : [];
 
   return {
