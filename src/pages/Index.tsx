@@ -916,8 +916,8 @@ export default function Index() {
                           <TrendingDown className="h-3.5 w-3.5" />
                           Degrado Gomme
                         </h3>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          Dati insufficienti per calcolare il degrado. Non sono state rilevate simulazioni passo gara (long run) con giri validi sufficienti.
+                        <p className="text-sm text-muted-foreground italic mb-3">
+                          Nessun long run statisticamente significativo rilevato in questa sessione di pratica.
                         </p>
                         <details className="group">
                           <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -927,10 +927,10 @@ export default function Index() {
                           </summary>
                           <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
                             <ul className="space-y-1.5 pl-5 list-disc">
-                              <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri anomali.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Basato su lunghezza, regolarità, trend di degrado.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile • 40–59: possibile • &lt;40: non long run.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza consecutiva di almeno 5 giri validi nello stesso stint.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri con durata mancante.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Qualifica statistica</span> — Delegata al motore principale (MAD compound-specific, esclusione warmup, regressione robusta).</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Validazione</span> — R² ≥ 0.25 e giri usati ≥ 5 nella regressione robusta.</li>
                             </ul>
                           </div>
                         </details>
