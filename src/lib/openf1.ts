@@ -186,8 +186,11 @@ async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
     // Exponential backoff: 1.5s, 3s, 6s, 12s
     const attempt = MAX_RETRIES - retries;
     const backoff = 1500 * Math.pow(2, attempt);
-    // Push the entire queue forward so concurrent siblings also wait — prevents thrashing.
-    nextAvailableTime = Math.max(nextAvailableTime, Date.now() + backoff);
+    // Push a phantom reservation into the future so concurrent siblings also wait.
+    const blockUntil = Date.now() + backoff;
+    scheduled.push(blockUntil);
+    scheduled.sort((a, b) => a - b);
+    console.debug(`[openf1] 429 received, backing off ${backoff}ms for ${path}`);
     await new Promise((r) => setTimeout(r, backoff));
     return fetchApi<T>(path, retries - 1);
   }
