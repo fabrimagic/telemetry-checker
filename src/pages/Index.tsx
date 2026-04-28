@@ -1019,6 +1019,8 @@ export default function Index() {
                             <TrackMap
                               drivers={mapDrivers}
                               activeDate={activeDate}
+                              activeInfo={activeInfo}
+                              onClearPin={() => setClickedTime(null)}
                             />
                           )}
                           {(() => {
