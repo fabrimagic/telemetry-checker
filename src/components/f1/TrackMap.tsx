@@ -13,9 +13,11 @@ interface Props {
   drivers: DriverLocation[];
   activeDate: string | null;
   driverZones?: DriverZones[];
+  activeInfo?: { timestamp: string; lapNumber: number | null; acronym: string; pinned: boolean } | null;
+  onClearPin?: () => void;
 }
 
-export function TrackMap({ drivers, activeDate, driverZones }: Props) {
+export function TrackMap({ drivers, activeDate, driverZones, activeInfo, onClearPin }: Props) {
   const { viewBox, driverPaths, scale } = useMemo(() => {
     const allLocs = drivers.flatMap((d) => d.locations);
     if (!allLocs.length) return { viewBox: "0 0 100 100", driverPaths: [], scale: 100 };
