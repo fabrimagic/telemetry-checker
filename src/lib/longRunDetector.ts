@@ -130,6 +130,11 @@ export function detectLongRuns(
       seq.length > best.length ? seq : best,
     );
 
+    // Reject push+rolling quali-sim sequences (CV > 5%). Real long runs
+    // sit well below this threshold; mixed push/rolling stints sit above 18%.
+    const cv = coefficientOfVariation(candidate);
+    if (cv > MAX_CV_LONG_RUN) continue;
+
     const virtualStint: StintData = {
       ...stint,
       lap_start: candidate[0].lap_number,
