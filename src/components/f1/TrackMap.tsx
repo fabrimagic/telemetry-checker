@@ -13,9 +13,11 @@ interface Props {
   drivers: DriverLocation[];
   activeDate: string | null;
   driverZones?: DriverZones[];
+  activeInfo?: { timestamp: string; lapNumber: number | null; acronym: string; pinned: boolean } | null;
+  onClearPin?: () => void;
 }
 
-export function TrackMap({ drivers, activeDate, driverZones }: Props) {
+export function TrackMap({ drivers, activeDate, driverZones, activeInfo, onClearPin }: Props) {
   const { viewBox, driverPaths, scale } = useMemo(() => {
     const allLocs = drivers.flatMap((d) => d.locations);
     if (!allLocs.length) return { viewBox: "0 0 100 100", driverPaths: [], scale: 100 };
@@ -83,7 +85,21 @@ export function TrackMap({ drivers, activeDate, driverZones }: Props) {
 
   return (
     <div className="bg-card rounded-lg border border-border p-4">
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Track Position</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Track Position</h3>
+        {activeInfo && (
+          <div className="flex items-center gap-2 text-[10px] font-mono">
+            <span className={`px-1.5 py-0.5 rounded border ${activeInfo.pinned ? "bg-primary/15 border-primary/40 text-primary" : "bg-muted/40 border-border text-muted-foreground"}`}>
+              {activeInfo.pinned ? "PIN" : "HOVER"} · {activeInfo.acronym}
+              {activeInfo.lapNumber != null && <> · L{activeInfo.lapNumber}</>}
+              <> · {activeInfo.timestamp}</>
+            </span>
+            {activeInfo.pinned && onClearPin && (
+              <button onClick={onClearPin} className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2">clear</button>
+            )}
+          </div>
+        )}
+      </div>
       <div className="flex flex-wrap gap-3 mb-3">
         {drivers.map((d) => (
           <span key={d.driverNumber} className="flex items-center gap-1.5 text-xs">
