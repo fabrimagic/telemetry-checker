@@ -101,21 +101,72 @@ export interface IntervalData {
   session_key: number;
 }
 
-// Atomic slot-reservation rate limiter for OpenF1.
-// OpenF1 enforces 15 requests per 10 seconds (= 1.5 req/s). We schedule one slot
-// every 700 ms (~1.43 req/s) to stay safely under the limit even when multiple
-// callers (Promise.all, head-to-head loaders) reserve concurrently.
-// On 429: exponential backoff + push the global queue forward so siblings also slow down.
-let nextAvailableTime: number = 0;
-const MIN_INTERVAL = 700; // ms between requests (~1.43 req/s, under OpenF1's 15/10s limit)
+// Dual-window rate limiter for OpenF1 free tier.
+// Real limits (per openf1.org/#sponsorship): 3 req/s AND 30 req/min.
+// We track scheduled timestamps and compute the next available slot as the MAX
+// of: (a) earliest time the 1s window has <3 reservations, and
+//     (b) earliest time the 60s window has <30 reservations.
+// JS single-thread guarantees the reserve read+write pair is atomic across callers.
+// 429s remain handled below as a fallback for edge cases (multi-tab, clock skew).
+const MAX_PER_SECOND = 3;
+const MAX_PER_MINUTE = 30;
+const WINDOW_SECOND_MS = 1000;
+const WINDOW_MINUTE_MS = 60_000;
 const MAX_RETRIES = 4;
 
+// Sorted (ascending) list of scheduled-fire timestamps for issued/in-flight reservations.
+const scheduled: number[] = [];
+
+function reserveSlot(): number {
+  const now = Date.now();
+  // Drop timestamps older than the longest window — they no longer constrain anything.
+  while (scheduled.length > 0 && scheduled[0] <= now - WINDOW_MINUTE_MS) {
+    scheduled.shift();
+  }
+  // Candidate = now. Push it forward until both windows have capacity.
+  let candidate = now;
+  // Iterate because pushing past one boundary may move us into another window.
+  // Bounded by scheduled.length, so terminates.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const inSecondWindow = scheduled.filter((t) => t > candidate - WINDOW_SECOND_MS).length;
+    const inMinuteWindow = scheduled.filter((t) => t > candidate - WINDOW_MINUTE_MS).length;
+    if (inSecondWindow < MAX_PER_SECOND && inMinuteWindow < MAX_PER_MINUTE) break;
+    // Need to wait until the oldest constraining timestamp falls out of its window.
+    let nextCandidate = candidate;
+    if (inSecondWindow >= MAX_PER_SECOND) {
+      // Find oldest ts inside the 1s window — candidate must move past ts + 1s.
+      const oldestInSec = scheduled.find((t) => t > candidate - WINDOW_SECOND_MS)!;
+      nextCandidate = Math.max(nextCandidate, oldestInSec + WINDOW_SECOND_MS);
+    }
+    if (inMinuteWindow >= MAX_PER_MINUTE) {
+      const oldestInMin = scheduled.find((t) => t > candidate - WINDOW_MINUTE_MS)!;
+      nextCandidate = Math.max(nextCandidate, oldestInMin + WINDOW_MINUTE_MS);
+    }
+    candidate = nextCandidate;
+  }
+  // Insert candidate into sorted scheduled[]. Most often it goes at the end.
+  if (scheduled.length === 0 || candidate >= scheduled[scheduled.length - 1]) {
+    scheduled.push(candidate);
+  } else {
+    let i = scheduled.length;
+    while (i > 0 && scheduled[i - 1] > candidate) i--;
+    scheduled.splice(i, 0, candidate);
+  }
+  return candidate;
+}
+
 async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
-  // Reserve a slot atomically (JS single-thread guarantees this read+write pair is uninterrupted).
-  const scheduledTime = Math.max(Date.now(), nextAvailableTime);
-  nextAvailableTime = scheduledTime + MIN_INTERVAL;
+  const scheduledTime = reserveSlot();
   const delay = scheduledTime - Date.now();
-  if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+  if (delay > 0) {
+    if (delay >= 250) {
+      console.debug(
+        `[openf1] rate-limit wait ${delay}ms (queue=${scheduled.length}) for ${path}`
+      );
+    }
+    await new Promise((r) => setTimeout(r, delay));
+  }
 
   let res: Response;
   try {
