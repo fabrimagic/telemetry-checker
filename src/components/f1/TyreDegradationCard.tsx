@@ -109,15 +109,15 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                   <th className="text-right py-1 pr-2">Giri</th>
                   <th className="text-right py-1 pr-2">Da–A</th>
                   <th className="text-right py-1 pr-2">Media</th>
-                  <th className="text-right py-1 pr-2">Std</th>
                   <th className="text-right py-1 pr-2">Slope</th>
-                  <th className="text-right py-1 pr-2">Score</th>
+                  <th className="text-right py-1 pr-2">R²</th>
+                  <th className="text-right py-1 pr-2">Robustezza</th>
                   <th className="text-center py-1">Long Run?</th>
                 </tr>
               </thead>
               <tbody>
                 {longRuns.map((lr) => (
-                  <tr key={`${lr.driverNumber}-${lr.stintNumber}`} className={lr.isLongRun ? "text-foreground" : "text-muted-foreground/60"}>
+                  <tr key={`${lr.driverNumber}-${lr.stintNumber}`} className={lr.isValidLongRun ? "text-foreground" : "text-muted-foreground/60"}>
                     <td className="py-0.5 pr-2">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: `#${lr.color}` }} />
@@ -129,19 +129,19 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                     <td className="py-0.5 pr-2 text-right font-mono">{lr.lapsCount}</td>
                     <td className="py-0.5 pr-2 text-right font-mono">{lr.lapStartLongRun}–{lr.lapEndLongRun}</td>
                     <td className="py-0.5 pr-2 text-right font-mono">{fmtTime(lr.avgLapTime)}</td>
-                    <td className="py-0.5 pr-2 text-right font-mono">{lr.stdLapTime.toFixed(3)}</td>
                     <td className="py-0.5 pr-2 text-right font-mono">{lr.degradationSlope > 0 ? "+" : ""}{lr.degradationSlope.toFixed(3)}</td>
-                    <td className="py-0.5 pr-2 text-right font-mono font-bold">{lr.score}</td>
-                    <td className="py-0.5 text-center">{lr.isLongRun ? "✅" : lr.score >= 40 ? "⚠️" : "❌"}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono font-bold">{lr.rSquared.toFixed(2)}</td>
+                    <td className="py-0.5 pr-2 text-right font-mono">{lr.fitRobustness ?? "—"}</td>
+                    <td className="py-0.5 text-center">{lr.isValidLongRun ? "✅" : "❌"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <ul className="text-[10px] text-muted-foreground mt-2 space-y-1 pl-4 list-disc">
               <li><span className="font-mono font-bold text-foreground/80">Media</span> — Tempo medio sul giro nella sequenza long run identificata.</li>
-              <li><span className="font-mono font-bold text-foreground/80">Std</span> — Deviazione standard dei tempi sul giro: misura la regolarità del passo.</li>
-              <li><span className="font-mono font-bold text-foreground/80">Slope</span> — Pendenza della regressione lineare (sec/giro).</li>
-              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Punteggio complessivo. ≥ 60: probabile long run • 40–59: possibile • &lt; 40: non long run.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Slope</span> — Pendenza della regressione robusta del motore principale (sec/giro).</li>
+              <li><span className="font-mono font-bold text-foreground/80">R²</span> — Bontà del fit. Long run validato se R² ≥ 0.25 e giri usati ≥ 5.</li>
+              <li><span className="font-mono font-bold text-foreground/80">Robustezza</span> — Classificazione della stabilità del fit (LOW / MEDIUM / HIGH).</li>
             </ul>
           </div>
         </details>
