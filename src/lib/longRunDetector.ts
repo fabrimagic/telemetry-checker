@@ -24,6 +24,30 @@ export interface LongRunResult {
 
 const DEFAULT_MIN_LAPS = 5;
 const MIN_R_SQUARED_LONG_RUN = 0.25;
+/**
+ * Maximum coefficient of variation (stddev/mean) tolerated on the candidate
+ * long-run sequence. Push+rolling quali-sim sequences in Practice exhibit
+ * CV > 18%, while real long runs sit below ~1.5%. A 5% cutoff cleanly
+ * separates the two populations without rejecting noisy-but-genuine runs.
+ *
+ * Scope: this filter is intentionally local to longRunDetector. The main
+ * tyre-degradation engine (calculateTyreDegradation) MUST keep accepting
+ * full race stints (18-25 laps) where post-SC rolling laps inflate CV
+ * legitimately.
+ */
+const MAX_CV_LONG_RUN = 0.05;
+
+function coefficientOfVariation(laps: Lap[]): number {
+  const durations = laps
+    .map((l) => l.lap_duration)
+    .filter((d): d is number => typeof d === "number" && d > 0);
+  if (durations.length < 2) return 0;
+  const mean = durations.reduce((a, b) => a + b, 0) / durations.length;
+  if (mean <= 0) return 0;
+  const variance =
+    durations.reduce((acc, d) => acc + (d - mean) ** 2, 0) / durations.length;
+  return Math.sqrt(variance) / mean;
+}
 
 function pitInLapsSet(pits: PitData[]): Set<number> {
   return new Set(pits.map((p) => p.lap_number));
@@ -105,6 +129,11 @@ export function detectLongRuns(
     const candidate = sequences.reduce((best, seq) =>
       seq.length > best.length ? seq : best,
     );
+
+    // Reject push+rolling quali-sim sequences (CV > 5%). Real long runs
+    // sit well below this threshold; mixed push/rolling stints sit above 18%.
+    const cv = coefficientOfVariation(candidate);
+    if (cv > MAX_CV_LONG_RUN) continue;
 
     const virtualStint: StintData = {
       ...stint,
