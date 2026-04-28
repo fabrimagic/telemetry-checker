@@ -335,3 +335,9 @@ export function getSessionsByMeetingKey(meetingKey: number) {
 export function getAllLaps(sessionKey: number) {
   return fetchApi<Lap[]>(`/laps?session_key=${sessionKey}`);
 }
+
+/** Test-only helper. Resets the rate limiter's internal state.
+ *  Production code MUST NOT call this. */
+export function __resetRateLimiterForTests(): void {
+  scheduled.length = 0;
+}
