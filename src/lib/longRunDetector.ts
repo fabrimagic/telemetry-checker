@@ -1,4 +1,5 @@
 import type { Lap, StintData, PitData } from "./openf1";
+import { calculateTyreDegradation, type DegradationResult } from "./tyreDegradation";
 
 export interface LongRunResult {
   driverNumber: number;
@@ -9,68 +10,46 @@ export interface LongRunResult {
   lapStartLongRun: number;
   lapEndLongRun: number;
   lapsCount: number;
+  /** From validated DegradationResult */
   avgLapTime: number;
-  stdLapTime: number;
+  /** From validated DegradationResult */
   degradationSlope: number;
-  score: number;
-  isLongRun: boolean;
-}
-
-interface ConsecutiveSequence {
-  laps: Lap[];
-  stintData: StintData;
+  /** From validated DegradationResult */
+  rSquared: number;
+  /** From validated DegradationResult */
+  fitRobustness: "LOW" | "MEDIUM" | "HIGH" | null;
+  /** True only if main engine returns a DegradationResult with sufficient quality */
+  isValidLongRun: boolean;
 }
 
 const DEFAULT_MIN_LAPS = 5;
+const MIN_R_SQUARED_LONG_RUN = 0.25;
 
-/**
- * Build a set of pit-in lap numbers (last lap before each pit stop).
- */
-function pitInLaps(pits: PitData[]): Set<number> {
+function pitInLapsSet(pits: PitData[]): Set<number> {
   return new Set(pits.map((p) => p.lap_number));
 }
 
 /**
- * Filter invalid laps from a stint:
- * - out laps
- * - in laps (ending with pit)
- * - null/zero duration
- * - outliers (< median*0.99 or > median*1.07)
+ * Identify consecutive sequences in a stint, excluding pit-in/out and null durations.
+ * NOTE: NO outlier filtering here. That is the responsibility of the main engine
+ * (compound-specific MAD).
  */
-function filterValidLaps(
+function buildConsecutiveSequences(
   stintLaps: Lap[],
-  pitInSet: Set<number>
-): Lap[] {
-  // Step 1: basic filters
-  const basic = stintLaps.filter(
+  pitInSet: Set<number>,
+  minLaps: number,
+): Lap[][] {
+  const valid = stintLaps.filter(
     (l) =>
       l.lap_duration != null &&
       l.lap_duration > 0 &&
       !l.is_pit_out_lap &&
-      !pitInSet.has(l.lap_number)
+      !pitInSet.has(l.lap_number),
   );
+  if (!valid.length) return [];
 
-  if (basic.length < 2) return basic;
-
-  // Step 2: outlier removal via median
-  const durations = basic.map((l) => l.lap_duration!).sort((a, b) => a - b);
-  const median = durations[Math.floor(durations.length / 2)];
-  const lowThreshold = median * 0.99;
-  const highThreshold = median * 1.07;
-
-  return basic.filter(
-    (l) => l.lap_duration! >= lowThreshold && l.lap_duration! <= highThreshold
-  );
-}
-
-/**
- * Group laps into consecutive sequences by lap_number.
- */
-function buildConsecutiveSequences(laps: Lap[], minLaps: number = DEFAULT_MIN_LAPS): Lap[][] {
-  if (!laps.length) return [];
-  const sorted = [...laps].sort((a, b) => a.lap_number - b.lap_number);
+  const sorted = [...valid].sort((a, b) => a.lap_number - b.lap_number);
   const sequences: Lap[][] = [[sorted[0]]];
-
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].lap_number === sorted[i - 1].lap_number + 1) {
       sequences[sequences.length - 1].push(sorted[i]);
@@ -78,85 +57,28 @@ function buildConsecutiveSequences(laps: Lap[], minLaps: number = DEFAULT_MIN_LA
       sequences.push([sorted[i]]);
     }
   }
-
   return sequences.filter((s) => s.length >= minLaps);
 }
 
-/**
- * Simple linear regression: y = slope*x + intercept
- */
-function linReg(xs: number[], ys: number[]) {
-  const n = xs.length;
-  if (n < 2) return { slope: 0, intercept: 0 };
-  let sx = 0, sy = 0, sxy = 0, sxx = 0;
-  for (let i = 0; i < n; i++) {
-    sx += xs[i]; sy += ys[i]; sxy += xs[i] * ys[i]; sxx += xs[i] * xs[i];
-  }
-  const d = n * sxx - sx * sx;
-  if (d === 0) return { slope: 0, intercept: sy / n };
-  const slope = (n * sxy - sx * sy) / d;
-  const intercept = (sy - slope * sx) / n;
-  return { slope, intercept };
-}
-
-function mean(arr: number[]) {
-  return arr.reduce((a, b) => a + b, 0) / arr.length;
-}
-
-function std(arr: number[]) {
-  const m = mean(arr);
-  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
+function avgFromDegResult(r: DegradationResult): number {
+  if (!r.points.length) return 0;
+  const sum = r.points.reduce((acc, p) => acc + p.lapTime, 0);
+  return Math.round((sum / r.points.length) * 1000) / 1000;
 }
 
 /**
- * Score a consecutive sequence to determine if it's a race-simulation long run.
- */
-function scoreSequence(
-  laps: Lap[],
-  stint: StintData
-): { score: number; avgLapTime: number; stdLapTime: number; slope: number } {
-  const durations = laps.map((l) => l.lap_duration!);
-  const avgLapTime = mean(durations);
-  const stdLapTime = std(durations);
-
-  let score = 0;
-
-  // 1. Length score
-  const len = laps.length;
-  if (len >= 8) score += 30;
-  else if (len >= 6) score += 20;
-  else score += 10;
-
-  // 2. Regularity score
-  if (stdLapTime < 0.5) score += 25;
-  else if (stdLapTime <= 0.8) score += 15;
-  else score += 5;
-
-  // 3. Degradation trend
-  const xs = laps.map(
-    (l) => (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start)
-  );
-  const ys = durations;
-  const { slope } = linReg(xs, ys);
-
-  if (slope > 0 && slope <= 0.2) score += 20;
-  else if (slope > 0.2) score += 5;
-  // slope <= 0 → +0
-
-  // 4. Push lap penalty
-  const medianD = [...durations].sort((a, b) => a - b)[Math.floor(durations.length / 2)];
-  if (durations.some((d) => d < medianD * 0.99)) score -= 25;
-
-  // 5. High variability penalty
-  const range = Math.max(...durations) - Math.min(...durations);
-  if (range > 2.0) score -= 15;
-
-  return { score, avgLapTime, stdLapTime, slope };
-}
-
-/**
- * Detect long runs for a single driver in a Practice session.
- * Returns the best long-run candidate per stint.
+ * Detect long runs for a driver in a Practice session.
+ *
+ * Pipeline:
+ *  1) For each stint, identify consecutive sequences of valid laps (≥ minLaps).
+ *  2) For each stint, pick the LONGEST consecutive sequence as the candidate
+ *     (a race-simulation long run is the uninterrupted run on the same compound).
+ *  3) Build a virtual stint and call calculateTyreDegradation, which applies
+ *     compound-specific MAD, warmup exclusion, robust regression, etc.
+ *  4) Mark isValidLongRun=true only if rSquared ≥ 0.25 AND lapsUsed ≥ minLaps.
+ *
+ * No multi-factor scoring, no inline regression, no ad-hoc outlier thresholds.
+ * Statistical qualification is fully delegated to the main engine.
  */
 export function detectLongRuns(
   driverNumber: number,
@@ -165,47 +87,43 @@ export function detectLongRuns(
   laps: Lap[],
   stints: StintData[],
   pits: PitData[],
-  minLaps: number = DEFAULT_MIN_LAPS
+  minLaps: number = DEFAULT_MIN_LAPS,
 ): LongRunResult[] {
   if (!stints.length || !laps.length) return [];
 
-  const pitSet = pitInLaps(pits);
+  const pitSet = pitInLapsSet(pits);
   const results: LongRunResult[] = [];
 
   for (const stint of stints) {
     const stintLaps = laps.filter(
-      (l) => l.lap_number >= stint.lap_start && l.lap_number <= stint.lap_end
+      (l) => l.lap_number >= stint.lap_start && l.lap_number <= stint.lap_end,
     );
-
-    const valid = filterValidLaps(stintLaps, pitSet);
-    const sequences = buildConsecutiveSequences(valid, minLaps);
-
+    const sequences = buildConsecutiveSequences(stintLaps, pitSet, minLaps);
     if (!sequences.length) continue;
 
-    // Score each sequence, pick the best
-    let best: {
-      seq: Lap[];
-      score: number;
-      avgLapTime: number;
-      stdLapTime: number;
-      slope: number;
-    } | null = null;
+    // Longest sequence wins; ties go to the chronologically first.
+    const candidate = sequences.reduce((best, seq) =>
+      seq.length > best.length ? seq : best,
+    );
 
-    for (const seq of sequences) {
-      const s = scoreSequence(seq, stint);
-      if (
-        !best ||
-        s.score > best.score ||
-        (s.score === best.score && seq.length > best.seq.length)
-      ) {
-        best = { seq, ...s };
-      }
-    }
+    const virtualStint: StintData = {
+      ...stint,
+      lap_start: candidate[0].lap_number,
+      lap_end: candidate[candidate.length - 1].lap_number,
+    };
 
-    if (!best) continue;
+    const degResults = calculateTyreDegradation(
+      driverNumber,
+      acronym,
+      color,
+      candidate,
+      [virtualStint],
+    );
+    if (!degResults.length) continue;
+    const deg = degResults[0];
 
-    const first = best.seq[0].lap_number;
-    const last = best.seq[best.seq.length - 1].lap_number;
+    const isValid =
+      deg.rSquared >= MIN_R_SQUARED_LONG_RUN && deg.lapsUsed >= minLaps;
 
     results.push({
       driverNumber,
@@ -213,14 +131,14 @@ export function detectLongRuns(
       color,
       stintNumber: stint.stint_number,
       compound: stint.compound,
-      lapStartLongRun: first,
-      lapEndLongRun: last,
-      lapsCount: best.seq.length,
-      avgLapTime: Math.round(best.avgLapTime * 1000) / 1000,
-      stdLapTime: Math.round(best.stdLapTime * 1000) / 1000,
-      degradationSlope: Math.round(best.slope * 1000) / 1000,
-      score: Math.round(best.score),
-      isLongRun: best.score >= 40,
+      lapStartLongRun: candidate[0].lap_number,
+      lapEndLongRun: candidate[candidate.length - 1].lap_number,
+      lapsCount: candidate.length,
+      avgLapTime: avgFromDegResult(deg),
+      degradationSlope: Math.round(deg.slopeSecPerLap * 1000) / 1000,
+      rSquared: Math.round(deg.rSquared * 1000) / 1000,
+      fitRobustness: deg.fitRobustness ?? null,
+      isValidLongRun: isValid,
     });
   }
 
@@ -228,15 +146,15 @@ export function detectLongRuns(
 }
 
 /**
- * Given long-run results, produce filtered laps & virtual stints
- * for the tyre degradation calculator.
+ * Given long-run results, produce filtered laps + virtual stints for downstream
+ * consumers. Only entries with isValidLongRun=true are included.
  */
 export function longRunToStintsAndLaps(
   laps: Lap[],
   longRuns: LongRunResult[],
-  stints: StintData[]
+  stints: StintData[],
 ): { filteredLaps: Lap[]; virtualStints: StintData[] } {
-  const validRuns = longRuns.filter((lr) => lr.isLongRun);
+  const validRuns = longRuns.filter((lr) => lr.isValidLongRun);
   if (!validRuns.length) return { filteredLaps: [], virtualStints: [] };
 
   const filteredLaps: Lap[] = [];
@@ -247,7 +165,8 @@ export function longRunToStintsAndLaps(
     if (!originalStint) continue;
 
     const runLaps = laps.filter(
-      (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun
+      (l) =>
+        l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun,
     );
     filteredLaps.push(...runLaps);
 

@@ -240,52 +240,44 @@ export default function Index() {
                     ]);
                     if (!pLaps.length || !pStints.length) continue;
 
-                    // Detect long runs with min 3 laps
+                    // Practice compound models — fully delegated to the main engine.
                     const pitInLaps: PitData[] = pStints
                       .slice(0, -1)
                       .map((s) => ({ lap_number: s.lap_end } as PitData));
                     const longRuns = detectLongRuns(
                       driverNumber, driver.name_acronym, "ffffff",
-                      pLaps, pStints, pitInLaps, 3
+                      pLaps, pStints, pitInLaps, 5,
                     );
-                    const validRuns = longRuns.filter((lr) => lr.isLongRun);
+                    const validRuns = longRuns.filter((lr) => lr.isValidLongRun);
 
                     for (const lr of validRuns) {
-                      // Use the long run degradation slope and calculate intercept
-                      const runLaps = pLaps.filter(
-                        (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun && l.lap_duration != null
-                      );
-                      if (runLaps.length < 3) continue;
-
                       const originalStint = pStints.find((s) => s.stint_number === lr.stintNumber);
                       if (!originalStint) continue;
 
-                      const xs = runLaps.map((l) => (originalStint.tyre_age_at_start ?? 0) + (l.lap_number - originalStint.lap_start));
-                      const ys = runLaps.map((l) => l.lap_duration!);
-                      const n = xs.length;
-                      let sx = 0, sy = 0, sxy = 0, sxx = 0;
-                      for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; sxy += xs[i] * ys[i]; sxx += xs[i] * xs[i]; }
-                      const d = n * sxx - sx * sx;
-                      if (d === 0) continue;
-                      const slope = (n * sxy - sx * sy) / d;
-                      const intercept = (sy - slope * sx) / n;
-                      const yMean = sy / n;
-                      let ssTot = 0, ssRes = 0;
-                      for (let i = 0; i < n; i++) {
-                        ssTot += (ys[i] - yMean) ** 2;
-                        ssRes += (ys[i] - (slope * xs[i] + intercept)) ** 2;
-                      }
-                      const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+                      const virtualStint: StintData = {
+                        ...originalStint,
+                        lap_start: lr.lapStartLongRun,
+                        lap_end: lr.lapEndLongRun,
+                      };
+                      const runLaps = pLaps.filter(
+                        (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun,
+                      );
 
-                      // Only add if not already present with better R²
+                      const degResults = calculateTyreDegradation(
+                        driverNumber, driver.name_acronym, "ffffff",
+                        runLaps, [virtualStint],
+                      );
+                      if (!degResults.length) continue;
+                      const deg = degResults[0];
+
                       const existing = practiceModels.find((m) => m.compound === lr.compound);
-                      if (!existing || rSquared > existing.rSquared) {
+                      if (!existing || deg.rSquared > existing.rSquared) {
                         practiceModels = practiceModels.filter((m) => m.compound !== lr.compound);
                         practiceModels.push({
                           compound: lr.compound,
-                          slope,
-                          intercept,
-                          rSquared,
+                          slope: deg.slopeSecPerLap,
+                          intercept: deg.intercept,
+                          rSquared: deg.rSquared,
                           source: ps.session_name,
                         });
                       }
@@ -924,8 +916,8 @@ export default function Index() {
                           <TrendingDown className="h-3.5 w-3.5" />
                           Degrado Gomme
                         </h3>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          Dati insufficienti per calcolare il degrado. Non sono state rilevate simulazioni passo gara (long run) con giri validi sufficienti.
+                        <p className="text-sm text-muted-foreground italic mb-3">
+                          Nessun long run statisticamente significativo rilevato in questa sessione di pratica.
                         </p>
                         <details className="group">
                           <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -935,10 +927,10 @@ export default function Index() {
                           </summary>
                           <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
                             <ul className="space-y-1.5 pl-5 list-disc">
-                              <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza di almeno 5 giri consecutivi validi all'interno di uno stint.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri anomali.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Score</span> — Basato su lunghezza, regolarità, trend di degrado.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Classificazione</span> — Score ≥ 60: probabile • 40–59: possibile • &lt;40: non long run.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza consecutiva di almeno 5 giri validi nello stesso stint.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri con durata mancante.</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Qualifica statistica</span> — Delegata al motore principale (MAD compound-specific, esclusione warmup, regressione robusta).</li>
+                              <li><span className="font-mono font-bold text-foreground/80">Validazione</span> — R² ≥ 0.25 e giri usati ≥ 5 nella regressione robusta.</li>
                             </ul>
                           </div>
                         </details>
