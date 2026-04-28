@@ -50,7 +50,10 @@ export function FingerprintCard({ fingerprint, insights }: Props) {
       <CardHeader>
         <CardTitle className="text-lg">Quali vs Race Fingerprint</CardTitle>
         <CardDescription>
-          Confronto tra posizione di qualifica e pace di pratica per identificare anomalie.
+          Confronto tra la posizione raggiunta in qualifica e il passo mostrato nei long run
+          di pratica. Un "UNDER QUALIFIER" parte indietro ma in gara ha il potenziale per
+          recuperare; un "OVER QUALIFIER" è l'opposto, parte avanti ma fatica a tenere il
+          passo sul lungo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
