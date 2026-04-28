@@ -578,6 +578,42 @@ export default function Index() {
     return closest.date;
   }, [clickedTime, cursorTime, chartDrivers]);
 
+  // Active marker info: formatted time + lap number for the reference driver
+  const activeInfo = useMemo(() => {
+    if (!activeDate || !chartDrivers.length) return null;
+    const refDriverNum = chartDrivers[0].driverNumber;
+    const refState = driverStates.get(refDriverNum);
+    const targetMs = new Date(activeDate).getTime();
+    let lapNumber: number | null = null;
+    if (refState?.laps?.length) {
+      // Find the lap whose [date_start, date_start + lap_duration] contains targetMs
+      for (const lap of refState.laps) {
+        if (!lap.date_start || !lap.lap_duration) continue;
+        const start = new Date(lap.date_start).getTime();
+        const end = start + lap.lap_duration * 1000;
+        if (targetMs >= start && targetMs <= end) {
+          lapNumber = lap.lap_number;
+          break;
+        }
+      }
+      // Fallback: closest lap by date_start
+      if (lapNumber == null) {
+        let best = refState.laps[0];
+        let bestDiff = Infinity;
+        for (const lap of refState.laps) {
+          if (!lap.date_start) continue;
+          const diff = Math.abs(new Date(lap.date_start).getTime() - targetMs);
+          if (diff < bestDiff) { bestDiff = diff; best = lap; }
+        }
+        lapNumber = best?.lap_number ?? null;
+      }
+    }
+    const d = new Date(activeDate);
+    const timestamp = d.toLocaleTimeString("it-IT", { hour12: false }) +
+      "." + String(d.getUTCMilliseconds()).padStart(3, "0");
+    return { timestamp, lapNumber, acronym: chartDrivers[0].acronym, pinned: clickedTime != null };
+  }, [activeDate, chartDrivers, driverStates, clickedTime]);
+
   // Lap table data
   const driversLaps = useMemo(
     () =>
