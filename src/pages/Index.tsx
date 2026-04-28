@@ -240,52 +240,44 @@ export default function Index() {
                     ]);
                     if (!pLaps.length || !pStints.length) continue;
 
-                    // Detect long runs with min 3 laps
+                    // Practice compound models — fully delegated to the main engine.
                     const pitInLaps: PitData[] = pStints
                       .slice(0, -1)
                       .map((s) => ({ lap_number: s.lap_end } as PitData));
                     const longRuns = detectLongRuns(
                       driverNumber, driver.name_acronym, "ffffff",
-                      pLaps, pStints, pitInLaps, 3
+                      pLaps, pStints, pitInLaps, 5,
                     );
-                    const validRuns = longRuns.filter((lr) => lr.isLongRun);
+                    const validRuns = longRuns.filter((lr) => lr.isValidLongRun);
 
                     for (const lr of validRuns) {
-                      // Use the long run degradation slope and calculate intercept
-                      const runLaps = pLaps.filter(
-                        (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun && l.lap_duration != null
-                      );
-                      if (runLaps.length < 3) continue;
-
                       const originalStint = pStints.find((s) => s.stint_number === lr.stintNumber);
                       if (!originalStint) continue;
 
-                      const xs = runLaps.map((l) => (originalStint.tyre_age_at_start ?? 0) + (l.lap_number - originalStint.lap_start));
-                      const ys = runLaps.map((l) => l.lap_duration!);
-                      const n = xs.length;
-                      let sx = 0, sy = 0, sxy = 0, sxx = 0;
-                      for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; sxy += xs[i] * ys[i]; sxx += xs[i] * xs[i]; }
-                      const d = n * sxx - sx * sx;
-                      if (d === 0) continue;
-                      const slope = (n * sxy - sx * sy) / d;
-                      const intercept = (sy - slope * sx) / n;
-                      const yMean = sy / n;
-                      let ssTot = 0, ssRes = 0;
-                      for (let i = 0; i < n; i++) {
-                        ssTot += (ys[i] - yMean) ** 2;
-                        ssRes += (ys[i] - (slope * xs[i] + intercept)) ** 2;
-                      }
-                      const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+                      const virtualStint: StintData = {
+                        ...originalStint,
+                        lap_start: lr.lapStartLongRun,
+                        lap_end: lr.lapEndLongRun,
+                      };
+                      const runLaps = pLaps.filter(
+                        (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun,
+                      );
 
-                      // Only add if not already present with better R²
+                      const degResults = calculateTyreDegradation(
+                        driverNumber, driver.name_acronym, "ffffff",
+                        runLaps, [virtualStint],
+                      );
+                      if (!degResults.length) continue;
+                      const deg = degResults[0];
+
                       const existing = practiceModels.find((m) => m.compound === lr.compound);
-                      if (!existing || rSquared > existing.rSquared) {
+                      if (!existing || deg.rSquared > existing.rSquared) {
                         practiceModels = practiceModels.filter((m) => m.compound !== lr.compound);
                         practiceModels.push({
                           compound: lr.compound,
-                          slope,
-                          intercept,
-                          rSquared,
+                          slope: deg.slopeSecPerLap,
+                          intercept: deg.intercept,
+                          rSquared: deg.rSquared,
                           source: ps.session_name,
                         });
                       }

@@ -48,6 +48,7 @@ import { classifyLapsWeather } from "./weatherClassification";
 import { classifyLapsTrackStatus } from "./trackStatusClassification";
 import { buildRaceDiary, type DiaryEvent } from "./raceDiary";
 import { detectLongRuns } from "./longRunDetector";
+import { calculateTyreDegradation } from "./tyreDegradation";
 import type { RiskMode } from "./riskAppetite";
 
 export interface VreLoaderInput {
@@ -173,7 +174,10 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     } catch { /* optional */ }
     out.diaryEvents = diary;
 
-    // Practice compound models from same meeting
+    // Practice compound models from same meeting — fully delegated to the main
+    // engine. detectLongRuns identifies the consecutive candidate sequence,
+    // calculateTyreDegradation returns statistically validated parameters.
+    // No inline regression here.
     const practiceModels: PracticeCompoundModel[] = [];
     if (meetingKey) {
       try {
@@ -190,46 +194,53 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
             ]);
             if (!pLaps.length || !pStints.length) continue;
 
-            const pitInLaps: PitData[] = pStints
+            const pitInLapsForPractice: PitData[] = pStints
               .slice(0, -1)
               .map((s) => ({ lap_number: s.lap_end } as PitData));
             const longRuns = detectLongRuns(
               driverNumber, driver.name_acronym, "ffffff",
-              pLaps, pStints, pitInLaps, 3
+              pLaps, pStints, pitInLapsForPractice,
+              5,
             );
-            const validRuns = longRuns.filter((lr) => lr.isLongRun);
+            const validRuns = longRuns.filter((lr) => lr.isValidLongRun);
 
             for (const lr of validRuns) {
-              const runLaps = pLaps.filter(
-                (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun && l.lap_duration != null
-              );
-              if (runLaps.length < 3) continue;
-
               const originalStint = pStints.find((s) => s.stint_number === lr.stintNumber);
               if (!originalStint) continue;
 
-              const xs = runLaps.map((l) => (originalStint.tyre_age_at_start ?? 0) + (l.lap_number - originalStint.lap_start));
-              const ys = runLaps.map((l) => l.lap_duration!);
-              const n = xs.length;
-              let sx = 0, sy = 0, sxy = 0, sxx = 0;
-              for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; sxy += xs[i] * ys[i]; sxx += xs[i] * xs[i]; }
-              const d = n * sxx - sx * sx;
-              if (d === 0) continue;
-              const slope = (n * sxy - sx * sy) / d;
-              const intercept = (sy - slope * sx) / n;
-              const yMean = sy / n;
-              let ssTot = 0, ssRes = 0;
-              for (let i = 0; i < n; i++) {
-                ssTot += (ys[i] - yMean) ** 2;
-                ssRes += (ys[i] - (slope * xs[i] + intercept)) ** 2;
-              }
-              const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+              const virtualStint: StintData = {
+                ...originalStint,
+                lap_start: lr.lapStartLongRun,
+                lap_end: lr.lapEndLongRun,
+              };
+              const runLaps = pLaps.filter(
+                (l) => l.lap_number >= lr.lapStartLongRun && l.lap_number <= lr.lapEndLongRun,
+              );
+
+              const degResults = calculateTyreDegradation(
+                driverNumber, driver.name_acronym, "ffffff",
+                runLaps, [virtualStint],
+              );
+              if (!degResults.length) continue;
+              const deg = degResults[0];
 
               const existingIdx = practiceModels.findIndex((m) => m.compound === lr.compound);
               if (existingIdx === -1) {
-                practiceModels.push({ compound: lr.compound, slope, intercept, rSquared, source: ps.session_name });
-              } else if (rSquared > practiceModels[existingIdx].rSquared) {
-                practiceModels[existingIdx] = { compound: lr.compound, slope, intercept, rSquared, source: ps.session_name };
+                practiceModels.push({
+                  compound: lr.compound,
+                  slope: deg.slopeSecPerLap,
+                  intercept: deg.intercept,
+                  rSquared: deg.rSquared,
+                  source: ps.session_name,
+                });
+              } else if (deg.rSquared > practiceModels[existingIdx].rSquared) {
+                practiceModels[existingIdx] = {
+                  compound: lr.compound,
+                  slope: deg.slopeSecPerLap,
+                  intercept: deg.intercept,
+                  rSquared: deg.rSquared,
+                  source: ps.session_name,
+                };
               }
             }
           } catch { /* skip individual practice errors */ }
