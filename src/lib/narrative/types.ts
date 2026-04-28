@@ -28,7 +28,11 @@ export type NarrativeCategory =
   | "overtake_difficulty"
   | "cliff"
   | "pit_window"
-  | "diary";
+  | "diary"
+  // Pre-race analysis (Strada C)
+  | "pre_race_compound_stress"
+  | "pre_race_watch"
+  | "pre_race_quali_anomaly";
 
 export type NarrativePriority = "critical" | "supporting" | "context";
 

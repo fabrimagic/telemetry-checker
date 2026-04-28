@@ -112,6 +112,27 @@ function bucketFor(
       if (s === "NEUTRAL") return "moderate";
       return "mild";
     }
+    case "pre_race_compound_stress": {
+      const variability = data.variability;
+      const sampleConfidence = data.sample_confidence;
+      if (variability === "VARIABILE") return "mild";
+      if (variability === "COERENTE" && sampleConfidence === "HIGH") return "strong";
+      if (variability === "COERENTE" && sampleConfidence === "MEDIUM") return "moderate";
+      return null; // LOW sample → no narrative
+    }
+    case "pre_race_watch": {
+      const signal = data.signal;
+      if (signal === "POSITIVE") return "strong";
+      if (signal === "NEGATIVE") return "moderate";
+      if (signal === "NEUTRAL") return "mild";
+      return null;
+    }
+    case "pre_race_quali_anomaly": {
+      const classification = data.classification;
+      if (classification === "UNDER_QUALIFIER") return "strong";
+      if (classification === "OVER_QUALIFIER") return "moderate";
+      return null; // ALIGNED / NO_QUALI_DATA → no narrative
+    }
     default:
       return null;
   }
@@ -255,6 +276,75 @@ const TEMPLATES: Partial<Record<NarrativeCategory, CategoryTemplates>> = {
         "Stima di degrado dello stint {stint} ({compound}) entro la norma",
         "Stint {stint} ({compound}): degrado coerente con il modello atteso",
         "Degrado dello stint {stint} ({compound}) regolare, usato pienamente nel modello",
+      ],
+    },
+  },
+  pre_race_compound_stress: {
+    strong: {
+      variants: [
+        "{compound}: degrado coerente tra {drivers_count} piloti, slope mediana {slope_median} s/giro",
+        "{compound} con comportamento omogeneo: {drivers_count} piloti, mediana {slope_median} s/giro, IQR ridotto",
+        "Pattern {compound} chiaro: {drivers_count} piloti convergenti su slope mediana {slope_median} s/giro",
+      ],
+    },
+    moderate: {
+      variants: [
+        "{compound}: comportamento coerente ma campione limitato ({drivers_count} piloti), slope mediana {slope_median} s/giro",
+        "{compound} sembra coerente ({drivers_count} piloti), mediana {slope_median} s/giro — campione da consolidare",
+        "Indicazione {compound}: slope mediana {slope_median} s/giro su {drivers_count} piloti, conferma da attendere con più dati",
+      ],
+    },
+    mild: {
+      variants: [
+        "{compound}: degrado disomogeneo tra i {drivers_count} piloti (IQR {slope_iqr} s/giro)",
+        "{compound} con risposta variabile: spread ampio della slope tra piloti (IQR {slope_iqr} s/giro)",
+        "Pattern {compound} non univoco: {drivers_count} piloti con comportamenti diversi (IQR {slope_iqr} s/giro)",
+      ],
+    },
+  },
+  pre_race_watch: {
+    strong: {
+      variants: [
+        "{acronym} da osservare: {reason}",
+        "Possibile sorpresa positiva da {acronym}: {reason}",
+        "{acronym} candidato a brillare in gara: {reason}",
+      ],
+    },
+    moderate: {
+      variants: [
+        "{acronym} potenzialmente fragile: {reason}",
+        "Attenzione su {acronym} in gara: {reason}",
+        "{acronym} con segnale di vulnerabilità: {reason}",
+      ],
+    },
+    mild: {
+      variants: [
+        "Nota su {acronym}: {reason}",
+        "{acronym} osservato: {reason}",
+        "Spunto da {acronym}: {reason}",
+      ],
+    },
+  },
+  pre_race_quali_anomaly: {
+    strong: {
+      variants: [
+        "{acronym} parte {qualifying_position}° ma ha mostrato il {pace_rank}° miglior passo: candidato a recuperare {position_delta_abs} posizioni",
+        "{acronym} con passo da {pace_rank}° posizione, partirà {qualifying_position}°: rimonta probabile",
+        "Sottoperformance in qualifica per {acronym}: {pace_rank}° in pace gara, {qualifying_position}° in griglia",
+      ],
+    },
+    moderate: {
+      variants: [
+        "{acronym} parte {qualifying_position}° ma in pace gara è {pace_rank}°: rischio di scivolare",
+        "{acronym} setup ottimizzato per giro singolo: {qualifying_position}° in griglia ma {pace_rank}° in pace",
+        "Vulnerabilità per {acronym}: posizione griglia {qualifying_position}° non riflette il passo ({pace_rank}°)",
+      ],
+    },
+    mild: {
+      variants: [
+        "Allineamento per {acronym} ({qualifying_position}° vs {pace_rank}°)",
+        "{acronym} in linea ({qualifying_position}° / {pace_rank}°)",
+        "Coerenza qualifica-passo per {acronym}",
       ],
     },
   },
