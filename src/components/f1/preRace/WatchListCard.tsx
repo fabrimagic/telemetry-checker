@@ -44,7 +44,10 @@ export function WatchListCard({ watchList, insights }: Props) {
       <CardHeader>
         <CardTitle className="text-lg">Watch List</CardTitle>
         <CardDescription>
-          Piloti e situazioni da monitorare in gara basandosi sull'analisi pre-race.
+          Piloti e situazioni che meritano attenzione durante la gara, sulla base dell'analisi
+          pre-race. Possibili sorprese positive (ottimo passo nei long run), vulnerabilità
+          (degrado peggiore della media), o stint particolarmente lunghi che indicano una
+          buona simulazione gara da parte della squadra.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
