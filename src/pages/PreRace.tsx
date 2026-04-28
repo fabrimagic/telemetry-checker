@@ -130,7 +130,7 @@ export default function PreRace() {
               <Loader2 className="h-4 w-4 animate-spin" />
               {loadingDrivers
                 ? "Caricamento piloti…"
-                : "Analisi long run di pratica in corso (può richiedere 30–60s la prima volta)…"}
+                : "Analisi long run di pratica in corso (può richiedere fino a 10 minuti la prima volta)…"}
             </div>
             <Skeleton className="h-32" />
             <Skeleton className="h-48" />
