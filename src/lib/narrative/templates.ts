@@ -282,62 +282,62 @@ const TEMPLATES: Partial<Record<NarrativeCategory, CategoryTemplates>> = {
   pre_race_compound_stress: {
     strong: {
       variants: [
-        "{compound}: degrado coerente tra {drivers_count} piloti, slope mediana {slope_median} s/giro",
-        "{compound} con comportamento omogeneo: {drivers_count} piloti, mediana {slope_median} s/giro, IQR ridotto",
-        "Pattern {compound} chiaro: {drivers_count} piloti convergenti su slope mediana {slope_median} s/giro",
+        "{compound}: i {drivers_count} piloti analizzati mostrano un comportamento omogeneo, con una perdita media di {slope_median} s/giro. È un dato solido per ipotizzare il passo gara su questa mescola.",
+        "Pattern chiaro su {compound}: tutti i {drivers_count} piloti convergono su un degrado di circa {slope_median} s/giro. Ci si aspetta un comportamento prevedibile in gara.",
+        "{compound} con risposta uniforme tra i {drivers_count} piloti, slope mediana {slope_median} s/giro. Buona base per pianificare le strategie.",
       ],
     },
     moderate: {
       variants: [
-        "{compound}: comportamento coerente ma campione limitato ({drivers_count} piloti), slope mediana {slope_median} s/giro",
-        "{compound} sembra coerente ({drivers_count} piloti), mediana {slope_median} s/giro — campione da consolidare",
-        "Indicazione {compound}: slope mediana {slope_median} s/giro su {drivers_count} piloti, conferma da attendere con più dati",
+        "{compound}: i {drivers_count} piloti che hanno fatto long run mostrano una tendenza coerente (slope mediana {slope_median} s/giro), ma il campione è limitato — la conferma arriverà in gara.",
+        "Indicazione su {compound}: con {drivers_count} piloti e slope mediana {slope_median} s/giro, si vede un pattern, ma servirebbero più dati per essere certi.",
+        "{compound} sembra avere un comportamento regolare ({slope_median} s/giro su {drivers_count} piloti), ma il campione ridotto invita a cautela.",
       ],
     },
     mild: {
       variants: [
-        "{compound}: degrado disomogeneo tra i {drivers_count} piloti (IQR {slope_iqr} s/giro)",
-        "{compound} con risposta variabile: spread ampio della slope tra piloti (IQR {slope_iqr} s/giro)",
-        "Pattern {compound} non univoco: {drivers_count} piloti con comportamenti diversi (IQR {slope_iqr} s/giro)",
+        "{compound}: i {drivers_count} piloti reagiscono in modo molto diverso (IQR {slope_iqr} s/giro). Difficile fare previsioni univoche — molto dipenderà dallo stile di guida e dal setup.",
+        "Risposta non uniforme su {compound}: spread ampio tra i piloti (IQR {slope_iqr} s/giro). Alcuni team hanno trovato la quadra, altri stanno ancora cercando.",
+        "{compound} si comporta diversamente da pilota a pilota (IQR {slope_iqr} s/giro). Aspettarsi gestione gomma differenziata in gara.",
       ],
     },
   },
   pre_race_watch: {
     strong: {
       variants: [
-        "{acronym} da osservare: {reason}",
-        "Possibile sorpresa positiva da {acronym}: {reason}",
-        "{acronym} candidato a brillare in gara: {reason}",
+        "{acronym} è da tenere d'occhio: {reason}. Potrebbe sorprendere in positivo durante la gara.",
+        "Segnale positivo da {acronym}: {reason}. Se questo passo si conferma, può essere protagonista.",
+        "Possibile outsider {acronym}: {reason}. La pratica suggerisce un potenziale superiore alla griglia di partenza.",
       ],
     },
     moderate: {
       variants: [
-        "{acronym} potenzialmente fragile: {reason}",
-        "Attenzione su {acronym} in gara: {reason}",
-        "{acronym} con segnale di vulnerabilità: {reason}",
+        "Attenzione su {acronym}: {reason}. C'è il rischio di scivolare durante la gara.",
+        "{acronym} mostra un segnale di vulnerabilità: {reason}. Il passo gara potrebbe non reggere fino alla fine.",
+        "Punto debole per {acronym}: {reason}. La gestione gomma in gara sarà critica.",
       ],
     },
     mild: {
       variants: [
-        "Nota su {acronym}: {reason}",
-        "{acronym} osservato: {reason}",
-        "Spunto da {acronym}: {reason}",
+        "Da segnalare su {acronym}: {reason}. Un dato che può essere utile interpretare nel contesto della gara.",
+        "Osservazione su {acronym}: {reason}. Non per forza positiva o negativa, ma significativa.",
+        "Spunto da {acronym}: {reason}. Vale la pena osservarlo per capire il quadro completo.",
       ],
     },
   },
   pre_race_quali_anomaly: {
     strong: {
       variants: [
-        "{acronym} parte {qualifying_position}° ma ha mostrato il {pace_rank}° miglior passo: candidato a recuperare {position_delta_abs} posizioni",
-        "{acronym} con passo da {pace_rank}° posizione, partirà {qualifying_position}°: rimonta probabile",
-        "Sottoperformance in qualifica per {acronym}: {pace_rank}° in pace gara, {qualifying_position}° in griglia",
+        "{acronym} parte {qualifying_position}° ma ha il {pace_rank}° miglior passo gara. Può recuperare fino a {position_delta_abs} posizioni se la gara fila liscia, senza neutralizzazioni che congelino i distacchi.",
+        "Sottoperformance in qualifica per {acronym}: {pace_rank}° nei long run, ma {qualifying_position}° in griglia. Da seguire come potenziale rimontatore.",
+        "{acronym} ha un passo gara da {pace_rank}° posizione, ma partirà {qualifying_position}°. La differenza di {position_delta_abs} posizioni è il margine di rimonta che la pratica suggerisce.",
       ],
     },
     moderate: {
       variants: [
-        "{acronym} parte {qualifying_position}° ma in pace gara è {pace_rank}°: rischio di scivolare",
-        "{acronym} setup ottimizzato per giro singolo: {qualifying_position}° in griglia ma {pace_rank}° in pace",
-        "Vulnerabilità per {acronym}: posizione griglia {qualifying_position}° non riflette il passo ({pace_rank}°)",
+        "{acronym} parte {qualifying_position}° ma in pace gara è solo {pace_rank}°. Setup probabilmente ottimizzato per il giro singolo: in gara potrebbe scivolare di {position_delta_abs} posizioni.",
+        "Vulnerabilità per {acronym}: la posizione in griglia ({qualifying_position}°) non riflette il passo nei long run ({pace_rank}°). Difficile difenderla per tutta la gara.",
+        "{acronym} ha brillato in qualifica ({qualifying_position}°) ma il passo nei long run è da {pace_rank}° posizione. Aspettarsi pressione sui rivali nelle fasi centrali.",
       ],
     },
     mild: {

@@ -140,6 +140,19 @@ export default function PreRace() {
 
         {analysis && !analysis.error && (
           <div className="space-y-6">
+            <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                Durante il weekend di gara, le squadre usano le pratiche per fare "long run",
+                cioè sequenze di giri consecutivi che simulano il passo gara reale. Pitwall
+                analizza questi long run cross-pilota per costruire un'idea di chi avrà il
+                passo migliore in gara, indipendentemente dalla posizione di qualifica. Le
+                quattro sezioni sotto mostrano: chi è veloce sul lungo, come reagiscono le
+                mescole, quali piloti hanno qualificato meglio o peggio del loro passo gara, e
+                chi tenere d'occhio. I dati provengono da OpenF1; le analisi sono solo
+                indicative.
+              </p>
+            </div>
+
             <div className="rounded-md border border-border bg-muted/30 px-4 py-3 space-y-2">
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <span>
