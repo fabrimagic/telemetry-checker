@@ -1,4 +1,52 @@
+import { readCache, writeCache } from "./clientCache";
+
 const BASE = "https://api.openf1.org/v1";
+
+// ---------------------------------------------------------------------------
+// Global client-side cache for OpenF1 responses.
+//
+// Goal: minimize 429s under high load by deduping identical requests.
+// Two layers:
+//  1) In-flight dedup (Map<path, Promise>): if N components request the same
+//     path concurrently, only ONE network call is made; all callers await the
+//     same Promise. Cleared when the promise settles.
+//  2) Persistent cache via sessionStorage (clientCache.ts), with a TTL chosen
+//     per endpoint family. Endpoints that are immutable once a session is
+//     finished (laps, stints, pit, weather of past sessions, etc.) get a long
+//     TTL; live/standings get a short TTL.
+//
+// Cache key = full path (already contains all query params → deterministic).
+// On error: never cache; on 429: backoff is unchanged (handled below).
+// Logic and call sites are untouched — only fetchApi is wrapped.
+// ---------------------------------------------------------------------------
+
+const CACHE_PREFIX = "pitwall:openf1:";
+
+// TTL families (ms). Past-session telemetry is effectively immutable; we still
+// cap with sessionStorage lifetime (cleared on tab close) for safety.
+const TTL_LONG = 60 * 60 * 1000;       // 1h — immutable per-session datasets
+const TTL_MEDIUM = 10 * 60 * 1000;     // 10min — calendars, standings
+const TTL_SHORT = 30 * 1000;           // 30s — live-ish data (intervals, positions)
+
+function ttlForPath(path: string): number {
+  // Live/streaming endpoints — short TTL so live updates aren't stale.
+  if (path.startsWith("/intervals")) return TTL_SHORT;
+  if (path.startsWith("/position?")) return TTL_SHORT;
+  if (path.startsWith("/race_control")) return TTL_SHORT;
+  // Calendars and championship standings change at most weekly.
+  if (path.startsWith("/sessions")) return TTL_MEDIUM;
+  if (path.startsWith("/championship_")) return TTL_MEDIUM;
+  // Everything else (laps, car_data, location, weather, stints, pit, drivers,
+  // session_result, starting_grid, overtakes) is immutable post-session.
+  return TTL_LONG;
+}
+
+function cacheKey(path: string): string {
+  return `${CACHE_PREFIX}${path}`;
+}
+
+// In-flight dedup map. Same path → same Promise.
+const inFlight = new Map<string, Promise<unknown>>();
 
 export interface Driver {
   driver_number: number;
@@ -156,7 +204,7 @@ function reserveSlot(): number {
   return candidate;
 }
 
-async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
+async function fetchApiUncached<T>(path: string, retries = MAX_RETRIES): Promise<T> {
   const scheduledTime = reserveSlot();
   const delay = scheduledTime - Date.now();
   if (delay > 0) {
@@ -177,7 +225,7 @@ async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
       const attempt = MAX_RETRIES - retries;
       const backoff = 800 * Math.pow(2, attempt); // 800, 1600, 3200, 6400
       await new Promise((r) => setTimeout(r, backoff));
-      return fetchApi<T>(path, retries - 1);
+      return fetchApiUncached<T>(path, retries - 1);
     }
     throw networkErr;
   }
@@ -192,10 +240,42 @@ async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
     scheduled.sort((a, b) => a - b);
     console.debug(`[openf1] 429 received, backing off ${backoff}ms for ${path}`);
     await new Promise((r) => setTimeout(r, backoff));
-    return fetchApi<T>(path, retries - 1);
+    return fetchApiUncached<T>(path, retries - 1);
   }
   if (!res.ok) throw new Error(`OpenF1 API error: ${res.status}`);
   return res.json();
+}
+
+/**
+ * Public fetch wrapper used by every endpoint helper below.
+ * Adds two layers on top of the rate-limited network fetch:
+ *  - sessionStorage cache (TTL per endpoint family)
+ *  - in-flight Promise dedup (concurrent identical requests share one fetch)
+ * On error: nothing is cached and the in-flight entry is cleared so the next
+ * caller can retry cleanly.
+ */
+async function fetchApi<T>(path: string): Promise<T> {
+  // 1) Persistent cache hit?
+  const cached = readCache<T>(cacheKey(path), ttlForPath(path));
+  if (cached !== null) return cached;
+
+  // 2) In-flight dedup: another caller already fetching the same path?
+  const pending = inFlight.get(path) as Promise<T> | undefined;
+  if (pending) return pending;
+
+  // 3) Cold path: fire the network request and register the in-flight Promise.
+  const promise = (async () => {
+    try {
+      const data = await fetchApiUncached<T>(path);
+      writeCache(cacheKey(path), data);
+      return data;
+    } finally {
+      inFlight.delete(path);
+    }
+  })();
+
+  inFlight.set(path, promise);
+  return promise;
 }
 
 export function getDrivers(sessionKey: number) {
@@ -377,8 +457,23 @@ export function getChampionshipTeams(sessionKey: number) {
   );
 }
 
-/** Test-only helper. Resets the rate limiter's internal state.
+/** Test-only helper. Resets the rate limiter's internal state, the in-flight
+ *  dedup map, and any cached OpenF1 entries in sessionStorage.
  *  Production code MUST NOT call this. */
 export function __resetRateLimiterForTests(): void {
   scheduled.length = 0;
+  inFlight.clear();
+  try {
+    if (typeof window !== "undefined" && window.sessionStorage) {
+      const store = window.sessionStorage;
+      const toRemove: string[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && k.startsWith(CACHE_PREFIX)) toRemove.push(k);
+      }
+      toRemove.forEach((k) => store.removeItem(k));
+    }
+  } catch {
+    /* ignore */
+  }
 }
