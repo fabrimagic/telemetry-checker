@@ -457,8 +457,23 @@ export function getChampionshipTeams(sessionKey: number) {
   );
 }
 
-/** Test-only helper. Resets the rate limiter's internal state.
+/** Test-only helper. Resets the rate limiter's internal state, the in-flight
+ *  dedup map, and any cached OpenF1 entries in sessionStorage.
  *  Production code MUST NOT call this. */
 export function __resetRateLimiterForTests(): void {
   scheduled.length = 0;
+  inFlight.clear();
+  try {
+    if (typeof window !== "undefined" && window.sessionStorage) {
+      const store = window.sessionStorage;
+      const toRemove: string[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && k.startsWith(CACHE_PREFIX)) toRemove.push(k);
+      }
+      toRemove.forEach((k) => store.removeItem(k));
+    }
+  } catch {
+    /* ignore */
+  }
 }
