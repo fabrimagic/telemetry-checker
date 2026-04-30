@@ -326,6 +326,9 @@ export interface SessionInfo {
   session_name: string;
   meeting_key: number;
   date_start: string;
+  date_end?: string;
+  location?: string;
+  country_name?: string;
 }
 
 export function getSessionsByMeetingKey(meetingKey: number) {
@@ -334,6 +337,44 @@ export function getSessionsByMeetingKey(meetingKey: number) {
 
 export function getAllLaps(sessionKey: number) {
   return fetchApi<Lap[]>(`/laps?session_key=${sessionKey}`);
+}
+
+export interface ChampionshipDriverStanding {
+  driver_number: number;
+  meeting_key: number;
+  session_key: number;
+  position_start: number;
+  position_current: number;
+  points_start: number;
+  points_current: number;
+}
+
+export interface ChampionshipTeamStanding {
+  team_name: string;
+  meeting_key: number;
+  session_key: number;
+  position_start: number;
+  position_current: number;
+  points_start: number;
+  points_current: number;
+}
+
+/** Returns all Race sessions for a given year. Note: includes future races
+ *  whose date_end is in the future. Caller must filter as needed. */
+export function getRaceSessionsByYear(year: number) {
+  return fetchApi<SessionInfo[]>(`/sessions?year=${year}&session_name=Race`);
+}
+
+export function getChampionshipDrivers(sessionKey: number) {
+  return fetchApi<ChampionshipDriverStanding[]>(
+    `/championship_drivers?session_key=${sessionKey}`,
+  );
+}
+
+export function getChampionshipTeams(sessionKey: number) {
+  return fetchApi<ChampionshipTeamStanding[]>(
+    `/championship_teams?session_key=${sessionKey}`,
+  );
 }
 
 /** Test-only helper. Resets the rate limiter's internal state.
