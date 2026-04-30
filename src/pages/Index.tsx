@@ -470,6 +470,7 @@ export default function Index() {
   }, [sessionKey, driverStates, selectedDriverNumbers, sessionType]);
 
   const handleReset = useCallback(() => {
+    setAnalysisMode(null);
     setSessionKey(null);
     setSessionType("");
     setAllDrivers([]);
