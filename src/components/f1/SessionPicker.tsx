@@ -96,13 +96,13 @@ export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props)
   }
 
   return (
-    <div className="max-w-md">
-      <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
-        Session
+    <div className="w-full">
+      <label className="block text-[10px] font-black text-muted-foreground mb-2 uppercase tracking-[0.25em]">
+        Seleziona Sessione
       </label>
       <Select value={selected} onValueChange={handleChange} disabled={isLoading}>
-        <SelectTrigger className="bg-muted border-border">
-          <SelectValue placeholder="Select a session" />
+        <SelectTrigger className="bg-background/60 border-border hover:border-[hsl(var(--f1-red))]/50 hover:bg-background transition-colors h-11 font-medium">
+          <SelectValue placeholder="Scegli una sessione del weekend…" />
         </SelectTrigger>
         <SelectContent className="max-h-80">
           {[...grouped.entries()].map(([event, eventSessions]) => (
