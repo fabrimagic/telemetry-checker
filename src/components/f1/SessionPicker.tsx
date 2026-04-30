@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { readCache, writeCache, CACHE_KEYS, CACHE_TTL } from "@/lib/clientCache";
 
 interface Session {
   session_key: number;
