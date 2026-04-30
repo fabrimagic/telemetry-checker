@@ -742,6 +742,7 @@ export default function Index() {
         {/* Controls */}
         <section className="flex flex-wrap gap-6 items-start">
           <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+          <ChampionshipSummaryCard />
         </section>
 
         {/* Mode Toggle */}
