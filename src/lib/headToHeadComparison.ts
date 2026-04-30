@@ -46,15 +46,38 @@ export interface HeadToHeadVerdict {
 }
 
 /**
- * Counterfactual analysis: what would have happened if BOTH drivers had executed
- * their respective "ex-ante balanced" alternative strategies (POST_RACE + BALANCED VRE).
+ * Outcome of a single counterfactual scenario.
+ *  - "only_a": only driver A switches to their alternative strategy.
+ *  - "only_b": only driver B switches to their alternative strategy.
+ *  - "both"  : both drivers switch to their respective alternatives.
  *
- * Numbers come from the alternative VRE's `recommended_strategy.time_delta_vs_actual`
- * (motorsport convention: negative = faster than actual). The counterfactual h2h delta is:
- *   counterfactual_h2h_delta = real_h2h_delta + (gain_A − gain_B)
+ * Convention (motorsport): negative seconds = faster than actual.
+ *   new (A − B) = realDelta + (appliedGainA − appliedGainB)
  *
- * This assumes per-driver simulated gains are independent — a strong simplification.
- * The `disclaimer` field is mandatory for UI rendering.
+ * `applicable=false` means the inputs required to compute this scenario are
+ * missing (e.g. alternative_b not available for "only_b" / "both"). When false,
+ * the numeric fields are null and the UI should show a disabled / fallback state.
+ */
+export interface CounterfactualScenarioOutcome {
+  applicable: boolean;
+  gain_a_seconds: number | null;
+  gain_b_seconds: number | null;
+  counterfactual_h2h_delta_seconds: number | null;
+  counterfactual_faster: "A" | "B" | "TIE" | null;
+  outcome_changed: boolean;
+}
+
+export type CounterfactualScenarioId = "only_a" | "only_b" | "both";
+
+/**
+ * Counterfactual analysis: what would have happened under three independent
+ * scenarios (only A switches, only B switches, both switch) to the "ex-ante
+ * balanced" alternative strategy from the second VRE pass.
+ *
+ * Backward-compatible top-level fields (`gain_a_seconds`, `gain_b_seconds`,
+ * `counterfactual_h2h_delta_seconds`, `counterfactual_faster`,
+ * `outcome_changed`) mirror the "both" scenario when applicable, otherwise the
+ * first applicable scenario.
  */
 export interface CounterfactualAnalysis {
   gain_a_seconds: number | null;
@@ -65,6 +88,11 @@ export interface CounterfactualAnalysis {
   outcome_changed: boolean;
   confidence: Confidence;
   disclaimer: string;
+  scenarios: {
+    only_a: CounterfactualScenarioOutcome;
+    only_b: CounterfactualScenarioOutcome;
+    both: CounterfactualScenarioOutcome;
+  };
 }
 
 export interface ComparisonResult {
