@@ -46,15 +46,38 @@ export interface HeadToHeadVerdict {
 }
 
 /**
- * Counterfactual analysis: what would have happened if BOTH drivers had executed
- * their respective "ex-ante balanced" alternative strategies (POST_RACE + BALANCED VRE).
+ * Outcome of a single counterfactual scenario.
+ *  - "only_a": only driver A switches to their alternative strategy.
+ *  - "only_b": only driver B switches to their alternative strategy.
+ *  - "both"  : both drivers switch to their respective alternatives.
  *
- * Numbers come from the alternative VRE's `recommended_strategy.time_delta_vs_actual`
- * (motorsport convention: negative = faster than actual). The counterfactual h2h delta is:
- *   counterfactual_h2h_delta = real_h2h_delta + (gain_A − gain_B)
+ * Convention (motorsport): negative seconds = faster than actual.
+ *   new (A − B) = realDelta + (appliedGainA − appliedGainB)
  *
- * This assumes per-driver simulated gains are independent — a strong simplification.
- * The `disclaimer` field is mandatory for UI rendering.
+ * `applicable=false` means the inputs required to compute this scenario are
+ * missing (e.g. alternative_b not available for "only_b" / "both"). When false,
+ * the numeric fields are null and the UI should show a disabled / fallback state.
+ */
+export interface CounterfactualScenarioOutcome {
+  applicable: boolean;
+  gain_a_seconds: number | null;
+  gain_b_seconds: number | null;
+  counterfactual_h2h_delta_seconds: number | null;
+  counterfactual_faster: "A" | "B" | "TIE" | null;
+  outcome_changed: boolean;
+}
+
+export type CounterfactualScenarioId = "only_a" | "only_b" | "both";
+
+/**
+ * Counterfactual analysis: what would have happened under three independent
+ * scenarios (only A switches, only B switches, both switch) to the "ex-ante
+ * balanced" alternative strategy from the second VRE pass.
+ *
+ * Backward-compatible top-level fields (`gain_a_seconds`, `gain_b_seconds`,
+ * `counterfactual_h2h_delta_seconds`, `counterfactual_faster`,
+ * `outcome_changed`) mirror the "both" scenario when applicable, otherwise the
+ * first applicable scenario.
  */
 export interface CounterfactualAnalysis {
   gain_a_seconds: number | null;
@@ -65,6 +88,11 @@ export interface CounterfactualAnalysis {
   outcome_changed: boolean;
   confidence: Confidence;
   disclaimer: string;
+  scenarios: {
+    only_a: CounterfactualScenarioOutcome;
+    only_b: CounterfactualScenarioOutcome;
+    both: CounterfactualScenarioOutcome;
+  };
 }
 
 export interface ComparisonResult {
@@ -311,37 +339,73 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     if (niB) factors.push(`${resultB.driver_acronym}: ${niB}`);
   }
 
-  // Counterfactual analysis (only when both alternatives are provided)
+  // Counterfactual analysis (rendered when at least one alternative is provided)
   let counterfactual: CounterfactualAnalysis | null = null;
-  if (alternativeA && alternativeB) {
-    // recommended_strategy.time_delta_vs_actual: negative = faster than actual (motorsport convention)
-    const gainA = Number.isFinite(alternativeA.recommended_strategy.time_delta_vs_actual)
-      ? alternativeA.recommended_strategy.time_delta_vs_actual : null;
-    const gainB = Number.isFinite(alternativeB.recommended_strategy.time_delta_vs_actual)
-      ? alternativeB.recommended_strategy.time_delta_vs_actual : null;
+  if (alternativeA || alternativeB) {
+    const gainA = alternativeA && Number.isFinite(alternativeA.recommended_strategy.time_delta_vs_actual)
+      ? (alternativeA.recommended_strategy.time_delta_vs_actual as number) : null;
+    const gainB = alternativeB && Number.isFinite(alternativeB.recommended_strategy.time_delta_vs_actual)
+      ? (alternativeB.recommended_strategy.time_delta_vs_actual as number) : null;
 
     const realDelta = totalDelta; // signed (A − B); negative = A faster
-    let cfDelta: number | null = null;
-    let cfFaster: "A" | "B" | "TIE" | null = null;
-    let outcomeChanged = false;
 
-    if (gainA != null && gainB != null) {
-      // If A switches to alt → A's time changes by gainA. B switches → B's by gainB.
-      // New (A − B) = realDelta + (gainA − gainB)
-      cfDelta = realDelta + (gainA - gainB);
-      cfFaster = Math.abs(cfDelta) <= 0.5 ? "TIE" : (cfDelta < 0 ? "A" : "B");
-      outcomeChanged = cfFaster !== faster;
-    }
+    const buildScenario = (applyA: boolean, applyB: boolean): CounterfactualScenarioOutcome => {
+      const needAOk = !applyA || (alternativeA != null && gainA != null);
+      const needBOk = !applyB || (alternativeB != null && gainB != null);
+      const applicable = needAOk && needBOk;
+      if (!applicable) {
+        return {
+          applicable: false,
+          gain_a_seconds: applyA ? gainA : 0,
+          gain_b_seconds: applyB ? gainB : 0,
+          counterfactual_h2h_delta_seconds: null,
+          counterfactual_faster: null,
+          outcome_changed: false,
+        };
+      }
+      const appliedGainA = applyA ? (gainA as number) : 0;
+      const appliedGainB = applyB ? (gainB as number) : 0;
+      const cfDelta = realDelta + (appliedGainA - appliedGainB);
+      const cfFaster: "A" | "B" | "TIE" =
+        Math.abs(cfDelta) <= 0.5 ? "TIE" : (cfDelta < 0 ? "A" : "B");
+      return {
+        applicable: true,
+        gain_a_seconds: applyA ? (gainA as number) : 0,
+        gain_b_seconds: applyB ? (gainB as number) : 0,
+        counterfactual_h2h_delta_seconds: cfDelta,
+        counterfactual_faster: cfFaster,
+        outcome_changed: cfFaster !== faster,
+      };
+    };
+
+    const scenarios = {
+      only_a: buildScenario(true, false),
+      only_b: buildScenario(false, true),
+      both: buildScenario(true, true),
+    };
+
+    const primary: CounterfactualScenarioOutcome =
+      scenarios.both.applicable ? scenarios.both
+      : scenarios.only_a.applicable ? scenarios.only_a
+      : scenarios.only_b.applicable ? scenarios.only_b
+      : { applicable: false, gain_a_seconds: gainA, gain_b_seconds: gainB,
+          counterfactual_h2h_delta_seconds: null, counterfactual_faster: null, outcome_changed: false };
+
+    const confidenceVal: Confidence =
+      alternativeA && alternativeB
+        ? confidenceMin(alternativeA.confidence, alternativeB.confidence)
+        : (alternativeA?.confidence ?? alternativeB?.confidence ?? "LOW");
 
     counterfactual = {
       gain_a_seconds: gainA,
       gain_b_seconds: gainB,
       real_h2h_delta_seconds: realDelta,
-      counterfactual_h2h_delta_seconds: cfDelta,
-      counterfactual_faster: cfFaster,
-      outcome_changed: outcomeChanged,
-      confidence: confidenceMin(alternativeA.confidence, alternativeB.confidence),
-      disclaimer: "Stima teorica: assume che entrambe le alternative siano applicate simultaneamente e indipendentemente. Non considera le reazioni avversarie, l'effetto undercut/overcut sui rivali esterni al confronto, né la disponibilità reale di mescole nuove.",
+      counterfactual_h2h_delta_seconds: primary.counterfactual_h2h_delta_seconds,
+      counterfactual_faster: primary.counterfactual_faster,
+      outcome_changed: primary.outcome_changed,
+      confidence: confidenceVal,
+      disclaimer: "Stima teorica: assume che le alternative siano applicate in modo indipendente. Non considera le reazioni avversarie, l'effetto undercut/overcut sui rivali esterni al confronto, né la disponibilità reale di mescole nuove.",
+      scenarios,
     };
   }
 
