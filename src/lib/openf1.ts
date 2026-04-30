@@ -1,4 +1,52 @@
+import { readCache, writeCache } from "./clientCache";
+
 const BASE = "https://api.openf1.org/v1";
+
+// ---------------------------------------------------------------------------
+// Global client-side cache for OpenF1 responses.
+//
+// Goal: minimize 429s under high load by deduping identical requests.
+// Two layers:
+//  1) In-flight dedup (Map<path, Promise>): if N components request the same
+//     path concurrently, only ONE network call is made; all callers await the
+//     same Promise. Cleared when the promise settles.
+//  2) Persistent cache via sessionStorage (clientCache.ts), with a TTL chosen
+//     per endpoint family. Endpoints that are immutable once a session is
+//     finished (laps, stints, pit, weather of past sessions, etc.) get a long
+//     TTL; live/standings get a short TTL.
+//
+// Cache key = full path (already contains all query params → deterministic).
+// On error: never cache; on 429: backoff is unchanged (handled below).
+// Logic and call sites are untouched — only fetchApi is wrapped.
+// ---------------------------------------------------------------------------
+
+const CACHE_PREFIX = "pitwall:openf1:";
+
+// TTL families (ms). Past-session telemetry is effectively immutable; we still
+// cap with sessionStorage lifetime (cleared on tab close) for safety.
+const TTL_LONG = 60 * 60 * 1000;       // 1h — immutable per-session datasets
+const TTL_MEDIUM = 10 * 60 * 1000;     // 10min — calendars, standings
+const TTL_SHORT = 30 * 1000;           // 30s — live-ish data (intervals, positions)
+
+function ttlForPath(path: string): number {
+  // Live/streaming endpoints — short TTL so live updates aren't stale.
+  if (path.startsWith("/intervals")) return TTL_SHORT;
+  if (path.startsWith("/position?")) return TTL_SHORT;
+  if (path.startsWith("/race_control")) return TTL_SHORT;
+  // Calendars and championship standings change at most weekly.
+  if (path.startsWith("/sessions")) return TTL_MEDIUM;
+  if (path.startsWith("/championship_")) return TTL_MEDIUM;
+  // Everything else (laps, car_data, location, weather, stints, pit, drivers,
+  // session_result, starting_grid, overtakes) is immutable post-session.
+  return TTL_LONG;
+}
+
+function cacheKey(path: string): string {
+  return `${CACHE_PREFIX}${path}`;
+}
+
+// In-flight dedup map. Same path → same Promise.
+const inFlight = new Map<string, Promise<unknown>>();
 
 export interface Driver {
   driver_number: number;
