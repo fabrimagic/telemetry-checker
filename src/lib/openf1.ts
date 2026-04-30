@@ -204,7 +204,7 @@ function reserveSlot(): number {
   return candidate;
 }
 
-async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
+async function fetchApiUncached<T>(path: string, retries = MAX_RETRIES): Promise<T> {
   const scheduledTime = reserveSlot();
   const delay = scheduledTime - Date.now();
   if (delay > 0) {
@@ -225,7 +225,7 @@ async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
       const attempt = MAX_RETRIES - retries;
       const backoff = 800 * Math.pow(2, attempt); // 800, 1600, 3200, 6400
       await new Promise((r) => setTimeout(r, backoff));
-      return fetchApi<T>(path, retries - 1);
+      return fetchApiUncached<T>(path, retries - 1);
     }
     throw networkErr;
   }
@@ -240,10 +240,42 @@ async function fetchApi<T>(path: string, retries = MAX_RETRIES): Promise<T> {
     scheduled.sort((a, b) => a - b);
     console.debug(`[openf1] 429 received, backing off ${backoff}ms for ${path}`);
     await new Promise((r) => setTimeout(r, backoff));
-    return fetchApi<T>(path, retries - 1);
+    return fetchApiUncached<T>(path, retries - 1);
   }
   if (!res.ok) throw new Error(`OpenF1 API error: ${res.status}`);
   return res.json();
+}
+
+/**
+ * Public fetch wrapper used by every endpoint helper below.
+ * Adds two layers on top of the rate-limited network fetch:
+ *  - sessionStorage cache (TTL per endpoint family)
+ *  - in-flight Promise dedup (concurrent identical requests share one fetch)
+ * On error: nothing is cached and the in-flight entry is cleared so the next
+ * caller can retry cleanly.
+ */
+async function fetchApi<T>(path: string): Promise<T> {
+  // 1) Persistent cache hit?
+  const cached = readCache<T>(cacheKey(path), ttlForPath(path));
+  if (cached !== null) return cached;
+
+  // 2) In-flight dedup: another caller already fetching the same path?
+  const pending = inFlight.get(path) as Promise<T> | undefined;
+  if (pending) return pending;
+
+  // 3) Cold path: fire the network request and register the in-flight Promise.
+  const promise = (async () => {
+    try {
+      const data = await fetchApiUncached<T>(path);
+      writeCache(cacheKey(path), data);
+      return data;
+    } finally {
+      inFlight.delete(path);
+    }
+  })();
+
+  inFlight.set(path, promise);
+  return promise;
 }
 
 export function getDrivers(sessionKey: number) {
