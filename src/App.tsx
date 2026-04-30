@@ -9,12 +9,14 @@ import Compare from "./pages/Compare.tsx";
 import PreRace from "./pages/PreRace.tsx";
 import Championship from "./pages/Championship.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import TelemetryBackground from "./components/TelemetryBackground.tsx";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <TelemetryBackground />
       <Toaster />
       <Sonner />
       <BrowserRouter>
