@@ -36,6 +36,9 @@ export default function Championship() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ChampionshipResult | null>(null);
   const [driverNameMap, setDriverNameMap] = useState<Map<number, string>>(new Map());
+  const [driverInfoMap, setDriverInfoMap] = useState<
+    Map<number, { headshot: string | null; teamColour: string | null }>
+  >(new Map());
   const [teamColorMap, setTeamColorMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
@@ -59,12 +62,18 @@ export default function Championship() {
             if (cancelled) return;
             const dMap = new Map<number, string>();
             const tMap = new Map<string, string>();
+            const iMap = new Map<number, { headshot: string | null; teamColour: string | null }>();
             for (const d of drivers) {
               dMap.set(d.driver_number, d.broadcast_name || d.name_acronym);
               if (d.team_name && d.team_colour) tMap.set(d.team_name, d.team_colour);
+              iMap.set(d.driver_number, {
+                headshot: d.headshot_url ?? null,
+                teamColour: d.team_colour ?? null,
+              });
             }
             setDriverNameMap(dMap);
             setTeamColorMap(tMap);
+            setDriverInfoMap(iMap);
           } catch {
             /* fallback */
           }
@@ -161,12 +170,33 @@ export default function Championship() {
                           const last = d.points[d.points.length - 1];
                           const display =
                             driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
+                          const info = driverInfoMap.get(d.driverNumber);
+                          const borderColor = info?.teamColour ? `#${info.teamColour}` : "hsl(var(--border))";
                           return (
                             <TableRow key={d.driverNumber}>
                               <TableCell className="font-bold">
                                 {d.currentPosition || "—"}
                               </TableCell>
-                              <TableCell className="font-mono uppercase">{display}</TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center gap-2">
+                                  {info?.headshot ? (
+                                    <img
+                                      src={info.headshot}
+                                      alt={display}
+                                      loading="lazy"
+                                      className="h-8 w-8 rounded-full object-cover border-2"
+                                      style={{ borderColor }}
+                                    />
+                                  ) : (
+                                    <span
+                                      className="h-8 w-8 rounded-full border-2 bg-muted inline-block"
+                                      style={{ borderColor }}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                  <span className="font-mono uppercase">{display}</span>
+                                </span>
+                              </TableCell>
                               <TableCell className="text-right font-bold">
                                 {d.totalPoints}
                               </TableCell>
