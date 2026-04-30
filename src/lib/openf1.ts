@@ -326,6 +326,9 @@ export interface SessionInfo {
   session_name: string;
   meeting_key: number;
   date_start: string;
+  date_end?: string;
+  location?: string;
+  country_name?: string;
 }
 
 export function getSessionsByMeetingKey(meetingKey: number) {
