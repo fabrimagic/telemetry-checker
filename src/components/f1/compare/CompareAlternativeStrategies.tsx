@@ -244,9 +244,43 @@ function DriverPanel({ driver, real, alt }: DriverPanelProps) {
   );
 }
 
+function scenarioLabel(id: CounterfactualScenarioId, aAcr: string, bAcr: string): string {
+  if (id === "only_a") return `Solo ${aAcr}`;
+  if (id === "only_b") return `Solo ${bAcr}`;
+  return "Entrambi";
+}
+
+function scenarioIntro(id: CounterfactualScenarioId, aAcr: string, bAcr: string): string {
+  if (id === "only_a") return `Se ${aAcr} avesse adottato la strategia alternativa (${bAcr} invariato)`;
+  if (id === "only_b") return `Se ${bAcr} avesse adottato la strategia alternativa (${aAcr} invariato)`;
+  return `Se entrambi avessero adottato la strategia alternativa`;
+}
+
 export function CompareAlternativeStrategies({ comparison, driverA, driverB }: Props) {
   const cf = comparison.counterfactual_analysis;
   const verdict = comparison.head_to_head_verdict;
+  const aAcr = driverA.name_acronym;
+  const bAcr = driverB.name_acronym;
+
+  // Default to "both" if applicable, else first applicable scenario.
+  const defaultScenario: CounterfactualScenarioId | null = useMemo(() => {
+    if (!cf) return null;
+    if (cf.scenarios.both.applicable) return "both";
+    if (cf.scenarios.only_a.applicable) return "only_a";
+    if (cf.scenarios.only_b.applicable) return "only_b";
+    return null;
+  }, [cf]);
+
+  const [scenarioId, setScenarioId] = useState<CounterfactualScenarioId>(defaultScenario ?? "both");
+
+  // Sync if comparison changes and current selection becomes inapplicable.
+  useEffect(() => {
+    if (defaultScenario && cf && !cf.scenarios[scenarioId].applicable) {
+      setScenarioId(defaultScenario);
+    }
+  }, [defaultScenario, cf, scenarioId]);
+
+  const activeScenario = cf?.scenarios[scenarioId] ?? null;
 
   return (
     <Card>
@@ -270,62 +304,89 @@ export function CompareAlternativeStrategies({ comparison, driverA, driverB }: P
           <DriverPanel driver={driverB} real={comparison.driver_b} alt={comparison.alternative_b} />
         </div>
 
-        {cf && (
+        {cf && activeScenario && (
           <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="text-xs font-mono uppercase tracking-wider text-foreground">Verdetto controfattuale</span>
               <Badge variant="secondary" className="text-[9px] font-mono uppercase">stima teorica</Badge>
             </div>
 
+            {/* Scenario switch (3-state) */}
+            <Tabs
+              value={scenarioId}
+              onValueChange={(v) => {
+                const next = v as CounterfactualScenarioId;
+                if (cf.scenarios[next]?.applicable) setScenarioId(next);
+              }}
+              className="mb-3"
+            >
+              <TabsList className="grid w-full grid-cols-3 h-auto">
+                {(["only_a", "only_b", "both"] as CounterfactualScenarioId[]).map((id) => {
+                  const sc = cf.scenarios[id];
+                  return (
+                    <TabsTrigger
+                      key={id}
+                      value={id}
+                      disabled={!sc.applicable}
+                      className="text-[10px] font-mono uppercase tracking-wider py-1.5 data-[state=active]:bg-[hsl(var(--f1-red))]/20 data-[state=active]:text-foreground"
+                      title={!sc.applicable ? "Scenario non disponibile: alternativa mancante" : undefined}
+                    >
+                      {scenarioLabel(id, aAcr, bAcr)}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div className="space-y-1">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Guadagno {driverA.name_acronym}
+                  Guadagno {aAcr} {scenarioId === "only_b" && <span className="opacity-60">(non applicato)</span>}
                 </div>
-                <GainBadge seconds={cf.gain_a_seconds} />
+                <GainBadge seconds={activeScenario.gain_a_seconds} />
               </div>
               <div className="space-y-1">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Guadagno {driverB.name_acronym}
+                  Guadagno {bAcr} {scenarioId === "only_a" && <span className="opacity-60">(non applicato)</span>}
                 </div>
-                <GainBadge seconds={cf.gain_b_seconds} />
+                <GainBadge seconds={activeScenario.gain_b_seconds} />
               </div>
               <div className="space-y-1">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
                   Δ controfattuale (A−B)
                 </div>
                 <span className="font-mono text-xs font-bold tabular-nums">
-                  {cf.counterfactual_h2h_delta_seconds == null
+                  {activeScenario.counterfactual_h2h_delta_seconds == null
                     ? "—"
-                    : `${cf.counterfactual_h2h_delta_seconds >= 0 ? "+" : ""}${cf.counterfactual_h2h_delta_seconds.toFixed(2)}s`}
+                    : `${activeScenario.counterfactual_h2h_delta_seconds >= 0 ? "+" : ""}${activeScenario.counterfactual_h2h_delta_seconds.toFixed(2)}s`}
                 </span>
               </div>
             </div>
 
-            {cf.counterfactual_faster && (
+            {activeScenario.counterfactual_faster && (
               <div className={cn(
                 "text-xs rounded px-3 py-2 mb-2 border",
-                cf.outcome_changed
+                activeScenario.outcome_changed
                   ? "bg-[hsl(var(--f1-red))]/10 border-[hsl(var(--f1-red))]/40 text-foreground"
                   : "bg-muted/40 border-border text-muted-foreground",
               )}>
-                {cf.outcome_changed ? (
+                {activeScenario.outcome_changed ? (
                   <>
                     <strong className="text-[hsl(var(--f1-red))]">Esito ribaltato:</strong>{" "}
                     nella realtà ha prevalso{" "}
-                    <strong>{verdict.faster_driver === "A" ? driverA.name_acronym : verdict.faster_driver === "B" ? driverB.name_acronym : "parità"}</strong>,
-                    ma con entrambe le alternative avrebbe prevalso{" "}
-                    <strong>{cf.counterfactual_faster === "A" ? driverA.name_acronym : cf.counterfactual_faster === "B" ? driverB.name_acronym : "parità"}</strong>
-                    {cf.counterfactual_h2h_delta_seconds != null && (
-                      <> di {Math.abs(cf.counterfactual_h2h_delta_seconds).toFixed(2)}s</>
+                    <strong>{verdict.faster_driver === "A" ? aAcr : verdict.faster_driver === "B" ? bAcr : "parità"}</strong>,
+                    ma {scenarioIntro(scenarioId, aAcr, bAcr).toLowerCase().replace(/^se /, "se ")} avrebbe prevalso{" "}
+                    <strong>{activeScenario.counterfactual_faster === "A" ? aAcr : activeScenario.counterfactual_faster === "B" ? bAcr : "parità"}</strong>
+                    {activeScenario.counterfactual_h2h_delta_seconds != null && (
+                      <> di {Math.abs(activeScenario.counterfactual_h2h_delta_seconds).toFixed(2)}s</>
                     )}.
                   </>
                 ) : (
                   <>
-                    <strong>Esito invariato:</strong> anche con entrambe le strategie alternative,{" "}
-                    {cf.counterfactual_faster === "TIE"
+                    <strong>Esito invariato:</strong> {scenarioIntro(scenarioId, aAcr, bAcr).toLowerCase()},{" "}
+                    {activeScenario.counterfactual_faster === "TIE"
                       ? "i due piloti sarebbero finiti in parità."
-                      : <>avrebbe comunque prevalso <strong>{cf.counterfactual_faster === "A" ? driverA.name_acronym : driverB.name_acronym}</strong>.</>}
+                      : <>avrebbe comunque prevalso <strong>{activeScenario.counterfactual_faster === "A" ? aAcr : bAcr}</strong>.</>}
                   </>
                 )}
               </div>
@@ -338,9 +399,9 @@ export function CompareAlternativeStrategies({ comparison, driverA, driverB }: P
           </div>
         )}
 
-        {!cf && (comparison.alternative_a == null || comparison.alternative_b == null) && (
+        {!cf && (
           <div className="text-xs text-muted-foreground italic">
-            Verdetto controfattuale non disponibile: alternativa mancante per uno o entrambi i piloti.
+            Verdetto controfattuale non disponibile: alternativa mancante per entrambi i piloti.
           </div>
         )}
       </CardContent>
