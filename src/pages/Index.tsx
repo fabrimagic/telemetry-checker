@@ -760,11 +760,11 @@ export default function Index() {
             <div className="relative max-w-3xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--f1-red))]/10 border border-[hsl(var(--f1-red))]/30 text-[hsl(var(--f1-red-glow))] text-[10px] font-black uppercase tracking-[0.2em] mb-5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--f1-red))] animate-pulse" />
-                Live F1 Telemetry Intelligence
+                Formula 1 Race Strategy and Analysis tool
               </div>
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] mb-4">
-                Decodifica ogni <span className="text-gradient-primary">millesimo</span><br />
-                della Formula 1.
+                Visualizza, analizza e <span className="text-gradient-primary">simula</span><br />
+                il corso degli eventi di ogni gara di Formula 1
               </h2>
               <p className="text-base sm:text-lg text-muted-foreground max-w-2xl leading-relaxed">
                 Analisi pilota, strategia gara, degrado gomme, telemetria, micro-settori e Virtual Race Engineer.
