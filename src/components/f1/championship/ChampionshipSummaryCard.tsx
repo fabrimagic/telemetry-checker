@@ -107,43 +107,45 @@ export function ChampionshipSummaryCard() {
     driverNameMap.get(leaderDriver.driverNumber) ?? `#${leaderDriver.driverNumber}`;
 
   return (
-    <Card className="max-w-md">
+    <Card className="max-w-md card-premium border-[hsl(var(--f1-red))]/20 hover:border-[hsl(var(--f1-red))]/50 transition-colors">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center justify-between gap-2">
+        <CardTitle className="text-sm flex items-center justify-between gap-2 uppercase tracking-wider">
           <span className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-primary" />
-            Mondiale F1 {year}
+            <Trophy className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+            <span className="font-black">Mondiale F1 {year}</span>
           </span>
-          <span className="text-xs font-normal text-muted-foreground">
-            Dopo {result.racesCompleted} {result.racesCompleted === 1 ? "gara" : "gare"}
+          <span className="text-[10px] font-bold normal-case tracking-normal text-muted-foreground px-2 py-0.5 rounded-full bg-muted/60 border border-border">
+            R{result.racesCompleted}
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <div>
-          <span className="text-muted-foreground">Piloti: </span>
-          <span className="font-mono uppercase">{driverDisplay}</span>{" "}
-          <span className="font-bold">({leaderDriver.totalPoints} pt)</span>
+      <CardContent className="space-y-2.5 text-sm">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground w-16">Piloti</span>
+          <span className="font-mono uppercase font-bold text-foreground">{driverDisplay}</span>
+          <span className="font-black text-[hsl(var(--f1-red-glow))]">{leaderDriver.totalPoints}</span>
+          <span className="text-[10px] text-muted-foreground">pt</span>
           {driverDelta !== null && (
-            <span className="text-muted-foreground"> +{driverDelta} sul 2°</span>
+            <span className="ml-auto text-[10px] font-bold text-emerald-400">+{driverDelta}</span>
           )}
         </div>
         {leaderTeam && (
-          <div>
-            <span className="text-muted-foreground">Costruttori: </span>
-            <span className="font-mono uppercase">{leaderTeam.teamName}</span>{" "}
-            <span className="font-bold">({leaderTeam.totalPoints} pt)</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground w-16">Team</span>
+            <span className="font-mono uppercase font-bold text-foreground truncate">{leaderTeam.teamName}</span>
+            <span className="font-black text-[hsl(var(--f1-red-glow))]">{leaderTeam.totalPoints}</span>
+            <span className="text-[10px] text-muted-foreground">pt</span>
             {teamDelta !== null && (
-              <span className="text-muted-foreground"> +{teamDelta} sul 2°</span>
+              <span className="ml-auto text-[10px] font-bold text-emerald-400">+{teamDelta}</span>
             )}
           </div>
         )}
-        <div className="pt-2">
+        <div className="pt-2 border-t border-border/60">
           <Link
             to="/campionato"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[hsl(var(--f1-red-glow))] hover:text-[hsl(var(--f1-red))] transition-colors"
           >
-            Vai alla timeline completa <ArrowRight className="h-3 w-3" />
+            Timeline completa <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
       </CardContent>
