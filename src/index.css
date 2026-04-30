@@ -167,32 +167,6 @@
     0% { background-position: 0% 0%; }
     100% { background-position: 200% 0%; }
   }
-
-  /* Telemetry hero animation */
-  .telemetry-scroll {
-    animation: telemetry-scroll 18s linear infinite;
-    will-change: transform;
-  }
-  @keyframes telemetry-scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-1200px); }
-  }
-  .telemetry-cursor {
-    animation: telemetry-cursor-pulse 1.6s ease-in-out infinite;
-  }
-  .telemetry-cursor-dot {
-    animation: telemetry-cursor-pulse 1.6s ease-in-out infinite;
-    transform-origin: center;
-  }
-  @keyframes telemetry-cursor-pulse {
-    0%, 100% { opacity: 0.35; }
-    50%      { opacity: 1; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .telemetry-scroll,
-    .telemetry-cursor,
-    .telemetry-cursor-dot { animation: none; }
-  }
 }
 
 /* Custom scrollbar for the app */
