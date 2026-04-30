@@ -22,11 +22,16 @@ const BASE = "https://api.openf1.org/v1";
 
 const CACHE_PREFIX = "pitwall:openf1:";
 
-// TTL families (ms). Past-session telemetry is effectively immutable; we still
-// cap with sessionStorage lifetime (cleared on tab close) for safety.
-const TTL_LONG = 60 * 60 * 1000;       // 1h — immutable per-session datasets
-const TTL_MEDIUM = 10 * 60 * 1000;     // 10min — calendars, standings
-const TTL_SHORT = 30 * 1000;           // 30s — live-ish data (intervals, positions)
+// TTL families (ms). Past-session data is effectively immutable; we still cap
+// with sessionStorage lifetime (cleared on tab close) for safety.
+//
+// The cache key is the full request path, which already includes session_key
+// and (where applicable) driver_number — so per-session/per-driver isolation
+// is guaranteed by construction. No driver/session salting is needed here.
+const TTL_TELEMETRY = 6 * 60 * 60 * 1000;  // 6h — heavy per-driver/session payloads (car_data, location, laps)
+const TTL_LONG = 60 * 60 * 1000;           // 1h — immutable per-session metadata (stints, pit, weather, drivers, results)
+const TTL_MEDIUM = 10 * 60 * 1000;         // 10min — calendars, standings
+const TTL_SHORT = 30 * 1000;               // 30s — live-ish data (intervals, positions)
 
 function ttlForPath(path: string): number {
   // Live/streaming endpoints — short TTL so live updates aren't stale.
@@ -36,13 +41,58 @@ function ttlForPath(path: string): number {
   // Calendars and championship standings change at most weekly.
   if (path.startsWith("/sessions")) return TTL_MEDIUM;
   if (path.startsWith("/championship_")) return TTL_MEDIUM;
-  // Everything else (laps, car_data, location, weather, stints, pit, drivers,
-  // session_result, starting_grid, overtakes) is immutable post-session.
+  // Heavy per-driver/per-session telemetry: immutable post-session, expensive
+  // to re-fetch (multi-MB payloads). Long TTL maximizes cache reuse across
+  // driver-switches and tab navigation within the same weekend.
+  if (path.startsWith("/car_data")) return TTL_TELEMETRY;
+  if (path.startsWith("/location")) return TTL_TELEMETRY;
+  if (path.startsWith("/laps?")) return TTL_TELEMETRY;
+  // Everything else (weather, stints, pit, drivers, session_result,
+  // starting_grid, overtakes) is immutable post-session but lightweight.
   return TTL_LONG;
 }
 
 function cacheKey(path: string): string {
   return `${CACHE_PREFIX}${path}`;
+}
+
+// Heavy telemetry payloads can hit sessionStorage's ~5MB cap. When a write
+// fails (clientCache.writeCache swallows the error), we proactively evict our
+// oldest entries (LRU by envelope timestamp) and retry once. This prevents a
+// single large payload from silently failing to cache while older small
+// entries linger and waste space.
+function trySetWithEviction(key: string, data: unknown): void {
+  writeCache(key, data);
+  // Verify the write actually landed; if not, evict and retry.
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) return;
+    if (window.sessionStorage.getItem(key) !== null) return;
+    const store = window.sessionStorage;
+    const entries: { k: string; ts: number; size: number }[] = [];
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (!k || !k.startsWith(CACHE_PREFIX) || k === key) continue;
+      const raw = store.getItem(k);
+      if (!raw) continue;
+      try {
+        const env = JSON.parse(raw) as { ts?: number };
+        entries.push({ k, ts: env?.ts ?? 0, size: raw.length });
+      } catch {
+        entries.push({ k, ts: 0, size: raw.length });
+      }
+    }
+    entries.sort((a, b) => a.ts - b.ts); // oldest first
+    const totalBytes = entries.reduce((s, e) => s + e.size, 0);
+    let freed = 0;
+    for (const e of entries) {
+      if (freed >= totalBytes * 0.25 && entries.indexOf(e) > 0) break;
+      store.removeItem(e.k);
+      freed += e.size;
+    }
+    writeCache(key, data);
+  } catch {
+    /* give up silently — cache miss next time is acceptable */
+  }
 }
 
 // In-flight dedup map. Same path → same Promise.
@@ -267,7 +317,7 @@ async function fetchApi<T>(path: string): Promise<T> {
   const promise = (async () => {
     try {
       const data = await fetchApiUncached<T>(path);
-      writeCache(cacheKey(path), data);
+      trySetWithEviction(cacheKey(path), data);
       return data;
     } finally {
       inFlight.delete(path);
