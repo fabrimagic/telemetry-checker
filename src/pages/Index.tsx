@@ -775,17 +775,105 @@ export default function Index() {
           </section>
         )}
 
-        {/* Controls */}
-        <section className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_auto] gap-6 items-start">
-          <div className="card-premium rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Step 01</span>
+        {/* Mode chooser */}
+        {!sessionKey && analysisMode === null && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Step 01 — Scegli la modalità</span>
               <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
             </div>
-            <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
-          </div>
-          <ChampionshipSummaryCard />
-        </section>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Single driver */}
+              <button
+                type="button"
+                onClick={() => setAnalysisMode("single")}
+                className="group relative overflow-hidden rounded-2xl border border-border/60 card-premium p-7 text-left transition-all hover:border-[hsl(var(--f1-red))]/70 hover:shadow-[0_0_32px_hsl(var(--f1-red)/0.25)] hover:-translate-y-0.5"
+              >
+                <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[hsl(var(--f1-red))]/10 blur-3xl pointer-events-none transition-opacity group-hover:opacity-150" />
+                <div className="relative flex items-start gap-5">
+                  <div className="shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-[hsl(var(--f1-red))]/25 to-[hsl(var(--f1-red-deep))]/15 border border-[hsl(var(--f1-red))]/40 flex items-center justify-center text-[hsl(var(--f1-red-glow))] group-hover:shadow-[0_0_20px_hsl(var(--f1-red)/0.5)] transition-shadow">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1.5">Modalità A</div>
+                    <h3 className="text-2xl font-black tracking-tight mb-2">Analisi Singolo Pilota</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                      Telemetria, degrado gomme, micro-settori, strategia, Virtual Race Engineer e diario gara per un pilota a tua scelta.
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[hsl(var(--f1-red-glow))] group-hover:gap-2.5 transition-all">
+                      Inizia <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </button>
+
+              {/* Head-to-head */}
+              <Link
+                to="/compare"
+                className="group relative overflow-hidden rounded-2xl border border-border/60 card-premium p-7 text-left transition-all hover:border-[hsl(var(--f1-red))]/70 hover:shadow-[0_0_32px_hsl(var(--f1-red)/0.25)] hover:-translate-y-0.5"
+              >
+                <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[hsl(var(--f1-red))]/10 blur-3xl pointer-events-none" />
+                <div className="relative flex items-start gap-5">
+                  <div className="shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-[hsl(var(--f1-red))]/25 to-[hsl(var(--f1-red-deep))]/15 border border-[hsl(var(--f1-red))]/40 flex items-center justify-center text-[hsl(var(--f1-red-glow))] group-hover:shadow-[0_0_20px_hsl(var(--f1-red)/0.5)] transition-shadow">
+                    <Swords className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1.5">Modalità B</div>
+                    <h3 className="text-2xl font-black tracking-tight mb-2">Head-to-Head</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                      Confronta due piloti fianco a fianco: pace, strategia, controfattuali e narrativa per capire chi ha fatto la differenza.
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[hsl(var(--f1-red-glow))] group-hover:gap-2.5 transition-all">
+                      Apri H2H <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            {/* Championship card still visible as supporting context */}
+            <div className="pt-2">
+              <ChampionshipSummaryCard />
+            </div>
+          </section>
+        )}
+
+        {/* Controls (single-driver flow) */}
+        {!sessionKey && analysisMode === "single" && (
+          <section className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_auto] gap-6 items-start">
+            <div className="card-premium rounded-xl p-5">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Step 02 — Seleziona la sessione</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAnalysisMode(null)}
+                  className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hover:text-[hsl(var(--f1-red-glow))] transition-colors"
+                >
+                  <ArrowLeft className="w-3 h-3" /> Cambia modalità
+                </button>
+              </div>
+              <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+            </div>
+            <ChampionshipSummaryCard />
+          </section>
+        )}
+
+        {/* Controls (after a session has been picked) */}
+        {sessionKey && (
+          <section className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_auto] gap-6 items-start">
+            <div className="card-premium rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Sessione attiva</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
+              </div>
+              <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+            </div>
+            <ChampionshipSummaryCard />
+          </section>
+        )}
 
         {/* Mode Toggle */}
         {allDrivers.length > 0 && (
