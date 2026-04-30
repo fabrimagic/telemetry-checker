@@ -80,7 +80,7 @@ export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props)
     past.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime());
     return past;
   }
-  }, [filterSig]);
+
 
   // Group sessions by event (country)
   const grouped = useMemo(() => {
