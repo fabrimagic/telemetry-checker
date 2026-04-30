@@ -317,7 +317,7 @@ async function fetchApi<T>(path: string): Promise<T> {
   const promise = (async () => {
     try {
       const data = await fetchApiUncached<T>(path);
-      writeCache(cacheKey(path), data);
+      trySetWithEviction(cacheKey(path), data);
       return data;
     } finally {
       inFlight.delete(path);
