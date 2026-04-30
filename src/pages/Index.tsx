@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { CountdownBanner } from "@/components/f1/CountdownBanner";
 import { Link } from "react-router-dom";
 import { SessionPicker } from "@/components/f1/SessionPicker";
+import { ChampionshipSummaryCard } from "@/components/f1/championship/ChampionshipSummaryCard";
 import { LapTimesChart } from "@/components/f1/LapTimesChart";
 import { DriverPicker } from "@/components/f1/DriverPicker";
 import { LapTable } from "@/components/f1/LapTable";
