@@ -36,6 +36,9 @@ export default function Championship() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ChampionshipResult | null>(null);
   const [driverNameMap, setDriverNameMap] = useState<Map<number, string>>(new Map());
+  const [driverInfoMap, setDriverInfoMap] = useState<
+    Map<number, { headshot: string | null; teamColour: string | null }>
+  >(new Map());
   const [teamColorMap, setTeamColorMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
