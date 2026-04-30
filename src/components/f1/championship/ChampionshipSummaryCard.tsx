@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { loadCurrentSeasonChampionship } from "@/lib/championshipLoader";
 import { getDrivers, type Driver } from "@/lib/openf1";
 import type { ChampionshipResult } from "@/lib/championship";
+import { readCache, writeCache, CACHE_KEYS, CACHE_TTL } from "@/lib/clientCache";
 
 export function ChampionshipSummaryCard() {
   const [loading, setLoading] = useState(true);
@@ -15,7 +16,40 @@ export function ChampionshipSummaryCard() {
 
   useEffect(() => {
     let cancelled = false;
+    const year = new Date().getFullYear();
+    const champKey = CACHE_KEYS.championshipByYear(year);
+
+    const applyResult = async (res: ChampionshipResult) => {
+      setResult(res);
+      if (res.racesCompleted >= 1 && res.races.length > 0) {
+        const latest = res.races[res.races.length - 1];
+        const driversKey = CACHE_KEYS.driversBySession(latest.sessionKey);
+        const cachedDrivers = readCache<Array<[number, string]>>(driversKey, CACHE_TTL.DRIVERS);
+        if (cachedDrivers) {
+          if (!cancelled) setDriverNameMap(new Map(cachedDrivers));
+        } else {
+          try {
+            const drivers: Driver[] = await getDrivers(latest.sessionKey);
+            if (cancelled) return;
+            const entries: Array<[number, string]> = drivers.map((d) => [d.driver_number, d.name_acronym]);
+            writeCache(driversKey, entries);
+            setDriverNameMap(new Map(entries));
+          } catch {
+            /* fallback: use #number */
+          }
+        }
+      }
+    };
+
     (async () => {
+      // Cache hit: render immediately, skip network entirely.
+      const cached = readCache<ChampionshipResult>(champKey, CACHE_TTL.CHAMPIONSHIP);
+      if (cached) {
+        await applyResult(cached);
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
       try {
         const out = await loadCurrentSeasonChampionship();
         if (cancelled) return;
@@ -23,22 +57,8 @@ export function ChampionshipSummaryCard() {
           setHidden(true);
           return;
         }
-        setResult(out.result);
-
-        if (out.result.racesCompleted >= 1 && out.result.races.length > 0) {
-          const latest = out.result.races[out.result.races.length - 1];
-          try {
-            const drivers: Driver[] = await getDrivers(latest.sessionKey);
-            if (cancelled) return;
-            const map = new Map<number, string>();
-            for (const d of drivers) {
-              map.set(d.driver_number, d.name_acronym);
-            }
-            setDriverNameMap(map);
-          } catch {
-            /* fallback: use #number */
-          }
-        }
+        writeCache(champKey, out.result);
+        await applyResult(out.result);
       } catch {
         if (!cancelled) setHidden(true);
       } finally {

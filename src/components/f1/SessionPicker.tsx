@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { readCache, writeCache, CACHE_KEYS, CACHE_TTL } from "@/lib/clientCache";
 
 interface Session {
   session_key: number;
@@ -42,6 +43,15 @@ export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props)
 
   useEffect(() => {
     const year = new Date().getFullYear();
+    const cacheKey = CACHE_KEYS.sessionsByYear(year);
+
+    const cached = readCache<Session[]>(cacheKey, CACHE_TTL.SESSIONS);
+    if (cached) {
+      setSessions(filterAndSort(cached, filterSig));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     fetch(`https://api.openf1.org/v1/sessions?year=${year}`)
       .then((r) => {
@@ -49,22 +59,28 @@ export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props)
         return r.json();
       })
       .then((data: Session[]) => {
-        const now = new Date();
-        const excludedCountries = ["bahrain", "saudi arabia"];
-        const allowedTypes = filterSig ? new Set(filterSig.split("|")) : null;
-        const past = data.filter((s) => {
-          if (new Date(s.date_start) >= now) return false;
-          const country = (s.country_name || "").toLowerCase();
-          if (excludedCountries.some((ex) => country.includes(ex))) return false;
-          if (allowedTypes && !allowedTypes.has((s.session_type || "").toLowerCase())) return false;
-          return true;
-        });
-        past.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime());
-        setSessions(past);
+        writeCache(cacheKey, data);
+        setSessions(filterAndSort(data, filterSig));
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [filterSig]);
+
+  function filterAndSort(data: Session[], sig: string): Session[] {
+    const now = new Date();
+    const excludedCountries = ["bahrain", "saudi arabia"];
+    const allowedTypes = sig ? new Set(sig.split("|")) : null;
+    const past = data.filter((s) => {
+      if (new Date(s.date_start) >= now) return false;
+      const country = (s.country_name || "").toLowerCase();
+      if (excludedCountries.some((ex) => country.includes(ex))) return false;
+      if (allowedTypes && !allowedTypes.has((s.session_type || "").toLowerCase())) return false;
+      return true;
+    });
+    past.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime());
+    return past;
+  }
+
 
   // Group sessions by event (country)
   const grouped = useMemo(() => {
