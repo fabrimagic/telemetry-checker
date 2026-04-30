@@ -711,25 +711,37 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       <CountdownBanner />
-      <header className="border-b border-border px-6 py-4">
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/75 border-b border-border/60 px-6 py-3.5 shadow-[0_1px_0_hsl(var(--f1-red)/0.25)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
-            <h1 className="text-lg font-bold tracking-tight">PitWall AI</h1>
-          </div>
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="relative">
+              <div className="w-1.5 h-7 rounded-full bg-gradient-to-b from-[hsl(var(--f1-red-glow))] to-[hsl(var(--f1-red-deep))] group-hover:shadow-[0_0_12px_hsl(var(--f1-red))] transition-shadow" />
+            </div>
+            <h1 className="text-base font-black tracking-tight uppercase">
+              <span className="text-foreground">Pit</span>
+              <span className="text-gradient-primary">Wall</span>
+              <span className="text-muted-foreground font-bold ml-1.5 text-xs tracking-[0.25em]">AI</span>
+            </h1>
+          </Link>
+          <div className="flex items-center gap-1.5">
             <Link
               to="/compare"
-              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-[hsl(var(--f1-red))]/10 text-[hsl(var(--f1-red))] border border-[hsl(var(--f1-red))]/30 hover:bg-[hsl(var(--f1-red))]/20 transition-colors"
+              className="text-[11px] font-black uppercase tracking-[0.15em] px-3.5 py-2 rounded-md inline-flex items-center gap-1.5 bg-gradient-to-br from-[hsl(var(--f1-red))]/15 to-[hsl(var(--f1-red))]/5 text-[hsl(var(--f1-red-glow))] border border-[hsl(var(--f1-red))]/40 hover:border-[hsl(var(--f1-red))] hover:shadow-[0_0_16px_hsl(var(--f1-red)/0.4)] transition-all"
               title="Apri la modalità head-to-head per confrontare due piloti"
             >
-              ⚔︎ Head-to-Head
+              ⚔︎ H2H
             </Link>
-            <Link to="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted/50">
+            <Link
+              to="/campionato"
+              className="text-[11px] font-bold uppercase tracking-[0.15em] px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            >
+              🏆 Mondiale
+            </Link>
+            <Link to="/docs" className="text-[11px] font-bold uppercase tracking-[0.15em] px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
               📖 Docs
             </Link>
             {sessionKey && (
-              <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-xs text-muted-foreground">
+              <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-[11px] uppercase tracking-wider font-bold text-muted-foreground hover:text-[hsl(var(--f1-red))]">
                 <RotateCcw className="h-3.5 w-3.5" />
                 Reset
               </Button>
@@ -738,10 +750,39 @@ export default function Index() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Hero */}
+        {!sessionKey && (
+          <section className="relative overflow-hidden rounded-2xl border border-border/60 px-6 sm:px-10 py-10 sm:py-14 card-premium">
+            <div className="absolute inset-0 bg-grid opacity-[0.06] pointer-events-none" />
+            <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-[hsl(var(--f1-red))]/20 blur-3xl pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-stripe opacity-50" style={{ background: "var(--gradient-stripe)" }} />
+            <div className="relative max-w-3xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--f1-red))]/10 border border-[hsl(var(--f1-red))]/30 text-[hsl(var(--f1-red-glow))] text-[10px] font-black uppercase tracking-[0.2em] mb-5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--f1-red))] animate-pulse" />
+                Live F1 Telemetry Intelligence
+              </div>
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] mb-4">
+                Decodifica ogni <span className="text-gradient-primary">millesimo</span><br />
+                della Formula 1.
+              </h2>
+              <p className="text-base sm:text-lg text-muted-foreground max-w-2xl leading-relaxed">
+                Analisi pilota, strategia gara, degrado gomme, telemetria, micro-settori e Virtual Race Engineer.
+                Tutto in un'unica piattaforma, con dati ufficiali e zero compromessi.
+              </p>
+            </div>
+          </section>
+        )}
+
         {/* Controls */}
-        <section className="flex flex-wrap gap-6 items-start">
-          <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+        <section className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_auto] gap-6 items-start">
+          <div className="card-premium rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Step 01</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
+            </div>
+            <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+          </div>
           <ChampionshipSummaryCard />
         </section>
 

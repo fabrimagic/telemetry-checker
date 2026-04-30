@@ -4,51 +4,69 @@
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 210 20% 92%;
+    --background: 220 25% 5%;
+    --foreground: 210 20% 95%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 92%;
+    --card: 220 22% 8%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 220 22% 8%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 0 76% 50%;
+    --primary: 0 84% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 16% 16%;
-    --secondary-foreground: 210 20% 92%;
+    --secondary: 220 18% 14%;
+    --secondary-foreground: 210 20% 95%;
 
-    --muted: 220 14% 14%;
-    --muted-foreground: 215 12% 55%;
+    --muted: 220 16% 12%;
+    --muted-foreground: 215 14% 60%;
 
-    --accent: 0 76% 50%;
+    --accent: 0 84% 55%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 50%;
+    --destructive: 0 72% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 18%;
-    --input: 220 14% 18%;
-    --ring: 0 76% 50%;
+    --border: 220 14% 16%;
+    --input: 220 14% 16%;
+    --ring: 0 84% 55%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    --sidebar-background: 220 18% 8%;
-    --sidebar-foreground: 210 20% 92%;
-    --sidebar-primary: 0 76% 50%;
+    --sidebar-background: 220 22% 6%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 0 84% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 14%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 220 14% 18%;
-    --sidebar-ring: 0 76% 50%;
+    --sidebar-accent: 220 16% 12%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 220 14% 16%;
+    --sidebar-ring: 0 84% 55%;
 
-    --f1-red: 0 76% 50%;
-    --f1-surface: 220 18% 12%;
+    --f1-red: 0 84% 55%;
+    --f1-red-glow: 0 95% 65%;
+    --f1-red-deep: 0 75% 38%;
+    --f1-carbon: 220 22% 9%;
+    --f1-surface: 220 20% 11%;
     --chart-green: 142 70% 45%;
     --chart-blue: 217 91% 60%;
     --chart-yellow: 45 93% 58%;
     --chart-orange: 25 95% 53%;
+
+    /* Premium gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--f1-red)) 0%, hsl(var(--f1-red-glow)) 100%);
+    --gradient-primary-deep: linear-gradient(135deg, hsl(var(--f1-red-deep)) 0%, hsl(var(--f1-red)) 100%);
+    --gradient-hero: radial-gradient(ellipse 80% 50% at 50% -10%, hsl(var(--f1-red) / 0.25), transparent 60%),
+                     radial-gradient(ellipse 60% 40% at 100% 0%, hsl(var(--f1-red) / 0.15), transparent 70%),
+                     linear-gradient(180deg, hsl(220 25% 7%) 0%, hsl(var(--background)) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(220 22% 6%) 100%);
+    --gradient-stripe: linear-gradient(90deg, transparent, hsl(var(--f1-red)) 50%, transparent);
+
+    /* Shadows */
+    --shadow-glow: 0 0 40px hsl(var(--f1-red) / 0.35);
+    --shadow-glow-soft: 0 0 24px hsl(var(--f1-red) / 0.18);
+    --shadow-elevated: 0 10px 30px -10px hsl(220 50% 2% / 0.7), 0 2px 6px hsl(220 50% 2% / 0.5);
+    --shadow-card: 0 1px 0 hsl(210 20% 100% / 0.04) inset, 0 8px 24px -12px hsl(220 50% 2% / 0.6);
   }
 }
 
@@ -59,6 +77,95 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 50% -5%, hsl(var(--f1-red) / 0.10), transparent 70%),
+      linear-gradient(180deg, hsl(220 25% 6%) 0%, hsl(var(--background)) 600px);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: hsl(var(--f1-red) / 0.4);
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer components {
+  /* Subtle carbon-fiber texture */
+  .bg-carbon {
+    background-color: hsl(var(--f1-carbon));
+    background-image:
+      linear-gradient(45deg, hsl(220 14% 16% / 0.4) 25%, transparent 25%, transparent 75%, hsl(220 14% 16% / 0.4) 75%),
+      linear-gradient(45deg, hsl(220 14% 16% / 0.4) 25%, transparent 25%, transparent 75%, hsl(220 14% 16% / 0.4) 75%);
+    background-size: 4px 4px;
+    background-position: 0 0, 2px 2px;
+  }
+
+  /* Diagonal racing stripes */
+  .bg-racing-stripes {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 14px,
+      hsl(var(--f1-red) / 0.05) 14px,
+      hsl(var(--f1-red) / 0.05) 28px
+    );
+  }
+
+  /* Faint grid backdrop */
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .border-glow {
+    box-shadow: var(--shadow-glow-soft);
+  }
+
+  .card-premium {
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+    border: 1px solid hsl(var(--border));
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-premium::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--gradient-stripe);
+    opacity: 0.6;
+  }
+}
+
+@layer utilities {
+  .animate-pulse-glow {
+    animation: pulse-glow 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--f1-red) / 0.5); }
+    50% { box-shadow: 0 0 24px 4px hsl(var(--f1-red) / 0); }
+  }
+
+  .animate-stripe {
+    background-size: 200% 100%;
+    animation: stripe-move 3s linear infinite;
+  }
+  @keyframes stripe-move {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
   }
 }
 
@@ -68,12 +175,12 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(220 18% 10%);
+  background: hsl(220 22% 8%);
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(220 14% 25%);
+  background: linear-gradient(180deg, hsl(var(--f1-red) / 0.6), hsl(var(--f1-red-deep) / 0.6));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(220 14% 35%);
+  background: hsl(var(--f1-red));
 }
