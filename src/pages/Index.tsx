@@ -757,6 +757,72 @@ export default function Index() {
         {!sessionKey && (
           <section className="relative overflow-hidden rounded-2xl border border-border/60 px-6 sm:px-10 py-10 sm:py-14 card-premium">
             <div className="absolute inset-0 bg-grid opacity-[0.06] pointer-events-none" />
+            {/* Simulated telemetry background */}
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.28]"
+              viewBox="0 0 1200 400"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient id="heroFadeL" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0" stopColor="hsl(var(--background))" stopOpacity="1" />
+                  <stop offset="0.18" stopColor="hsl(var(--background))" stopOpacity="0" />
+                  <stop offset="0.82" stopColor="hsl(var(--background))" stopOpacity="0" />
+                  <stop offset="1" stopColor="hsl(var(--background))" stopOpacity="1" />
+                </linearGradient>
+                <linearGradient id="heroFadeV" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stopColor="hsl(var(--background))" stopOpacity="0.4" />
+                  <stop offset="0.5" stopColor="hsl(var(--background))" stopOpacity="0" />
+                  <stop offset="1" stopColor="hsl(var(--background))" stopOpacity="0.7" />
+                </linearGradient>
+                <linearGradient id="throttleFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stopColor="hsl(var(--f1-red))" stopOpacity="0.35" />
+                  <stop offset="1" stopColor="hsl(var(--f1-red))" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {/* Horizontal grid lines */}
+              {[40, 110, 180, 250, 320].map((y) => (
+                <line key={y} x1="0" x2="1200" y1={y} y2={y} stroke="hsl(var(--foreground))" strokeOpacity="0.08" strokeDasharray="3 6" />
+              ))}
+              {/* Vertical grid lines */}
+              {[150, 300, 450, 600, 750, 900, 1050].map((x) => (
+                <line key={x} x1={x} x2={x} y1="20" y2="360" stroke="hsl(var(--foreground))" strokeOpacity="0.06" />
+              ))}
+
+              {/* Speed trace (top) — corners + straights */}
+              <path
+                d="M0,80 L80,55 L140,60 L180,200 L230,210 L290,70 L360,50 L420,55 L460,230 L520,240 L580,90 L660,55 L720,60 L770,250 L820,260 L880,80 L960,55 L1040,60 L1100,210 L1160,220 L1200,90"
+                fill="none"
+                stroke="hsl(var(--f1-red-glow))"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+
+              {/* Throttle area (mid) */}
+              <path
+                d="M0,180 L80,150 L140,150 L180,300 L230,300 L290,160 L360,150 L420,150 L460,310 L520,310 L580,170 L660,150 L720,150 L770,320 L820,320 L880,170 L960,150 L1040,150 L1100,300 L1160,300 L1200,180 L1200,360 L0,360 Z"
+                fill="url(#throttleFill)"
+                stroke="hsl(var(--f1-red))"
+                strokeOpacity="0.55"
+                strokeWidth="1.2"
+              />
+
+              {/* Brake spikes (bottom) */}
+              <path
+                d="M0,360 L175,360 L178,310 L182,310 L185,360 L455,360 L458,300 L462,300 L465,360 L765,360 L768,305 L772,305 L775,360 L1095,360 L1098,310 L1102,310 L1105,360 L1200,360"
+                fill="none"
+                stroke="hsl(0 85% 65%)"
+                strokeOpacity="0.7"
+                strokeWidth="1.4"
+              />
+
+              {/* Edge fades */}
+              <rect x="0" y="0" width="1200" height="400" fill="url(#heroFadeL)" />
+              <rect x="0" y="0" width="1200" height="400" fill="url(#heroFadeV)" />
+            </svg>
             <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-[hsl(var(--f1-red))]/20 blur-3xl pointer-events-none" />
             <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-stripe opacity-50" style={{ background: "var(--gradient-stripe)" }} />
             <div className="relative max-w-3xl">
