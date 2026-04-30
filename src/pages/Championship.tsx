@@ -170,12 +170,33 @@ export default function Championship() {
                           const last = d.points[d.points.length - 1];
                           const display =
                             driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
+                          const info = driverInfoMap.get(d.driverNumber);
+                          const borderColor = info?.teamColour ? `#${info.teamColour}` : "hsl(var(--border))";
                           return (
                             <TableRow key={d.driverNumber}>
                               <TableCell className="font-bold">
                                 {d.currentPosition || "—"}
                               </TableCell>
-                              <TableCell className="font-mono uppercase">{display}</TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center gap-2">
+                                  {info?.headshot ? (
+                                    <img
+                                      src={info.headshot}
+                                      alt={display}
+                                      loading="lazy"
+                                      className="h-8 w-8 rounded-full object-cover border-2"
+                                      style={{ borderColor }}
+                                    />
+                                  ) : (
+                                    <span
+                                      className="h-8 w-8 rounded-full border-2 bg-muted inline-block"
+                                      style={{ borderColor }}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                  <span className="font-mono uppercase">{display}</span>
+                                </span>
+                              </TableCell>
                               <TableCell className="text-right font-bold">
                                 {d.totalPoints}
                               </TableCell>
