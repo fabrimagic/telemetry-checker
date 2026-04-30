@@ -43,6 +43,15 @@ export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props)
 
   useEffect(() => {
     const year = new Date().getFullYear();
+    const cacheKey = CACHE_KEYS.sessionsByYear(year);
+
+    const cached = readCache<Session[]>(cacheKey, CACHE_TTL.SESSIONS);
+    if (cached) {
+      setSessions(filterAndSort(cached, filterSig));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     fetch(`https://api.openf1.org/v1/sessions?year=${year}`)
       .then((r) => {
@@ -50,6 +59,9 @@ export function SessionPicker({ onSelect, isLoading, sessionTypeFilter }: Props)
         return r.json();
       })
       .then((data: Session[]) => {
+        writeCache(cacheKey, data);
+        setSessions(filterAndSort(data, filterSig));
+      })
         const now = new Date();
         const excludedCountries = ["bahrain", "saudi arabia"];
         const allowedTypes = filterSig ? new Set(filterSig.split("|")) : null;
