@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import Documentation from "./pages/Documentation.tsx";
 import Compare from "./pages/Compare.tsx";
 import PreRace from "./pages/PreRace.tsx";
+import Championship from "./pages/Championship.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/docs" element={<Documentation />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/pre-race" element={<PreRace />} />
+          <Route path="/campionato" element={<Championship />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
