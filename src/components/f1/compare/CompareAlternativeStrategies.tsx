@@ -12,11 +12,13 @@
  * is non-null, and ALWAYS surfaces the disclaimer string from the analysis.
  */
 
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowRight, AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
-import type { ComparisonResult } from "@/lib/headToHeadComparison";
+import type { ComparisonResult, CounterfactualScenarioId } from "@/lib/headToHeadComparison";
 import type { Driver } from "@/lib/openf1";
 import type { VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
 import { cn } from "@/lib/utils";
