@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import Documentation from "./pages/Documentation.tsx";
 import Compare from "./pages/Compare.tsx";
 import PreRace from "./pages/PreRace.tsx";
+import Championship from "./pages/Championship.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
