@@ -94,19 +94,21 @@ describe("detectLongRuns (refactored, delegates to main engine)", () => {
     expect(out[0].lapEndLongRun).toBe(9);
   });
 
-  it("5) very noisy stint → low R², isValidLongRun=false", () => {
-    // Alternating pattern with no real trend → R² near 0.
+  it("5) noisy stint with low R² but flat slope → still valid (low-degradation long run)", () => {
+    // Alternating push/lift pattern with no real trend. The slope is
+    // statistically indistinguishable from zero (|slope| ≤ 2·stdError) and
+    // CV stays under 5%, so this is treated as a genuine flat long run —
+    // mirroring real-world cases (e.g., new HARD on a green track) where
+    // tyres simply don't degrade and rejecting the run would discard
+    // useful information.
     const laps: Lap[] = [];
     const noise = [90.0, 91.5, 89.5, 91.4, 89.6, 91.3, 89.7, 91.2];
     noise.forEach((d, i) => laps.push(lap(DRV, i + 1, d)));
     const stints = [stint(DRV, 1, "MEDIUM", 1, 8)];
     const out = detectLongRuns(DRV, "LEC", "E80020", laps, stints, []);
-    if (out.length > 0) {
-      expect(out[0].isValidLongRun).toBe(false);
-    } else {
-      // Acceptable: main engine may reject the stint outright.
-      expect(out).toHaveLength(0);
-    }
+    expect(out).toHaveLength(1);
+    expect(out[0].isValidLongRun).toBe(true);
+    expect(out[0].rSquared).toBeLessThan(0.25);
   });
 
   it("6) longRunToStintsAndLaps keeps only valid runs", () => {
