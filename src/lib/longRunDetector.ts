@@ -25,6 +25,15 @@ export interface LongRunResult {
 const DEFAULT_MIN_LAPS = 5;
 const MIN_R_SQUARED_LONG_RUN = 0.25;
 /**
+ * Relative threshold (vs. sequence median lap time) above which the LAST lap
+ * of a candidate long-run sequence is treated as an in-lap and trimmed.
+ *
+ * Rationale: when the engine receives a single virtual stint, its built-in
+ * in-lap exclusion is bypassed (isLastStint is always true). Trimming here
+ * ensures CV gating and regression operate on the pure rolling sequence.
+ */
+const IN_LAP_REL_THRESHOLD = 1.07;
+/**
  * Maximum coefficient of variation (stddev/mean) tolerated on the candidate
  * long-run sequence. Push+rolling quali-sim sequences in Practice exhibit
  * CV > 18%, while real long runs sit below ~1.5%. A 5% cutoff cleanly
@@ -126,9 +135,31 @@ export function detectLongRuns(
     if (!sequences.length) continue;
 
     // Longest sequence wins; ties go to the chronologically first.
-    const candidate = sequences.reduce((best, seq) =>
+    let candidate = sequences.reduce((best, seq) =>
       seq.length > best.length ? seq : best,
     );
+
+    // Trim trailing in-lap if present. The main engine cannot do this for us
+    // because it sees a single virtual stint (isLastStint=true → in-lap kept).
+    // We compare the last lap to the median of the preceding ones; if it's
+    // > IN_LAP_REL_THRESHOLD × median, it's an in-lap and we drop it.
+    if (candidate.length >= minLaps + 1) {
+      const head = candidate.slice(0, -1);
+      const last = candidate[candidate.length - 1];
+      const sorted = head
+        .map((l) => l.lap_duration)
+        .filter((d): d is number => typeof d === "number" && d > 0)
+        .sort((a, b) => a - b);
+      if (sorted.length) {
+        const median = sorted[Math.floor(sorted.length / 2)];
+        if (
+          typeof last.lap_duration === "number" &&
+          last.lap_duration > median * IN_LAP_REL_THRESHOLD
+        ) {
+          candidate = head;
+        }
+      }
+    }
 
     // Reject push+rolling quali-sim sequences (CV > 5%). Real long runs
     // sit well below this threshold; mixed push/rolling stints sit above 18%.
@@ -151,8 +182,21 @@ export function detectLongRuns(
     if (!degResults.length) continue;
     const deg = degResults[0];
 
+    // Validity rule:
+    //  - lapsUsed must meet the minimum, AND
+    //  - either R² ≥ threshold (clear monotone trend) OR
+    //    the slope is statistically flat (|slope| ≤ 2 × stdError).
+    // The flat-slope branch prevents us from rejecting genuine long runs on
+    // tyres that simply don't degrade (e.g., new HARD on a green track):
+    // pace is stable, CV is tiny, and a flat slope is itself useful info.
+    const slopeFlat =
+      deg.slopeStdError != null &&
+      deg.slopeStdError > 0 &&
+      Math.abs(deg.slopeSecPerLap) <= 2 * deg.slopeStdError;
+
     const isValid =
-      deg.rSquared >= MIN_R_SQUARED_LONG_RUN && deg.lapsUsed >= minLaps;
+      deg.lapsUsed >= minLaps &&
+      (deg.rSquared >= MIN_R_SQUARED_LONG_RUN || slopeFlat);
 
     results.push({
       driverNumber,
