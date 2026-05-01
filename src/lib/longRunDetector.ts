@@ -25,6 +25,15 @@ export interface LongRunResult {
 const DEFAULT_MIN_LAPS = 5;
 const MIN_R_SQUARED_LONG_RUN = 0.25;
 /**
+ * Relative threshold (vs. sequence median lap time) above which the LAST lap
+ * of a candidate long-run sequence is treated as an in-lap and trimmed.
+ *
+ * Rationale: when the engine receives a single virtual stint, its built-in
+ * in-lap exclusion is bypassed (isLastStint is always true). Trimming here
+ * ensures CV gating and regression operate on the pure rolling sequence.
+ */
+const IN_LAP_REL_THRESHOLD = 1.07;
+/**
  * Maximum coefficient of variation (stddev/mean) tolerated on the candidate
  * long-run sequence. Push+rolling quali-sim sequences in Practice exhibit
  * CV > 18%, while real long runs sit below ~1.5%. A 5% cutoff cleanly
