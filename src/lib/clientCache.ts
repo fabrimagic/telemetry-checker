@@ -73,6 +73,6 @@ export const CACHE_TTL = {
 export const CACHE_KEYS = {
   sessionsByYear: (year: number) => `pitwall:sessions:${year}`,
   championshipByYear: (year: number) => `pitwall:championship:${year}`,
-  driversBySession: (sessionKey: number) => `pitwall:drivers:${sessionKey}`,
+  driversBySession: (sessionKey: number) => `pitwall:drivers:v2:${sessionKey}`,
   weekendWeather: (round: number) => `pitwall:weekendWeather:${round}`,
 } as const;
