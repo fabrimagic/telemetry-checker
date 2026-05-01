@@ -66,10 +66,13 @@ export const CACHE_TTL = {
   CHAMPIONSHIP: 10 * 60 * 1000,
   /** Driver roster per session is immutable post-session → 1 hour. */
   DRIVERS: 60 * 60 * 1000,
+  /** Weather forecast for the upcoming race weekend → 6 hours per spec. */
+  WEEKEND_WEATHER: 6 * 60 * 60 * 1000,
 } as const;
 
 export const CACHE_KEYS = {
   sessionsByYear: (year: number) => `pitwall:sessions:${year}`,
   championshipByYear: (year: number) => `pitwall:championship:${year}`,
   driversBySession: (sessionKey: number) => `pitwall:drivers:${sessionKey}`,
+  weekendWeather: (round: number) => `pitwall:weekendWeather:${round}`,
 } as const;
