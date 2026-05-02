@@ -59,24 +59,28 @@ export function ChampionshipSummaryCard() {
     };
 
     (async () => {
+      // Stale-while-revalidate: show cached result instantly (if any),
+      // then ALWAYS refetch in background on every mount so the mini card
+      // is kept up to date at every page load.
       const cached = readCache<ChampionshipResult>(champKey, CACHE_TTL.CHAMPIONSHIP);
+      let hadCached = false;
       if (cached) {
+        hadCached = true;
         await applyResult(cached);
         if (!cancelled) setLoading(false);
-        return;
       }
 
       try {
         const out = await loadCurrentSeasonChampionship();
         if (cancelled) return;
         if (out.error || !out.result) {
-          setHidden(true);
+          if (!hadCached) setHidden(true);
           return;
         }
         writeCache(champKey, out.result);
         await applyResult(out.result);
       } catch {
-        if (!cancelled) setHidden(true);
+        if (!cancelled && !hadCached) setHidden(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
