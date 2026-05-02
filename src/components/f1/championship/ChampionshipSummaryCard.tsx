@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { loadCurrentSeasonChampionship } from "@/lib/championshipLoader";
 import { getDrivers, type Driver } from "@/lib/openf1";
 import type { ChampionshipResult } from "@/lib/championship";
-import { readCache, writeCache, CACHE_KEYS, CACHE_TTL } from "@/lib/clientCache";
+
 
 interface CachedDriverInfo {
   acronym: string;
