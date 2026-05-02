@@ -89,8 +89,8 @@ export function NextCircuitCard() {
           >
             {(() => {
               const vbW = parseFloat(viewBox.split(" ")[2]) || 1;
-              const glowW = Math.max(vbW * 0.008, 0.0008);
-              const lineW = Math.max(vbW * 0.0035, 0.0004);
+              const glowW = Math.max(vbW * 0.004, 0.0004);
+              const lineW = Math.max(vbW * 0.0018, 0.0002);
               return (
                 <>
                   <polyline
