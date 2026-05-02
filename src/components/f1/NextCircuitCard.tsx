@@ -87,23 +87,32 @@ export function NextCircuitCard() {
             preserveAspectRatio="xMidYMid meet"
             className="w-full h-full p-3"
           >
-            <polyline
-              points={polyPoints}
-              fill="none"
-              stroke="hsl(var(--f1-red))"
-              strokeOpacity={0.25}
-              strokeWidth={Math.max((viewBox.split(" ")[2] ? parseFloat(viewBox.split(" ")[2]) : 1) * 0.025, 0.002)}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <polyline
-              points={polyPoints}
-              fill="none"
-              stroke="hsl(var(--f1-red-glow))"
-              strokeWidth={Math.max((viewBox.split(" ")[2] ? parseFloat(viewBox.split(" ")[2]) : 1) * 0.012, 0.001)}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            {(() => {
+              const vbW = parseFloat(viewBox.split(" ")[2]) || 1;
+              const glowW = Math.max(vbW * 0.008, 0.0008);
+              const lineW = Math.max(vbW * 0.0035, 0.0004);
+              return (
+                <>
+                  <polyline
+                    points={polyPoints}
+                    fill="none"
+                    stroke="hsl(var(--f1-red))"
+                    strokeOpacity={0.2}
+                    strokeWidth={glowW}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <polyline
+                    points={polyPoints}
+                    fill="none"
+                    stroke="hsl(var(--f1-red-glow))"
+                    strokeWidth={lineW}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </>
+              );
+            })()}
           </svg>
         ) : (
           <span className="text-xs text-muted-foreground">Layout non disponibile</span>
