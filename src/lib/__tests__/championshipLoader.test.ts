@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../openf1", () => ({
   getRaceSessionsByYear: vi.fn(),
+  getSprintSessionsByYear: vi.fn().mockResolvedValue([]),
   getChampionshipDrivers: vi.fn(),
   getChampionshipTeams: vi.fn(),
 }));
 
 import {
   getRaceSessionsByYear,
+  getSprintSessionsByYear,
   getChampionshipDrivers,
   getChampionshipTeams,
   type SessionInfo,
