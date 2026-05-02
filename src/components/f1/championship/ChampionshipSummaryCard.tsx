@@ -208,6 +208,42 @@ export function ChampionshipSummaryCard() {
           </div>
         )}
 
+        {/* Palmares del leader (Wikipedia IT) */}
+        {(() => {
+          const palmares = getDriverPalmares(leaderDriver.driverNumber);
+          if (!palmares) return null;
+          const formatNum = (n: number) =>
+            n.toLocaleString("it-IT", { maximumFractionDigits: 1 });
+          const rows: Array<[string, string]> = [
+            ["Esordio", palmares.debutDate],
+            ["GP vinti", formatNum(palmares.wins)],
+            ["Podi", formatNum(palmares.podiums)],
+            ["Punti carriera", formatNum(palmares.careerPoints)],
+            ["Pole position", formatNum(palmares.polePositions)],
+            ["Giri veloci", formatNum(palmares.fastestLaps)],
+          ];
+          return (
+            <div className="pt-2 border-t border-border/40">
+              <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-bold mb-1.5">
+                Palmares — {driverInfoMap.get(leaderDriver.driverNumber)?.acronym ?? `#${leaderDriver.driverNumber}`}
+                {palmares.worldTitles ? (
+                  <span className="ml-1.5 text-[hsl(var(--f1-red-glow))]">
+                    · {palmares.worldTitles}× iridato
+                  </span>
+                ) : null}
+              </div>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                {rows.map(([label, value]) => (
+                  <div key={label} className="flex items-baseline justify-between gap-2 border-b border-border/30 py-0.5">
+                    <dt className="text-muted-foreground truncate">{label}</dt>
+                    <dd className="font-mono font-bold text-foreground tabular-nums">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          );
+        })()}
+
         <div className="pt-2 border-t border-border/60">
           <Link
             to="/campionato"
