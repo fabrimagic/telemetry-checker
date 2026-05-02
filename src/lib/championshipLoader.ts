@@ -35,8 +35,12 @@ export async function loadCurrentSeasonChampionship(): Promise<ChampionshipLoade
   }
 
   const now = new Date().toISOString();
+  // 2026 season: Bahrain and Saudi Arabia rounds are not held — exclude them
+  // so they don't appear as "missing data" in the championship timeline.
+  const EXCLUDED_2026 = new Set(["Sakhir", "Jeddah"]);
   const completedRaces = allRaces
     .filter((r) => r.date_end && r.date_end < now)
+    .filter((r) => !(year === 2026 && EXCLUDED_2026.has(r.location ?? "")))
     .sort((a, b) => a.date_start.localeCompare(b.date_start));
 
   if (!completedRaces.length) {
