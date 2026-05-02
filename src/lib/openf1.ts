@@ -495,6 +495,12 @@ export function getRaceSessionsByYear(year: number) {
   return fetchApi<SessionInfo[]>(`/sessions?year=${year}&session_name=Race`);
 }
 
+/** Returns all Sprint sessions for a given year (Sprint race only,
+ *  not Sprint Qualifying). Used to include sprint points in standings. */
+export function getSprintSessionsByYear(year: number) {
+  return fetchApi<SessionInfo[]>(`/sessions?year=${year}&session_name=Sprint`);
+}
+
 export function getChampionshipDrivers(sessionKey: number) {
   return fetchApi<ChampionshipDriverStanding[]>(
     `/championship_drivers?session_key=${sessionKey}`,
