@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { CountdownBanner } from "@/components/f1/CountdownBanner";
 import { WeekendWeatherCard } from "@/components/f1/WeekendWeatherCard";
+import { NextCircuitCard } from "@/components/f1/NextCircuitCard";
 import { Link } from "react-router-dom";
 import { SessionPicker } from "@/components/f1/SessionPicker";
 import { ChampionshipSummaryCard } from "@/components/f1/championship/ChampionshipSummaryCard";
@@ -833,10 +834,11 @@ export default function Index() {
               </Link>
             </div>
 
-            {/* Championship + weekend weather as supporting context */}
-            <div className="pt-2 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Championship + weekend weather + next circuit as supporting context */}
+            <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
               <ChampionshipSummaryCard />
               <WeekendWeatherCard />
+              <NextCircuitCard />
             </div>
           </section>
         )}
