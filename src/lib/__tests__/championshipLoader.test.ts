@@ -53,6 +53,7 @@ function mkFuture(session_key: number, daysAhead: number, loc: string): SessionI
 
 beforeEach(() => {
   vi.clearAllMocks();
+  (getSprintSessionsByYear as any).mockResolvedValue([]);
 });
 
 describe("loadCurrentSeasonChampionship", () => {
