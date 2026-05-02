@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { loadCurrentSeasonChampionship } from "@/lib/championshipLoader";
 import { getDrivers, type Driver } from "@/lib/openf1";
 import type { ChampionshipResult } from "@/lib/championship";
-import { readCache, writeCache, CACHE_KEYS, CACHE_TTL } from "@/lib/clientCache";
+
 
 interface CachedDriverInfo {
   acronym: string;
@@ -24,63 +24,43 @@ export function ChampionshipSummaryCard() {
 
   useEffect(() => {
     let cancelled = false;
-    const year = new Date().getFullYear();
-    const champKey = CACHE_KEYS.championshipByYear(year);
 
     const applyResult = async (res: ChampionshipResult) => {
       setResult(res);
       if (res.racesCompleted >= 1 && res.races.length > 0) {
         const latest = res.races[res.races.length - 1];
-        const driversKey = CACHE_KEYS.driversBySession(latest.sessionKey);
-        const cachedDrivers = readCache<Array<[number, CachedDriverInfo]>>(driversKey, CACHE_TTL.DRIVERS);
-        if (cachedDrivers) {
-          if (!cancelled) setDriverInfoMap(new Map(cachedDrivers));
-        } else {
-          try {
-            const drivers: Driver[] = await getDrivers(latest.sessionKey);
-            if (cancelled) return;
-            const entries: Array<[number, CachedDriverInfo]> = drivers.map((d) => [
-              d.driver_number,
-              {
-                acronym: d.name_acronym,
-                fullName: d.full_name,
-                teamName: d.team_name,
-                teamColour: d.team_colour,
-                headshotUrl: d.headshot_url,
-              },
-            ]);
-            writeCache(driversKey, entries);
-            setDriverInfoMap(new Map(entries));
-          } catch {
-            /* fallback: degrade gracefully */
-          }
+        try {
+          const drivers: Driver[] = await getDrivers(latest.sessionKey);
+          if (cancelled) return;
+          const entries: Array<[number, CachedDriverInfo]> = drivers.map((d) => [
+            d.driver_number,
+            {
+              acronym: d.name_acronym,
+              fullName: d.full_name,
+              teamName: d.team_name,
+              teamColour: d.team_colour,
+              headshotUrl: d.headshot_url,
+            },
+          ]);
+          setDriverInfoMap(new Map(entries));
+        } catch {
+          /* fallback: degrade gracefully */
         }
       }
     };
 
     (async () => {
-      // Stale-while-revalidate: show cached result instantly (if any),
-      // then ALWAYS refetch in background on every mount so the mini card
-      // is kept up to date at every page load.
-      const cached = readCache<ChampionshipResult>(champKey, CACHE_TTL.CHAMPIONSHIP);
-      let hadCached = false;
-      if (cached) {
-        hadCached = true;
-        await applyResult(cached);
-        if (!cancelled) setLoading(false);
-      }
-
+      // No cache: always fetch fresh standings on every mount.
       try {
         const out = await loadCurrentSeasonChampionship();
         if (cancelled) return;
         if (out.error || !out.result) {
-          if (!hadCached) setHidden(true);
+          setHidden(true);
           return;
         }
-        writeCache(champKey, out.result);
         await applyResult(out.result);
       } catch {
-        if (!cancelled && !hadCached) setHidden(true);
+        if (!cancelled) setHidden(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
