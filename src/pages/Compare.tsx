@@ -189,6 +189,7 @@ export default function Compare() {
         positions,
         alternativeA: dual.outA.alternativeVreResult,
         alternativeB: dual.outB.alternativeVreResult,
+        sessionResults: dual.sessionResults,
       });
     } catch (e: any) {
       setError(e?.message ?? "Errore comparazione");
