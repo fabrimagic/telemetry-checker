@@ -17,6 +17,7 @@ import {
   getDrivers, getWeatherForSession, getRaceControl,
   getAllLaps, getSessionResult,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
+  type SessionResult,
 } from "@/lib/openf1";
 import { loadVreForDriver, type VreLoaderOutput } from "@/lib/vreLoader";
 import { computeHeadToHead, type ComparisonResult } from "@/lib/headToHeadComparison";
@@ -26,6 +27,7 @@ interface DualState {
   outA: VreLoaderOutput | null;
   outB: VreLoaderOutput | null;
   loading: boolean;
+  sessionResults: SessionResult[] | null;
 }
 
 export default function Compare() {
