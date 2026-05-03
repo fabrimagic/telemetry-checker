@@ -17,6 +17,7 @@ import {
   getDrivers, getWeatherForSession, getRaceControl,
   getAllLaps, getSessionResult,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
+  type SessionResult,
 } from "@/lib/openf1";
 import { loadVreForDriver, type VreLoaderOutput } from "@/lib/vreLoader";
 import { computeHeadToHead, type ComparisonResult } from "@/lib/headToHeadComparison";
@@ -26,6 +27,7 @@ interface DualState {
   outA: VreLoaderOutput | null;
   outB: VreLoaderOutput | null;
   loading: boolean;
+  sessionResults: SessionResult[] | null;
 }
 
 export default function Compare() {
@@ -42,7 +44,7 @@ export default function Compare() {
   const [driverA, setDriverA] = useState<number | null>(null);
   const [driverB, setDriverB] = useState<number | null>(null);
 
-  const [dual, setDual] = useState<DualState>({ outA: null, outB: null, loading: false });
+  const [dual, setDual] = useState<DualState>({ outA: null, outB: null, loading: false, sessionResults: null });
   const [error, setError] = useState<string | null>(null);
 
   // Hydrate from URL on mount only — once we have allDrivers, set initial selection
@@ -76,7 +78,7 @@ export default function Compare() {
     setMeetingKey(mKey);
     setDriverA(null);
     setDriverB(null);
-    setDual({ outA: null, outB: null, loading: false });
+    setDual({ outA: null, outB: null, loading: false, sessionResults: null });
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
@@ -109,7 +111,7 @@ export default function Compare() {
     if (driverObjA.driver_number === driverObjB.driver_number) return;
 
     let cancelled = false;
-    setDual({ outA: null, outB: null, loading: true });
+    setDual({ outA: null, outB: null, loading: true, sessionResults: null });
     setError(null);
 
     // Fetch session-scoped cumulative-deviation data ONCE and share between
@@ -119,6 +121,7 @@ export default function Compare() {
     // where one driver's cumulative_deviation_context is "non disponibile".
     (async () => {
       let sharedCumDev: CumulativeDeviationResult | null = null;
+      let sharedSessionResults: SessionResult[] | null = null;
       try {
         const [sessionAllLaps, sessionResults] = await Promise.all([
           getAllLaps(sessionKey),
@@ -127,6 +130,7 @@ export default function Compare() {
         if (sessionAllLaps.length && sessionResults.length) {
           sharedCumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
         }
+        if (sessionResults.length) sharedSessionResults = sessionResults;
       } catch { /* optional — loaders will fall back to their own fetch */ }
 
       if (cancelled) return;
@@ -161,11 +165,11 @@ export default function Compare() {
           }),
         ]);
         if (cancelled) return;
-        setDual({ outA, outB, loading: false });
+        setDual({ outA, outB, loading: false, sessionResults: sharedSessionResults });
       } catch (e: any) {
         if (cancelled) return;
         setError(e?.message ?? "Errore caricamento confronto");
-        setDual({ outA: null, outB: null, loading: false });
+        setDual({ outA: null, outB: null, loading: false, sessionResults: null });
       }
     })();
 
@@ -185,6 +189,7 @@ export default function Compare() {
         positions,
         alternativeA: dual.outA.alternativeVreResult,
         alternativeB: dual.outB.alternativeVreResult,
+        sessionResults: dual.sessionResults,
       });
     } catch (e: any) {
       setError(e?.message ?? "Errore comparazione");
@@ -204,7 +209,7 @@ export default function Compare() {
     setAllDrivers([]);
     setDriverA(null);
     setDriverB(null);
-    setDual({ outA: null, outB: null, loading: false });
+    setDual({ outA: null, outB: null, loading: false, sessionResults: null });
     setError(null);
     setSearchParams({}, { replace: true });
   };

@@ -11,7 +11,7 @@
  */
 
 import type { VirtualRaceEngineerResult, Confidence } from "./virtualRaceEngineer";
-import type { Lap, PositionData } from "./openf1";
+import type { Lap, PositionData, SessionResult } from "./openf1";
 
 export type DivergenceEventType =
   | "PIT_A_ONLY"
@@ -113,12 +113,23 @@ export interface ComparisonResult {
 }
 
 /**
- * Filter laps suitable for direct pace comparison. Mirrors `cleanLapsForStint`
- * intent (no pit-out, valid duration) without weather/track filters — the
- * delta itself naturally absorbs shared neutralisations.
+ * Filter laps suitable for direct pace comparison. Excludes:
+ *  - laps with no/invalid duration
+ *  - pit-out laps (out of the pit-lane, cold tyres / partial fuel-load lap)
+ *  - pit-in laps (lap during which the driver entered the pit-lane: includes
+ *    the ~20s of pit-lane crawl, which would otherwise inflate the "pace"
+ *    delta whenever the two drivers do a different number of pit stops —
+ *    leading to verdicts where the driver with fewer stops appears faster
+ *    even though he finished behind).
+ *
+ * `pitLaps` is the set of pit-in lap numbers from `actual_strategy.pit_laps`
+ * (already populated by the VRE engine from /pit data).
  */
-function isComparableLap(l: Lap): boolean {
-  return l.lap_duration != null && l.lap_duration > 0 && !l.is_pit_out_lap;
+function isComparableLap(l: Lap, pitLaps: Set<number>): boolean {
+  if (l.lap_duration == null || l.lap_duration <= 0) return false;
+  if (l.is_pit_out_lap) return false;
+  if (pitLaps.has(l.lap_number)) return false;
+  return true;
 }
 
 function lapByNumber(laps: Lap[]): Map<number, Lap> {
@@ -205,6 +216,16 @@ export interface HeadToHeadInput {
   alternativeA?: VirtualRaceEngineerResult | null;
   /** Optional: alternative VRE result for driver B (POST_RACE + BALANCED). */
   alternativeB?: VirtualRaceEngineerResult | null;
+  /**
+   * Optional: official session results (one entry per driver). When present and
+   * the session is a Race/Sprint, the head-to-head verdict reports the
+   * authoritative finishing gap (gap_to_leader) instead of the sum of lap-pace
+   * deltas. Pace deltas remain biased whenever drivers run different pit
+   * counts (each extra pit-in lap adds ~20s of pit-lane crawl that is not
+   * pure race pace), so the official gap is the only correct verdict source
+   * when comparing complete races.
+   */
+  sessionResults?: SessionResult[] | null;
 }
 
 export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
@@ -213,6 +234,7 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     positions = null,
     alternativeA = null,
     alternativeB = null,
+    sessionResults = null,
   } = input;
 
   if (resultA.session_key !== resultB.session_key) {
@@ -228,6 +250,10 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     ...lapsB.map((l) => l.lap_number),
   );
 
+  // Pit-in lap sets (used both to filter pace deltas and to drive divergence)
+  const pitsA = new Set(resultA.actual_strategy.pit_laps);
+  const pitsB = new Set(resultB.actual_strategy.pit_laps);
+
   // Lap-by-lap delta
   const mapA = lapByNumber(lapsA);
   const mapB = lapByNumber(lapsB);
@@ -237,7 +263,7 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     const la = mapA.get(lap);
     const lb = mapB.get(lap);
     let delta: number | null = null;
-    if (la && lb && isComparableLap(la) && isComparableLap(lb)) {
+    if (la && lb && isComparableLap(la, pitsA) && isComparableLap(lb, pitsB)) {
       delta = la.lap_duration! - lb.lap_duration!;
       cum += delta;
     }
@@ -274,8 +300,6 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
 
   // Divergence points
   const divergence: DivergencePoint[] = [];
-  const pitsA = new Set(resultA.actual_strategy.pit_laps);
-  const pitsB = new Set(resultB.actual_strategy.pit_laps);
   const allPitLaps = [...new Set([...pitsA, ...pitsB])].sort((a, b) => a - b);
   for (const lap of allPitLaps) {
     if (pitsA.has(lap) && !pitsB.has(lap)) {
@@ -301,8 +325,37 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
   divergence.sort((a, b) => a.lap - b.lap);
 
   // Verdict
+  // Pace-based total (sum of comparable lap deltas, pit-in/out already excluded).
   const validDeltas = deltas.filter((d) => d.delta_a_minus_b != null);
-  const totalDelta = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : 0;
+  const paceTotalDelta = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : 0;
+
+  // Authoritative finishing-gap from official session_result, when available.
+  // Convention matches paceTotalDelta: signed (A − B), negative = A faster/ahead.
+  // We use this for the verdict only — lap-by-lap deltas remain pace-based for
+  // the timeline. Any pit-count asymmetry, neutralisation pit-loss, off-track
+  // moments etc. are absorbed by the official gap, eliminating the systematic
+  // bias that previously favoured the driver with fewer pit stops.
+  let officialDelta: number | null = null;
+  if (sessionResults && sessionResults.length) {
+    const rA = sessionResults.find((r) => r.driver_number === resultA.driver_number);
+    const rB = sessionResults.find((r) => r.driver_number === resultB.driver_number);
+    const bothFinished = !!(rA && rB && !rA.dnf && !rA.dns && !rA.dsq && !rB.dnf && !rB.dns && !rB.dsq);
+    if (bothFinished && rA && rB) {
+      const gA = typeof rA.gap_to_leader === "number" ? rA.gap_to_leader : null;
+      const gB = typeof rB.gap_to_leader === "number" ? rB.gap_to_leader : null;
+      if (gA != null && gB != null) {
+        // gap_to_leader is positive seconds behind P1 (0 for the winner).
+        // (A − B) > 0 ⇒ A finished further behind ⇒ B faster.
+        officialDelta = gA - gB;
+      } else if (rA.position && rB.position && rA.position !== rB.position) {
+        // Fallback: only the finishing order is known (no numeric gap, e.g. lapped cars).
+        // Use a tiny non-zero magnitude so the verdict still reflects the correct order.
+        officialDelta = rA.position < rB.position ? -0.001 : 0.001;
+      }
+    }
+  }
+
+  const totalDelta = officialDelta != null ? officialDelta : paceTotalDelta;
   let faster: "A" | "B" | "TIE" = "TIE";
   if (Math.abs(totalDelta) > 0.5) faster = totalDelta < 0 ? "A" : "B";
 
