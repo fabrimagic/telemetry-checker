@@ -239,6 +239,10 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     ...lapsB.map((l) => l.lap_number),
   );
 
+  // Pit-in lap sets (used both to filter pace deltas and to drive divergence)
+  const pitsA = new Set(resultA.actual_strategy.pit_laps);
+  const pitsB = new Set(resultB.actual_strategy.pit_laps);
+
   // Lap-by-lap delta
   const mapA = lapByNumber(lapsA);
   const mapB = lapByNumber(lapsB);
@@ -248,7 +252,7 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     const la = mapA.get(lap);
     const lb = mapB.get(lap);
     let delta: number | null = null;
-    if (la && lb && isComparableLap(la) && isComparableLap(lb)) {
+    if (la && lb && isComparableLap(la, pitsA) && isComparableLap(lb, pitsB)) {
       delta = la.lap_duration! - lb.lap_duration!;
       cum += delta;
     }
