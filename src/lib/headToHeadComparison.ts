@@ -216,6 +216,16 @@ export interface HeadToHeadInput {
   alternativeA?: VirtualRaceEngineerResult | null;
   /** Optional: alternative VRE result for driver B (POST_RACE + BALANCED). */
   alternativeB?: VirtualRaceEngineerResult | null;
+  /**
+   * Optional: official session results (one entry per driver). When present and
+   * the session is a Race/Sprint, the head-to-head verdict reports the
+   * authoritative finishing gap (gap_to_leader) instead of the sum of lap-pace
+   * deltas. Pace deltas remain biased whenever drivers run different pit
+   * counts (each extra pit-in lap adds ~20s of pit-lane crawl that is not
+   * pure race pace), so the official gap is the only correct verdict source
+   * when comparing complete races.
+   */
+  sessionResults?: SessionResult[] | null;
 }
 
 export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
