@@ -11,7 +11,7 @@
  */
 
 import type { VirtualRaceEngineerResult, Confidence } from "./virtualRaceEngineer";
-import type { Lap, PositionData } from "./openf1";
+import type { Lap, PositionData, SessionResult } from "./openf1";
 
 export type DivergenceEventType =
   | "PIT_A_ONLY"
