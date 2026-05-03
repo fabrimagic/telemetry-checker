@@ -74,7 +74,7 @@ export const F1_CALENDAR_2026: F1Session[] = [
 
   // Round 4 — Miami — 1-3 May (Sprint)
   ...sprintWeekend(4, "Gran Premio di Miami", "2026-05-01", "2026-05-02", "2026-05-03",
-    "16:30", "20:30", "16:00", "20:00", "20:00"),
+    "16:30", "20:30", "16:00", "20:00", "17:00"),
 
   // Round 5 — Canada (Montreal) — 22-24 May
   ...stdWeekend(5, "Gran Premio del Canada", "2026-05-22", "2026-05-23", "2026-05-24",
