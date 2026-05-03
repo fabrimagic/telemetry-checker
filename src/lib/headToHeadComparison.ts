@@ -234,6 +234,7 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     positions = null,
     alternativeA = null,
     alternativeB = null,
+    sessionResults = null,
   } = input;
 
   if (resultA.session_key !== resultB.session_key) {
