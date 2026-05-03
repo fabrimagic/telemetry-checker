@@ -325,8 +325,37 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
   divergence.sort((a, b) => a.lap - b.lap);
 
   // Verdict
+  // Pace-based total (sum of comparable lap deltas, pit-in/out already excluded).
   const validDeltas = deltas.filter((d) => d.delta_a_minus_b != null);
-  const totalDelta = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : 0;
+  const paceTotalDelta = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : 0;
+
+  // Authoritative finishing-gap from official session_result, when available.
+  // Convention matches paceTotalDelta: signed (A − B), negative = A faster/ahead.
+  // We use this for the verdict only — lap-by-lap deltas remain pace-based for
+  // the timeline. Any pit-count asymmetry, neutralisation pit-loss, off-track
+  // moments etc. are absorbed by the official gap, eliminating the systematic
+  // bias that previously favoured the driver with fewer pit stops.
+  let officialDelta: number | null = null;
+  if (sessionResults && sessionResults.length) {
+    const rA = sessionResults.find((r) => r.driver_number === resultA.driver_number);
+    const rB = sessionResults.find((r) => r.driver_number === resultB.driver_number);
+    const bothFinished = !!(rA && rB && !rA.dnf && !rA.dns && !rA.dsq && !rB.dnf && !rB.dns && !rB.dsq);
+    if (bothFinished && rA && rB) {
+      const gA = typeof rA.gap_to_leader === "number" ? rA.gap_to_leader : null;
+      const gB = typeof rB.gap_to_leader === "number" ? rB.gap_to_leader : null;
+      if (gA != null && gB != null) {
+        // gap_to_leader is positive seconds behind P1 (0 for the winner).
+        // (A − B) > 0 ⇒ A finished further behind ⇒ B faster.
+        officialDelta = gA - gB;
+      } else if (rA.position && rB.position && rA.position !== rB.position) {
+        // Fallback: only the finishing order is known (no numeric gap, e.g. lapped cars).
+        // Use a tiny non-zero magnitude so the verdict still reflects the correct order.
+        officialDelta = rA.position < rB.position ? -0.001 : 0.001;
+      }
+    }
+  }
+
+  const totalDelta = officialDelta != null ? officialDelta : paceTotalDelta;
   let faster: "A" | "B" | "TIE" = "TIE";
   if (Math.abs(totalDelta) > 0.5) faster = totalDelta < 0 ? "A" : "B";
 
