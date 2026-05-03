@@ -289,8 +289,6 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
 
   // Divergence points
   const divergence: DivergencePoint[] = [];
-  const pitsA = new Set(resultA.actual_strategy.pit_laps);
-  const pitsB = new Set(resultB.actual_strategy.pit_laps);
   const allPitLaps = [...new Set([...pitsA, ...pitsB])].sort((a, b) => a - b);
   for (const lap of allPitLaps) {
     if (pitsA.has(lap) && !pitsB.has(lap)) {
