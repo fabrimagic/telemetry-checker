@@ -113,12 +113,23 @@ export interface ComparisonResult {
 }
 
 /**
- * Filter laps suitable for direct pace comparison. Mirrors `cleanLapsForStint`
- * intent (no pit-out, valid duration) without weather/track filters — the
- * delta itself naturally absorbs shared neutralisations.
+ * Filter laps suitable for direct pace comparison. Excludes:
+ *  - laps with no/invalid duration
+ *  - pit-out laps (out of the pit-lane, cold tyres / partial fuel-load lap)
+ *  - pit-in laps (lap during which the driver entered the pit-lane: includes
+ *    the ~20s of pit-lane crawl, which would otherwise inflate the "pace"
+ *    delta whenever the two drivers do a different number of pit stops —
+ *    leading to verdicts where the driver with fewer stops appears faster
+ *    even though he finished behind).
+ *
+ * `pitLaps` is the set of pit-in lap numbers from `actual_strategy.pit_laps`
+ * (already populated by the VRE engine from /pit data).
  */
-function isComparableLap(l: Lap): boolean {
-  return l.lap_duration != null && l.lap_duration > 0 && !l.is_pit_out_lap;
+function isComparableLap(l: Lap, pitLaps: Set<number>): boolean {
+  if (l.lap_duration == null || l.lap_duration <= 0) return false;
+  if (l.is_pit_out_lap) return false;
+  if (pitLaps.has(l.lap_number)) return false;
+  return true;
 }
 
 function lapByNumber(laps: Lap[]): Map<number, Lap> {
