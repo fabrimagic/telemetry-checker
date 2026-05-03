@@ -121,6 +121,7 @@ export default function Compare() {
     // where one driver's cumulative_deviation_context is "non disponibile".
     (async () => {
       let sharedCumDev: CumulativeDeviationResult | null = null;
+      let sharedSessionResults: SessionResult[] | null = null;
       try {
         const [sessionAllLaps, sessionResults] = await Promise.all([
           getAllLaps(sessionKey),
@@ -129,6 +130,7 @@ export default function Compare() {
         if (sessionAllLaps.length && sessionResults.length) {
           sharedCumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
         }
+        if (sessionResults.length) sharedSessionResults = sessionResults;
       } catch { /* optional — loaders will fall back to their own fetch */ }
 
       if (cancelled) return;
@@ -163,7 +165,7 @@ export default function Compare() {
           }),
         ]);
         if (cancelled) return;
-        setDual({ outA, outB, loading: false });
+        setDual({ outA, outB, loading: false, sessionResults: sharedSessionResults });
       } catch (e: any) {
         if (cancelled) return;
         setError(e?.message ?? "Errore caricamento confronto");
