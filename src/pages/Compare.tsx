@@ -44,7 +44,7 @@ export default function Compare() {
   const [driverA, setDriverA] = useState<number | null>(null);
   const [driverB, setDriverB] = useState<number | null>(null);
 
-  const [dual, setDual] = useState<DualState>({ outA: null, outB: null, loading: false });
+  const [dual, setDual] = useState<DualState>({ outA: null, outB: null, loading: false, sessionResults: null });
   const [error, setError] = useState<string | null>(null);
 
   // Hydrate from URL on mount only — once we have allDrivers, set initial selection
@@ -78,7 +78,7 @@ export default function Compare() {
     setMeetingKey(mKey);
     setDriverA(null);
     setDriverB(null);
-    setDual({ outA: null, outB: null, loading: false });
+    setDual({ outA: null, outB: null, loading: false, sessionResults: null });
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
@@ -111,7 +111,7 @@ export default function Compare() {
     if (driverObjA.driver_number === driverObjB.driver_number) return;
 
     let cancelled = false;
-    setDual({ outA: null, outB: null, loading: true });
+    setDual({ outA: null, outB: null, loading: true, sessionResults: null });
     setError(null);
 
     // Fetch session-scoped cumulative-deviation data ONCE and share between
@@ -167,7 +167,7 @@ export default function Compare() {
       } catch (e: any) {
         if (cancelled) return;
         setError(e?.message ?? "Errore caricamento confronto");
-        setDual({ outA: null, outB: null, loading: false });
+        setDual({ outA: null, outB: null, loading: false, sessionResults: null });
       }
     })();
 
@@ -206,7 +206,7 @@ export default function Compare() {
     setAllDrivers([]);
     setDriverA(null);
     setDriverB(null);
-    setDual({ outA: null, outB: null, loading: false });
+    setDual({ outA: null, outB: null, loading: false, sessionResults: null });
     setError(null);
     setSearchParams({}, { replace: true });
   };
