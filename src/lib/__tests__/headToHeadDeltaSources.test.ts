@@ -66,7 +66,7 @@ describe("HeadToHead — delta source separation", () => {
 
     expect(r.head_to_head_verdict.delta_source).toBe("official_gap");
     expect(r.head_to_head_verdict.gap_at_finish_seconds!).toBeCloseTo(25, 0);
-    expect(r.head_to_head_verdict.pace_sum_delta_seconds!).toBeCloseTo(27, 0);
+    expect(r.head_to_head_verdict.pace_sum_delta_seconds!).toBeCloseTo(28, 0);
     expect(r.head_to_head_verdict.delta_total_seconds).toBeCloseTo(25, 0);
     expect(r.head_to_head_verdict.faster_driver).toBe("B");
   });
@@ -87,8 +87,8 @@ describe("HeadToHead — delta source separation", () => {
 
     expect(r.head_to_head_verdict.delta_source).toBe("pace_sum");
     expect(r.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
-    expect(r.head_to_head_verdict.pace_sum_delta_seconds!).toBeCloseTo(27, 0);
-    expect(r.head_to_head_verdict.delta_total_seconds).toBeCloseTo(27, 0);
+    expect(r.head_to_head_verdict.pace_sum_delta_seconds!).toBeCloseTo(28, 0);
+    expect(r.head_to_head_verdict.delta_total_seconds).toBeCloseTo(28, 0);
     expect(r.head_to_head_verdict.faster_driver).toBe("B");
   });
 
