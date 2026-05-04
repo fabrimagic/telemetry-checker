@@ -107,6 +107,7 @@ export interface RecommendedStrategy {
   scoring_without_soft_sensors?: number;
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
+  intent?: IntentClassification;
 }
 
 export interface AlternativeStrategy {
@@ -127,6 +128,7 @@ export interface AlternativeStrategy {
   scoring_without_soft_sensors?: number;
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
+  intent?: IntentClassification;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
