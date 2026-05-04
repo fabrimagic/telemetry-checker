@@ -203,6 +203,8 @@ export default function Championship() {
     Map<number, { headshot: string | null; teamColour: string | null }>
   >(new Map());
   const [teamColorMap, setTeamColorMap] = useState<Map<string, string>>(new Map());
+  const [driverTeamMap, setDriverTeamMap] = useState<Map<number, string>>(new Map());
+  const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
