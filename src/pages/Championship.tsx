@@ -291,6 +291,18 @@ export default function Championship() {
               {result.racesCompleted === 1 ? "gara disputata" : "gare disputate"}.
             </p>
 
+            {(() => {
+              const sentences = buildChampionshipNarrative(result, driverNameMap);
+              if (!sentences.length) return null;
+              return (
+                <div className="bg-muted/30 rounded-lg border p-4 mb-4 leading-relaxed text-sm space-y-2">
+                  {sentences.map((s, i) => (
+                    <p key={i}>{s}</p>
+                  ))}
+                </div>
+              );
+            })()}
+
             <Tabs defaultValue="drivers">
               <TabsList>
                 <TabsTrigger value="drivers">Piloti</TabsTrigger>
