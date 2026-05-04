@@ -41,7 +41,14 @@ export interface DivergencePoint {
 
 export interface HeadToHeadVerdict {
   faster_driver: "A" | "B" | "TIE";
-  delta_total_seconds: number; // |sum of lap deltas where both valid|
+  /** Backward-compat: official_gap se disponibile, altrimenti pace_sum (assoluto). */
+  delta_total_seconds: number;
+  /** Sorgente del delta_total_seconds: "official_gap" | "pace_sum". */
+  delta_source: "official_gap" | "pace_sum";
+  /** Differenza tra gap_to_leader ufficiali (assoluta). Null quando session_result non disponibili o nessuno dei due ha finito. */
+  gap_at_finish_seconds: number | null;
+  /** Somma cumulativa dei delta lap-by-lap sui giri comparabili (assoluta). Null se nessun giro comparabile. */
+  pace_sum_delta_seconds: number | null;
   key_factors: string[];
 }
 
