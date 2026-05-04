@@ -62,6 +62,9 @@ describe("computeHeadToHead — counterfactual scenarios", () => {
     });
 
     expect(r.head_to_head_verdict.faster_driver).toBe("B");
+    expect(r.head_to_head_verdict.delta_source).toBe("pace_sum");
+    expect(r.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
+    expect(r.head_to_head_verdict.pace_sum_delta_seconds!).toBeCloseTo(30, 0);
     expect(r.counterfactual_analysis).not.toBeNull();
     const cf = r.counterfactual_analysis!;
 
