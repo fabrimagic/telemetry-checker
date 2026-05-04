@@ -160,11 +160,11 @@ describe("buildChampionshipNarrative", () => {
   });
 
   it("4. A6: campionato chiuso, 20 gare, leader +200 sul secondo → 'già assegnato'", () => {
-    // 20 races, leader scores 25 each = 500. Second scores 15 each = 300. Gap = 200.
-    // Races left = 24-20=4, max remaining = 100. 200 > 100 → closed.
+    // 20 races done, totalRacesInSeason=24 → 4 left × 33 max = 132. Gap 200 > 132 → closed.
     const leader = mkDriver(1, Array.from({ length: 20 }, () => ({ gained: 25, pos: 1 })));
     const second = mkDriver(44, Array.from({ length: 20 }, () => ({ gained: 15, pos: 2 })));
     const result = mkResult(2026, [leader, second]);
+    result.totalRacesInSeason = 24;
     const map = new Map([[1, "BIG. CHAMP"], [44, "RUNNER. UP"]]);
     const out = buildChampionshipNarrative(result, map);
     expect(out.some((s) => s.includes("già assegnato"))).toBe(true);
@@ -346,5 +346,56 @@ describe("buildChampionshipNarrative", () => {
     const map = new Map([[1, "LEADER"]]);
     const out = buildChampionshipNarrative(result, map);
     expect(out.some((s) => s.includes("momento è di") && s.includes("Mercedes") && s.includes("80"))).toBe(true);
+  });
+
+  it("10. A6 NON appare se totalRacesInSeason è undefined", () => {
+    const leader = mkDriver(1, Array.from({ length: 20 }, () => ({ gained: 25, pos: 1 })));
+    const second = mkDriver(44, Array.from({ length: 20 }, () => ({ gained: 15, pos: 2 })));
+    const result = mkResult(2026, [leader, second]);
+    // totalRacesInSeason intentionally not set
+    const map = new Map([[1, "BIG. CHAMP"], [44, "RUNNER. UP"]]);
+    const out = buildChampionshipNarrative(result, map);
+    expect(out.some((s) => s.includes("già assegnato"))).toBe(false);
+  });
+
+  it("11. A6 NON appare se delta non sufficiente per Sprint residui (anti-regression bug)", () => {
+    // 22 races done, totalRacesInSeason=24 → 2 left × 33 = 66. Gap 60 < 66 → not closed.
+    // With the OLD formula (2 × 25 = 50) this would erroneously be declared closed.
+    const leader = mkDriver(
+      1,
+      Array.from({ length: 22 }, (_, i) => ({ gained: i === 0 ? 500 - 21 * 22 : 22, pos: 1 })),
+    );
+    // Adjust to ensure totals: leader 500, second 440
+    const leader2 = mkDriver(
+      1,
+      [{ gained: 500, pos: 1 }, ...Array.from({ length: 21 }, () => ({ gained: 0, pos: 1 }))],
+    );
+    const second = mkDriver(
+      44,
+      [{ gained: 440, pos: 2 }, ...Array.from({ length: 21 }, () => ({ gained: 0, pos: 2 }))],
+    );
+    void leader;
+    const result = mkResult(2026, [leader2, second]);
+    result.totalRacesInSeason = 24;
+    const map = new Map([[1, "LEAD"], [44, "SEC"]]);
+    const out = buildChampionshipNarrative(result, map);
+    expect(out.some((s) => s.includes("già assegnato"))).toBe(false);
+  });
+
+  it("12. A6 appare con delta sufficientemente grande anche con Sprint residui", () => {
+    // 22 done, totalRacesInSeason=24 → 2 left × 33 = 66. Gap 70 > 66 → closed.
+    const leader = mkDriver(
+      1,
+      [{ gained: 500, pos: 1 }, ...Array.from({ length: 21 }, () => ({ gained: 0, pos: 1 }))],
+    );
+    const second = mkDriver(
+      44,
+      [{ gained: 430, pos: 2 }, ...Array.from({ length: 21 }, () => ({ gained: 0, pos: 2 }))],
+    );
+    const result = mkResult(2026, [leader, second]);
+    result.totalRacesInSeason = 24;
+    const map = new Map([[1, "LEAD"], [44, "SEC"]]);
+    const out = buildChampionshipNarrative(result, map);
+    expect(out.some((s) => s.includes("già assegnato"))).toBe(true);
   });
 });

@@ -13,8 +13,9 @@ const TEAMMATE_GAP_MIN = 15;
 const LEADER_MIN_WINS = 2;
 const HOT_TEAM_MIN_GAIN = 30;
 const CLOSED_MIN_RACES = 18;
-const ASSUMED_MAX_RACES_IN_SEASON = 24;
-const MAX_POINTS_PER_RACE = 25;
+/** Max realistic points per weekend including Sprint (8 Sprint + 25 Race).
+ *  Conservative upper bound: assumes every remaining round COULD be Sprint. */
+const MAX_POINTS_PER_WEEKEND = 33;
 
 function gainInLastN(timeline: DriverTimeline | TeamTimeline, n: number): number {
   const slice = timeline.points.slice(-n);
@@ -24,11 +25,14 @@ function gainInLastN(timeline: DriverTimeline | TeamTimeline, n: number): number
 function isMathematicallyClosed(
   drivers: DriverTimeline[],
   racesCompleted: number,
+  totalRacesInSeason: number | undefined,
 ): boolean {
   if (racesCompleted < CLOSED_MIN_RACES) return false;
   if (drivers.length < 2) return false;
-  const racesLeft = Math.max(0, ASSUMED_MAX_RACES_IN_SEASON - racesCompleted);
-  const maxPointsRemaining = racesLeft * MAX_POINTS_PER_RACE;
+  // Without totalRacesInSeason we cannot honestly claim "closed". Bail out.
+  if (totalRacesInSeason == null) return false;
+  const racesLeft = Math.max(0, totalRacesInSeason - racesCompleted);
+  const maxPointsRemaining = racesLeft * MAX_POINTS_PER_WEEKEND;
   const delta = drivers[0].totalPoints - drivers[1].totalPoints;
   return delta > maxPointsRemaining;
 }
@@ -107,7 +111,7 @@ export function buildChampionshipNarrative(
   }
 
   // [N1=A6] Campionato chiuso
-  if (leader && leaderName && isMathematicallyClosed(drivers, races)) {
+  if (leader && leaderName && isMathematicallyClosed(drivers, races, result.totalRacesInSeason)) {
     sentences.push(
       `Mondiale Piloti già assegnato a ${leaderName}: anche con un en-plein delle gare rimanenti, il secondo non può più raggiungerlo.`,
     );

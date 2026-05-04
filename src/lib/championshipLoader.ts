@@ -60,6 +60,12 @@ export async function loadCurrentSeasonChampionship(): Promise<ChampionshipLoade
     .filter((r) => !(year === 2026 && EXCLUDED_2026.has(r.location ?? "")))
     .sort((a, b) => a.date_start.localeCompare(b.date_start));
 
+  // Total scheduled Race sessions (completed + future), excluding 2026 cancellations.
+  // Used by the narrative module to compute "mathematically closed" honestly.
+  const totalRacesInSeason = races.filter(
+    (r) => !(year === 2026 && EXCLUDED_2026.has(r.location ?? "")),
+  ).length;
+
   if (!completed.length) {
     return {
       result: {
@@ -69,6 +75,7 @@ export async function loadCurrentSeasonChampionship(): Promise<ChampionshipLoade
         driverTimelines: [],
         teamTimelines: [],
         warnings: ["Nessuna gara ancora disputata in questa stagione"],
+        totalRacesInSeason,
       },
       error: null,
     };
@@ -105,6 +112,7 @@ export async function loadCurrentSeasonChampionship(): Promise<ChampionshipLoade
 
   const result = buildChampionshipResult(year, snapshots);
   result.warnings = [...warnings, ...result.warnings];
+  result.totalRacesInSeason = totalRacesInSeason;
 
   return { result, error: null };
 }
