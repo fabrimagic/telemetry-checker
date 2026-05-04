@@ -58,6 +58,7 @@ describe("computeHeadToHead verdict — pit-in lap exclusion", () => {
     expect(result.head_to_head_verdict.delta_source).toBe("pace_sum");
     expect(result.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
     expect(result.head_to_head_verdict.pace_sum_delta_seconds!).toBeLessThan(0.1);
+  });
 
   it("Test 2: A 1-pit vs B 2-pit, B faster by 1s/lap → faster_driver = B", () => {
     const A = mkVreResult(1, 9999, [15]);
