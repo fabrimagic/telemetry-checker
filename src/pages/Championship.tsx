@@ -65,6 +65,20 @@ function shortLabel(raceLabel: string, countryName: string): string {
   return src.slice(0, 3).toUpperCase() || "—";
 }
 
+/** Lighten a #rrggbb color toward white by a 0..1 amount. */
+function lightenHex(hex: string, amount: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  let r = (n >> 16) & 0xff;
+  let g = (n >> 8) & 0xff;
+  let b = n & 0xff;
+  r = Math.round(r + (255 - r) * amount);
+  g = Math.round(g + (255 - g) * amount);
+  b = Math.round(b + (255 - b) * amount);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 interface EvolutionChartProps {
   timelines: (DriverTimeline | TeamTimeline)[];
   races: ChampionshipResult["races"];
@@ -189,6 +203,8 @@ export default function Championship() {
     Map<number, { headshot: string | null; teamColour: string | null }>
   >(new Map());
   const [teamColorMap, setTeamColorMap] = useState<Map<string, string>>(new Map());
+  const [driverTeamMap, setDriverTeamMap] = useState<Map<number, string>>(new Map());
+  const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,9 +228,11 @@ export default function Championship() {
             const dMap = new Map<number, string>();
             const tMap = new Map<string, string>();
             const iMap = new Map<number, { headshot: string | null; teamColour: string | null }>();
+            const dtMap = new Map<number, string>();
             for (const d of drivers) {
               dMap.set(d.driver_number, d.broadcast_name || d.name_acronym);
               if (d.team_name && d.team_colour) tMap.set(d.team_name, d.team_colour);
+              if (d.team_name) dtMap.set(d.driver_number, d.team_name);
               iMap.set(d.driver_number, {
                 headshot: d.headshot_url ?? null,
                 teamColour: d.team_colour ?? null,
@@ -223,6 +241,7 @@ export default function Championship() {
             setDriverNameMap(dMap);
             setTeamColorMap(tMap);
             setDriverInfoMap(iMap);
+            setDriverTeamMap(dtMap);
           } catch {
             /* fallback */
           }
@@ -311,90 +330,160 @@ export default function Championship() {
               </TabsList>
 
               <TabsContent value="drivers" className="mt-4">
-                <div className="bg-card rounded-lg border p-4 mb-4">
-                  <h3 className="text-sm font-semibold mb-3">Evoluzione punti</h3>
-                  <EvolutionChart
-                    timelines={result.driverTimelines}
-                    races={result.races}
-                    colorOf={(t) => {
-                      const d = t as DriverTimeline;
-                      const info = driverInfoMap.get(d.driverNumber);
-                      return info?.teamColour ? `#${info.teamColour}` : "hsl(215 12% 60%)";
-                    }}
-                    labelOf={(t) => {
-                      const d = t as DriverTimeline;
-                      return driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
-                    }}
-                    keyOf={(t) => String((t as DriverTimeline).driverNumber)}
-                  />
-                </div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Classifica Piloti</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">Pos</TableHead>
-                          <TableHead>Pilota</TableHead>
-                          <TableHead className="text-center">Trend</TableHead>
-                          <TableHead className="text-right">Punti</TableHead>
-                          <TableHead className="text-right">Δ ultima gara</TableHead>
-                          <TableHead className="text-right">Punti ultima gara</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {result.driverTimelines.map((d) => {
-                          const last = d.points[d.points.length - 1];
-                          const display =
-                            driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
-                          const info = driverInfoMap.get(d.driverNumber);
-                          const borderColor = info?.teamColour ? `#${info.teamColour}` : "hsl(var(--border))";
-                          return (
-                            <TableRow key={d.driverNumber}>
-                              <TableCell className="font-bold">
-                                {d.currentPosition || "—"}
-                              </TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center gap-2">
-                                  {info?.headshot ? (
-                                    <img
-                                      src={info.headshot}
-                                      alt={display}
-                                      loading="lazy"
-                                      className="h-8 w-8 rounded-full object-cover border-2"
-                                      style={{ borderColor }}
-                                    />
-                                  ) : (
-                                    <span
-                                      className="h-8 w-8 rounded-full border-2 bg-muted inline-block"
-                                      style={{ borderColor }}
-                                      aria-hidden="true"
-                                    />
-                                  )}
-                                  <span className="font-mono uppercase">{display}</span>
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <MiniSparkline points={d.points} />
-                              </TableCell>
-                              <TableCell className="text-right font-bold">
-                                {d.totalPoints}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <PositionDelta delta={d.positionDeltaVsPrevRace} />
-                              </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
-                                {last?.pointsGained ?? 0}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                {(() => {
+                  // Color override map: when 2+ drivers share the same team color,
+                  // lighten the 2nd, 3rd, ... by progressive amounts for chart legibility.
+                  const colorByDriver = new Map<number, string>();
+                  const seenByTeam = new Map<string, number>();
+                  for (const d of result.driverTimelines) {
+                    const info = driverInfoMap.get(d.driverNumber);
+                    const base = info?.teamColour ? `#${info.teamColour}` : "hsl(215 12% 60%)";
+                    const teamKey = driverTeamMap.get(d.driverNumber) ?? `__${d.driverNumber}`;
+                    const idx = seenByTeam.get(teamKey) ?? 0;
+                    seenByTeam.set(teamKey, idx + 1);
+                    // 0 → base, 1 → +28% lighter, 2 → +50% lighter
+                    const amount = idx === 0 ? 0 : idx === 1 ? 0.28 : 0.5;
+                    colorByDriver.set(d.driverNumber, idx === 0 || !base.startsWith("#") ? base : lightenHex(base, amount));
+                  }
+
+                  const allDriverNums = result.driverTimelines.map((d) => d.driverNumber);
+                  const isVisible = (num: number) => !visibleDrivers || visibleDrivers.has(num);
+                  const visibleTimelines = result.driverTimelines.filter((d) => isVisible(d.driverNumber));
+
+                  const toggleDriver = (num: number) => {
+                    setVisibleDrivers((prev) => {
+                      const current = prev ?? new Set(allDriverNums);
+                      const next = new Set(current);
+                      if (next.has(num)) {
+                        next.delete(num);
+                        if (next.size === 0) return null;
+                      } else {
+                        next.add(num);
+                      }
+                      return next;
+                    });
+                  };
+
+                  return (
+                    <>
+                      {/* Driver filter bar */}
+                      <div className="bg-card rounded-lg border border-border p-3 mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtra Piloti</h3>
+                          <div className="flex gap-2">
+                            <button onClick={() => setVisibleDrivers(null)} className="text-[10px] text-primary hover:underline">Tutti</button>
+                            <button onClick={() => setVisibleDrivers(new Set())} className="text-[10px] text-primary hover:underline">Nessuno</button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {allDriverNums.map((num) => {
+                            const active = isVisible(num);
+                            const display = driverNameMap.get(num) ?? `#${num}`;
+                            const color = colorByDriver.get(num) ?? "hsl(215 12% 60%)";
+                            return (
+                              <button
+                                key={num}
+                                onClick={() => toggleDriver(num)}
+                                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
+                                  active
+                                    ? "border-border bg-muted/80 text-foreground"
+                                    : "border-transparent bg-muted/20 text-muted-foreground opacity-40"
+                                }`}
+                              >
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                {display}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="bg-card rounded-lg border p-4 mb-4">
+                        <h3 className="text-sm font-semibold mb-3">Evoluzione punti</h3>
+                        <EvolutionChart
+                          timelines={visibleTimelines}
+                          races={result.races}
+                          colorOf={(t) => {
+                            const d = t as DriverTimeline;
+                            return colorByDriver.get(d.driverNumber) ?? "hsl(215 12% 60%)";
+                          }}
+                          labelOf={(t) => {
+                            const d = t as DriverTimeline;
+                            return driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
+                          }}
+                          keyOf={(t) => String((t as DriverTimeline).driverNumber)}
+                        />
+                      </div>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Classifica Piloti</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-12">Pos</TableHead>
+                                <TableHead>Pilota</TableHead>
+                                <TableHead className="text-center">Trend</TableHead>
+                                <TableHead className="text-right">Punti</TableHead>
+                                <TableHead className="text-right">Δ ultima gara</TableHead>
+                                <TableHead className="text-right">Punti ultima gara</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {visibleTimelines.map((d) => {
+                                const last = d.points[d.points.length - 1];
+                                const display =
+                                  driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
+                                const info = driverInfoMap.get(d.driverNumber);
+                                const borderColor = info?.teamColour ? `#${info.teamColour}` : "hsl(var(--border))";
+                                return (
+                                  <TableRow key={d.driverNumber}>
+                                    <TableCell className="font-bold">
+                                      {d.currentPosition || "—"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className="inline-flex items-center gap-2">
+                                        {info?.headshot ? (
+                                          <img
+                                            src={info.headshot}
+                                            alt={display}
+                                            loading="lazy"
+                                            className="h-8 w-8 rounded-full object-cover border-2"
+                                            style={{ borderColor }}
+                                          />
+                                        ) : (
+                                          <span
+                                            className="h-8 w-8 rounded-full border-2 bg-muted inline-block"
+                                            style={{ borderColor }}
+                                            aria-hidden="true"
+                                          />
+                                        )}
+                                        <span className="font-mono uppercase">{display}</span>
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <MiniSparkline points={d.points} />
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold">
+                                      {d.totalPoints}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <PositionDelta delta={d.positionDeltaVsPrevRace} />
+                                    </TableCell>
+                                    <TableCell className="text-right text-muted-foreground">
+                                      {last?.pointsGained ?? 0}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    </>
+                  );
+                })()}
               </TabsContent>
 
               <TabsContent value="teams" className="mt-4">
