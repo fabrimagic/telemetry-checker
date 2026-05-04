@@ -107,6 +107,9 @@ describe("computeHeadToHead — counterfactual scenarios", () => {
     });
 
     expect(r.head_to_head_verdict.faster_driver).toBe("TIE");
+    expect(r.head_to_head_verdict.delta_source).toBe("pace_sum");
+    expect(r.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
+    expect(r.head_to_head_verdict.pace_sum_delta_seconds!).toBeLessThan(0.1);
     const cf = r.counterfactual_analysis!;
     expect(cf).not.toBeNull();
     expect(cf.real_h2h_delta_seconds).toBeCloseTo(0, 1);
