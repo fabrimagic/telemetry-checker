@@ -65,6 +65,20 @@ function shortLabel(raceLabel: string, countryName: string): string {
   return src.slice(0, 3).toUpperCase() || "—";
 }
 
+/** Lighten a #rrggbb color toward white by a 0..1 amount. */
+function lightenHex(hex: string, amount: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  let r = (n >> 16) & 0xff;
+  let g = (n >> 8) & 0xff;
+  let b = n & 0xff;
+  r = Math.round(r + (255 - r) * amount);
+  g = Math.round(g + (255 - g) * amount);
+  b = Math.round(b + (255 - b) * amount);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 interface EvolutionChartProps {
   timelines: (DriverTimeline | TeamTimeline)[];
   races: ChampionshipResult["races"];
