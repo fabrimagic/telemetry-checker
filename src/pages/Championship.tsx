@@ -228,9 +228,11 @@ export default function Championship() {
             const dMap = new Map<number, string>();
             const tMap = new Map<string, string>();
             const iMap = new Map<number, { headshot: string | null; teamColour: string | null }>();
+            const dtMap = new Map<number, string>();
             for (const d of drivers) {
               dMap.set(d.driver_number, d.broadcast_name || d.name_acronym);
               if (d.team_name && d.team_colour) tMap.set(d.team_name, d.team_colour);
+              if (d.team_name) dtMap.set(d.driver_number, d.team_name);
               iMap.set(d.driver_number, {
                 headshot: d.headshot_url ?? null,
                 teamColour: d.team_colour ?? null,
@@ -239,6 +241,7 @@ export default function Championship() {
             setDriverNameMap(dMap);
             setTeamColorMap(tMap);
             setDriverInfoMap(iMap);
+            setDriverTeamMap(dtMap);
           } catch {
             /* fallback */
           }
