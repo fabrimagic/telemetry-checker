@@ -1465,6 +1465,7 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
                         {alt.analysis?.robustness && (
                           <RobustnessBadge label={alt.analysis.robustness.robustness_label} />
                         )}
+                        <IntentBadge intent={alt.intent} />
                       </div>
                       <div className="flex items-center gap-1.5">
                         {risk_mode !== "BALANCED" && Math.abs(alt.adjusted_score - alt.estimated_delta_vs_actual) > 0.05 && (
