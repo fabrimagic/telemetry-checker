@@ -1147,6 +1147,25 @@ export function computeVirtualRaceEngineer(
       simulateStrategyCost, driverAvgPace, actualPitLaps,
     );
 
+    // Strategy intent for recommended (inferential)
+    recommendedStrategy.intent = classifyStrategyIntent(recommendedStrategy.analysis.competitor_context);
+
+    // Enrich actual strategy with the same analysis layer to classify its intent.
+    if (actualPitLaps.length > 0 && actualAdjustedTime != null) {
+      const actualEnriched = enrichStrategyAnalysis(
+        actualPitLaps, actualCompounds, 0,
+        totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
+        pitLoss, trafficAvgBaseline, [],
+        riskMode, effectiveScenarioId,
+        intervals, positions, stints, allDrivers, driverNumber,
+        simulateStrategyCost, driverAvgPace, actualPitLaps,
+      );
+      actualStrategy.analysis = actualEnriched;
+      actualStrategy.intent = classifyStrategyIntent(actualEnriched.competitor_context);
+    } else {
+      actualStrategy.intent = classifyStrategyIntent(null);
+    }
+
     // Pros / Cons
     const recPros: string[] = [];
     const recCons: string[] = [];
