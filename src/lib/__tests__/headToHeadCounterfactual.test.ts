@@ -192,5 +192,6 @@ describe("computeHeadToHead — counterfactual scenarios", () => {
     });
 
     expect(r.counterfactual_analysis).toBeNull();
+    expect(r.head_to_head_verdict.delta_source).toBe("pace_sum");
   });
 });
