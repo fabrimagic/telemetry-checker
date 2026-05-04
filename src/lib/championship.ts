@@ -52,6 +52,10 @@ export interface ChampionshipResult {
   driverTimelines: DriverTimeline[];
   teamTimelines: TeamTimeline[];
   warnings: string[];
+  /** Total Race sessions scheduled in the season (completed + future).
+   *  Optional for backward compat: if undefined, narrative module falls back
+   *  to a permissive default (no "matematicamente chiuso" claim). */
+  totalRacesInSeason?: number;
 }
 
 /**
