@@ -47,11 +47,12 @@ export function CompareHeader({ comparison, driverA, driverB, onSwap }: Props) {
 
   let verdictText = "Pareggio sostanziale";
   let verdictTone: "default" | "destructive" | "secondary" = "secondary";
+  const sourceLabel = v.delta_source === "official_gap" ? " al traguardo" : " sul passo";
   if (v.faster_driver === "A") {
-    verdictText = `${driverA.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s`;
+    verdictText = `${driverA.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s${sourceLabel}`;
     verdictTone = "default";
   } else if (v.faster_driver === "B") {
-    verdictText = `${driverB.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s`;
+    verdictText = `${driverB.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s${sourceLabel}`;
     verdictTone = "default";
   }
 
