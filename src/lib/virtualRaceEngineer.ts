@@ -25,6 +25,35 @@ import type { NarrativeChapter } from "./narrative/types";
 
 export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
 
+/**
+ * Hierarchical selection of the best compound model when multiple stints
+ * use the same compound. Replaces the previous "first-stint wins" rule.
+ * Order of precedence:
+ *   1. status: VALID > NEUTRAL > INVALID
+ *   2. rSquared: higher wins
+ *   3. lapsUsed: higher wins
+ *   4. tiebreaker: caller's iteration order (first wins)
+ */
+export interface CompoundModelCandidate {
+  status: "VALID" | "NEUTRAL" | "INVALID";
+  rSquared: number;
+  lapsUsed: number;
+}
+
+export function isBetterCompoundModel(
+  candidate: CompoundModelCandidate,
+  incumbent: CompoundModelCandidate,
+): boolean {
+  const statusRank = { VALID: 3, NEUTRAL: 2, INVALID: 1 } as const;
+  if (statusRank[candidate.status] !== statusRank[incumbent.status]) {
+    return statusRank[candidate.status] > statusRank[incumbent.status];
+  }
+  if (candidate.rSquared !== incumbent.rSquared) {
+    return candidate.rSquared > incumbent.rSquared;
+  }
+  return candidate.lapsUsed > incumbent.lapsUsed;
+}
+
 /* ── Types ── */
 
 export interface StintAnalysis {
@@ -378,10 +407,21 @@ export function computeVirtualRaceEngineer(
 
   // Build a simple lap time predictor per compound (race data first)
   const compoundModels = new Map<string, { slope: number; intercept: number; source: string }>();
+  const compoundCandidateBest = new Map<string, CompoundModelCandidate>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
-    if (model && !compoundModels.has(sa.compound)) {
+    if (!model) continue;
+    const dv = degradationValidations.find(v => v.original.stint === sa.stint_number);
+    if (!dv) continue;
+    const candidate: CompoundModelCandidate = {
+      status: dv.status,
+      rSquared: dv.original.rSquared,
+      lapsUsed: dv.original.lapsUsed,
+    };
+    const existing = compoundCandidateBest.get(sa.compound);
+    if (!existing || isBetterCompoundModel(candidate, existing)) {
       compoundModels.set(sa.compound, { ...model, source: "race" });
+      compoundCandidateBest.set(sa.compound, candidate);
     }
   }
 
