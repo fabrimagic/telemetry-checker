@@ -47,11 +47,12 @@ export function CompareHeader({ comparison, driverA, driverB, onSwap }: Props) {
 
   let verdictText = "Pareggio sostanziale";
   let verdictTone: "default" | "destructive" | "secondary" = "secondary";
+  const sourceLabel = v.delta_source === "official_gap" ? " al traguardo" : " sul passo";
   if (v.faster_driver === "A") {
-    verdictText = `${driverA.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s`;
+    verdictText = `${driverA.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s${sourceLabel}`;
     verdictTone = "default";
   } else if (v.faster_driver === "B") {
-    verdictText = `${driverB.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s`;
+    verdictText = `${driverB.name_acronym} più veloce di ${v.delta_total_seconds.toFixed(2)}s${sourceLabel}`;
     verdictTone = "default";
   }
 
@@ -72,6 +73,23 @@ export function CompareHeader({ comparison, driverA, driverB, onSwap }: Props) {
           {verdictText}
         </Badge>
       </div>
+      {(() => {
+        const gap = v.gap_at_finish_seconds;
+        const pace = v.pace_sum_delta_seconds;
+        if (gap == null || pace == null) return null;
+        const divergence = Math.abs(gap - pace);
+        if (divergence < 2.0) return null;
+        const secondaryLabel = v.delta_source === "official_gap"
+          ? `Differenza di passo sui giri confrontabili: ${pace.toFixed(2)}s`
+          : `Gap al traguardo: ${gap.toFixed(2)}s`;
+        return (
+          <div className="mt-1.5 flex justify-center">
+            <span className="text-[11px] text-muted-foreground italic">
+              {secondaryLabel}
+            </span>
+          </div>
+        );
+      })()}
       <div className="mt-2 flex justify-center">
         <span className="text-[10px] text-muted-foreground">
           Confidence comune: <span className="font-mono font-semibold">{comparison.common_confidence}</span>
