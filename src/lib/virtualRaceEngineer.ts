@@ -18,6 +18,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
+import { classifyStrategyIntent, type IntentClassification } from "./strategyIntent";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
 import { NarrativeCollector } from "./narrative/collector";
 import { renderNarrative } from "./narrative/renderer";
@@ -84,6 +85,8 @@ export interface ActualStrategy {
   stints: StintAnalysis[];
   pit_stops: PitStopAnalysis[];
   total_race_time: number | null;
+  analysis?: EnrichedStrategyAnalysis;
+  intent?: IntentClassification;
 }
 
 export interface RecommendedStrategy {
@@ -104,6 +107,7 @@ export interface RecommendedStrategy {
   scoring_without_soft_sensors?: number;
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
+  intent?: IntentClassification;
 }
 
 export interface AlternativeStrategy {
@@ -124,6 +128,7 @@ export interface AlternativeStrategy {
   scoring_without_soft_sensors?: number;
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
+  intent?: IntentClassification;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -1114,6 +1119,9 @@ export function computeVirtualRaceEngineer(
       const text = "Finestra pit fragile — il giro esatto è critico";
       narrativeCollector.add({ id: `pit_window_alt${altIdx}`, category: "pit_window", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { window_robustness: "FRAGILE" }, prerendered_text: text });
     }
+
+    // Strategy intent (inferential, never blocks)
+    alt.intent = classifyStrategyIntent(alt.analysis.competitor_context);
   }
 
   // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
@@ -1138,6 +1146,25 @@ export function computeVirtualRaceEngineer(
       intervals, positions, stints, allDrivers, driverNumber,
       simulateStrategyCost, driverAvgPace, actualPitLaps,
     );
+
+    // Strategy intent for recommended (inferential)
+    recommendedStrategy.intent = classifyStrategyIntent(recommendedStrategy.analysis.competitor_context);
+
+    // Enrich actual strategy with the same analysis layer to classify its intent.
+    if (actualPitLaps.length > 0 && actualAdjustedTime != null) {
+      const actualEnriched = enrichStrategyAnalysis(
+        actualPitLaps, actualCompounds, 0,
+        totalLaps, compoundModels as Map<string, { slope: number; intercept: number }>,
+        pitLoss, trafficAvgBaseline, [],
+        riskMode, effectiveScenarioId,
+        intervals, positions, stints, allDrivers, driverNumber,
+        simulateStrategyCost, driverAvgPace, actualPitLaps,
+      );
+      actualStrategy.analysis = actualEnriched;
+      actualStrategy.intent = classifyStrategyIntent(actualEnriched.competitor_context);
+    } else {
+      actualStrategy.intent = classifyStrategyIntent(null);
+    }
 
     // Pros / Cons
     const recPros: string[] = [];

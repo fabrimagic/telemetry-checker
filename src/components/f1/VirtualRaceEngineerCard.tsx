@@ -1,4 +1,5 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy, AnalysisMode } from "@/lib/virtualRaceEngineer";
+import type { IntentClassification } from "@/lib/strategyIntent";
 import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition, WarmupInterpretation, DegradationValidationContext, ValidationSupportLevel, SoftSensorScoringGate } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
 import type { StrategyBreakdown } from "@/lib/strategyBreakdown";
@@ -71,6 +72,24 @@ function RobustnessBadge({ label }: { label: RobustnessLabel }) {
   return (
     <span className={`inline-flex items-center px-1.5 py-0 rounded border text-[9px] font-semibold ${styles[label]}`}>
       {label}
+    </span>
+  );
+}
+
+function IntentBadge({ intent }: { intent?: IntentClassification }) {
+  if (!intent || intent.intent === "neutral") return null;
+  const config: Record<"attack" | "defense" | "optimal", { label: string; cls: string }> = {
+    attack: { label: "Attacco", cls: "bg-green-500/15 text-green-600 border-green-500/30" },
+    defense: { label: "Difesa", cls: "bg-orange-500/15 text-orange-600 border-orange-500/30" },
+    optimal: { label: "Passo puro", cls: "bg-muted text-muted-foreground border-border" },
+  };
+  const c = config[intent.intent];
+  return (
+    <span
+      title={intent.rationale}
+      className={`inline-flex items-center px-1.5 py-0 rounded border text-[9px] font-semibold ${c.cls}`}
+    >
+      {c.label}
     </span>
   );
 }
@@ -1465,6 +1484,7 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
                         {alt.analysis?.robustness && (
                           <RobustnessBadge label={alt.analysis.robustness.robustness_label} />
                         )}
+                        <IntentBadge intent={alt.intent} />
                       </div>
                       <div className="flex items-center gap-1.5">
                         {risk_mode !== "BALANCED" && Math.abs(alt.adjusted_score - alt.estimated_delta_vs_actual) > 0.05 && (
