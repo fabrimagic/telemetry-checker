@@ -1119,6 +1119,9 @@ export function computeVirtualRaceEngineer(
       const text = "Finestra pit fragile — il giro esatto è critico";
       narrativeCollector.add({ id: `pit_window_alt${altIdx}`, category: "pit_window", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { window_robustness: "FRAGILE" }, prerendered_text: text });
     }
+
+    // Strategy intent (inferential, never blocks)
+    alt.intent = classifyStrategyIntent(alt.analysis.competitor_context);
   }
 
   // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
