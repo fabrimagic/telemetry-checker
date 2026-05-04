@@ -187,9 +187,8 @@ export function classifyPaceLossRate(
   if (rate < 0) return "STABLE"; // Improving pace
   if (rate <= config.stable_threshold) return "STABLE";
   if (rate <= config.normal_loss_threshold) return "NORMAL_LOSS";
-  if (rate <= config.high_loss_threshold) return "HIGH_LOSS";
-  if (rate > config.cliff_threshold) return "CLIFF_RISK";
-  return "HIGH_LOSS";
+  if (rate <= config.cliff_threshold) return "HIGH_LOSS";
+  return "CLIFF_RISK";
 }
 
 /**

@@ -200,6 +200,11 @@ export function extractDecisionPoints(input: ExtractionInput): DecisionPoint[] {
     else if (stayDriverCount >= pitDriverCount + 2) decisionType = "STAY_OUT";
 
     // Real action
+    // The "+1" on windowEnd is intentional: it captures a pit stop that happens
+    // on the lap immediately AFTER the decision window. Rationale: a driver may
+    // decide on lap N to pit, but the actual pit may be executed on lap N+1
+    // (in/out lap mechanics). Treating it as the response to the decision
+    // remains semantically correct; the asymmetry vs windowStart is by design.
     const pitInWindow = pitStops.find(p => p.lap_number >= windowStart && p.lap_number <= windowEnd + 1);
     const realAction = pitInWindow ? "PIT" as const : "STAY_OUT" as const;
     const realDetail = pitInWindow
