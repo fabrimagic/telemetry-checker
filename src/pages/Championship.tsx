@@ -311,7 +311,7 @@ export default function Championship() {
             </p>
 
             {(() => {
-              const sentences = buildChampionshipNarrative(result, driverNameMap);
+              const sentences = buildChampionshipNarrative(result, driverNameMap, driverTeamMap);
               if (!sentences.length) return null;
               return (
                 <div className="bg-muted/30 rounded-lg border p-4 mb-4 leading-relaxed text-sm space-y-2">
