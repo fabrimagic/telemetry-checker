@@ -5,9 +5,158 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 import { loadCurrentSeasonChampionship } from "@/lib/championshipLoader";
 import { getDrivers, type Driver } from "@/lib/openf1";
-import type { ChampionshipResult } from "@/lib/championship";
+import type {
+  ChampionshipResult,
+  DriverTimeline,
+  TeamTimeline,
+} from "@/lib/championship";
+import { buildChampionshipNarrative } from "@/lib/championshipNarrative";
+
+/** Inline mini-sparkline of last 5 pointsCurrent values. */
+function MiniSparkline({ points }: { points: { pointsCurrent: number }[] }) {
+  const last5 = points.slice(-5);
+  if (last5.length < 2) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  const W = 60;
+  const H = 16;
+  const values = last5.map((p) => p.pointsCurrent);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = W / (values.length - 1);
+  const coords = values
+    .map((v, i) => {
+      const x = i * step;
+      const y = H - ((v - min) / range) * (H - 2) - 1;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const trending = values[values.length - 1] >= values[0];
+  const color = trending ? "hsl(142 70% 45%)" : "hsl(0 70% 55%)";
+  return (
+    <svg width={W} height={H} className="inline-block align-middle">
+      <polyline
+        points={coords}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function shortLabel(raceLabel: string, countryName: string): string {
+  const src = (countryName || raceLabel || "").trim();
+  return src.slice(0, 3).toUpperCase() || "—";
+}
+
+interface EvolutionChartProps {
+  timelines: (DriverTimeline | TeamTimeline)[];
+  races: ChampionshipResult["races"];
+  colorOf: (t: DriverTimeline | TeamTimeline) => string;
+  labelOf: (t: DriverTimeline | TeamTimeline) => string;
+  keyOf: (t: DriverTimeline | TeamTimeline) => string;
+}
+
+function EvolutionChart({ timelines, races, colorOf, labelOf, keyOf }: EvolutionChartProps) {
+  const top = timelines.slice(0, 10);
+  if (top.length === 0 || races.length === 0) {
+    return (
+      <div className="text-center text-sm text-muted-foreground py-12">
+        Dati insufficienti per il grafico
+      </div>
+    );
+  }
+  const data = races.map((_r, i) => {
+    const row: Record<string, number | string> = {
+      raceIndex: i + 1,
+      _label: races[i].raceLabel,
+      _short: shortLabel(races[i].raceLabel, races[i].countryName),
+    };
+    for (const t of top) {
+      const p = t.points[i];
+      if (p) {
+        row[`points_${keyOf(t)}`] = p.pointsCurrent;
+        row[`gained_${keyOf(t)}`] = p.pointsGained;
+      }
+    }
+    return row;
+  });
+
+  return (
+    <ResponsiveContainer width="100%" height={400}>
+      <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 16 }}>
+        <CartesianGrid stroke="hsl(220 14% 16%)" strokeDasharray="3 3" />
+        <XAxis
+          dataKey="raceIndex"
+          tick={{ fill: "hsl(215 12% 45%)", fontSize: 10 }}
+          tickFormatter={(v: number) => {
+            const r = data[v - 1];
+            return (r?._short as string) ?? String(v);
+          }}
+        />
+        <YAxis
+          tick={{ fill: "hsl(215 12% 45%)", fontSize: 10 }}
+          label={{ value: "Punti", angle: -90, position: "insideLeft", style: { fill: "hsl(215 12% 45%)", fontSize: 10 } }}
+        />
+        <Tooltip
+          contentStyle={{
+            background: "hsl(220 18% 10%)",
+            border: "1px solid hsl(220 14% 18%)",
+            borderRadius: 6,
+            fontSize: 11,
+          }}
+          labelFormatter={(v) => {
+            const row = data[Number(v) - 1];
+            return row ? `${row._label}` : `Gara ${v}`;
+          }}
+          formatter={(value: number, name: string, item: any) => {
+            const k = name.replace(/^points_/, "");
+            const t = top.find((tt) => keyOf(tt) === k);
+            const display = t ? labelOf(t) : k;
+            const gained = item?.payload?.[`gained_${k}`] ?? 0;
+            return [`${value} pt (+${gained})`, display];
+          }}
+        />
+        <Legend
+          wrapperStyle={{ fontSize: 11 }}
+          formatter={(name: string) => {
+            const k = name.replace(/^points_/, "");
+            const t = top.find((tt) => keyOf(tt) === k);
+            return t ? labelOf(t) : k;
+          }}
+        />
+        {top.map((t) => (
+          <Line
+            key={keyOf(t)}
+            type="monotone"
+            dataKey={`points_${keyOf(t)}`}
+            stroke={colorOf(t)}
+            strokeWidth={2}
+            dot={false}
+            isAnimationActive={false}
+            connectNulls
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
 
 function PositionDelta({ delta }: { delta: number }) {
   if (delta === 0)
