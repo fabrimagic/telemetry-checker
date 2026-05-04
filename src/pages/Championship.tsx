@@ -311,6 +311,23 @@ export default function Championship() {
               </TabsList>
 
               <TabsContent value="drivers" className="mt-4">
+                <div className="bg-card rounded-lg border p-4 mb-4">
+                  <h3 className="text-sm font-semibold mb-3">Evoluzione punti</h3>
+                  <EvolutionChart
+                    timelines={result.driverTimelines}
+                    races={result.races}
+                    colorOf={(t) => {
+                      const d = t as DriverTimeline;
+                      const info = driverInfoMap.get(d.driverNumber);
+                      return info?.teamColour ? `#${info.teamColour}` : "hsl(215 12% 60%)";
+                    }}
+                    labelOf={(t) => {
+                      const d = t as DriverTimeline;
+                      return driverNameMap.get(d.driverNumber) ?? `#${d.driverNumber}`;
+                    }}
+                    keyOf={(t) => String((t as DriverTimeline).driverNumber)}
+                  />
+                </div>
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Classifica Piloti</CardTitle>
@@ -321,6 +338,7 @@ export default function Championship() {
                         <TableRow>
                           <TableHead className="w-12">Pos</TableHead>
                           <TableHead>Pilota</TableHead>
+                          <TableHead className="text-center">Trend</TableHead>
                           <TableHead className="text-right">Punti</TableHead>
                           <TableHead className="text-right">Δ ultima gara</TableHead>
                           <TableHead className="text-right">Punti ultima gara</TableHead>
@@ -358,6 +376,9 @@ export default function Championship() {
                                   <span className="font-mono uppercase">{display}</span>
                                 </span>
                               </TableCell>
+                              <TableCell className="text-center">
+                                <MiniSparkline points={d.points} />
+                              </TableCell>
                               <TableCell className="text-right font-bold">
                                 {d.totalPoints}
                               </TableCell>
@@ -377,6 +398,20 @@ export default function Championship() {
               </TabsContent>
 
               <TabsContent value="teams" className="mt-4">
+                <div className="bg-card rounded-lg border p-4 mb-4">
+                  <h3 className="text-sm font-semibold mb-3">Evoluzione punti</h3>
+                  <EvolutionChart
+                    timelines={result.teamTimelines}
+                    races={result.races}
+                    colorOf={(t) => {
+                      const tt = t as TeamTimeline;
+                      const c = teamColorMap.get(tt.teamName);
+                      return c ? `#${c}` : "hsl(215 12% 60%)";
+                    }}
+                    labelOf={(t) => (t as TeamTimeline).teamName}
+                    keyOf={(t) => (t as TeamTimeline).teamName.replace(/\s+/g, "_")}
+                  />
+                </div>
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Classifica Costruttori</CardTitle>
@@ -387,6 +422,7 @@ export default function Championship() {
                         <TableRow>
                           <TableHead className="w-12">Pos</TableHead>
                           <TableHead>Team</TableHead>
+                          <TableHead className="text-center">Trend</TableHead>
                           <TableHead className="text-right">Punti</TableHead>
                           <TableHead className="text-right">Δ ultima gara</TableHead>
                           <TableHead className="text-right">Punti ultima gara</TableHead>
@@ -411,6 +447,9 @@ export default function Championship() {
                                   )}
                                   {t.teamName}
                                 </span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <MiniSparkline points={t.points} />
                               </TableCell>
                               <TableCell className="text-right font-bold">
                                 {t.totalPoints}
