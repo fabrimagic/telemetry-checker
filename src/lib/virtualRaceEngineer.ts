@@ -18,6 +18,7 @@ import { type ScenarioId, SCENARIO_DEFINITIONS, isSimulatedScenario, applyScenar
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
 import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
+import { classifyStrategyIntent, type IntentClassification } from "./strategyIntent";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
 import { NarrativeCollector } from "./narrative/collector";
 import { renderNarrative } from "./narrative/renderer";
@@ -84,6 +85,8 @@ export interface ActualStrategy {
   stints: StintAnalysis[];
   pit_stops: PitStopAnalysis[];
   total_race_time: number | null;
+  analysis?: EnrichedStrategyAnalysis;
+  intent?: IntentClassification;
 }
 
 export interface RecommendedStrategy {
