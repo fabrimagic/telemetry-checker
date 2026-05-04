@@ -171,17 +171,16 @@ describe("buildChampionshipNarrative", () => {
     expect(out.some((s) => s.includes("BIG. CHAMP"))).toBe(true);
   });
 
-  it("5. A1: pilota del momento (non leader) ha +50 negli ultimi 3 → 'rampa di lancio'; skip se è il leader", () => {
-    // Leader has 200 total, modest recent gains.
+  it("5. A1: pilota del momento (non leader) ha +54 negli ultimi 3 → 'rampa di lancio'; skip se è il leader", () => {
+    // Leader: dominant total but cold lately (last3 = 0)
     const leader = mkDriver(1, [
       { gained: 25, pos: 1 },
       { gained: 25, pos: 1 },
-      { gained: 50, pos: 1 }, // +50 from sprints → wait keep <= 25
-    ].map((r) => ({ gained: Math.min(r.gained, 25), pos: r.pos })).concat([
-      { gained: 25, pos: 1 },
-      { gained: 25, pos: 1 },
-    ]));
-    // Hot driver: 0,0,18,18,18 → last3=54
+      { gained: 0, pos: 1 },
+      { gained: 0, pos: 1 },
+      { gained: 0, pos: 1 },
+    ]);
+    // Hot driver: last3 = 18+18+18 = 54
     const hot = mkDriver(99, [
       { gained: 0, pos: 8 },
       { gained: 0, pos: 8 },
@@ -190,8 +189,8 @@ describe("buildChampionshipNarrative", () => {
       { gained: 18, pos: 3 },
     ]);
     const filler = mkDriver(44, [
-      { gained: 10, pos: 2 },
-      { gained: 10, pos: 2 },
+      { gained: 5, pos: 2 },
+      { gained: 5, pos: 2 },
       { gained: 5, pos: 2 },
       { gained: 5, pos: 2 },
       { gained: 5, pos: 2 },
