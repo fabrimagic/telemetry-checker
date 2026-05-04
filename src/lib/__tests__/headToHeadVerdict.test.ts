@@ -55,6 +55,9 @@ describe("computeHeadToHead verdict — pit-in lap exclusion", () => {
 
     expect(result.head_to_head_verdict.faster_driver).toBe("TIE");
     expect(Math.abs(result.head_to_head_verdict.delta_total_seconds)).toBeLessThan(0.1);
+    expect(result.head_to_head_verdict.delta_source).toBe("pace_sum");
+    expect(result.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
+    expect(result.head_to_head_verdict.pace_sum_delta_seconds!).toBeLessThan(0.1);
   });
 
   it("Test 2: A 1-pit vs B 2-pit, B faster by 1s/lap → faster_driver = B", () => {
@@ -76,6 +79,9 @@ describe("computeHeadToHead verdict — pit-in lap exclusion", () => {
     const abs = Math.abs(result.head_to_head_verdict.delta_total_seconds);
     expect(abs).toBeGreaterThan(20);
     expect(abs).toBeCloseTo(27, 0);
+    expect(result.head_to_head_verdict.delta_source).toBe("pace_sum");
+    expect(result.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
+    expect(result.head_to_head_verdict.pace_sum_delta_seconds!).toBeCloseTo(27, 0);
   });
 
   it("Test 3: identical pit_laps and identical pace → TIE (backward compatibility)", () => {
@@ -90,5 +96,8 @@ describe("computeHeadToHead verdict — pit-in lap exclusion", () => {
 
     expect(result.head_to_head_verdict.faster_driver).toBe("TIE");
     expect(Math.abs(result.head_to_head_verdict.delta_total_seconds)).toBeLessThan(0.1);
+    expect(result.head_to_head_verdict.delta_source).toBe("pace_sum");
+    expect(result.head_to_head_verdict.gap_at_finish_seconds).toBeNull();
+    expect(result.head_to_head_verdict.pace_sum_delta_seconds!).toBeLessThan(0.1);
   });
 });

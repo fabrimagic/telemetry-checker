@@ -41,7 +41,14 @@ export interface DivergencePoint {
 
 export interface HeadToHeadVerdict {
   faster_driver: "A" | "B" | "TIE";
-  delta_total_seconds: number; // |sum of lap deltas where both valid|
+  /** Backward-compat: official_gap se disponibile, altrimenti pace_sum (assoluto). */
+  delta_total_seconds: number;
+  /** Sorgente del delta_total_seconds: "official_gap" | "pace_sum". */
+  delta_source: "official_gap" | "pace_sum";
+  /** Differenza tra gap_to_leader ufficiali (assoluta). Null quando session_result non disponibili o nessuno dei due ha finito. */
+  gap_at_finish_seconds: number | null;
+  /** Somma cumulativa dei delta lap-by-lap sui giri comparabili (assoluta). Null se nessun giro comparabile. */
+  pace_sum_delta_seconds: number | null;
   key_factors: string[];
 }
 
@@ -327,7 +334,7 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
   // Verdict
   // Pace-based total (sum of comparable lap deltas, pit-in/out already excluded).
   const validDeltas = deltas.filter((d) => d.delta_a_minus_b != null);
-  const paceTotalDelta = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : 0;
+  const paceTotalDelta: number | null = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : null;
 
   // Authoritative finishing-gap from official session_result, when available.
   // Convention matches paceTotalDelta: signed (A − B), negative = A faster/ahead.
@@ -355,9 +362,10 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     }
   }
 
-  const totalDelta = officialDelta != null ? officialDelta : paceTotalDelta;
+  const totalDelta = officialDelta != null ? officialDelta : (paceTotalDelta ?? 0);
   let faster: "A" | "B" | "TIE" = "TIE";
   if (Math.abs(totalDelta) > 0.5) faster = totalDelta < 0 ? "A" : "B";
+  const deltaSource: "official_gap" | "pace_sum" = officialDelta != null ? "official_gap" : "pace_sum";
 
   // Key factors: derive 3-5 narrative strings from VRE results + measurable deltas
   const factors: string[] = [];
@@ -475,6 +483,9 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     head_to_head_verdict: {
       faster_driver: faster,
       delta_total_seconds: Math.abs(totalDelta),
+      delta_source: deltaSource,
+      gap_at_finish_seconds: officialDelta != null ? Math.abs(officialDelta) : null,
+      pace_sum_delta_seconds: paceTotalDelta != null ? Math.abs(paceTotalDelta) : null,
       key_factors: factors.slice(0, 5),
     },
     counterfactual_analysis: counterfactual,
