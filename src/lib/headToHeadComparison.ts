@@ -362,9 +362,10 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     }
   }
 
-  const totalDelta = officialDelta != null ? officialDelta : paceTotalDelta;
+  const totalDelta = officialDelta != null ? officialDelta : (paceTotalDelta ?? 0);
   let faster: "A" | "B" | "TIE" = "TIE";
   if (Math.abs(totalDelta) > 0.5) faster = totalDelta < 0 ? "A" : "B";
+  const deltaSource: "official_gap" | "pace_sum" = officialDelta != null ? "official_gap" : "pace_sum";
 
   // Key factors: derive 3-5 narrative strings from VRE results + measurable deltas
   const factors: string[] = [];
