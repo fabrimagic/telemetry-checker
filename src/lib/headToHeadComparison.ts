@@ -334,7 +334,7 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
   // Verdict
   // Pace-based total (sum of comparable lap deltas, pit-in/out already excluded).
   const validDeltas = deltas.filter((d) => d.delta_a_minus_b != null);
-  const paceTotalDelta = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : 0;
+  const paceTotalDelta: number | null = validDeltas.length ? validDeltas[validDeltas.length - 1].cumulative_delta : null;
 
   // Authoritative finishing-gap from official session_result, when available.
   // Convention matches paceTotalDelta: signed (A − B), negative = A faster/ahead.
