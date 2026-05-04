@@ -483,6 +483,9 @@ export function computeHeadToHead(input: HeadToHeadInput): ComparisonResult {
     head_to_head_verdict: {
       faster_driver: faster,
       delta_total_seconds: Math.abs(totalDelta),
+      delta_source: deltaSource,
+      gap_at_finish_seconds: officialDelta != null ? Math.abs(officialDelta) : null,
+      pace_sum_delta_seconds: paceTotalDelta != null ? Math.abs(paceTotalDelta) : null,
       key_factors: factors.slice(0, 5),
     },
     counterfactual_analysis: counterfactual,
