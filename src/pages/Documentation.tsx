@@ -520,7 +520,7 @@ export default function Documentation() {
           <p>È una stima qualitativa basata sulle posizioni e sui distacchi al momento dell'eventuale rientro.</p>
         </DocSection>
 
-
+        <DocSection id="vre-verdict" title="Verdetto e confidenza" icon={<Target className="h-4 w-4" />}>
           <p>
             Il VRE chiude con un <strong className="text-foreground">verdetto</strong>: la strategia eseguita è stata
             <em> ottima, accettabile, sub-ottimale</em> o <em>peggiore di un'alternativa chiara</em>. Affianca un
