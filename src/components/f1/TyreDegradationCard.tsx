@@ -5,6 +5,7 @@ import { type CorrectedDegradationResult } from "@/lib/correctedDegradation";
 import { validateAllDegradationEstimates, type DegradationValidationResult } from "@/lib/degradationValidation";
 import { type LongRunResult } from "@/lib/longRunDetector";
 import { isWetCompound, WET_COMPOUND_CAVEAT_IT } from "@/lib/wetCompoundCheck";
+import { degradationValidationLabel } from "@/lib/statusLabels";
 import { Watermark } from "./Watermark";
 import {
   Table,
@@ -180,7 +181,7 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
             <li><span className="font-mono font-bold text-foreground/80">Degrado corretto (sec/giro)</span> — Coefficiente della variabile tyre_life in un modello multivariato corretto per fuel proxy e temperatura. Rappresenta il degrado gomme isolato dagli effetti confondenti.</li>
             <li><span className="font-mono font-bold text-foreground/80">Fuel proxy</span> — Proxy dell'alleggerimento progressivo della vettura (giri rimanenti). NON è il fuel load reale — OpenF1 non lo fornisce.</li>
             <li><span className="font-mono font-bold text-foreground/80">R²</span> — Coefficiente di determinazione del modello corretto. Valori vicini a 1 indicano un fit affidabile.</li>
-            <li><span className="font-mono font-bold text-foreground/80">Status</span> — Validazione basata sulla slope corretta: <span className="text-emerald-400 font-semibold">VALID</span> = stima attendibile, <span className="text-amber-400 font-semibold">NEUTRAL</span> = segnale troppo debole, <span className="text-red-400 font-semibold">INVALID</span> = stima non attendibile (esclusa dal VRE).</li>
+            <li><span className="font-mono font-bold text-foreground/80">Status</span> — Validazione basata sulla slope corretta: <span className="text-emerald-400 font-semibold">Valido</span> = stima attendibile, <span className="text-amber-400 font-semibold">Neutro</span> = segnale troppo debole, <span className="text-red-400 font-semibold">Invalido</span> = stima non attendibile (esclusa dal VRE).</li>
           </ul>
           <p className="pt-1 italic">Clicca su una riga della tabella per visualizzare il grafico di regressione dello stint selezionato.</p>
         </div>
@@ -305,7 +306,7 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                 </TableCell>
                 <TableCell className="text-xs text-center">
                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[v?.status ?? "VALID"]}`} title={v?.reason ?? ""}>
-                    {v?.status ?? "—"}
+                    {v?.status ? degradationValidationLabel(v.status) : "—"}
                   </span>
                   {v?.status === "INVALID" && (
                     <p className="text-[8px] text-red-400/70 mt-0.5">Non usato nel VRE</p>

@@ -968,11 +968,11 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
                         </td>
                         <td className="py-1.5 pr-2 text-center">
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[pl.pace_loss_status]}`}>
-                            {pl.pace_loss_status}
+                            {paceLossStatusLabel(pl.pace_loss_status)}
                           </span>
                         </td>
                         <td className={`py-1.5 pr-2 text-center text-[10px] font-semibold ${confStyles[pl.pace_loss_confidence] || ""}`}>
-                          {pl.pace_loss_confidence}
+                          {confidenceLabel(pl.pace_loss_confidence)}
                         </td>
                         <td className="py-1.5 pr-2 text-center">
                           {pl.pace_loss_used_for_strategy ? "✓" : "—"}
