@@ -30,7 +30,7 @@ function signalBadge(signal: WatchListEntry["signal"]) {
     case "NEUTRAL":
       return (
         <Badge variant="outline" className="text-[10px] text-muted-foreground">
-          NEUTRAL
+          Neutro
         </Badge>
       );
   }
