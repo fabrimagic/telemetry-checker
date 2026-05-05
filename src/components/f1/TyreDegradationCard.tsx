@@ -4,6 +4,7 @@ import { type DegradationResult } from "@/lib/tyreDegradation";
 import { type CorrectedDegradationResult } from "@/lib/correctedDegradation";
 import { validateAllDegradationEstimates, type DegradationValidationResult } from "@/lib/degradationValidation";
 import { type LongRunResult } from "@/lib/longRunDetector";
+import { isWetCompound, WET_COMPOUND_CAVEAT_IT } from "@/lib/wetCompoundCheck";
 import { Watermark } from "./Watermark";
 import {
   Table,
