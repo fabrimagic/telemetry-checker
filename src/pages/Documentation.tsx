@@ -128,6 +128,8 @@ export default function Documentation() {
               <TocLink href="#navigation">Navigazione tra le sezioni</TocLink>
               <TocLink href="#countdown">Conto alla rovescia prossima gara</TocLink>
               <TocLink href="#championship-summary">Mini classifica Mondiale</TocLink>
+              <TocLink href="#weekend-weather">Meteo del weekend</TocLink>
+              <TocLink href="#fullgas-feed">Dal Full Gas Blog</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Analisi singolo pilota</p>
               <TocLink href="#single-driver-flow">Flusso analisi singolo pilota</TocLink>
