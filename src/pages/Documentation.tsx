@@ -128,6 +128,8 @@ export default function Documentation() {
               <TocLink href="#navigation">Navigazione tra le sezioni</TocLink>
               <TocLink href="#countdown">Conto alla rovescia prossima gara</TocLink>
               <TocLink href="#championship-summary">Mini classifica Mondiale</TocLink>
+              <TocLink href="#weekend-weather">Meteo del weekend</TocLink>
+              <TocLink href="#fullgas-feed">Dal Full Gas Blog</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Analisi singolo pilota</p>
               <TocLink href="#single-driver-flow">Flusso analisi singolo pilota</TocLink>
@@ -155,6 +157,8 @@ export default function Documentation() {
               <TocLink href="#vre-view-modes">Modalità di lettura (Engineer / Strategist / Storyteller / Skeptic)</TocLink>
               <TocLink href="#vre-risk-mode">Profilo di rischio</TocLink>
               <TocLink href="#vre-scenarios">Scenari What-If</TocLink>
+              <TocLink href="#vre-intent">Intent della strategia</TocLink>
+              <TocLink href="#vre-traffic">Traffico in pit-out</TocLink>
               <TocLink href="#vre-verdict">Verdetto e confidenza</TocLink>
               <TocLink href="#vre-narrative">Capitoli narrativi</TocLink>
 
@@ -162,6 +166,7 @@ export default function Documentation() {
               <TocLink href="#h2h-overview">Cos'è il confronto Head-to-Head</TocLink>
               <TocLink href="#h2h-flow">Come avviare un confronto</TocLink>
               <TocLink href="#h2h-cards">Le card del confronto</TocLink>
+              <TocLink href="#h2h-duel-insight">Tradeoff passo vs posizione</TocLink>
               <TocLink href="#h2h-alternative">Strategie alternative & controfattuali</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Altre sezioni</p>
@@ -237,6 +242,22 @@ export default function Documentation() {
             rapida: per la classifica completa apri la pagina <strong className="text-foreground">Mondiale</strong>.
           </p>
           <Tip>I dati vengono cachati lato browser per non sovraccaricare i server e per caricare la home più velocemente nelle visite successive.</Tip>
+        </DocSection>
+
+        <DocSection id="weekend-weather" title="Meteo del weekend" icon={<Cloud className="h-4 w-4" />}>
+          <p>
+            Una card sulla home mostra le <strong className="text-foreground">previsioni meteo</strong> per le sessioni del prossimo weekend di gara:
+            temperatura, probabilità di pioggia e condizioni generali per ciascuna sessione (Prove Libere, Qualifica, Sprint, Gara).
+            Serve a inquadrare in anticipo possibili scenari bagnato/asciutto.
+          </p>
+        </DocSection>
+
+        <DocSection id="fullgas-feed" title="Dal Full Gas Blog" icon={<BookOpen className="h-4 w-4" />}>
+          <p>
+            In fondo alla home trovi gli <strong className="text-foreground">ultimi tre articoli di Formula 1</strong> pubblicati sul blog
+            <em> Full Gas</em>, con titolo, data e breve estratto. Cliccando sul titolo apri l'articolo originale in una nuova scheda.
+            La sezione si aggiorna automaticamente e usa una cache locale per evitare richieste eccessive.
+          </p>
         </DocSection>
 
         {/* ───────────── ANALISI SINGOLO PILOTA ───────────── */}
@@ -376,6 +397,11 @@ export default function Documentation() {
             <li>Eventuali <strong className="text-foreground">avvertenze</strong> quando i segnali non sono coerenti (es. stint troppo corto, troppi outlier, neutralizzazioni).</li>
           </ul>
           <p>Nelle gare il modello tiene conto anche del <em>carburante che diminuisce</em>, in modo da non confondere "macchina che si alleggerisce" con "gomma che migliora".</p>
+          <p className="text-xs italic border-l-2 border-primary/40 pl-3">
+            Per gli stint con gomme da bagnato (<strong className="text-foreground">Intermediate</strong> o <strong className="text-foreground">Wet</strong>) le metriche
+            di degrado non vengono mostrate: il modello è calibrato sulle mescole da asciutto e una stima su gomme da bagnato sarebbe poco affidabile.
+            In quei casi, al posto del numero, compare un avviso esplicito.
+          </p>
         </DocSection>
 
         <DocSection id="key-decision-moments" title="Key Decision Moments" icon={<Target className="h-4 w-4" />}>
@@ -468,6 +494,32 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="vre-intent" title="Intent della strategia" icon={<Target className="h-4 w-4" />}>
+          <p>
+            Accanto alla strategia attuale, a quella consigliata e alle alternative simulate, può comparire un piccolo badge
+            che ne descrive l'<strong className="text-foreground">intento</strong>:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Attack</strong> — orientata a guadagnare posizioni (es. provare l'undercut su chi sta davanti).</li>
+            <li><strong className="text-foreground">Defense</strong> — orientata a difendersi da un avversario dietro che minaccia il sorpasso o un overcut.</li>
+            <li><strong className="text-foreground">Optimal</strong> — la scelta più efficiente in assoluto sul piano del tempo, indipendentemente dai vicini.</li>
+            <li><strong className="text-foreground">Neutral</strong> — nessuna pressione competitiva chiara nei dintorni.</li>
+          </ul>
+          <p>L'intento è una <em>lettura interpretativa</em>, non una certezza: serve a capire "perché" una strategia ha quella forma.</p>
+        </DocSection>
+
+        <DocSection id="vre-traffic" title="Traffico in pit-out" icon={<Navigation className="h-4 w-4" />}>
+          <p>
+            Quando il VRE valuta una sosta, prova anche a stimare cosa il pilota avrebbe trovato uscendo dai box:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Clean</strong> — pista libera davanti, niente da superare nei primi giri.</li>
+            <li><strong className="text-foreground">Traffic</strong> — uno o due piloti più lenti davanti, da gestire.</li>
+            <li><strong className="text-foreground">Pack</strong> — gruppetto serrato davanti, con probabile perdita di tempo.</li>
+          </ul>
+          <p>È una stima qualitativa basata sulle posizioni e sui distacchi al momento dell'eventuale rientro.</p>
+        </DocSection>
+
         <DocSection id="vre-verdict" title="Verdetto e confidenza" icon={<Target className="h-4 w-4" />}>
           <p>
             Il VRE chiude con un <strong className="text-foreground">verdetto</strong>: la strategia eseguita è stata
@@ -516,6 +568,16 @@ export default function Documentation() {
             <li><strong className="text-foreground">Griglia metriche</strong> — confronto numerico su pace, gestione gomme, pit stop, sorpassi.</li>
             <li><strong className="text-foreground">Narrativa</strong> — racconto del duello con le cause più probabili dell'esito.</li>
           </ul>
+        </DocSection>
+
+        <DocSection id="h2h-duel-insight" title="Tradeoff passo vs posizione" icon={<Lightbulb className="h-4 w-4" />}>
+          <p>
+            Nella card di intestazione del confronto può apparire un riquadro informativo che segnala un
+            <strong className="text-foreground"> trade-off non sfruttato</strong> o un <strong className="text-foreground">rischio non coperto</strong>:
+            ad esempio quando uno dei due piloti aveva un'opportunità realistica di attaccare l'altro
+            (passo migliore ma non capitalizzato), oppure quando era esposto a un possibile attacco non difeso adeguatamente.
+            È un'osservazione narrativa, separata dal verdetto principale, e non modifica le simulazioni.
+          </p>
         </DocSection>
 
         <DocSection id="h2h-alternative" title="Strategie alternative & controfattuali" icon={<Lightbulb className="h-4 w-4" />}>
