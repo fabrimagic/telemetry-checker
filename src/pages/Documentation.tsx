@@ -157,6 +157,8 @@ export default function Documentation() {
               <TocLink href="#vre-view-modes">Modalità di lettura (Engineer / Strategist / Storyteller / Skeptic)</TocLink>
               <TocLink href="#vre-risk-mode">Profilo di rischio</TocLink>
               <TocLink href="#vre-scenarios">Scenari What-If</TocLink>
+              <TocLink href="#vre-intent">Intent della strategia</TocLink>
+              <TocLink href="#vre-traffic">Traffico in pit-out</TocLink>
               <TocLink href="#vre-verdict">Verdetto e confidenza</TocLink>
               <TocLink href="#vre-narrative">Capitoli narrativi</TocLink>
 
