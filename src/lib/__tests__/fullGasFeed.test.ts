@@ -4,6 +4,7 @@ import {
   decodeEntities,
   formatItalianDate,
   parseFullGasFeed,
+  extractFeaturedImage,
 } from "../fullGasFeed";
 
 describe("fullGasFeed pure helpers", () => {
