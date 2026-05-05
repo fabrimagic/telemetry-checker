@@ -59,4 +59,17 @@ describe("fullGasFeed pure helpers", () => {
     expect(result.items[0].excerpt).toBe("Primo articolo di test per il feed.");
     expect(result.items[1].excerpt).toBe("Solo testo");
   });
+
+  it("extractFeaturedImage picks ~480w variant from srcset", () => {
+    const html =
+      '<p>x</p><img src="https://x.test/full.webp" srcset="https://x.test/300.webp 300w, https://x.test/480.webp 480w, https://x.test/1024.webp 1024w" alt="x" />';
+    expect(extractFeaturedImage(html)).toBe("https://x.test/480.webp");
+  });
+
+  it("extractFeaturedImage falls back to src and returns null when no img", () => {
+    expect(extractFeaturedImage('<img src="https://x.test/a.jpg" />')).toBe(
+      "https://x.test/a.jpg",
+    );
+    expect(extractFeaturedImage("<p>no image here</p>")).toBe(null);
+  });
 });
