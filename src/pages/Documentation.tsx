@@ -166,6 +166,7 @@ export default function Documentation() {
               <TocLink href="#h2h-overview">Cos'è il confronto Head-to-Head</TocLink>
               <TocLink href="#h2h-flow">Come avviare un confronto</TocLink>
               <TocLink href="#h2h-cards">Le card del confronto</TocLink>
+              <TocLink href="#h2h-duel-insight">Tradeoff passo vs posizione</TocLink>
               <TocLink href="#h2h-alternative">Strategie alternative & controfattuali</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Altre sezioni</p>
