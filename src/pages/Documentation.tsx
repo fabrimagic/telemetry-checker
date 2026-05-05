@@ -397,6 +397,11 @@ export default function Documentation() {
             <li>Eventuali <strong className="text-foreground">avvertenze</strong> quando i segnali non sono coerenti (es. stint troppo corto, troppi outlier, neutralizzazioni).</li>
           </ul>
           <p>Nelle gare il modello tiene conto anche del <em>carburante che diminuisce</em>, in modo da non confondere "macchina che si alleggerisce" con "gomma che migliora".</p>
+          <p className="text-xs italic border-l-2 border-primary/40 pl-3">
+            Per gli stint con gomme da bagnato (<strong className="text-foreground">Intermediate</strong> o <strong className="text-foreground">Wet</strong>) le metriche
+            di degrado non vengono mostrate: il modello è calibrato sulle mescole da asciutto e una stima su gomme da bagnato sarebbe poco affidabile.
+            In quei casi, al posto del numero, compare un avviso esplicito.
+          </p>
         </DocSection>
 
         <DocSection id="key-decision-moments" title="Key Decision Moments" icon={<Target className="h-4 w-4" />}>
