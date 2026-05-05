@@ -10,6 +10,8 @@ export interface FullGasFeedItem {
   link: string;
   pubDate: Date;
   excerpt: string;
+  /** URL of the article's featured image (small/medium variant), or null if unavailable. */
+  imageUrl: string | null;
 }
 
 export interface FullGasFeedResult {
@@ -22,6 +24,7 @@ interface SerializedItem {
   link: string;
   pubDateIso: string;
   excerpt: string;
+  imageUrl: string | null;
 }
 interface SerializedResult {
   items: SerializedItem[];
@@ -53,6 +56,7 @@ function serialize(r: FullGasFeedResult): SerializedResult {
       link: i.link,
       pubDateIso: i.pubDate.toISOString(),
       excerpt: i.excerpt,
+      imageUrl: i.imageUrl,
     })),
     fetchedAtIso: r.fetchedAt.toISOString(),
   };
@@ -64,6 +68,7 @@ function deserialize(s: SerializedResult): FullGasFeedResult {
       link: i.link,
       pubDate: new Date(i.pubDateIso),
       excerpt: i.excerpt,
+      imageUrl: i.imageUrl ?? null,
     })),
     fetchedAt: new Date(s.fetchedAtIso),
   };
@@ -81,17 +86,57 @@ export function parseFullGasFeed(xmlText: string): FullGasFeedResult {
     const link = node.querySelector("link")?.textContent?.trim() ?? "";
     const pubDateStr = node.querySelector("pubDate")?.textContent?.trim() ?? "";
     const descRaw = node.querySelector("description")?.textContent ?? "";
+    // content:encoded carries the full post HTML which holds the <img> tags.
+    // Fallback to description if encoded is empty.
+    const encoded =
+      node.getElementsByTagName("content:encoded")[0]?.textContent ?? "";
     return {
       title: decodeEntities(title),
       link,
       pubDate: pubDateStr ? new Date(pubDateStr) : new Date(0),
       excerpt: stripHtmlAndTruncate(descRaw, EXCERPT_MAX_CHARS),
+      imageUrl: extractFeaturedImage(encoded || descRaw),
     };
   });
   return { items, fetchedAt: new Date() };
 }
 
-export function stripHtmlAndTruncate(html: string, maxChars: number): string {
+/**
+ * Extract a thumbnail-sized featured image from an HTML blob.
+ * Prefers a srcset variant ~480px wide for layout fit; falls back to the
+ * src attribute. Returns null if no <img> is found.
+ */
+export function extractFeaturedImage(html: string): string | null {
+  if (!html) return null;
+  const imgMatch = html.match(/<img\b[^>]*>/i);
+  if (!imgMatch) return null;
+  const tag = imgMatch[0];
+  const srcsetMatch = tag.match(/srcset=["']([^"']+)["']/i);
+  if (srcsetMatch) {
+    const candidates = srcsetMatch[1]
+      .split(",")
+      .map((c) => c.trim())
+      .map((c) => {
+        const parts = c.split(/\s+/);
+        const url = parts[0];
+        const wMatch = parts[1]?.match(/^(\d+)w$/);
+        const width = wMatch ? Number(wMatch[1]) : 0;
+        return { url, width };
+      })
+      .filter((c) => c.url && c.width > 0);
+    if (candidates.length > 0) {
+      // Pick the smallest width >= 400px, otherwise the largest available.
+      const TARGET = 400;
+      const okAbove = candidates
+        .filter((c) => c.width >= TARGET)
+        .sort((a, b) => a.width - b.width)[0];
+      const fallback = candidates.sort((a, b) => b.width - a.width)[0];
+      return (okAbove ?? fallback).url;
+    }
+  }
+  const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
+  return srcMatch ? srcMatch[1] : null;
+}
   const noTags = html.replace(/<[^>]*>/g, " ");
   const decoded = decodeEntities(noTags);
   const collapsed = decoded.replace(/\s+/g, " ").trim();
