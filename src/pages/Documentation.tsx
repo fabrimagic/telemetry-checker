@@ -244,6 +244,22 @@ export default function Documentation() {
           <Tip>I dati vengono cachati lato browser per non sovraccaricare i server e per caricare la home più velocemente nelle visite successive.</Tip>
         </DocSection>
 
+        <DocSection id="weekend-weather" title="Meteo del weekend" icon={<Cloud className="h-4 w-4" />}>
+          <p>
+            Una card sulla home mostra le <strong className="text-foreground">previsioni meteo</strong> per le sessioni del prossimo weekend di gara:
+            temperatura, probabilità di pioggia e condizioni generali per ciascuna sessione (Prove Libere, Qualifica, Sprint, Gara).
+            Serve a inquadrare in anticipo possibili scenari bagnato/asciutto.
+          </p>
+        </DocSection>
+
+        <DocSection id="fullgas-feed" title="Dal Full Gas Blog" icon={<BookOpen className="h-4 w-4" />}>
+          <p>
+            In fondo alla home trovi gli <strong className="text-foreground">ultimi tre articoli di Formula 1</strong> pubblicati sul blog
+            <em> Full Gas</em>, con titolo, data e breve estratto. Cliccando sul titolo apri l'articolo originale in una nuova scheda.
+            La sezione si aggiorna automaticamente e usa una cache locale per evitare richieste eccessive.
+          </p>
+        </DocSection>
+
         {/* ───────────── ANALISI SINGOLO PILOTA ───────────── */}
         <SectionDivider title="Analisi singolo pilota" />
 
