@@ -16,6 +16,7 @@ import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge
 import React, { useMemo, useState } from "react";
 import { AnalystView, BroadcastView, type ViewMode } from "./VREViewModes";
 import { NarrativeChapters } from "./NarrativeChapters";
+import { paceLossStatusLabel, confidenceLabel } from "@/lib/statusLabels";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -536,7 +537,7 @@ function SoftSensorImpactDetail({ adjustment }: { adjustment: StrategySoftSensor
       <div className="flex items-center gap-2 text-[9px]">
         <Thermometer className="h-3 w-3 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground font-semibold">Soft Sensors Impact</span>
-        <span className={`ml-auto ${confStyle[adjustment.confidence]}`}>{adjustment.confidence}</span>
+        <span className={`ml-auto ${confStyle[adjustment.confidence]}`}>{confidenceLabel(adjustment.confidence)}</span>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground">
         {Math.abs(adjustment.thermal_adjustment_total) > 0.005 && (
@@ -967,11 +968,11 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
                         </td>
                         <td className="py-1.5 pr-2 text-center">
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusStyles[pl.pace_loss_status]}`}>
-                            {pl.pace_loss_status}
+                            {paceLossStatusLabel(pl.pace_loss_status)}
                           </span>
                         </td>
                         <td className={`py-1.5 pr-2 text-center text-[10px] font-semibold ${confStyles[pl.pace_loss_confidence] || ""}`}>
-                          {pl.pace_loss_confidence}
+                          {confidenceLabel(pl.pace_loss_confidence)}
                         </td>
                         <td className="py-1.5 pr-2 text-center">
                           {pl.pace_loss_used_for_strategy ? "✓" : "—"}
