@@ -570,6 +570,16 @@ export default function Documentation() {
           </ul>
         </DocSection>
 
+        <DocSection id="h2h-duel-insight" title="Tradeoff passo vs posizione" icon={<Lightbulb className="h-4 w-4" />}>
+          <p>
+            Nella card di intestazione del confronto può apparire un riquadro informativo che segnala un
+            <strong className="text-foreground"> trade-off non sfruttato</strong> o un <strong className="text-foreground">rischio non coperto</strong>:
+            ad esempio quando uno dei due piloti aveva un'opportunità realistica di attaccare l'altro
+            (passo migliore ma non capitalizzato), oppure quando era esposto a un possibile attacco non difeso adeguatamente.
+            È un'osservazione narrativa, separata dal verdetto principale, e non modifica le simulazioni.
+          </p>
+        </DocSection>
+
         <DocSection id="h2h-alternative" title="Strategie alternative & controfattuali" icon={<Lightbulb className="h-4 w-4" />}>
           <p>
             La sezione <strong className="text-foreground">Strategia alternativa</strong> mostra cosa sarebbe successo
