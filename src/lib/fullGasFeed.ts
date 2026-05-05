@@ -137,6 +137,8 @@ export function extractFeaturedImage(html: string): string | null {
   const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
   return srcMatch ? srcMatch[1] : null;
 }
+
+export function stripHtmlAndTruncate(html: string, maxChars: number): string {
   const noTags = html.replace(/<[^>]*>/g, " ");
   const decoded = decodeEntities(noTags);
   const collapsed = decoded.replace(/\s+/g, " ").trim();
