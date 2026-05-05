@@ -494,7 +494,33 @@ export default function Documentation() {
           </p>
         </DocSection>
 
-        <DocSection id="vre-verdict" title="Verdetto e confidenza" icon={<Target className="h-4 w-4" />}>
+        <DocSection id="vre-intent" title="Intent della strategia" icon={<Target className="h-4 w-4" />}>
+          <p>
+            Accanto alla strategia attuale, a quella consigliata e alle alternative simulate, può comparire un piccolo badge
+            che ne descrive l'<strong className="text-foreground">intento</strong>:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Attack</strong> — orientata a guadagnare posizioni (es. provare l'undercut su chi sta davanti).</li>
+            <li><strong className="text-foreground">Defense</strong> — orientata a difendersi da un avversario dietro che minaccia il sorpasso o un overcut.</li>
+            <li><strong className="text-foreground">Optimal</strong> — la scelta più efficiente in assoluto sul piano del tempo, indipendentemente dai vicini.</li>
+            <li><strong className="text-foreground">Neutral</strong> — nessuna pressione competitiva chiara nei dintorni.</li>
+          </ul>
+          <p>L'intento è una <em>lettura interpretativa</em>, non una certezza: serve a capire "perché" una strategia ha quella forma.</p>
+        </DocSection>
+
+        <DocSection id="vre-traffic" title="Traffico in pit-out" icon={<Navigation className="h-4 w-4" />}>
+          <p>
+            Quando il VRE valuta una sosta, prova anche a stimare cosa il pilota avrebbe trovato uscendo dai box:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Clean</strong> — pista libera davanti, niente da superare nei primi giri.</li>
+            <li><strong className="text-foreground">Traffic</strong> — uno o due piloti più lenti davanti, da gestire.</li>
+            <li><strong className="text-foreground">Pack</strong> — gruppetto serrato davanti, con probabile perdita di tempo.</li>
+          </ul>
+          <p>È una stima qualitativa basata sulle posizioni e sui distacchi al momento dell'eventuale rientro.</p>
+        </DocSection>
+
+
           <p>
             Il VRE chiude con un <strong className="text-foreground">verdetto</strong>: la strategia eseguita è stata
             <em> ottima, accettabile, sub-ottimale</em> o <em>peggiore di un'alternativa chiara</em>. Affianca un
