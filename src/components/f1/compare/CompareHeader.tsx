@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ComparisonResult } from "@/lib/headToHeadComparison";
 import type { Driver } from "@/lib/openf1";
+import { computeDuelInsight } from "@/lib/duelInsight";
 
 interface Props {
   comparison: ComparisonResult;
