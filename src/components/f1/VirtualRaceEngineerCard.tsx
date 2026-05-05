@@ -16,6 +16,7 @@ import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge
 import React, { useMemo, useState } from "react";
 import { AnalystView, BroadcastView, type ViewMode } from "./VREViewModes";
 import { NarrativeChapters } from "./NarrativeChapters";
+import { paceLossStatusLabel, confidenceLabel } from "@/lib/statusLabels";
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "hsl(0 80% 50%)",
@@ -536,7 +537,7 @@ function SoftSensorImpactDetail({ adjustment }: { adjustment: StrategySoftSensor
       <div className="flex items-center gap-2 text-[9px]">
         <Thermometer className="h-3 w-3 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground font-semibold">Soft Sensors Impact</span>
-        <span className={`ml-auto ${confStyle[adjustment.confidence]}`}>{adjustment.confidence}</span>
+        <span className={`ml-auto ${confStyle[adjustment.confidence]}`}>{confidenceLabel(adjustment.confidence)}</span>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground">
         {Math.abs(adjustment.thermal_adjustment_total) > 0.005 && (
