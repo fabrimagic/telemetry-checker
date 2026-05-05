@@ -117,7 +117,25 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {longRuns.map((lr) => (
+                {longRuns.map((lr) => {
+                  if (isWetCompound(lr.compound)) {
+                    return (
+                      <tr key={`${lr.driverNumber}-${lr.stintNumber}`} className="text-muted-foreground bg-muted/20">
+                        <td className="py-0.5 pr-2">
+                          <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: `#${lr.color}` }} />
+                            <span className="font-mono font-bold">{lr.acronym}</span>
+                          </span>
+                        </td>
+                        <td className="py-0.5 pr-2 font-mono">{lr.stintNumber}</td>
+                        <td className="py-0.5 pr-2">{lr.compound}</td>
+                        <td colSpan={7} className="py-0.5 pr-2 italic text-[10px] border-l-2 border-l-blue-500/40 pl-2">
+                          {WET_COMPOUND_CAVEAT_IT}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
                   <tr key={`${lr.driverNumber}-${lr.stintNumber}`} className={lr.isValidLongRun ? "text-foreground" : "text-muted-foreground/60"}>
                     <td className="py-0.5 pr-2">
                       <span className="flex items-center gap-1">
@@ -135,7 +153,8 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
                     <td className="py-0.5 pr-2 text-right font-mono">{lr.fitRobustness ?? "—"}</td>
                     <td className="py-0.5 text-center">{lr.isValidLongRun ? "✅" : "❌"}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <ul className="text-[10px] text-muted-foreground mt-2 space-y-1 pl-4 list-disc">
