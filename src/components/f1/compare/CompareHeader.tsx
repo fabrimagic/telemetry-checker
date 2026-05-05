@@ -91,6 +91,27 @@ export function CompareHeader({ comparison, driverA, driverB, onSwap }: Props) {
           </div>
         );
       })()}
+      {(() => {
+        const insight = computeDuelInsight(comparison, driverA.name_acronym, driverB.name_acronym);
+        if (!insight.variant || !insight.message) return null;
+        const variantStyle = insight.variant === "offensive_chance"
+          ? "bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-300"
+          : "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300";
+        const title = insight.variant === "offensive_chance"
+          ? "Possibilità offensiva non sfruttata"
+          : "Esposizione difensiva";
+        return (
+          <div className="mt-2 flex justify-center">
+            <div className={`max-w-2xl rounded-md border px-3 py-2 text-xs ${variantStyle}`}>
+              <div className="font-semibold mb-0.5">{title}</div>
+              <div>{insight.message}</div>
+              <div className="mt-1 text-[10px] opacity-80 italic">
+                {insight.rationale} Stima ex-ante: si basa sul verdict del duello come proxy della posizione relativa, non sul lap-by-lap; in caso di sorpassi multipli durante la gara il messaggio è approssimativo.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <div className="mt-2 flex justify-center">
         <span className="text-[10px] text-muted-foreground">
           Confidence comune: <span className="font-mono font-semibold">{comparison.common_confidence}</span>
