@@ -68,6 +68,7 @@ import { computeKeyDecisionMoments, type KeyDecisionMomentsResult } from "@/lib/
 import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
 import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
+import { FullGasFeedSection } from "@/components/landing/FullGasFeedSection";
 
 interface DriverState {
   driver: Driver;
@@ -1277,6 +1278,7 @@ export default function Index() {
           </Tabs>
         )}
       </main>
+      <FullGasFeedSection />
       <footer className="border-t border-border px-6 py-4 mt-8">
         <p className="text-center text-xs text-muted-foreground">
           Questo è un progetto sviluppato da Fabrizio Monaco
