@@ -84,6 +84,17 @@ export interface LivePit {
   pit_duration: number | null;
 }
 
+export interface LiveWeather {
+  date: string;
+  air_temperature: number | null;
+  track_temperature: number | null;
+  humidity: number | null;
+  rainfall: number | null;
+  wind_speed: number | null;
+  wind_direction?: number | null;
+  pressure?: number | null;
+}
+
 export interface LiveCarData {
   driver_number: number;
   date: string;
