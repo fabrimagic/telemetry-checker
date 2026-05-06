@@ -27,6 +27,14 @@ const App = () => (
           <Route path="/compare" element={<Compare />} />
           <Route path="/pre-race" element={<PreRace />} />
           <Route path="/campionato" element={<Championship />} />
+          <Route
+            path="/internal-pitwall-live-x7k2m9"
+            element={
+              <Suspense fallback={<div className="p-6">Caricamento dashboard…</div>}>
+                <InternalLiveDashboard />
+              </Suspense>
+            }
+          />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
