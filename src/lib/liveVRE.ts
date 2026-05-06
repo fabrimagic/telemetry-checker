@@ -1,5 +1,6 @@
 import {
   calculateCorrectedTyreDegradation,
+  DEFAULT_CORRECTED_CONFIG,
   type CorrectedDegradationResult,
 } from "./correctedDegradation";
 import {
