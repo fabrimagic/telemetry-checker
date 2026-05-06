@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { detectLiveSession, fetchLivedata, LiveDriver, LiveSession } from "@/lib/livedataClient";
 import { LiveTimingTable } from "@/components/internal/LiveTimingTable";
 import { LiveTelemetryPanel } from "@/components/internal/LiveTelemetryPanel";
+import { LiveStrategyMonitor } from "@/components/internal/LiveStrategyMonitor";
 
 export default function InternalLiveDashboard() {
   const [session, setSession] = useState<LiveSession | null>(null);
@@ -74,14 +75,23 @@ export default function InternalLiveDashboard() {
             onSelectDriver={setSelectedDriver}
           />
         </section>
-        <section className="rounded border border-border bg-card p-3">
-          <LiveTelemetryPanel
-            session={session}
-            drivers={drivers}
-            selectedDriver={selectedDriver}
-            onSelectDriver={setSelectedDriver}
-          />
-        </section>
+        <div className="space-y-4 max-h-[calc(100vh-6rem)] overflow-y-auto pr-1">
+          <section className="rounded border border-border bg-card p-3">
+            <LiveTelemetryPanel
+              session={session}
+              drivers={drivers}
+              selectedDriver={selectedDriver}
+              onSelectDriver={setSelectedDriver}
+            />
+          </section>
+          <section className="rounded border border-border bg-card p-3">
+            <LiveStrategyMonitor
+              session={session}
+              drivers={drivers}
+              selectedDriver={selectedDriver}
+            />
+          </section>
+        </div>
       </div>
     </div>
   );
