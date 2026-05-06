@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,6 +10,8 @@ import Compare from "./pages/Compare.tsx";
 import PreRace from "./pages/PreRace.tsx";
 import Championship from "./pages/Championship.tsx";
 import NotFound from "./pages/NotFound.tsx";
+
+const InternalLiveDashboard = lazy(() => import("./pages/InternalLiveDashboard.tsx"));
 
 const queryClient = new QueryClient();
 
