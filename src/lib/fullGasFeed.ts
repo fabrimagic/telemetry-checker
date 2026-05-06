@@ -34,14 +34,11 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 const EXCERPT_MAX_CHARS = 180;
 const ITEMS_LIMIT = 3;
 
-export async function fetchFullGasFeed(options?: { forceRefresh?: boolean }): Promise<FullGasFeedResult> {
-  const forceRefresh = options?.forceRefresh ?? true;
-  if (!forceRefresh) {
-    const cached = readCache<SerializedResult>(CACHE_KEY, CACHE_TTL_MS);
-    if (cached) return deserialize(cached);
-  }
+export async function fetchFullGasFeed(): Promise<FullGasFeedResult> {
+  const cached = readCache<SerializedResult>(CACHE_KEY, CACHE_TTL_MS);
+  if (cached) return deserialize(cached);
 
-  const res = await fetch(FEED_URL, { method: "GET", cache: "no-store" });
+  const res = await fetch(FEED_URL, { method: "GET" });
   if (!res.ok) throw new Error(`Feed fetch failed: ${res.status}`);
   const xmlText = await res.text();
   const parsed = parseFullGasFeed(xmlText);
