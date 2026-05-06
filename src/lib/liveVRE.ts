@@ -103,6 +103,13 @@ export function computeLiveStrategyAdvice(input: {
       adaptedStints,
       [],
       totalSessionLaps,
+      undefined,
+      undefined,
+      // Use st_speed proxy: with null st_speed, the engine falls back
+      // to the raw tyre_life regression (slope_raw == slope_corrected).
+      // The default "laps_remaining" proxy is collinear with tyre_life
+      // within a single live stint, which collapses slope_corrected to ~0.
+      { ...DEFAULT_CORRECTED_CONFIG, fuel_proxy_type: "st_speed" },
     );
     liveResultForCompound =
       liveResults.find((r) => r.stint === currentStint.stint_number) ?? null;
