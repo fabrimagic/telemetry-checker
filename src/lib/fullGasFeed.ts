@@ -41,8 +41,7 @@ export async function fetchFullGasFeed(options?: { forceRefresh?: boolean }): Pr
     if (cached) return deserialize(cached);
   }
 
-  const url = `${FEED_URL}?_=${Date.now()}`;
-  const res = await fetch(url, { method: "GET", cache: "no-store" });
+  const res = await fetch(FEED_URL, { method: "GET", cache: "no-store" });
   if (!res.ok) throw new Error(`Feed fetch failed: ${res.status}`);
   const xmlText = await res.text();
   const parsed = parseFullGasFeed(xmlText);
