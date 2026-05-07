@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchLivedata,
   type LiveSession,
@@ -11,6 +11,16 @@ import {
 } from "@/lib/livedataClient";
 import { useLivePolling } from "@/hooks/useLivePolling";
 import { meanStintLap } from "@/lib/strategyMonitorHelpers";
+import { computeLiveStrategyAdvice, type LiveStrategyAdvice } from "@/lib/liveVRE";
+
+function estimateTotalSessionLaps(
+  _laps: LiveLap[],
+  _stints: LiveStint[],
+): number | null {
+  // Heuristic placeholder: OpenF1 doesn't expose total race laps directly.
+  // Future: derive from circuit_short_name → total laps map.
+  return null;
+}
 
 interface Props {
   session: LiveSession;
