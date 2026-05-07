@@ -104,6 +104,49 @@ export function LiveStrategyMonitor({ session, drivers, selectedDriver }: Props)
 
   const { data, error, loading } = useLivePolling(fetcher, 1000, selectedDriver != null);
 
+  const [advice, setAdvice] = useState<LiveStrategyAdvice | null>(null);
+  const [adviceComputedAt, setAdviceComputedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    setAdvice(null);
+    setAdviceComputedAt(null);
+  }, [selectedDriver]);
+
+  useEffect(() => {
+    if (!data || selectedDriver == null) return;
+
+    const computeAdviceNow = () => {
+      const dLaps = data.laps.filter((l) => l.driver_number === selectedDriver);
+      const dStints = data.stints.filter((s) => s.driver_number === selectedDriver);
+      const dPits = data.pits.filter((p) => p.driver_number === selectedDriver);
+      const lastLapNumber = dLaps.length > 0 ? Math.max(...dLaps.map((l) => l.lap_number)) : 0;
+      const driverInfo = drivers.find((d) => d.driver_number === selectedDriver);
+      const acronym = driverInfo?.name_acronym ?? "—";
+      const totalSessionLaps = estimateTotalSessionLaps(dLaps, dStints) ?? 60;
+
+      const newAdvice = computeLiveStrategyAdvice({
+        driverNumber: selectedDriver,
+        acronym,
+        raceLaps: dLaps,
+        raceStints: dStints,
+        racePits: dPits,
+        raceWeather: [],
+        totalSessionLaps,
+        practicePrior: undefined,
+        currentLap: lastLapNumber,
+        sessionKey: session.session_key,
+      });
+
+      setAdvice(newAdvice);
+      setAdviceComputedAt(Date.now());
+    };
+
+    if (advice == null) computeAdviceNow();
+    const interval = setInterval(computeAdviceNow, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDriver, session.session_key, data?.laps?.length]);
+
   if (selectedDriver == null) {
     return (
       <div>
