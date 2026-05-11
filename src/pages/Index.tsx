@@ -24,6 +24,9 @@ import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
 import { SessionReport } from "@/components/f1/SessionReport";
 import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Gauge, Target, Wrench, User, Swords, ArrowRight, ArrowLeft } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
+import { ToolbarSection } from "@/components/layout/ToolbarSection";
+import { ContentGrid } from "@/components/layout/ContentGrid";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Play } from "lucide-react";
@@ -713,11 +716,355 @@ export default function Index() {
     });
   }, [selectedDriverNumbers, driverStates, sessionType, getColor, longRunResults, sessionWeather]);
 
+  // VRE recomputation handler — same logic that was previously inlined inside the JSX IIFE.
+  // Extracted so the toolbar (sidebar) can invoke it from any layout slot.
+  const recomputeVre = useCallback((overrides: {
+    riskMode?: RiskMode; scenario?: import("@/lib/scenarioContext").ScenarioId;
+    scenarioLap?: number | null; scenarioDuration?: number | null;
+    analysisMode?: AnalysisMode; customDeg?: Record<string, number> | null;
+  }) => {
+    const args = vreArgsRef.current;
+    if (!args) return;
+    const rm = overrides.riskMode ?? vreRiskMode;
+    const sc = overrides.scenario ?? vreScenario;
+    const sl = overrides.scenarioLap !== undefined ? overrides.scenarioLap : vreScenarioLap;
+    const sd = overrides.scenarioDuration !== undefined ? overrides.scenarioDuration : vreScenarioDuration;
+    const am = overrides.analysisMode ?? vreAnalysisMode;
+    const cd = overrides.customDeg !== undefined ? overrides.customDeg : vreCustomDeg;
+    const newVre = computeVirtualRaceEngineer(
+      args.driverNumber, args.driverAcronym, args.sessionKey,
+      args.laps, args.stints, args.pits,
+      args.weather, args.raceControl,
+      args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
+      args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
+    );
+    setVreResult(newVre);
+    if (newVre) {
+      try {
+        const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
+        const trackStatusMapForKdm = classifyLapsTrackStatus(args.laps, args.raceControl);
+        const driverCumDevForKdm = args.cumDevResult?.drivers.find(d => d.driver_number === args.driverNumber) ?? null;
+        const kdm = computeKeyDecisionMoments({
+          laps: args.laps, stints: args.stints, pitStops: args.pits,
+          weatherMap: weatherMapForKdm, trackStatusMap: trackStatusMapForKdm,
+          trafficAnalysis: newVre.traffic_analysis, paceLossResults: newVre.pace_loss_results,
+          degradationValidations: newVre.degradation_validations, diaryEvents: args.diaryEvents,
+          driverCumDev: driverCumDevForKdm, positions: args.positions, intervals: args.intervals,
+          driverNumber: args.driverNumber, driverAcronym: args.driverAcronym,
+          sessionKey: args.sessionKey, totalLaps: Math.max(...args.laps.map(l => l.lap_number)),
+          softSensorsTimeline: newVre.soft_sensors_timeline,
+        });
+        setKdmResult(kdm);
+      } catch { setKdmResult(null); }
+    }
+  }, [vreRiskMode, vreScenario, vreScenarioLap, vreScenarioDuration, vreAnalysisMode, vreCustomDeg]);
+
+  const showVreSetup = selectedDriverNumbers.length === 1
+    && (sessionType === "Race" || sessionType === "Sprint")
+    && !loadingVre && vreResult != null;
+
+  const setupCard = showVreSetup ? (
+    <VRESetupCard
+      analysisMode={vreAnalysisMode}
+      onAnalysisModeChange={(mode) => {
+        setVreAnalysisMode(mode);
+        if (mode === "RACE_ENGINEER") {
+          setVreScenario("REAL_CONTEXT");
+          setVreScenarioLap(null);
+          setVreScenarioDuration(null);
+        }
+        recomputeVre({
+          analysisMode: mode,
+          scenario: mode === "RACE_ENGINEER" ? "REAL_CONTEXT" : undefined,
+          scenarioLap: mode === "RACE_ENGINEER" ? null : undefined,
+          scenarioDuration: mode === "RACE_ENGINEER" ? null : undefined,
+        });
+      }}
+      viewMode={vreViewMode}
+      onViewModeChange={setVreViewMode}
+      riskMode={vreRiskMode}
+      onRiskModeChange={(mode) => { setVreRiskMode(mode); recomputeVre({ riskMode: mode }); }}
+      scenarioId={vreScenario}
+      onScenarioChange={(scenario) => {
+        setVreScenario(scenario);
+        const isReal = scenario === "REAL_CONTEXT";
+        if (isReal) { setVreScenarioLap(null); setVreScenarioDuration(null); }
+        recomputeVre({
+          scenario,
+          scenarioLap: isReal ? null : undefined,
+          scenarioDuration: isReal ? null : undefined,
+        });
+      }}
+      scenarioActivationLap={vreScenarioLap}
+      onScenarioActivationLapChange={(lap) => { setVreScenarioLap(lap); recomputeVre({ scenarioLap: lap }); }}
+      scenarioDurationLaps={vreScenarioDuration}
+      onScenarioDurationChange={(duration) => { setVreScenarioDuration(duration); recomputeVre({ scenarioDuration: duration }); }}
+      scenarioDescription={vreResult?.scenario_description}
+      scenarioIsSimulated={vreResult?.scenario_is_simulated}
+      scenarioWindow={vreResult?.scenario_window}
+      scenarioActivationWarning={vreResult?.scenario_activation_warning}
+      maxLap={vreResult?.actual_strategy?.stints?.length ? Math.max(...vreResult.actual_strategy.stints.map(s => s.lap_end)) : 99}
+      degradationValidations={vreResult?.degradation_validations}
+      customDegradationOverride={vreResult?.custom_degradation_override}
+      onCustomDegradationChange={(deg) => { setVreCustomDeg(deg); recomputeVre({ customDeg: deg }); }}
+    />
+  ) : null;
+
+  // ───────── Toolbar (sidebar sinistra) ─────────
+  const toolbar = (
+    <>
+      <ToolbarSection title="Sessione" defaultOpen={!sessionKey}>
+        <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
+      </ToolbarSection>
+
+      {allDrivers.length > 0 && (
+        <ToolbarSection title="Vista" defaultOpen>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "drivers" | "report")}>
+            <TabsList className="w-full">
+              <TabsTrigger value="drivers" className="flex-1 text-[11px]">Analisi Pilota</TabsTrigger>
+              <TabsTrigger value="report" className="flex-1 text-[11px]">Report</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </ToolbarSection>
+      )}
+
+      {allDrivers.length > 0 && viewMode === "drivers" && (
+        <ToolbarSection title="Pilota" defaultOpen>
+          <DriverPicker
+            drivers={allDrivers}
+            selected={selectedDriverNumbers}
+            onAdd={handleAddDriver}
+            onRemove={handleRemoveDriver}
+            max={1}
+          />
+        </ToolbarSection>
+      )}
+
+      {setupCard && (
+        <ToolbarSection title="VRE Setup" defaultOpen>
+          {setupCard}
+        </ToolbarSection>
+      )}
+    </>
+  );
+
+  // ───────── Contenuto centrale ─────────
+  const singleDriverState = selectedDriverNumbers.length === 1 ? driverStates.get(selectedDriverNumbers[0]) : null;
+  const isRaceOrSprint = sessionType === "Race" || sessionType === "Sprint";
+
+  const workspaceContent = (
+    <>
+      {error && (
+        <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
+      )}
+
+      {loadingLaps.size > 0 && (
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Caricamento dati…
+        </div>
+      )}
+
+      {viewMode === "report" && sessionKey && (
+        <SessionReport sessionKey={sessionKey} sessionType={sessionType} />
+      )}
+
+      {viewMode === "drivers" && (
+        <>
+          {/* Dashboard Summary */}
+          {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
+            loadingVre ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+              </div>
+            ) : (
+              <DashboardSummary
+                vreResult={vreResult}
+                kdmResult={kdmResult}
+                diaryEvents={diaryEvents}
+                driverHeadshotUrl={singleDriverState.driver.headshot_url}
+                driverAcronym={singleDriverState.driver.name_acronym}
+                driverColor={getColor(singleDriverState.driver.driver_number)}
+                sessionType={sessionType}
+              />
+            )
+          )}
+
+          {driversLaps.length > 0 && loadingLaps.size === 0 && (
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="w-full justify-start flex-wrap">
+                <TabsTrigger value="overview" className="text-xs gap-1">
+                  <Eye className="h-3.5 w-3.5" /> Panoramica
+                </TabsTrigger>
+                {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
+                  <TabsTrigger value="strategy" className="text-xs gap-1">
+                    <Target className="h-3.5 w-3.5" /> Strategia
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="tyres" className="text-xs gap-1">
+                  <Gauge className="h-3.5 w-3.5" /> Gomme
+                </TabsTrigger>
+                <TabsTrigger value="deep" className="text-xs gap-1">
+                  <Wrench className="h-3.5 w-3.5" /> Tecnica
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ═══ PANORAMICA ═══ */}
+              <TabsContent value="overview" className="mt-4 space-y-4">
+                {(stintsData.length > 0 || pitStopsData.length > 0 || overtakesData.length > 0 || (sessionWeather.length > 0 && selectedDriverNumbers.length === 1)) && (
+                  <ContentGrid columns={2}>
+                    {stintsData.length > 0 && <StintsCard stints={stintsData} />}
+                    {pitStopsData.length > 0 && isRaceOrSprint && (
+                      <PitStopsCard pitStops={pitStopsData} allDrivers={allDrivers} multiDriver={selectedDriverNumbers.length > 1} />
+                    )}
+                    {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                      <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+                    )}
+                    {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
+                      <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
+                    )}
+                  </ContentGrid>
+                )}
+
+                <LapTimesChart
+                  drivers={driversLaps.map((dl) => ({
+                    driverNumber: dl.driver.driver_number,
+                    acronym: dl.driver.name_acronym,
+                    color: getColor(dl.driver.driver_number),
+                    laps: dl.laps,
+                    stints: dl.stints,
+                  }))}
+                  sessionWeather={sessionWeather}
+                  raceControlMessages={raceControlMessages}
+                  selectedLaps={driversLaps.map((dl) => ({
+                    driverNumber: dl.driver.driver_number,
+                    lapNumber: dl.selectedLap,
+                  }))}
+                  onSelectLap={handleSelectLap}
+                />
+
+                {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
+                  loadingDiary ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
+                    </div>
+                  ) : (
+                    <RaceDiaryCard
+                      events={diaryEvents}
+                      driverAcronym={singleDriverState.driver.name_acronym}
+                      driverColor={getColor(singleDriverState.driver.driver_number)}
+                    />
+                  )
+                )}
+              </TabsContent>
+
+              {/* ═══ STRATEGIA ═══ */}
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
+                <TabsContent value="strategy" className="mt-4 space-y-4">
+                  {loadingVre ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+                    </div>
+                  ) : vreResult ? (
+                    <VirtualRaceEngineerCard result={vreResult} analysisMode={vreAnalysisMode} viewMode={vreViewMode} />
+                  ) : null}
+                  {kdmResult && kdmResult.decision_points.length > 0 && (
+                    <KeyDecisionMomentsCard result={kdmResult} />
+                  )}
+                </TabsContent>
+              )}
+
+              {/* ═══ GOMME ═══ */}
+              <TabsContent value="tyres" className="mt-4 space-y-4">
+                {degradationResults.length > 0 ? (
+                  <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
+                ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
+                  <div className="bg-card rounded-lg border border-border p-4">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <TrendingDown className="h-3.5 w-3.5" /> Degrado Gomme
+                    </h3>
+                    <p className="text-sm text-muted-foreground italic">
+                      Nessun long run statisticamente significativo rilevato in questa sessione di pratica.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ═══ TECNICA ═══ */}
+              <TabsContent value="deep" className="mt-4 space-y-4">
+                <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
+
+                {hasLapsSelected && (
+                  <Button onClick={handleLoadTelemetry} disabled={loadingTelemetry} className="gap-2">
+                    {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    Carica Telemetria
+                  </Button>
+                )}
+
+                {loadingTelemetry && (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento telemetria…
+                  </div>
+                )}
+
+                {chartDrivers.length > 0 && !loadingTelemetry && (
+                  <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
+                    <section className="bg-card rounded-lg border border-border p-4 overflow-hidden min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telemetria</h2>
+                      </div>
+                      <TelemetryCharts
+                        drivers={chartDrivers}
+                        cursorTime={cursorTime}
+                        onCursorChange={setCursorTime}
+                        onCursorClick={setClickedTime}
+                      />
+                    </section>
+                    <aside className="space-y-4 min-w-0">
+                      {mapDrivers.length > 0 && (
+                        <TrackMap drivers={mapDrivers} activeDate={activeDate} activeInfo={activeInfo} onClearPin={() => setClickedTime(null)} />
+                      )}
+                      {(() => {
+                        const analysisDrivers = [...driverStates.values()]
+                          .filter((s) => s.carData.length > 0 && s.locationData.length > 0)
+                          .map((s) => ({
+                            driverNumber: s.driver.driver_number,
+                            acronym: s.driver.name_acronym,
+                            color: getColor(s.driver.driver_number),
+                            carData: s.carData,
+                          }));
+                        if (!analysisDrivers.length) return null;
+                        return <DrivingAnalysis drivers={analysisDrivers} />;
+                      })()}
+                      {weatherData && <WeatherCard weather={weatherData} />}
+                      {(() => {
+                        const driversForMiniSectors = [...driverStates.values()]
+                          .filter((s) => s.selectedLap != null)
+                          .map((s) => {
+                            const lap = s.laps.find((l) => l.lap_number === s.selectedLap);
+                            if (!lap) return null;
+                            return { driver: s.driver, lap, color: getColor(s.driver.driver_number) };
+                          })
+                          .filter((d): d is NonNullable<typeof d> => d != null);
+                        if (!driversForMiniSectors.length) return null;
+                        return <SectorMiniSectors drivers={driversForMiniSectors} />;
+                      })()}
+                    </aside>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <CountdownBanner />
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/75 border-b border-border/60 px-6 py-3.5 shadow-[0_1px_0_hsl(var(--f1-red)/0.25)]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative">
               <div className="w-1.5 h-7 rounded-full bg-gradient-to-b from-[hsl(var(--f1-red-glow))] to-[hsl(var(--f1-red-deep))] group-hover:shadow-[0_0_12px_hsl(var(--f1-red))] transition-shadow" />
@@ -729,17 +1076,10 @@ export default function Index() {
             </h1>
           </Link>
           <div className="flex items-center gap-1.5">
-            <Link
-              to="/compare"
-              className="text-[11px] font-black uppercase tracking-[0.15em] px-3.5 py-2 rounded-md inline-flex items-center gap-1.5 bg-gradient-to-br from-[hsl(var(--f1-red))]/15 to-[hsl(var(--f1-red))]/5 text-[hsl(var(--f1-red-glow))] border border-[hsl(var(--f1-red))]/40 hover:border-[hsl(var(--f1-red))] hover:shadow-[0_0_16px_hsl(var(--f1-red)/0.4)] transition-all"
-              title="Apri la modalità head-to-head per confrontare due piloti"
-            >
+            <Link to="/compare" className="text-[11px] font-black uppercase tracking-[0.15em] px-3.5 py-2 rounded-md inline-flex items-center gap-1.5 bg-gradient-to-br from-[hsl(var(--f1-red))]/15 to-[hsl(var(--f1-red))]/5 text-[hsl(var(--f1-red-glow))] border border-[hsl(var(--f1-red))]/40 hover:border-[hsl(var(--f1-red))] hover:shadow-[0_0_16px_hsl(var(--f1-red)/0.4)] transition-all" title="Apri la modalità head-to-head">
               ⚔︎ H2H
             </Link>
-            <Link
-              to="/campionato"
-              className="text-[11px] font-bold uppercase tracking-[0.15em] px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-            >
+            <Link to="/campionato" className="text-[11px] font-bold uppercase tracking-[0.15em] px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
               🏆 Mondiale
             </Link>
             <Link to="/docs" className="text-[11px] font-bold uppercase tracking-[0.15em] px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
@@ -747,104 +1087,98 @@ export default function Index() {
             </Link>
             {sessionKey && (
               <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5 text-[11px] uppercase tracking-wider font-bold text-muted-foreground hover:text-[hsl(var(--f1-red))]">
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset
+                <RotateCcw className="h-3.5 w-3.5" /> Reset
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Hero */}
-        {!sessionKey && (
-          <section className="relative overflow-hidden rounded-2xl border border-border/60 px-6 sm:px-10 py-10 sm:py-14 card-premium">
-            <div className="absolute inset-0 bg-grid opacity-[0.06] pointer-events-none" />
-            <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-[hsl(var(--f1-red))]/20 blur-3xl pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-stripe opacity-50" style={{ background: "var(--gradient-stripe)" }} />
-            <div className="relative max-w-3xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--f1-red))]/10 border border-[hsl(var(--f1-red))]/30 text-[hsl(var(--f1-red-glow))] text-[10px] font-black uppercase tracking-[0.2em] mb-5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--f1-red))] animate-pulse" />
-                Formula 1 Race Strategy and Analysis tool
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] mb-4">
-                Visualizza, analizza e <span className="text-gradient-primary">simula</span><br />
-                il corso degli eventi di ogni gara di Formula 1
-              </h2>
-              <p className="text-base sm:text-lg text-muted-foreground max-w-2xl leading-relaxed">
-                Analisi pilota, strategia gara, degrado gomme, telemetria, micro-settori e Virtual Race Engineer.
-                Tutto in un'unica piattaforma, con dati ufficiali e zero compromessi.
-              </p>
-            </div>
-          </section>
-        )}
-
-        {/* Mode chooser */}
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Landing: hero + mode chooser quando non c'è sessione e non si è scelta modalità */}
         {!sessionKey && analysisMode === null && (
-          <section className="space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Step 01 — Scegli la modalità</span>
-              <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Single driver */}
-              <button
-                type="button"
-                onClick={() => setAnalysisMode("single")}
-                className="group relative overflow-hidden rounded-2xl border border-border/60 card-premium p-7 text-left transition-all hover:border-[hsl(var(--f1-red))]/70 hover:shadow-[0_0_32px_hsl(var(--f1-red)/0.25)] hover:-translate-y-0.5"
-              >
-                <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[hsl(var(--f1-red))]/10 blur-3xl pointer-events-none transition-opacity group-hover:opacity-150" />
-                <div className="relative flex items-start gap-5">
-                  <div className="shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-[hsl(var(--f1-red))]/25 to-[hsl(var(--f1-red-deep))]/15 border border-[hsl(var(--f1-red))]/40 flex items-center justify-center text-[hsl(var(--f1-red-glow))] group-hover:shadow-[0_0_20px_hsl(var(--f1-red)/0.5)] transition-shadow">
-                    <User className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1.5">Modalità A</div>
-                    <h3 className="text-2xl font-black tracking-tight mb-2">Analisi Singolo Pilota</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                      Telemetria, degrado gomme, micro-settori, strategia, Virtual Race Engineer e diario gara per un pilota a tua scelta.
-                    </p>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[hsl(var(--f1-red-glow))] group-hover:gap-2.5 transition-all">
-                      Inizia <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
+          <>
+            <section className="relative overflow-hidden rounded-2xl border border-border/60 px-6 sm:px-10 py-10 sm:py-14 card-premium">
+              <div className="absolute inset-0 bg-grid opacity-[0.06] pointer-events-none" />
+              <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-[hsl(var(--f1-red))]/20 blur-3xl pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-stripe opacity-50" style={{ background: "var(--gradient-stripe)" }} />
+              <div className="relative max-w-3xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(var(--f1-red))]/10 border border-[hsl(var(--f1-red))]/30 text-[hsl(var(--f1-red-glow))] text-[10px] font-black uppercase tracking-[0.2em] mb-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--f1-red))] animate-pulse" />
+                  Formula 1 Race Strategy and Analysis tool
                 </div>
-              </button>
+                <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] mb-4">
+                  Visualizza, analizza e <span className="text-gradient-primary">simula</span><br />
+                  il corso degli eventi di ogni gara di Formula 1
+                </h2>
+                <p className="text-base sm:text-lg text-muted-foreground max-w-2xl leading-relaxed">
+                  Analisi pilota, strategia gara, degrado gomme, telemetria, micro-settori e Virtual Race Engineer.
+                </p>
+              </div>
+            </section>
 
-              {/* Head-to-head */}
-              <Link
-                to="/compare"
-                className="group relative overflow-hidden rounded-2xl border border-border/60 card-premium p-7 text-left transition-all hover:border-[hsl(var(--f1-red))]/70 hover:shadow-[0_0_32px_hsl(var(--f1-red)/0.25)] hover:-translate-y-0.5"
-              >
-                <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[hsl(var(--f1-red))]/10 blur-3xl pointer-events-none" />
-                <div className="relative flex items-start gap-5">
-                  <div className="shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-[hsl(var(--f1-red))]/25 to-[hsl(var(--f1-red-deep))]/15 border border-[hsl(var(--f1-red))]/40 flex items-center justify-center text-[hsl(var(--f1-red-glow))] group-hover:shadow-[0_0_20px_hsl(var(--f1-red)/0.5)] transition-shadow">
-                    <Swords className="w-6 h-6" />
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Step 01 — Scegli la modalità</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <button
+                  type="button"
+                  onClick={() => setAnalysisMode("single")}
+                  className="group relative overflow-hidden rounded-2xl border border-border/60 card-premium p-7 text-left transition-all hover:border-[hsl(var(--f1-red))]/70 hover:shadow-[0_0_32px_hsl(var(--f1-red)/0.25)] hover:-translate-y-0.5"
+                >
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[hsl(var(--f1-red))]/10 blur-3xl pointer-events-none" />
+                  <div className="relative flex items-start gap-5">
+                    <div className="shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-[hsl(var(--f1-red))]/25 to-[hsl(var(--f1-red-deep))]/15 border border-[hsl(var(--f1-red))]/40 flex items-center justify-center text-[hsl(var(--f1-red-glow))]">
+                      <User className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1.5">Modalità A</div>
+                      <h3 className="text-2xl font-black tracking-tight mb-2">Analisi Singolo Pilota</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                        Telemetria, degrado, strategia, VRE e diario gara.
+                      </p>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[hsl(var(--f1-red-glow))]">
+                        Inizia <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1.5">Modalità B</div>
-                    <h3 className="text-2xl font-black tracking-tight mb-2">Head-to-Head</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                      Confronta due piloti fianco a fianco: pace, strategia, controfattuali e narrativa per capire chi ha fatto la differenza.
-                    </p>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[hsl(var(--f1-red-glow))] group-hover:gap-2.5 transition-all">
-                      Apri H2H <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            </div>
+                </button>
 
-            {/* Championship + weekend weather + next circuit as supporting context */}
-            <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-              <ChampionshipSummaryCard />
-              <WeekendWeatherCard />
-              <NextCircuitCard />
-            </div>
-          </section>
+                <Link
+                  to="/compare"
+                  className="group relative overflow-hidden rounded-2xl border border-border/60 card-premium p-7 text-left transition-all hover:border-[hsl(var(--f1-red))]/70 hover:shadow-[0_0_32px_hsl(var(--f1-red)/0.25)] hover:-translate-y-0.5"
+                >
+                  <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-[hsl(var(--f1-red))]/10 blur-3xl pointer-events-none" />
+                  <div className="relative flex items-start gap-5">
+                    <div className="shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-[hsl(var(--f1-red))]/25 to-[hsl(var(--f1-red-deep))]/15 border border-[hsl(var(--f1-red))]/40 flex items-center justify-center text-[hsl(var(--f1-red-glow))]">
+                      <Swords className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1.5">Modalità B</div>
+                      <h3 className="text-2xl font-black tracking-tight mb-2">Head-to-Head</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                        Confronta due piloti fianco a fianco.
+                      </p>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em] text-[hsl(var(--f1-red-glow))]">
+                        Apri H2H <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+                <ChampionshipSummaryCard />
+                <WeekendWeatherCard />
+                <NextCircuitCard />
+              </div>
+            </section>
+          </>
         )}
 
-        {/* Controls (single-driver flow) */}
+        {/* Modalità singolo pilota scelta, ma nessuna sessione: solo SessionPicker centrato */}
         {!sessionKey && analysisMode === "single" && (
           <section className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_auto] gap-6 items-start">
             <div className="card-premium rounded-xl p-5">
@@ -867,418 +1201,15 @@ export default function Index() {
           </section>
         )}
 
-        {/* Controls (after a session has been picked) */}
+        {/* Workspace con toolbar laterale */}
         {sessionKey && (
-          <section className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_auto] gap-6 items-start">
-            <div className="card-premium rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[hsl(var(--f1-red-glow))]">▸ Sessione attiva</span>
-                <div className="h-px flex-1 bg-gradient-to-r from-[hsl(var(--f1-red))]/40 to-transparent" />
-              </div>
-              <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} />
-            </div>
-            <ChampionshipSummaryCard />
-          </section>
-        )}
-
-        {/* Mode Toggle */}
-        {allDrivers.length > 0 && (
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "drivers" | "report")}>
-            <TabsList>
-              <TabsTrigger value="drivers">Analisi Pilota</TabsTrigger>
-              <TabsTrigger value="report">Report Sessione</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="report" className="mt-4">
-              {sessionKey && <SessionReport sessionKey={sessionKey} sessionType={sessionType} />}
-            </TabsContent>
-
-             <TabsContent value="drivers" className="mt-4 space-y-5">
-              <DriverPicker
-                drivers={allDrivers}
-                selected={selectedDriverNumbers}
-                onAdd={handleAddDriver}
-                onRemove={handleRemoveDriver}
-                max={1}
-              />
-
-        {error && (
-          <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
-        )}
-
-        {loadingLaps.size > 0 && (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento dati…
-          </div>
-        )}
-
-        {/* ── LAYOUT: content + VRE Setup sidebar ── */}
-        {(() => {
-          const showVreSetup = selectedDriverNumbers.length === 1
-            && (sessionType === "Race" || sessionType === "Sprint")
-            && !loadingVre && vreResult != null;
-
-          const recomputeVre = (overrides: {
-            riskMode?: RiskMode; scenario?: import("@/lib/scenarioContext").ScenarioId;
-            scenarioLap?: number | null; scenarioDuration?: number | null;
-            analysisMode?: AnalysisMode; customDeg?: Record<string, number> | null;
-          }) => {
-            const args = vreArgsRef.current;
-            if (!args) return;
-            const rm = overrides.riskMode ?? vreRiskMode;
-            const sc = overrides.scenario ?? vreScenario;
-            const sl = overrides.scenarioLap !== undefined ? overrides.scenarioLap : vreScenarioLap;
-            const sd = overrides.scenarioDuration !== undefined ? overrides.scenarioDuration : vreScenarioDuration;
-            const am = overrides.analysisMode ?? vreAnalysisMode;
-            const cd = overrides.customDeg !== undefined ? overrides.customDeg : vreCustomDeg;
-            const newVre = computeVirtualRaceEngineer(
-              args.driverNumber, args.driverAcronym, args.sessionKey,
-              args.laps, args.stints, args.pits,
-              args.weather, args.raceControl,
-              args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
-              args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
-            );
-            setVreResult(newVre);
-            if (newVre) {
-              try {
-                const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
-                const trackStatusMapForKdm = classifyLapsTrackStatus(args.laps, args.raceControl);
-                const driverCumDevForKdm = args.cumDevResult?.drivers.find(d => d.driver_number === args.driverNumber) ?? null;
-                const kdm = computeKeyDecisionMoments({
-                  laps: args.laps, stints: args.stints, pitStops: args.pits,
-                  weatherMap: weatherMapForKdm, trackStatusMap: trackStatusMapForKdm,
-                  trafficAnalysis: newVre.traffic_analysis, paceLossResults: newVre.pace_loss_results,
-                  degradationValidations: newVre.degradation_validations, diaryEvents: args.diaryEvents,
-                  driverCumDev: driverCumDevForKdm, positions: args.positions, intervals: args.intervals,
-                  driverNumber: args.driverNumber, driverAcronym: args.driverAcronym,
-                  sessionKey: args.sessionKey, totalLaps: Math.max(...args.laps.map(l => l.lap_number)),
-                  softSensorsTimeline: newVre.soft_sensors_timeline,
-                });
-                setKdmResult(kdm);
-              } catch { setKdmResult(null); }
-            }
-          };
-
-          const mainContent = (
-            <>
-              {/* ── DASHBOARD SUMMARY (Race/Sprint only, single driver) ── */}
-              {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (() => {
-                const state = driverStates.get(selectedDriverNumbers[0]);
-                if (!state || loadingVre) return loadingVre ? (
-                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
-                  </div>
-                ) : null;
-                return (
-                  <DashboardSummary
-                    vreResult={vreResult}
-                    kdmResult={kdmResult}
-                    diaryEvents={diaryEvents}
-                    driverHeadshotUrl={state.driver.headshot_url}
-                    driverAcronym={state.driver.name_acronym}
-                    driverColor={getColor(state.driver.driver_number)}
-                    sessionType={sessionType}
-                  />
-                );
-              })()}
-
-              {/* ── 4-TAB LAYOUT ── */}
-              {driversLaps.length > 0 && loadingLaps.size === 0 && (
-                <Tabs defaultValue="overview" className="w-full">
-                  <TabsList className="w-full justify-start flex-wrap">
-                    <TabsTrigger value="overview" className="text-xs gap-1">
-                      <Eye className="h-3.5 w-3.5" /> Panoramica
-                    </TabsTrigger>
-                    {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (
-                      <TabsTrigger value="strategy" className="text-xs gap-1">
-                        <Target className="h-3.5 w-3.5" /> Strategia
-                      </TabsTrigger>
-                    )}
-                    <TabsTrigger value="tyres" className="text-xs gap-1">
-                      <Gauge className="h-3.5 w-3.5" /> Gomme & Performance
-                    </TabsTrigger>
-                    <TabsTrigger value="deep" className="text-xs gap-1">
-                      <Wrench className="h-3.5 w-3.5" /> Analisi Tecnica
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* ═══ TAB A: PANORAMICA ═══ */}
-                  <TabsContent value="overview" className="mt-4 space-y-4">
-                    {/* Summary cards */}
-                    {(stintsData.length > 0 || pitStopsData.length > 0 || overtakesData.length > 0 || (sessionWeather.length > 0 && selectedDriverNumbers.length === 1)) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {stintsData.length > 0 && <StintsCard stints={stintsData} />}
-                        {pitStopsData.length > 0 && (sessionType === "Race" || sessionType === "Sprint") && (
-                          <PitStopsCard pitStops={pitStopsData} allDrivers={allDrivers} multiDriver={selectedDriverNumbers.length > 1} />
-                        )}
-                        {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
-                          <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
-                        )}
-                        {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
-                          <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Lap Times Chart */}
-                    <LapTimesChart
-                      drivers={driversLaps.map((dl) => ({
-                        driverNumber: dl.driver.driver_number,
-                        acronym: dl.driver.name_acronym,
-                        color: getColor(dl.driver.driver_number),
-                        laps: dl.laps,
-                        stints: dl.stints,
-                      }))}
-                      sessionWeather={sessionWeather}
-                      raceControlMessages={raceControlMessages}
-                      selectedLaps={driversLaps.map((dl) => ({
-                        driverNumber: dl.driver.driver_number,
-                        lapNumber: dl.selectedLap,
-                      }))}
-                      onSelectLap={handleSelectLap}
-                    />
-
-                    {/* Race Diary */}
-                    {selectedDriverNumbers.length === 1 &&
-                      (sessionType === "Race" || sessionType === "Sprint") && (() => {
-                        const state = driverStates.get(selectedDriverNumbers[0]);
-                        if (!state) return null;
-                        return loadingDiary ? (
-                          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                            <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
-                          </div>
-                        ) : (
-                          <RaceDiaryCard
-                            events={diaryEvents}
-                            driverAcronym={state.driver.name_acronym}
-                            driverColor={getColor(state.driver.driver_number)}
-                          />
-                        );
-                      })()}
-                  </TabsContent>
-
-                  {/* ═══ TAB B: STRATEGIA (Race/Sprint only) ═══ */}
-                  {selectedDriverNumbers.length === 1 && (sessionType === "Race" || sessionType === "Sprint") && (
-                    <TabsContent value="strategy" className="mt-4 space-y-4">
-                      {loadingVre ? (
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                          <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
-                        </div>
-                      ) : vreResult ? (
-                        <VirtualRaceEngineerCard
-                          result={vreResult}
-                          analysisMode={vreAnalysisMode}
-                          viewMode={vreViewMode}
-                        />
-                      ) : null}
-
-                      {/* Key Decision Moments */}
-                      {kdmResult && kdmResult.decision_points.length > 0 && (
-                        <KeyDecisionMomentsCard result={kdmResult} />
-                      )}
-                    </TabsContent>
-                  )}
-
-                  {/* ═══ TAB C: GOMME & PERFORMANCE ═══ */}
-                  <TabsContent value="tyres" className="mt-4 space-y-4">
-                    {/* Tyre Degradation */}
-                    {degradationResults.length > 0 ? (
-                      <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
-                    ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
-                      <div className="bg-card rounded-lg border border-border p-4">
-                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <TrendingDown className="h-3.5 w-3.5" />
-                          Degrado Gomme
-                        </h3>
-                        <p className="text-sm text-muted-foreground italic mb-3">
-                          Nessun long run statisticamente significativo rilevato in questa sessione di pratica.
-                        </p>
-                        <details className="group">
-                          <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                            <Info className="h-3.5 w-3.5 shrink-0" />
-                            <span className="font-medium text-foreground/80">Come funziona il rilevamento Long Run</span>
-                            <ChevronDown className="h-3 w-3 ml-auto transition-transform group-open:rotate-180" />
-                          </summary>
-                          <div className="bg-muted/40 rounded-b-md px-3 py-2.5 space-y-2 text-[11px] text-muted-foreground -mt-1">
-                            <ul className="space-y-1.5 pl-5 list-disc">
-                              <li><span className="font-mono font-bold text-foreground/80">Long Run</span> — Sequenza consecutiva di almeno 5 giri validi nello stesso stint.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Filtro giri</span> — Esclusi out lap, in lap e giri con durata mancante.</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Qualifica statistica</span> — Delegata al motore principale (MAD compound-specific, esclusione warmup, regressione robusta).</li>
-                              <li><span className="font-mono font-bold text-foreground/80">Validazione</span> — R² ≥ 0.25 e giri usati ≥ 5 nella regressione robusta.</li>
-                            </ul>
-                          </div>
-                        </details>
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  {/* ═══ TAB D: ANALISI TECNICA ═══ */}
-                  <TabsContent value="deep" className="mt-4 space-y-4">
-                    {/* Lap Table */}
-                    <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
-
-                    {/* Telemetry load button */}
-                    {hasLapsSelected && (
-                      <Button
-                        onClick={handleLoadTelemetry}
-                        disabled={loadingTelemetry}
-                        className="gap-2"
-                      >
-                        {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                        Carica Telemetria
-                      </Button>
-                    )}
-
-                    {loadingTelemetry && (
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Caricamento telemetria…
-                      </div>
-                    )}
-
-                    {chartDrivers.length > 0 && !loadingTelemetry && (
-                      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-                        <section className="bg-card rounded-lg border border-border p-4 overflow-hidden">
-                          <div className="flex items-center gap-3 mb-2">
-                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              Telemetria
-                            </h2>
-                          </div>
-                          <TelemetryCharts
-                            drivers={chartDrivers}
-                            cursorTime={cursorTime}
-                            onCursorChange={setCursorTime}
-                            onCursorClick={setClickedTime}
-                          />
-                        </section>
-
-                        <aside className="space-y-4">
-                          {mapDrivers.length > 0 && (
-                            <TrackMap
-                              drivers={mapDrivers}
-                              activeDate={activeDate}
-                              activeInfo={activeInfo}
-                              onClearPin={() => setClickedTime(null)}
-                            />
-                          )}
-                          {(() => {
-                            const analysisDrivers = [...driverStates.values()]
-                              .filter((s) => s.carData.length > 0 && s.locationData.length > 0)
-                              .map((s) => ({
-                                driverNumber: s.driver.driver_number,
-                                acronym: s.driver.name_acronym,
-                                color: getColor(s.driver.driver_number),
-                                carData: s.carData,
-                              }));
-                            if (!analysisDrivers.length) return null;
-                            return <DrivingAnalysis drivers={analysisDrivers} />;
-                          })()}
-                          {weatherData && (
-                            <WeatherCard weather={weatherData} />
-                          )}
-                          {(() => {
-                            const driversForMiniSectors = [...driverStates.values()]
-                              .filter((s) => s.selectedLap != null)
-                              .map((s) => {
-                                const lap = s.laps.find((l) => l.lap_number === s.selectedLap);
-                                if (!lap) return null;
-                                return { driver: s.driver, lap, color: getColor(s.driver.driver_number) };
-                              })
-                              .filter((d): d is NonNullable<typeof d> => d != null);
-                            if (!driversForMiniSectors.length) return null;
-                            return <SectorMiniSectors drivers={driversForMiniSectors} />;
-                          })()}
-                        </aside>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              )}
-            </>
-          );
-
-          if (showVreSetup) {
-            const setupCard = (
-                  <VRESetupCard
-                    analysisMode={vreAnalysisMode}
-                    onAnalysisModeChange={(mode) => {
-                      setVreAnalysisMode(mode);
-                      if (mode === "RACE_ENGINEER") {
-                        setVreScenario("REAL_CONTEXT");
-                        setVreScenarioLap(null);
-                        setVreScenarioDuration(null);
-                      }
-                      recomputeVre({
-                        analysisMode: mode,
-                        scenario: mode === "RACE_ENGINEER" ? "REAL_CONTEXT" : undefined,
-                        scenarioLap: mode === "RACE_ENGINEER" ? null : undefined,
-                        scenarioDuration: mode === "RACE_ENGINEER" ? null : undefined,
-                      });
-                    }}
-                    viewMode={vreViewMode}
-                    onViewModeChange={setVreViewMode}
-                    riskMode={vreRiskMode}
-                    onRiskModeChange={(mode) => {
-                      setVreRiskMode(mode);
-                      recomputeVre({ riskMode: mode });
-                    }}
-                    scenarioId={vreScenario}
-                    onScenarioChange={(scenario) => {
-                      setVreScenario(scenario);
-                      const isReal = scenario === "REAL_CONTEXT";
-                      if (isReal) { setVreScenarioLap(null); setVreScenarioDuration(null); }
-                      recomputeVre({
-                        scenario,
-                        scenarioLap: isReal ? null : undefined,
-                        scenarioDuration: isReal ? null : undefined,
-                      });
-                    }}
-                    scenarioActivationLap={vreScenarioLap}
-                    onScenarioActivationLapChange={(lap) => {
-                      setVreScenarioLap(lap);
-                      recomputeVre({ scenarioLap: lap });
-                    }}
-                    scenarioDurationLaps={vreScenarioDuration}
-                    onScenarioDurationChange={(duration) => {
-                      setVreScenarioDuration(duration);
-                      recomputeVre({ scenarioDuration: duration });
-                    }}
-                    scenarioDescription={vreResult?.scenario_description}
-                    scenarioIsSimulated={vreResult?.scenario_is_simulated}
-                    scenarioWindow={vreResult?.scenario_window}
-                    scenarioActivationWarning={vreResult?.scenario_activation_warning}
-                    maxLap={vreResult?.actual_strategy?.stints?.length ? Math.max(...vreResult.actual_strategy.stints.map(s => s.lap_end)) : 99}
-                    degradationValidations={vreResult?.degradation_validations}
-                    customDegradationOverride={vreResult?.custom_degradation_override}
-                    onCustomDegradationChange={(deg) => {
-                      setVreCustomDeg(deg);
-                      recomputeVre({ customDeg: deg });
-                    }}
-                  />
-                );
-
-            return (
-              <>
-                <div className="lg:hidden mb-5">{setupCard}</div>
-                <div className="flex gap-6 items-start">
-                  <div className="flex-1 min-w-0 space-y-5">
-                    {mainContent}
-                  </div>
-                  <div className="w-[280px] shrink-0 sticky top-6 hidden lg:block">
-                    {setupCard}
-                  </div>
-                </div>
-              </>
-            );
-          }
-
-          return <div className="space-y-5">{mainContent}</div>;
-        })()}
-            </TabsContent>
-          </Tabs>
+          <AppShell toolbar={toolbar} headerOffset={72}>
+            {workspaceContent}
+          </AppShell>
         )}
       </main>
-      <FullGasFeedSection />
+
+      {!sessionKey && <FullGasFeedSection />}
       <footer className="border-t border-border px-6 py-4 mt-8">
         <p className="text-center text-xs text-muted-foreground">
           Questo è un progetto sviluppato da Fabrizio Monaco

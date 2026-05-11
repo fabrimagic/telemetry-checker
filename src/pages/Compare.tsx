@@ -13,6 +13,8 @@ import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
+import { AppShell } from "@/components/layout/AppShell";
+import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
   getAllLaps, getSessionResult,
@@ -217,10 +219,145 @@ export default function Compare() {
   const availableForA = allDrivers.filter((d) => d.driver_number !== driverB);
   const availableForB = allDrivers.filter((d) => d.driver_number !== driverA);
 
+  const toolbar = (
+    <>
+      <ToolbarSection title="Sessione" defaultOpen>
+        <SessionPicker onSelect={handleSessionSubmit} isLoading={loadingDrivers} sessionTypeFilter={["Race", "Sprint"]} />
+      </ToolbarSection>
+
+      {sessionKey && isRace && allDrivers.length > 0 && (
+        <ToolbarSection title="Piloti" defaultOpen>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pilota A</label>
+              <Select value={driverA?.toString() ?? ""} onValueChange={(v) => setDriverA(Number(v))}>
+                <SelectTrigger className="bg-muted border-border h-9"><SelectValue placeholder="Seleziona pilota A" /></SelectTrigger>
+                <SelectContent>
+                  {availableForA.map((d) => (
+                    <SelectItem key={d.driver_number} value={d.driver_number.toString()}>
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: `#${d.team_colour || "ffffff"}` }} />
+                        <span className="font-mono font-bold text-xs">{d.name_acronym}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pilota B</label>
+              <Select value={driverB?.toString() ?? ""} onValueChange={(v) => setDriverB(Number(v))}>
+                <SelectTrigger className="bg-muted border-border h-9"><SelectValue placeholder="Seleziona pilota B" /></SelectTrigger>
+                <SelectContent>
+                  {availableForB.map((d) => (
+                    <SelectItem key={d.driver_number} value={d.driver_number.toString()}>
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: `#${d.team_colour || "ffffff"}` }} />
+                        <span className="font-mono font-bold text-xs">{d.name_acronym}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {driverA != null && driverB != null && (
+              <Button variant="outline" size="sm" onClick={handleSwap} className="w-full gap-1.5 text-xs">
+                ⇄ Inverti
+              </Button>
+            )}
+          </div>
+        </ToolbarSection>
+      )}
+    </>
+  );
+
+  const workspaceContent = (
+    <>
+      {sessionKey && !isRace && (
+        <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground flex gap-2 items-start">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Il confronto head-to-head è disponibile solo per sessioni Race o Sprint.</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
+      )}
+
+      {dual.loading && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Analisi parallela in corso (può richiedere 20–40s la prima volta)…
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+          <Skeleton className="h-48" />
+          <Skeleton className="h-72" />
+        </div>
+      )}
+
+      {!dual.loading && dual.outA && !dual.outA.vreResult && driverObjA && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+          Analisi non disponibile per <strong>{driverObjA.name_acronym}</strong>
+          {dual.outA.error ? `: ${dual.outA.error}` : ""}.
+        </div>
+      )}
+      {!dual.loading && dual.outB && !dual.outB.vreResult && driverObjB && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+          Analisi non disponibile per <strong>{driverObjB.name_acronym}</strong>
+          {dual.outB.error ? `: ${dual.outB.error}` : ""}.
+        </div>
+      )}
+
+      {comparison && driverObjA && driverObjB && (
+        <div className="space-y-6">
+          <section className="space-y-5">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground px-2">
+                Strategia reale eseguita
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
+            <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            <CompareDriverContext
+              driverA={driverObjA}
+              driverB={driverObjB}
+              resultA={dual.outA?.vreResult ?? null}
+              resultB={dual.outB?.vreResult ?? null}
+            />
+            <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+          </section>
+
+          <section className="space-y-5">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--f1-red))] px-2">
+                Strategia alternativa (ex-ante · balanced)
+              </span>
+              <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
+            </div>
+            <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+          </section>
+        </div>
+      )}
+
+      {!sessionKey && (
+        <div className="text-sm text-muted-foreground border border-dashed border-border rounded-lg p-6 text-center">
+          Seleziona una sessione Race o Sprint dalla toolbar a sinistra per iniziare il confronto.
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full bg-[hsl(var(--f1-red))]" />
             <h1 className="text-lg font-bold tracking-tight">PitWall AI · Head-to-Head</h1>
@@ -238,130 +375,10 @@ export default function Compare() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        <section className="flex flex-wrap gap-6 items-start">
-          <SessionPicker
-            onSelect={handleSessionSubmit}
-            isLoading={loadingDrivers}
-            sessionTypeFilter={["Race", "Sprint"]}
-          />
-        </section>
-
-        {/* Defensive guard: SessionPicker is filtered to Race/Sprint only,
-            but if a stale URL or upstream change ever surfaces another type, warn the user. */}
-        {sessionKey && !isRace && (
-          <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground flex gap-2 items-start">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>Il confronto head-to-head è disponibile solo per sessioni Race o Sprint.</span>
-          </div>
-        )}
-
-        {sessionKey && isRace && allDrivers.length > 0 && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">Pilota A</label>
-              <Select value={driverA?.toString() ?? ""} onValueChange={(v) => setDriverA(Number(v))}>
-                <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Seleziona pilota A" /></SelectTrigger>
-                <SelectContent>
-                  {availableForA.map((d) => (
-                    <SelectItem key={d.driver_number} value={d.driver_number.toString()}>
-                      <span className="flex items-center gap-2">
-                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: `#${d.team_colour || "ffffff"}` }} />
-                        <span className="font-mono font-bold text-xs">{d.name_acronym}</span>
-                        <span className="text-muted-foreground text-xs">{d.full_name}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">Pilota B</label>
-              <Select value={driverB?.toString() ?? ""} onValueChange={(v) => setDriverB(Number(v))}>
-                <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Seleziona pilota B" /></SelectTrigger>
-                <SelectContent>
-                  {availableForB.map((d) => (
-                    <SelectItem key={d.driver_number} value={d.driver_number.toString()}>
-                      <span className="flex items-center gap-2">
-                        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: `#${d.team_colour || "ffffff"}` }} />
-                        <span className="font-mono font-bold text-xs">{d.name_acronym}</span>
-                        <span className="text-muted-foreground text-xs">{d.full_name}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </section>
-        )}
-
-        {error && (
-          <div className="text-sm text-destructive bg-destructive/10 rounded-md px-4 py-2.5">{error}</div>
-        )}
-
-        {dual.loading && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> Analisi parallela in corso (può richiedere 20–40s la prima volta)…
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Skeleton className="h-24" />
-              <Skeleton className="h-24" />
-            </div>
-            <Skeleton className="h-48" />
-            <Skeleton className="h-72" />
-          </div>
-        )}
-
-        {!dual.loading && dual.outA && !dual.outA.vreResult && driverObjA && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-            Analisi non disponibile per <strong>{driverObjA.name_acronym}</strong>
-            {dual.outA.error ? `: ${dual.outA.error}` : ""}.
-          </div>
-        )}
-        {!dual.loading && dual.outB && !dual.outB.vreResult && driverObjB && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-            Analisi non disponibile per <strong>{driverObjB.name_acronym}</strong>
-            {dual.outB.error ? `: ${dual.outB.error}` : ""}.
-          </div>
-        )}
-
-        {comparison && driverObjA && driverObjB && (
-          <div className="space-y-6">
-            {/* ═══ STRATEGIA REALE ═══ */}
-            <section className="space-y-5">
-              <div className="flex items-center gap-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground px-2">
-                  Strategia reale eseguita
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-              <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
-              <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-              <CompareDriverContext
-                driverA={driverObjA}
-                driverB={driverObjB}
-                resultA={dual.outA?.vreResult ?? null}
-                resultB={dual.outB?.vreResult ?? null}
-              />
-              <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-              <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            </section>
-
-            {/* ═══ STRATEGIA ALTERNATIVA ═══ */}
-            <section className="space-y-5">
-              <div className="flex items-center gap-2">
-                <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--f1-red))] px-2">
-                  Strategia alternativa (ex-ante · balanced)
-                </span>
-                <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
-              </div>
-              <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            </section>
-          </div>
-        )}
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
+        <AppShell toolbar={toolbar} headerOffset={72}>
+          {workspaceContent}
+        </AppShell>
       </main>
 
       <footer className="mt-12 border-t border-border px-6 py-4 text-center text-xs text-muted-foreground">
