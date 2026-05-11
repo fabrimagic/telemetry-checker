@@ -839,6 +839,22 @@ export default function Index() {
             onRemove={handleRemoveDriver}
             max={1}
           />
+          {selectedDriverNumbers.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-3 gap-1.5 text-xs"
+              disabled={loadingLaps.size > 0}
+              onClick={() => {
+                const drivers = [...selectedDriverNumbers];
+                drivers.forEach(handleRemoveDriver);
+                setTimeout(() => drivers.forEach(handleAddDriver), 0);
+              }}
+              title="Ri-scarica laps, stints, pit stop e overtakes da OpenF1 bypassando cache e dedup"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Aggiorna dati
+            </Button>
+          )}
         </ToolbarSection>
       )}
 
