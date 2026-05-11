@@ -13,6 +13,8 @@ import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
+import { DataIntegrityNotice } from "@/components/f1/DataIntegrityNotice";
+import { detectDataIntegrityIssues } from "@/lib/dataIntegrity";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import {
@@ -309,6 +311,23 @@ export default function Compare() {
           Analisi non disponibile per <strong>{driverObjB.name_acronym}</strong>
           {dual.outB.error ? `: ${dual.outB.error}` : ""}.
         </div>
+      )}
+
+      {!dual.loading && (dual.outA || dual.outB) && isRace && (
+        <>
+          {dual.outA && driverObjA && (() => {
+            const issues = detectDataIntegrityIssues({
+              laps: dual.outA.laps, stints: dual.outA.stints, pits: dual.outA.pits, isRaceOrSprint: true,
+            });
+            return issues.length > 0 ? <DataIntegrityNotice issues={issues} driverAcronym={driverObjA.name_acronym} /> : null;
+          })()}
+          {dual.outB && driverObjB && (() => {
+            const issues = detectDataIntegrityIssues({
+              laps: dual.outB.laps, stints: dual.outB.stints, pits: dual.outB.pits, isRaceOrSprint: true,
+            });
+            return issues.length > 0 ? <DataIntegrityNotice issues={issues} driverAcronym={driverObjB.name_acronym} /> : null;
+          })()}
+        </>
       )}
 
       {comparison && driverObjA && driverObjB && (

@@ -22,6 +22,8 @@ import { WeatherCard } from "@/components/f1/WeatherCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
+import { DataIntegrityNotice } from "@/components/f1/DataIntegrityNotice";
+import { detectDataIntegrityIssues } from "@/lib/dataIntegrity";
 import { SessionReport } from "@/components/f1/SessionReport";
 import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Gauge, Target, Wrench, User, Swords, ArrowRight, ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -888,6 +890,18 @@ export default function Index() {
               />
             )
           )}
+
+          {selectedDriverNumbers.length === 1 && singleDriverState && (() => {
+            const issues = detectDataIntegrityIssues({
+              laps: singleDriverState.laps,
+              stints: singleDriverState.stints,
+              pits: pitStopsData.filter((p) => p.driver_number === singleDriverState.driver.driver_number),
+              isRaceOrSprint,
+            });
+            return issues.length > 0 ? (
+              <DataIntegrityNotice issues={issues} driverAcronym={singleDriverState.driver.name_acronym} />
+            ) : null;
+          })()}
 
           {driversLaps.length > 0 && loadingLaps.size === 0 && (
             <Tabs defaultValue="overview" className="w-full">
