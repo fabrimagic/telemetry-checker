@@ -50,6 +50,7 @@ export default function Compare() {
 
   const [dual, setDual] = useState<DualState>({ outA: null, outB: null, loading: false, sessionResults: null });
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Hydrate from URL on mount only — once we have allDrivers, set initial selection
   useEffect(() => {
@@ -178,7 +179,7 @@ export default function Compare() {
     })();
 
     return () => { cancelled = true; };
-  }, [sessionKey, isRace, driverObjA, driverObjB, meetingKey, sessionWeather, raceControlMessages, allDrivers]);
+  }, [sessionKey, isRace, driverObjA, driverObjB, meetingKey, sessionWeather, raceControlMessages, allDrivers, refreshTick]);
 
   const comparison: ComparisonResult | null = useMemo(() => {
     if (!dual.outA?.vreResult || !dual.outB?.vreResult) return null;
