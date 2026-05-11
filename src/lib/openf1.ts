@@ -304,7 +304,16 @@ async function fetchApiUncached<T>(path: string, retries = MAX_RETRIES): Promise
  * On error: nothing is cached and the in-flight entry is cleared so the next
  * caller can retry cleanly.
  */
-async function fetchApi<T>(path: string): Promise<T> {
+async function fetchApi<T>(path: string, opts?: { forceFresh?: boolean }): Promise<T> {
+  // Force-fresh: bypass cache and in-flight dedup to guarantee a network round-trip.
+  // Used when re-selecting a driver/session so partial OpenF1 responses (e.g. missing
+  // stints) are re-checked rather than served forever from sessionStorage.
+  if (opts?.forceFresh) {
+    const data = await fetchApiUncached<T>(path);
+    trySetWithEviction(cacheKey(path), data); // refresh cache with the new payload
+    return data;
+  }
+
   // 1) Persistent cache hit?
   const cached = readCache<T>(cacheKey(path), ttlForPath(path));
   if (cached !== null) return cached;
@@ -332,19 +341,21 @@ export function getDrivers(sessionKey: number) {
   return fetchApi<Driver[]>(`/drivers?session_key=${sessionKey}`);
 }
 
-export function getLaps(sessionKey: number, driverNumber: number) {
-  return fetchApi<Lap[]>(`/laps?session_key=${sessionKey}&driver_number=${driverNumber}`);
+export function getLaps(sessionKey: number, driverNumber: number, opts?: { forceFresh?: boolean }) {
+  return fetchApi<Lap[]>(`/laps?session_key=${sessionKey}&driver_number=${driverNumber}`, opts);
 }
 
-export function getCarData(sessionKey: number, driverNumber: number, dateStart: string, dateEnd: string) {
+export function getCarData(sessionKey: number, driverNumber: number, dateStart: string, dateEnd: string, opts?: { forceFresh?: boolean }) {
   return fetchApi<CarData[]>(
-    `/car_data?session_key=${sessionKey}&driver_number=${driverNumber}&date>=${dateStart}&date<=${dateEnd}`
+    `/car_data?session_key=${sessionKey}&driver_number=${driverNumber}&date>=${dateStart}&date<=${dateEnd}`,
+    opts,
   );
 }
 
-export function getLocation(sessionKey: number, driverNumber: number, dateStart: string, dateEnd: string) {
+export function getLocation(sessionKey: number, driverNumber: number, dateStart: string, dateEnd: string, opts?: { forceFresh?: boolean }) {
   return fetchApi<LocationData[]>(
-    `/location?session_key=${sessionKey}&driver_number=${driverNumber}&date>=${dateStart}&date<=${dateEnd}`
+    `/location?session_key=${sessionKey}&driver_number=${driverNumber}&date>=${dateStart}&date<=${dateEnd}`,
+    opts,
   );
 }
 
@@ -354,27 +365,31 @@ export function getWeather(sessionKey: number, dateStart: string, dateEnd: strin
   );
 }
 
-export function getOvertakes(sessionKey: number, driverNumber: number) {
+export function getOvertakes(sessionKey: number, driverNumber: number, opts?: { forceFresh?: boolean }) {
   return fetchApi<OvertakeData[]>(
-    `/overtakes?session_key=${sessionKey}&overtaking_driver_number=${driverNumber}`
+    `/overtakes?session_key=${sessionKey}&overtaking_driver_number=${driverNumber}`,
+    opts,
   );
 }
 
-export function getOvertakesReceived(sessionKey: number, driverNumber: number) {
+export function getOvertakesReceived(sessionKey: number, driverNumber: number, opts?: { forceFresh?: boolean }) {
   return fetchApi<OvertakeData[]>(
-    `/overtakes?session_key=${sessionKey}&overtaken_driver_number=${driverNumber}`
+    `/overtakes?session_key=${sessionKey}&overtaken_driver_number=${driverNumber}`,
+    opts,
   );
 }
 
-export function getStints(sessionKey: number, driverNumber: number) {
+export function getStints(sessionKey: number, driverNumber: number, opts?: { forceFresh?: boolean }) {
   return fetchApi<StintData[]>(
-    `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`
+    `/stints?session_key=${sessionKey}&driver_number=${driverNumber}`,
+    opts,
   );
 }
 
-export function getPitStops(sessionKey: number, driverNumber: number) {
+export function getPitStops(sessionKey: number, driverNumber: number, opts?: { forceFresh?: boolean }) {
   return fetchApi<PitData[]>(
-    `/pit?session_key=${sessionKey}&driver_number=${driverNumber}`
+    `/pit?session_key=${sessionKey}&driver_number=${driverNumber}`,
+    opts,
   );
 }
 

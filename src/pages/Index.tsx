@@ -169,10 +169,10 @@ export default function Index() {
       setLoadingLaps((prev) => new Set(prev).add(driverNumber));
       setError(null);
       try {
-        const laps = await getLaps(sessionKey, driverNumber);
+        const laps = await getLaps(sessionKey, driverNumber, { forceFresh: true });
         let driverStints: StintData[] = [];
         try {
-          driverStints = await getStints(sessionKey, driverNumber);
+          driverStints = await getStints(sessionKey, driverNumber, { forceFresh: true });
         } catch { /* optional */ }
         setDriverStates((prev) => {
           const next = new Map(prev);
@@ -189,7 +189,7 @@ export default function Index() {
         // Fetch pit stops for Race/Sprint
         if (sessionType === "Race" || sessionType === "Sprint") {
           try {
-            const pits = await getPitStops(sessionKey, driverNumber);
+            const pits = await getPitStops(sessionKey, driverNumber, { forceFresh: true });
             setPitStopsData((prev) => {
               const filtered = prev.filter((p) => p.driver_number !== driverNumber);
               return [...filtered, ...pits].sort((a, b) => a.lap_number - b.lap_number);
@@ -200,8 +200,8 @@ export default function Index() {
         // Fetch overtakes for single driver Race/Sprint
         const willBeSingle = selectedDriverNumbers.length === 0;
         if (willBeSingle && (sessionType === "Race" || sessionType === "Sprint")) {
-          try { const ot = await getOvertakes(sessionKey, driverNumber); setOvertakesData(ot); } catch {}
-          try { const otR = await getOvertakesReceived(sessionKey, driverNumber); setOvertakesReceivedData(otR); } catch {}
+          try { const ot = await getOvertakes(sessionKey, driverNumber, { forceFresh: true }); setOvertakesData(ot); } catch {}
+          try { const otR = await getOvertakesReceived(sessionKey, driverNumber, { forceFresh: true }); setOvertakesReceivedData(otR); } catch {}
         }
 
         // Build diary immediately for single driver Race/Sprint
@@ -217,10 +217,10 @@ export default function Index() {
 
             const diary = buildRaceDiary(
               driverNumber,
-              overtakesData.length ? overtakesData : await getOvertakes(sessionKey, driverNumber).catch(() => []),
-              overtakesReceivedData.length ? overtakesReceivedData : await getOvertakesReceived(sessionKey, driverNumber).catch(() => []),
+              overtakesData.length ? overtakesData : await getOvertakes(sessionKey, driverNumber, { forceFresh: true }).catch(() => []),
+              overtakesReceivedData.length ? overtakesReceivedData : await getOvertakesReceived(sessionKey, driverNumber, { forceFresh: true }).catch(() => []),
               raceControlMessages,
-              pitStopsData.length ? pitStopsData : await getPitStops(sessionKey, driverNumber).catch(() => []),
+              pitStopsData.length ? pitStopsData : await getPitStops(sessionKey, driverNumber, { forceFresh: true }).catch(() => []),
               driverStints, ivls, pos, allDrivers, laps,
             );
             setDiaryEvents(diary);
@@ -231,7 +231,7 @@ export default function Index() {
           // Build Virtual Race Engineer (with practice compound models)
           setLoadingVre(true);
           try {
-            const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber).catch(() => []);
+            const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber, { forceFresh: true }).catch(() => []);
 
             // Fetch practice compound models from same weekend
             let practiceModels: PracticeCompoundModel[] = [];

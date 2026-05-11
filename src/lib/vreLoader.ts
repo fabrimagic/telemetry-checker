@@ -128,7 +128,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
 
   try {
     // Core driver data
-    const laps = await getLaps(sessionKey, driverNumber);
+    const laps = await getLaps(sessionKey, driverNumber, { forceFresh: true });
     if (!laps.length) {
       out.error = "Nessun giro disponibile per il pilota";
       return out;
@@ -136,11 +136,11 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     out.laps = laps;
 
     let stints: StintData[] = [];
-    try { stints = await getStints(sessionKey, driverNumber); } catch { /* optional */ }
+    try { stints = await getStints(sessionKey, driverNumber, { forceFresh: true }); } catch { /* optional */ }
     out.stints = stints;
 
     let pits: PitData[] = [];
-    try { pits = await getPitStops(sessionKey, driverNumber); } catch { /* optional */ }
+    try { pits = await getPitStops(sessionKey, driverNumber, { forceFresh: true }); } catch { /* optional */ }
     out.pits = pits;
 
     // Race-wide context (intervals/positions). These are session-scoped,
