@@ -13,6 +13,8 @@ import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
+import { AppShell } from "@/components/layout/AppShell";
+import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
   getAllLaps, getSessionResult,
