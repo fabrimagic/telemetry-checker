@@ -264,9 +264,21 @@ export default function Compare() {
               </Select>
             </div>
             {driverA != null && driverB != null && (
-              <Button variant="outline" size="sm" onClick={handleSwap} className="w-full gap-1.5 text-xs">
-                ⇄ Inverti
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={handleSwap} className="w-full gap-1.5 text-xs">
+                  ⇄ Inverti
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 text-xs"
+                  disabled={dual.loading}
+                  onClick={() => setRefreshTick((t) => t + 1)}
+                  title="Ri-scarica tutti i dati per entrambi i piloti da OpenF1 bypassando cache e dedup"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Aggiorna dati
+                </Button>
+              </>
             )}
           </div>
         </ToolbarSection>
