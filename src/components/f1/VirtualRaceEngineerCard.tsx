@@ -1308,7 +1308,7 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
           <VRESection
             title="Strategia raccomandata"
             icon={<Target className="h-3.5 w-3.5 text-muted-foreground" />}
-            defaultOpen={false}
+            defaultOpen={true}
             badge={
               <div className="flex items-center gap-1.5">
                 {recommended_strategy.analysis?.robustness && (
@@ -1444,7 +1444,7 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
           <VRESection
             title="Strategie alternative"
             icon={<Repeat className="h-3.5 w-3.5 text-muted-foreground" />}
-            defaultOpen={false}
+            defaultOpen={true}
             badge={
               <div className="flex items-center gap-1.5">
                 <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">
