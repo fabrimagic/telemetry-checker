@@ -891,6 +891,18 @@ export default function Index() {
             )
           )}
 
+          {selectedDriverNumbers.length === 1 && singleDriverState && (() => {
+            const issues = detectDataIntegrityIssues({
+              laps: singleDriverState.laps,
+              stints: singleDriverState.stints,
+              pits: pitStopsData.filter((p) => p.driver_number === singleDriverState.driver.driver_number),
+              isRaceOrSprint,
+            });
+            return issues.length > 0 ? (
+              <DataIntegrityNotice issues={issues} driverAcronym={singleDriverState.driver.name_acronym} />
+            ) : null;
+          })()}
+
           {driversLaps.length > 0 && loadingLaps.size === 0 && (
             <Tabs defaultValue="overview" className="w-full">
               <TabsList className="w-full justify-start flex-wrap">
