@@ -971,7 +971,7 @@ export default function Index() {
                 )}
               </TabsContent>
 
-              {/* ═══ STRATEGIA ═══ */}
+              {/* ═══ VIRTUAL RACE ENGINEER ═══ */}
               {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
                 <TabsContent value="strategy" className="mt-4 space-y-4">
                   {loadingVre ? (
