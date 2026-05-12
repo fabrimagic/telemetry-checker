@@ -905,13 +905,13 @@ export default function Index() {
 
           {driversLaps.length > 0 && loadingLaps.size === 0 && (
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="w-full justify-start flex-wrap">
+              <TabsList className="w-full justify-start flex-wrap h-auto min-h-10">
                 <TabsTrigger value="overview" className="text-xs gap-1">
                   <Eye className="h-3.5 w-3.5" /> Panoramica
                 </TabsTrigger>
                 {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
                   <TabsTrigger value="strategy" className="text-xs gap-1">
-                    <Target className="h-3.5 w-3.5" /> Strategia
+                    <Target className="h-3.5 w-3.5" /> Virtual Race Engineer
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="tyres" className="text-xs gap-1">
@@ -971,7 +971,7 @@ export default function Index() {
                 )}
               </TabsContent>
 
-              {/* ═══ STRATEGIA ═══ */}
+              {/* ═══ VIRTUAL RACE ENGINEER ═══ */}
               {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
                 <TabsContent value="strategy" className="mt-4 space-y-4">
                   {loadingVre ? (
