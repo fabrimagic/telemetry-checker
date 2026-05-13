@@ -979,7 +979,15 @@ export default function Index() {
                       <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                     </div>
                   ) : vreResult ? (
-                    <VirtualRaceEngineerCard result={vreResult} analysisMode={vreAnalysisMode} viewMode={vreViewMode} />
+                    <VirtualRaceEngineerCard
+                      result={vreResult}
+                      analysisMode={vreAnalysisMode}
+                      viewMode={vreViewMode}
+                      laps={singleDriverState?.laps}
+                      positions={diaryPositions}
+                      allDrivers={allDrivers}
+                      driverAcronym={singleDriverState?.driver.name_acronym}
+                    />
                   ) : null}
                   {kdmResult && kdmResult.decision_points.length > 0 && (
                     <KeyDecisionMomentsCard result={kdmResult} />
