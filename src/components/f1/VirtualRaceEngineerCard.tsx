@@ -1031,6 +1031,145 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
 
 export type { AnalysisMode } from "@/lib/virtualRaceEngineer";
 
+/* ── Track Projection Section ── */
+function TrackProjectionSection({
+  result, laps, positions, allDrivers, driverAcronym,
+}: {
+  result: VirtualRaceEngineerResult;
+  laps: Lap[];
+  positions: PositionData[];
+  allDrivers: Driver[];
+  driverAcronym: string;
+}) {
+  const driverNumber = result.driver_number;
+  const sessionKey = result.session_key;
+
+  const strategyOptions = useMemo(() => {
+    const opts: { key: string; label: string; pitLap: number | null }[] = [];
+    const actualPit = result.actual_strategy.pit_laps[0] ?? null;
+    if (actualPit != null) opts.push({ key: "actual", label: "Strategia reale", pitLap: actualPit });
+    const recPit = result.recommended_strategy.pit_windows?.[0]?.ideal_lap ?? null;
+    if (recPit != null) opts.push({ key: "recommended", label: "Strategia raccomandata", pitLap: recPit });
+    result.alternative_strategies.forEach((a, i) => {
+      const pl = a.pit_laps[0] ?? null;
+      if (pl != null) opts.push({ key: `alt_${i}`, label: `Alternativa: ${a.name}`, pitLap: pl });
+    });
+    return opts;
+  }, [result]);
+
+  const [open, setOpen] = useState(false);
+  const [projectionStrategyKey, setProjectionStrategyKey] = useState<string>(strategyOptions[0]?.key ?? "actual");
+  const [locationsCache, setLocationsCache] = useState<Map<string, LocationData[]>>(new Map());
+  const [loading, setLoading] = useState(false);
+
+  const selectedOption = strategyOptions.find((o) => o.key === projectionStrategyKey);
+  const adjacent = useMemo(() => {
+    if (!selectedOption?.pitLap) return null;
+    return resolveAdjacentDrivers(driverNumber, selectedOption.pitLap, laps, positions, allDrivers);
+  }, [selectedOption?.pitLap, driverNumber, laps, positions, allDrivers]);
+
+  const driversToFetch = useMemo(() => {
+    return [driverNumber, adjacent?.ahead?.driver_number, adjacent?.behind?.driver_number]
+      .filter((n): n is number => n != null);
+  }, [driverNumber, adjacent]);
+
+  const cacheKey = `${projectionStrategyKey}:${driversToFetch.join(",")}`;
+
+  useEffect(() => {
+    if (!open || !selectedOption?.pitLap || driversToFetch.length === 0) return;
+    const w = computeLocationWindow(driverNumber, selectedOption.pitLap, laps);
+    if (!w) return;
+    if (locationsCache.has(cacheKey)) return;
+
+    setLoading(true);
+    Promise.all(driversToFetch.map((dn) => getLocation(sessionKey, dn, w.dateStart, w.dateEnd)))
+      .then((results) => {
+        const flat: LocationData[] = results.flat();
+        setLocationsCache((prev) => new Map(prev).set(cacheKey, flat));
+      })
+      .catch(() => { /* fail silent */ })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cacheKey]);
+
+  if (strategyOptions.length === 0) return null;
+
+  const locs = locationsCache.get(cacheKey);
+  const timestamps = selectedOption?.pitLap
+    ? pickPrePostTimestamps(driverNumber, selectedOption.pitLap, laps)
+    : null;
+
+  const driversForMap = (locs && adjacent && timestamps)
+    ? ([
+        { driverNumber, acronym: driverAcronym, color: "FFD700", locations: locs.filter((l) => l.driver_number === driverNumber) },
+        adjacent.ahead && { driverNumber: adjacent.ahead.driver_number, acronym: adjacent.ahead.name_acronym, color: "FF6B6B", locations: locs.filter((l) => l.driver_number === adjacent.ahead!.driver_number) },
+        adjacent.behind && { driverNumber: adjacent.behind.driver_number, acronym: adjacent.behind.name_acronym, color: "4ECDC4", locations: locs.filter((l) => l.driver_number === adjacent.behind!.driver_number) },
+      ].filter(Boolean) as { driverNumber: number; acronym: string; color: string; locations: LocationData[] }[])
+    : [];
+
+  return (
+    <div className="border-t border-border pt-4 mt-4">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 text-sm font-semibold w-full text-left"
+      >
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
+        Proiezione su pista
+        <span className="text-xs text-muted-foreground ml-auto font-normal">
+          {open ? "Click per chiudere" : "Click per aprire"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-xs text-muted-foreground">Strategia:</label>
+            <select
+              className="bg-background border border-border rounded px-2 py-1 text-sm"
+              value={projectionStrategyKey}
+              onChange={(e) => setProjectionStrategyKey(e.target.value)}
+            >
+              {strategyOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label} (giro {opt.pitLap})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {loading && (
+            <div className="text-xs text-muted-foreground italic">Caricamento posizioni…</div>
+          )}
+
+          {!loading && (!locs || driversForMap.length === 0 || driversForMap.every((d) => d.locations.length === 0)) && (
+            <div className="text-xs text-muted-foreground italic">
+              Dati di posizione non disponibili per questa strategia.
+            </div>
+          )}
+
+          {!loading && timestamps && driversForMap.some((d) => d.locations.length > 0) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1 text-center">Pre-pit</div>
+                <TrackMap drivers={driversForMap} activeDate={timestamps.prePit} />
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1 text-center">Post-pit</div>
+                <TrackMap drivers={driversForMap} activeDate={timestamps.postPit} />
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] text-muted-foreground italic">
+            Proiezione su pista approssimata. Le posizioni "post-pit" assumono un pit stop standard di ~25s e usano i dati di posizione reali al timestamp risultante. Per le strategie alternative (non eseguite), le posizioni mostrate sono quelle reali al giro del pit teorico, non quelle che si sarebbero verificate nello scenario alternativo.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 interface Props {
   result: VirtualRaceEngineerResult;
   analysisMode?: AnalysisMode;
@@ -1595,6 +1734,16 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
         )}
 
         </>)}
+
+        {laps && positions && allDrivers && driverAcronym && (
+          <TrackProjectionSection
+            result={result}
+            laps={laps}
+            positions={positions}
+            allDrivers={allDrivers}
+            driverAcronym={driverAcronym}
+          />
+        )}
       </CardContent>
     </Card>
   );
