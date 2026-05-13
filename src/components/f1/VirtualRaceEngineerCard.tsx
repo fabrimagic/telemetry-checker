@@ -1,4 +1,8 @@
 import type { VirtualRaceEngineerResult, ActualStrategy, RecommendedStrategy, AnalysisMode } from "@/lib/virtualRaceEngineer";
+import type { Lap, PositionData, Driver, LocationData } from "@/lib/openf1";
+import { getLocation } from "@/lib/openf1";
+import { resolveAdjacentDrivers, computeLocationWindow, pickPrePostTimestamps } from "@/lib/trackProjectionResolver";
+import { TrackMap } from "./TrackMap";
 import type { IntentClassification } from "@/lib/strategyIntent";
 import type { SoftSensorsContext, SoftSensorResult, TyreThermalLabel, TyreStressLabel, TrackGripLabel, SoftSensorConfidence, SoftSensorsTimeline, StrategySoftSensorAdjustment, GripTransition, WarmupInterpretation, DegradationValidationContext, ValidationSupportLevel, SoftSensorScoringGate } from "@/lib/softSensors";
 import type { TrafficPrediction, TrafficLevel } from "@/lib/trafficPredictor";
@@ -13,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Info, ChevronDown, ArrowRight, Clock, AlertTriangle, CheckCircle, Gauge, Navigation, BarChart3, Shield, Zap, Scale, Activity, FlaskConical, Target, Layers, Globe, Flag, Repeat, Thermometer } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { AnalystView, BroadcastView, type ViewMode } from "./VREViewModes";
 import { NarrativeChapters } from "./NarrativeChapters";
 import { paceLossStatusLabel, confidenceLabel } from "@/lib/statusLabels";
@@ -1031,9 +1035,13 @@ interface Props {
   result: VirtualRaceEngineerResult;
   analysisMode?: AnalysisMode;
   viewMode?: ViewMode;
+  laps?: Lap[];
+  positions?: PositionData[];
+  allDrivers?: Driver[];
+  driverAcronym?: string;
 }
 
-export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER", viewMode = "ENGINEER" }: Props) {
+export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER", viewMode = "ENGINEER", laps, positions, allDrivers, driverAcronym }: Props) {
   const { actual_strategy, recommended_strategy, alternative_strategies, verdict, confidence, confidence_factors, weather_impact, neutralisation_impact, practice_compounds_used, traffic_analysis, actual_breakdown, risk_mode, integrated_context, narrative_insights, scenario_id, scenario_is_simulated, scenario_label, scenario_description, scenario_activation_lap, scenario_duration_laps, scenario_window, scenario_activation_warning, degradation_validations, pace_loss_results, custom_degradation_override } = result;
 
   const isRaceEngineerMode = analysisMode === "RACE_ENGINEER";
