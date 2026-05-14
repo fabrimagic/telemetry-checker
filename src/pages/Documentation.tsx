@@ -336,8 +336,8 @@ export default function Documentation() {
             Identifica e quantifica due comportamenti di guida significativi:
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Superclipping</strong> — quando il pilota stacca tardi e taglia molto la curva.</li>
-            <li><strong className="text-foreground">Lift &amp; Coast</strong> — rilascio anticipato del gas per gestire consumo o temperature.</li>
+            <li><strong className="text-foreground">Superclipping</strong> — si verifica quando la velocità della vettura cala mentre l'acceleratore è premuto al 100% e il freno è allo 0%.</li>
+            <li><strong className="text-foreground">Lift &amp; Coast</strong> — si verifica quando il pilota passa da acceleratore superiore al 90% e freno a 0% ad acceleratore a 0% e freno a 0%; termina non appena uno dei due pedali viene premuto, anche solo leggermente.</li>
           </ul>
           <p>Per ogni zona vengono mostrati il numero di curve coinvolte e l'intensità relativa.</p>
         </DocSection>
