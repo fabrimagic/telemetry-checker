@@ -133,12 +133,15 @@ export function buildChampionshipResult(
     });
   }
 
+  // Sort primarily by points (the actual championship criterion).
+  // OpenF1 sometimes returns position_current=null for top entries after a
+  // sprint snapshot; relying on it would mis-rank the leaders.
+  // position_current is used only as a tiebreaker when points are equal.
   driverTimelines.sort((a, b) => {
-    if (a.currentPosition === 0 && b.currentPosition === 0)
-      return b.totalPoints - a.totalPoints;
-    if (a.currentPosition === 0) return 1;
-    if (b.currentPosition === 0) return -1;
-    return a.currentPosition - b.currentPosition;
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    const ap = a.currentPosition || Number.POSITIVE_INFINITY;
+    const bp = b.currentPosition || Number.POSITIVE_INFINITY;
+    return ap - bp;
   });
 
   const teamTimelines: TeamTimeline[] = [];
@@ -183,11 +186,10 @@ export function buildChampionshipResult(
   }
 
   teamTimelines.sort((a, b) => {
-    if (a.currentPosition === 0 && b.currentPosition === 0)
-      return b.totalPoints - a.totalPoints;
-    if (a.currentPosition === 0) return 1;
-    if (b.currentPosition === 0) return -1;
-    return a.currentPosition - b.currentPosition;
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    const ap = a.currentPosition || Number.POSITIVE_INFINITY;
+    const bp = b.currentPosition || Number.POSITIVE_INFINITY;
+    return ap - bp;
   });
 
   return {
