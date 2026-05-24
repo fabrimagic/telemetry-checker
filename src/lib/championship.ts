@@ -186,11 +186,10 @@ export function buildChampionshipResult(
   }
 
   teamTimelines.sort((a, b) => {
-    if (a.currentPosition === 0 && b.currentPosition === 0)
-      return b.totalPoints - a.totalPoints;
-    if (a.currentPosition === 0) return 1;
-    if (b.currentPosition === 0) return -1;
-    return a.currentPosition - b.currentPosition;
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    const ap = a.currentPosition || Number.POSITIVE_INFINITY;
+    const bp = b.currentPosition || Number.POSITIVE_INFINITY;
+    return ap - bp;
   });
 
   return {
