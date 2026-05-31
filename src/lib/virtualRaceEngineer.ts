@@ -109,7 +109,14 @@ export interface RecommendedStrategy {
   scoring_delta_soft_sensors?: number;
   intent?: IntentClassification;
   position_score_adjustment?: number;
-  adjusted_score?: number;
+  /**
+   * Estimated absolute ranking time in seconds — LOWER = BETTER.
+   * = (actual reference time − estimated_gain_seconds) + position_score_adjustment.
+   * NOTE: NOT the same convention as `ScoredStrategy.adjusted_score` from
+   * `riskAppetite.ts`, which is a delta-score where HIGHER = BETTER.
+   * Pure-pace fields are NEVER mutated by the position-aware adjustment.
+   */
+  ranking_time_estimate?: number;
 }
 
 export interface AlternativeStrategy {
@@ -140,12 +147,14 @@ export interface AlternativeStrategy {
    */
   position_score_adjustment?: number;
   /**
-   * Final ranking score in TIME units (lower = better).
+   * Estimated absolute ranking time in seconds — LOWER = BETTER.
    * = (actual reference time − estimated_delta_vs_actual) + position_score_adjustment.
-   * estimated_delta_vs_actual and time_delta_vs_actual remain pure-pace deltas
-   * (unchanged) and are still consumed by UI/tests.
+   * NOTE: NOT the same convention as `ScoredStrategy.adjusted_score` from
+   * `riskAppetite.ts`, which is a delta-score where HIGHER = BETTER.
+   * estimated_delta_vs_actual and time_delta_vs_actual remain pure-pace
+   * deltas (unchanged) and are still consumed by UI/tests.
    */
-  adjusted_score?: number;
+  ranking_time_estimate?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -301,7 +310,43 @@ export function computePositionAdjustment(
 
 }
 
-/* ── Main engine ── */
+/**
+ * Reorder alternatives in-place by risk-aware adjusted_score (HIGHER=BETTER)
+ * minus position_score_adjustment (LOWER=BETTER in seconds). A negative
+ * position adjustment (attack bonus) pushes the alternative UP.
+ *
+ * Convention guarantee: the main branch reads `ScoredStrategy.adjusted_score`
+ * (higher=better, see riskAppetite.ts:207). The fallback uses
+ * `estimated_delta_vs_actual` which is `actualTime − altTime` (positive =
+ * faster than actual = better) — SAME direction. A stable tiebreaker on
+ * the original index preserves prior order when scores are equal, so a
+ * missing altScores entry does not silently re-order siblings.
+ */
+export function sortAlternativesByPositionAwareScore<
+  A extends { name: string; estimated_delta_vs_actual: number; position_score_adjustment?: number },
+  S extends { name: string; isRecommended?: boolean },
+>(
+  alternatives: A[],
+  altScores: Map<number, { adjusted_score: number }>,
+  scoringInput: S[],
+): void {
+  // Snapshot original indices for stable tiebreaker.
+  const originalIndex = new Map<A, number>();
+  alternatives.forEach((a, i) => originalIndex.set(a, i));
+
+  alternatives.sort((a, b) => {
+    const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
+    const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
+    // Both branches use higher=better convention (see jsdoc above).
+    const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
+    const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+    const scoreA = baseA - (a.position_score_adjustment ?? 0);
+    const scoreB = baseB - (b.position_score_adjustment ?? 0);
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
+  });
+}
+
 
 
 export function computeVirtualRaceEngineer(
@@ -1225,7 +1270,7 @@ export function computeVirtualRaceEngineer(
     const posAdj = computePositionAdjustment(alt.analysis.competitor_context, riskMode);
     alt.position_score_adjustment = posAdj;
     const refTime = actualAdjustedTime ?? 0;
-    alt.adjusted_score = (refTime - alt.estimated_delta_vs_actual) + posAdj;
+    alt.ranking_time_estimate = (refTime - alt.estimated_delta_vs_actual) + posAdj;
   }
 
 
@@ -1260,7 +1305,7 @@ export function computeVirtualRaceEngineer(
     const recPosAdj = computePositionAdjustment(recommendedStrategy.analysis.competitor_context, riskMode);
     recommendedStrategy.position_score_adjustment = recPosAdj;
     const recRefTime = actualAdjustedTime ?? 0;
-    recommendedStrategy.adjusted_score = (recRefTime - recommendedStrategy.estimated_gain_seconds) + recPosAdj;
+    recommendedStrategy.ranking_time_estimate = (recRefTime - recommendedStrategy.estimated_gain_seconds) + recPosAdj;
 
     // Enrich actual strategy with the same analysis layer to classify its intent.
     if (actualPitLaps.length > 0 && actualAdjustedTime != null) {
@@ -2078,20 +2123,16 @@ export function computeVirtualRaceEngineer(
       recommendedStrategy.cons.push(...__renderedAltRec.recommended_cons);
     }
 
-    // Reorder alternatives by risk-aware adjusted_score (descending), then
-    // apply position-aware adjustment. Existing scores are in "delta-units,
-    // higher=better"; position_score_adjustment is in "time-units, lower=
-    // better" → subtract it so that a NEGATIVE adjustment (attack/bonus)
-    // pushes the strategy UP the ranking.
-    alternatives.sort((a, b) => {
-      const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
-      const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
-      const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
-      const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
-      const scoreA = baseA - (a.position_score_adjustment ?? 0);
-      const scoreB = baseB - (b.position_score_adjustment ?? 0);
-      return scoreB - scoreA;
-    });
+    // Reorder alternatives by risk-aware adjusted_score (higher=better),
+    // then subtract the position-aware adjustment (lower=better in time-units)
+    // so a NEGATIVE adjustment (attack bonus) pushes the strategy UP.
+    // Fallback convention check: both `ScoredStrategy.adjusted_score` AND
+    // `estimated_delta_vs_actual` follow the SAME higher=better convention
+    // (delta = actualTime − altTime, so positive = faster = better — see
+    // assignments at lines 884-994). The fallback therefore matches the
+    // main branch's sign. Stable tiebreaker on original index preserves
+    // pre-existing order when scores tie.
+    sortAlternativesByPositionAwareScore(alternatives, altScores, scoringInput);
 
 
     // ── Promotion check: if the top alternative is robustly better than recommended,
