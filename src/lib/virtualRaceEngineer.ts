@@ -296,7 +296,9 @@ export function computePositionAdjustment(
   const raw = -(opp * oppWeight - risk * riskWeight) * POSITION_VALUE_BASE;
   if (raw > POSITION_ADJUSTMENT_MAX) return POSITION_ADJUSTMENT_MAX;
   if (raw < -POSITION_ADJUSTMENT_MAX) return -POSITION_ADJUSTMENT_MAX;
-  return Math.round(raw * 100) / 100;
+  const rounded = Math.round(raw * 100) / 100;
+  return rounded === 0 ? 0 : rounded; // normalize -0 → 0
+
 }
 
 /* ── Main engine ── */
