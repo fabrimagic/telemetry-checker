@@ -1,0 +1,65 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`simulateStrategyCost — scenario neutralization/opportunity bonus > REAL_CONTEXT baseline is unchanged (no bonus path triggered) 1`] = `
+[
+  {
+    "compounds": [
+      "HARD",
+      "SOFT",
+    ],
+    "estimated_delta_vs_actual": 2.3,
+    "name": "Strategia compound invertiti",
+    "pit_laps": [
+      15,
+    ],
+  },
+  {
+    "compounds": [
+      "SOFT",
+      "HARD",
+    ],
+    "estimated_delta_vs_actual": -0.6,
+    "name": "Overcut / estensione stint",
+    "pit_laps": [
+      18,
+    ],
+  },
+  {
+    "compounds": [
+      "SOFT",
+      "HARD",
+    ],
+    "estimated_delta_vs_actual": -0.7,
+    "name": "Undercut anticipato",
+    "pit_laps": [
+      12,
+    ],
+  },
+  {
+    "compounds": [
+      "SOFT",
+      "HARD",
+      "SOFT",
+    ],
+    "estimated_delta_vs_actual": -16.6,
+    "name": "2-stop",
+    "pit_laps": [
+      9,
+      15,
+    ],
+  },
+  {
+    "compounds": [
+      "SOFT",
+      "HARD",
+      "HARD",
+    ],
+    "estimated_delta_vs_actual": -27.1,
+    "name": "2-stop",
+    "pit_laps": [
+      9,
+      15,
+    ],
+  },
+]
+`;
