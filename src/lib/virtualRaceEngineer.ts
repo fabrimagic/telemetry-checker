@@ -108,6 +108,8 @@ export interface RecommendedStrategy {
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
   intent?: IntentClassification;
+  position_score_adjustment?: number;
+  adjusted_score?: number;
 }
 
 export interface AlternativeStrategy {
