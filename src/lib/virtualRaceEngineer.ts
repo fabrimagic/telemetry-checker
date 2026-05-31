@@ -310,7 +310,43 @@ export function computePositionAdjustment(
 
 }
 
-/* ── Main engine ── */
+/**
+ * Reorder alternatives in-place by risk-aware adjusted_score (HIGHER=BETTER)
+ * minus position_score_adjustment (LOWER=BETTER in seconds). A negative
+ * position adjustment (attack bonus) pushes the alternative UP.
+ *
+ * Convention guarantee: the main branch reads `ScoredStrategy.adjusted_score`
+ * (higher=better, see riskAppetite.ts:207). The fallback uses
+ * `estimated_delta_vs_actual` which is `actualTime − altTime` (positive =
+ * faster than actual = better) — SAME direction. A stable tiebreaker on
+ * the original index preserves prior order when scores are equal, so a
+ * missing altScores entry does not silently re-order siblings.
+ */
+export function sortAlternativesByPositionAwareScore<
+  A extends { name: string; estimated_delta_vs_actual: number; position_score_adjustment?: number },
+  S extends { name: string; isRecommended?: boolean },
+>(
+  alternatives: A[],
+  altScores: Map<number, { adjusted_score: number }>,
+  scoringInput: S[],
+): void {
+  // Snapshot original indices for stable tiebreaker.
+  const originalIndex = new Map<A, number>();
+  alternatives.forEach((a, i) => originalIndex.set(a, i));
+
+  alternatives.sort((a, b) => {
+    const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
+    const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
+    // Both branches use higher=better convention (see jsdoc above).
+    const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
+    const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+    const scoreA = baseA - (a.position_score_adjustment ?? 0);
+    const scoreB = baseB - (b.position_score_adjustment ?? 0);
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
+  });
+}
+
 
 
 export function computeVirtualRaceEngineer(
