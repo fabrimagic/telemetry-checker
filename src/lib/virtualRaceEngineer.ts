@@ -1201,6 +1201,7 @@ export function computeVirtualRaceEngineer(
     recommendedStrategy.breakdown = computeStrategyBreakdown(
       bestPitLaps, bestCompounds, totalLaps, compoundModels, pitLoss,
       recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
+      true, trackTempAtStart,
     );
   }
 
@@ -1212,7 +1213,9 @@ export function computeVirtualRaceEngineer(
     alt.breakdown = computeStrategyBreakdown(
       alt.pit_laps, alt.compounds, totalLaps, compoundModels, pitLoss,
       altTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
+      true, trackTempAtStart,
     );
+
   }
 
 
