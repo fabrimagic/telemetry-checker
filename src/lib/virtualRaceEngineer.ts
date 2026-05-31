@@ -1137,7 +1137,7 @@ export function computeVirtualRaceEngineer(
     const altStintBounds = buildStintBounds(alt.pit_laps, alt.compounds);
     let altWarmupTotal = 0;
     for (let si = 0; si < altStintBounds.length; si++) {
-      altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0);
+      altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0, trackTempAtStart);
     }
     if (altWarmupTotal > 2.5) {
       const text = `Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`;
@@ -1452,7 +1452,7 @@ export function computeVirtualRaceEngineer(
     const recStintBoundsForPC = buildStintBounds(bestPitLaps, bestCompounds);
     let recWarmupForPC = 0;
     for (let si = 0; si < recStintBoundsForPC.length; si++) {
-      recWarmupForPC += computeStintWarmupCost(recStintBoundsForPC[si].compound, si === 0);
+      recWarmupForPC += computeStintWarmupCost(recStintBoundsForPC[si].compound, si === 0, trackTempAtStart);
     }
     if (recWarmupForPC > 2.5) {
       const text = `Warmup elevato: ${recWarmupForPC.toFixed(1)}s persi per riscaldamento gomme`;
@@ -1815,7 +1815,7 @@ export function computeVirtualRaceEngineer(
     const recStintBounds = buildStintBounds(bestPitLaps, bestCompounds);
     let recWarmupFromModel = 0;
     for (let si = 0; si < recStintBounds.length; si++) {
-      recWarmupFromModel += computeStintWarmupCost(recStintBounds[si].compound, si === 0);
+      recWarmupFromModel += computeStintWarmupCost(recStintBounds[si].compound, si === 0, trackTempAtStart);
     }
     // Use model-computed warmup (more precise) or breakdown warmup as fallback
     const recWarmup = recWarmupFromModel > 0 ? recWarmupFromModel : (recommendedStrategy.breakdown?.warmup_cost ?? 0);
@@ -1831,7 +1831,7 @@ export function computeVirtualRaceEngineer(
       const aBounds = buildStintBounds(a.pit_laps, a.compounds);
       let wTotal = 0;
       for (let si = 0; si < aBounds.length; si++) {
-        wTotal += computeStintWarmupCost(aBounds[si].compound, si === 0);
+        wTotal += computeStintWarmupCost(aBounds[si].compound, si === 0, trackTempAtStart);
       }
       return { name: a.name, warmup: wTotal, compounds: a.compounds };
     }).filter(a => a.warmup > 0);
