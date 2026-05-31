@@ -1269,7 +1269,7 @@ export function computeVirtualRaceEngineer(
     const recPosAdj = computePositionAdjustment(recommendedStrategy.analysis.competitor_context, riskMode);
     recommendedStrategy.position_score_adjustment = recPosAdj;
     const recRefTime = actualAdjustedTime ?? 0;
-    recommendedStrategy.adjusted_score = (recRefTime - recommendedStrategy.estimated_gain_seconds) + recPosAdj;
+    recommendedStrategy.ranking_time_estimate = (recRefTime - recommendedStrategy.estimated_gain_seconds) + recPosAdj;
 
     // Enrich actual strategy with the same analysis layer to classify its intent.
     if (actualPitLaps.length > 0 && actualAdjustedTime != null) {
