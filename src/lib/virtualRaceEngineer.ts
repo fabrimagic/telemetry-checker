@@ -1216,7 +1216,16 @@ export function computeVirtualRaceEngineer(
 
     // Strategy intent (inferential, never blocks)
     alt.intent = classifyStrategyIntent(alt.analysis.competitor_context);
+
+    // Position-aware ranking adjustment. Falls back to 0 when no competitor
+    // context (empty intervals/positions) → no behavior change. Pure-pace
+    // delta fields are intentionally NOT mutated.
+    const posAdj = computePositionAdjustment(alt.analysis.competitor_context, riskMode);
+    alt.position_score_adjustment = posAdj;
+    const refTime = actualAdjustedTime ?? 0;
+    alt.adjusted_score = (refTime - alt.estimated_delta_vs_actual) + posAdj;
   }
+
 
   // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
   {
