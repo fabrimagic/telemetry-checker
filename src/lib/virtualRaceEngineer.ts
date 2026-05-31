@@ -2076,14 +2076,21 @@ export function computeVirtualRaceEngineer(
       recommendedStrategy.cons.push(...__renderedAltRec.recommended_cons);
     }
 
-    // Reorder alternatives by risk-aware adjusted_score (descending)
+    // Reorder alternatives by risk-aware adjusted_score (descending), then
+    // apply position-aware adjustment. Existing scores are in "delta-units,
+    // higher=better"; position_score_adjustment is in "time-units, lower=
+    // better" → subtract it so that a NEGATIVE adjustment (attack/bonus)
+    // pushes the strategy UP the ranking.
     alternatives.sort((a, b) => {
       const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
       const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
-      const scoreA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
-      const scoreB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+      const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
+      const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+      const scoreA = baseA - (a.position_score_adjustment ?? 0);
+      const scoreB = baseB - (b.position_score_adjustment ?? 0);
       return scoreB - scoreA;
     });
+
 
     // ── Promotion check: if the top alternative is robustly better than recommended,
     // promote it. Threshold is conservative (>1.0s advantage after all adjustments)
