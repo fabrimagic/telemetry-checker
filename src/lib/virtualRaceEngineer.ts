@@ -1234,7 +1234,7 @@ export function computeVirtualRaceEngineer(
     const posAdj = computePositionAdjustment(alt.analysis.competitor_context, riskMode);
     alt.position_score_adjustment = posAdj;
     const refTime = actualAdjustedTime ?? 0;
-    alt.adjusted_score = (refTime - alt.estimated_delta_vs_actual) + posAdj;
+    alt.ranking_time_estimate = (refTime - alt.estimated_delta_vs_actual) + posAdj;
   }
 
 
