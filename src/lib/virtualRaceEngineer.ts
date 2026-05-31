@@ -399,6 +399,17 @@ export function computeVirtualRaceEngineer(
   const pitLoss = estimatePitLoss(pitStops);
   const totalLaps = maxLapNumber;
 
+  // Representative track temperature at race start (used by the first-stint
+  // tyre warmup model). Falls back to undefined if no valid sample exists,
+  // which disables the temperature factor (neutral 1.0).
+  const trackTempAtStart: number | undefined = (() => {
+    for (const w of weather) {
+      if (w && Number.isFinite(w.track_temperature)) return w.track_temperature;
+    }
+    return undefined;
+  })();
+
+
   // ── 1. Actual strategy ──
   const stintAnalyses: StintAnalysis[] = [];
   const degradationModels = new Map<number, { slope: number; intercept: number }>();
