@@ -108,6 +108,8 @@ export interface RecommendedStrategy {
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
   intent?: IntentClassification;
+  position_score_adjustment?: number;
+  adjusted_score?: number;
 }
 
 export interface AlternativeStrategy {
@@ -129,6 +131,21 @@ export interface AlternativeStrategy {
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
   intent?: IntentClassification;
+  /**
+   * Position-aware ranking adjustment, in seconds.
+   * Negative = strategy made more attractive by a net position-gain
+   * opportunity (attack). Positive = strategy penalized by exposed
+   * defensive position (risk of being undercut). 0 when no
+   * competitor_context is available (e.g. empty intervals/positions).
+   */
+  position_score_adjustment?: number;
+  /**
+   * Final ranking score in TIME units (lower = better).
+   * = (actual reference time − estimated_delta_vs_actual) + position_score_adjustment.
+   * estimated_delta_vs_actual and time_delta_vs_actual remain pure-pace deltas
+   * (unchanged) and are still consumed by UI/tests.
+   */
+  adjusted_score?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -229,7 +246,63 @@ function predictLapTime(slope: number, intercept: number, tyreLife: number): num
   return slope * tyreLife + intercept;
 }
 
+/**
+ * Position-aware ranking adjustment for an alternative strategy.
+ *
+ * Translates the competitor context at the pit lap (undercut_opportunity vs
+ * undercut_risk, both 0–1) into a seconds-valued cost adjustment used to
+ * re-rank strategies AFTER the pure-pace simulation.
+ *
+ * Convention (TIME-units, lower-is-better target):
+ *  - opportunity > risk → NEGATIVE adjustment (attack: makes strategy more
+ *    attractive, since it would gain a contested position)
+ *  - risk > opportunity → POSITIVE adjustment (exposure: penalizes a
+ *    strategy that fails to cover a defensive threat)
+ *  - balanced or null → 0
+ *
+ * POSITION_VALUE_BASE represents the typical strategic value of one
+ * contested track position over the remainder of a stint (seconds equivalent
+ * of holding/losing a slot through pit cycles + dirty-air effects).
+ *
+ * The result is clamped to ±POSITION_ADJUSTMENT_MAX so it never overwhelms
+ * the pure-pace term: it tips ties and breaks neutral ranks, not the law of
+ * physics. Returns 0 when ctx is null (backward-compatible: empty
+ * intervals/positions ⇒ no behavioral change).
+ */
+export const POSITION_VALUE_BASE = 8; // seconds — value of one contested position
+export const POSITION_ADJUSTMENT_MAX = 12; // seconds — hard clamp
+
+export function computePositionAdjustment(
+  ctx: { undercut_opportunity: number; undercut_risk: number } | null | undefined,
+  riskMode: RiskMode,
+): number {
+  if (!ctx) return 0;
+  const opp = ctx.undercut_opportunity ?? 0;
+  const risk = ctx.undercut_risk ?? 0;
+
+  // Risk-mode weighting: AGGRESSIVE values opportunity more, CONSERVATIVE
+  // values defense more. BALANCED treats them symmetrically.
+  let oppWeight = 1;
+  let riskWeight = 1;
+  if (riskMode === "AGGRESSIVE") {
+    oppWeight = 1.3;
+    riskWeight = 0.8;
+  } else if (riskMode === "CONSERVATIVE") {
+    oppWeight = 0.8;
+    riskWeight = 1.3;
+  }
+
+  // Negative when opportunity dominates (bonus), positive when risk dominates.
+  const raw = -(opp * oppWeight - risk * riskWeight) * POSITION_VALUE_BASE;
+  if (raw > POSITION_ADJUSTMENT_MAX) return POSITION_ADJUSTMENT_MAX;
+  if (raw < -POSITION_ADJUSTMENT_MAX) return -POSITION_ADJUSTMENT_MAX;
+  const rounded = Math.round(raw * 100) / 100;
+  return rounded === 0 ? 0 : rounded; // normalize -0 → 0
+
+}
+
 /* ── Main engine ── */
+
 
 export function computeVirtualRaceEngineer(
   driverNumber: number,
@@ -1145,7 +1218,16 @@ export function computeVirtualRaceEngineer(
 
     // Strategy intent (inferential, never blocks)
     alt.intent = classifyStrategyIntent(alt.analysis.competitor_context);
+
+    // Position-aware ranking adjustment. Falls back to 0 when no competitor
+    // context (empty intervals/positions) → no behavior change. Pure-pace
+    // delta fields are intentionally NOT mutated.
+    const posAdj = computePositionAdjustment(alt.analysis.competitor_context, riskMode);
+    alt.position_score_adjustment = posAdj;
+    const refTime = actualAdjustedTime ?? 0;
+    alt.adjusted_score = (refTime - alt.estimated_delta_vs_actual) + posAdj;
   }
+
 
   // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
   {
@@ -1172,6 +1254,13 @@ export function computeVirtualRaceEngineer(
 
     // Strategy intent for recommended (inferential)
     recommendedStrategy.intent = classifyStrategyIntent(recommendedStrategy.analysis.competitor_context);
+
+    // Position-aware ranking adjustment for recommended (diagnostic; does not
+    // mutate time_delta_vs_actual / estimated_gain_seconds).
+    const recPosAdj = computePositionAdjustment(recommendedStrategy.analysis.competitor_context, riskMode);
+    recommendedStrategy.position_score_adjustment = recPosAdj;
+    const recRefTime = actualAdjustedTime ?? 0;
+    recommendedStrategy.adjusted_score = (recRefTime - recommendedStrategy.estimated_gain_seconds) + recPosAdj;
 
     // Enrich actual strategy with the same analysis layer to classify its intent.
     if (actualPitLaps.length > 0 && actualAdjustedTime != null) {
@@ -1989,14 +2078,21 @@ export function computeVirtualRaceEngineer(
       recommendedStrategy.cons.push(...__renderedAltRec.recommended_cons);
     }
 
-    // Reorder alternatives by risk-aware adjusted_score (descending)
+    // Reorder alternatives by risk-aware adjusted_score (descending), then
+    // apply position-aware adjustment. Existing scores are in "delta-units,
+    // higher=better"; position_score_adjustment is in "time-units, lower=
+    // better" → subtract it so that a NEGATIVE adjustment (attack/bonus)
+    // pushes the strategy UP the ranking.
     alternatives.sort((a, b) => {
       const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
       const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
-      const scoreA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
-      const scoreB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+      const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
+      const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+      const scoreA = baseA - (a.position_score_adjustment ?? 0);
+      const scoreB = baseB - (b.position_score_adjustment ?? 0);
       return scoreB - scoreA;
     });
+
 
     // ── Promotion check: if the top alternative is robustly better than recommended,
     // promote it. Threshold is conservative (>1.0s advantage after all adjustments)
