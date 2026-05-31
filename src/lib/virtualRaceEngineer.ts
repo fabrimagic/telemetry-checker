@@ -109,7 +109,14 @@ export interface RecommendedStrategy {
   scoring_delta_soft_sensors?: number;
   intent?: IntentClassification;
   position_score_adjustment?: number;
-  adjusted_score?: number;
+  /**
+   * Estimated absolute ranking time in seconds — LOWER = BETTER.
+   * = (actual reference time − estimated_gain_seconds) + position_score_adjustment.
+   * NOTE: NOT the same convention as `ScoredStrategy.adjusted_score` from
+   * `riskAppetite.ts`, which is a delta-score where HIGHER = BETTER.
+   * Pure-pace fields are NEVER mutated by the position-aware adjustment.
+   */
+  ranking_time_estimate?: number;
 }
 
 export interface AlternativeStrategy {
