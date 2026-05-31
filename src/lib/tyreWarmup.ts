@@ -60,14 +60,75 @@ export function computeTyreWarmupPenalty(compound: string, lapAfterPit: number):
 }
 
 /**
+ * Fraction of the full post-pit warmup that applies to the FIRST stint
+ * (race start). Lower than 1 because the formation lap pre-heats the tyres,
+ * but greater than 0 because a single out-lap doesn't bring them fully into
+ * window — especially on HARD in cold ambient conditions.
+ */
+export const START_WARMUP_FRACTION = 0.4;
+
+/**
+ * Reference track temperature (°C) at which the temperature factor equals 1.
+ * Below it warmup grows, above it shrinks.
+ */
+export const TEMP_REFERENCE_C = 30;
+
+/**
+ * Sensitivity of the temperature factor: each °C away from TEMP_REFERENCE_C
+ * shifts the multiplier by this amount (linear, then clamped).
+ */
+export const TEMP_SENSITIVITY = 0.02;
+
+export const TEMP_FACTOR_MIN = 0.5;
+export const TEMP_FACTOR_MAX = 2.0;
+
+/**
+ * Compute the temperature factor for start warmup.
+ * Returns 1 when trackTempC is undefined.
+ * Colder than reference → > 1 (more penalty); hotter → < 1.
+ */
+export function computeStartWarmupTempFactor(trackTempC?: number): number {
+  if (trackTempC == null || !Number.isFinite(trackTempC)) return 1;
+  const raw = 1 + (TEMP_REFERENCE_C - trackTempC) * TEMP_SENSITIVITY;
+  return Math.max(TEMP_FACTOR_MIN, Math.min(TEMP_FACTOR_MAX, raw));
+}
+
+/**
+ * Compute the START warmup cost for a stint (race start, after formation lap).
+ * Distinct from post-pit warmup: tyres start partly warm but a cold track and
+ * a hard compound still cost time in the first laps.
+ *
+ * = sum(per-lap full warmup penalty) × START_WARMUP_FRACTION × tempFactor
+ */
+export function computeStartWarmupCost(compound: string, trackTempC?: number): number {
+  const normalized = compound.toUpperCase();
+  const config = TYRE_WARMUP_CONFIG[normalized];
+  if (!config) return 0;
+
+  let full = 0;
+  for (let i = 0; i < config.laps_affected; i++) {
+    full += config.base_penalty * Math.exp(-i / config.decay);
+  }
+  return full * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempC);
+}
+
+/**
  * Compute total warmup time lost for an entire stint.
- * 
+ *
  * @param compound - Tyre compound
- * @param isFirstStint - If true, no warmup applies (race start, tyres already warm from formation lap)
+ * @param isFirstStint - If true, applies the reduced START warmup (not zero).
+ * @param trackTempC - Optional track temperature (°C). Only used for the
+ *                    first stint; modulates the start warmup penalty.
  * @returns total warmup penalty in seconds for the stint
  */
-export function computeStintWarmupCost(compound: string, isFirstStint: boolean): number {
-  if (isFirstStint) return 0;
+export function computeStintWarmupCost(
+  compound: string,
+  isFirstStint: boolean,
+  trackTempC?: number,
+): number {
+  if (isFirstStint) {
+    return computeStartWarmupCost(compound, trackTempC);
+  }
 
   const normalized = compound.toUpperCase();
   const config = TYRE_WARMUP_CONFIG[normalized];
@@ -79,3 +140,5 @@ export function computeStintWarmupCost(compound: string, isFirstStint: boolean):
   }
   return total;
 }
+
+

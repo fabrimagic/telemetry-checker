@@ -16,7 +16,7 @@ import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, NEUTRALIZATION_PIT_LOSS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
-import { computeTyreWarmupPenalty, computeStintWarmupCost } from "./tyreWarmup";
+import { computeTyreWarmupPenalty, computeStintWarmupCost, computeStartWarmupTempFactor, START_WARMUP_FRACTION } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { classifyStrategyIntent, type IntentClassification } from "./strategyIntent";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
@@ -399,6 +399,17 @@ export function computeVirtualRaceEngineer(
   const pitLoss = estimatePitLoss(pitStops);
   const totalLaps = maxLapNumber;
 
+  // Representative track temperature at race start (used by the first-stint
+  // tyre warmup model). Falls back to undefined if no valid sample exists,
+  // which disables the temperature factor (neutral 1.0).
+  const trackTempAtStart: number | undefined = (() => {
+    for (const w of weather) {
+      if (w && Number.isFinite(w.track_temperature)) return w.track_temperature;
+    }
+    return undefined;
+  })();
+
+
   // ── 1. Actual strategy ──
   const stintAnalyses: StintAnalysis[] = [];
   const degradationModels = new Map<number, { slope: number; intercept: number }>();
@@ -733,8 +744,13 @@ export function computeVirtualRaceEngineer(
         const tyreLife = lap - sb.start;
         const baseLap = model.intercept;
         const degLap = model.slope * tyreLife * lapDegradationMult(lap);
-        // Tyre warmup penalty: temporary time loss in first laps after pit
-        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        // Tyre warmup penalty: temporary time loss in first laps after pit.
+        // First stint uses a reduced "start warmup" (formation lap pre-heats
+        // the tyres but cold tracks/Hard still cost time).
+        const warmupPenalty = isFirstStint
+          ? computeTyreWarmupPenalty(sb.compound, tyreLife) * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempAtStart)
+          : computeTyreWarmupPenalty(sb.compound, tyreLife);
+
         totalCost += baseLap + degLap + warmupPenalty;
       }
       // Cliff risk for this stint
@@ -792,7 +808,10 @@ export function computeVirtualRaceEngineer(
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
-        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        const warmupPenalty = isFirstStint
+          ? computeTyreWarmupPenalty(sb.compound, tyreLife) * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempAtStart)
+          : computeTyreWarmupPenalty(sb.compound, tyreLife);
+
         total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
       }
     }
@@ -1118,7 +1137,7 @@ export function computeVirtualRaceEngineer(
     const altStintBounds = buildStintBounds(alt.pit_laps, alt.compounds);
     let altWarmupTotal = 0;
     for (let si = 0; si < altStintBounds.length; si++) {
-      altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0);
+      altWarmupTotal += computeStintWarmupCost(altStintBounds[si].compound, si === 0, trackTempAtStart);
     }
     if (altWarmupTotal > 2.5) {
       const text = `Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`;
@@ -1182,6 +1201,7 @@ export function computeVirtualRaceEngineer(
     recommendedStrategy.breakdown = computeStrategyBreakdown(
       bestPitLaps, bestCompounds, totalLaps, compoundModels, pitLoss,
       recTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
+      true, trackTempAtStart,
     );
   }
 
@@ -1193,7 +1213,9 @@ export function computeVirtualRaceEngineer(
     alt.breakdown = computeStrategyBreakdown(
       alt.pit_laps, alt.compounds, totalLaps, compoundModels, pitLoss,
       altTrafficForBreakdown, weatherMap, trackStatusMap, pitStopAnalyses, breakdownMods,
+      true, trackTempAtStart,
     );
+
   }
 
 
@@ -1433,7 +1455,7 @@ export function computeVirtualRaceEngineer(
     const recStintBoundsForPC = buildStintBounds(bestPitLaps, bestCompounds);
     let recWarmupForPC = 0;
     for (let si = 0; si < recStintBoundsForPC.length; si++) {
-      recWarmupForPC += computeStintWarmupCost(recStintBoundsForPC[si].compound, si === 0);
+      recWarmupForPC += computeStintWarmupCost(recStintBoundsForPC[si].compound, si === 0, trackTempAtStart);
     }
     if (recWarmupForPC > 2.5) {
       const text = `Warmup elevato: ${recWarmupForPC.toFixed(1)}s persi per riscaldamento gomme`;
@@ -1796,7 +1818,7 @@ export function computeVirtualRaceEngineer(
     const recStintBounds = buildStintBounds(bestPitLaps, bestCompounds);
     let recWarmupFromModel = 0;
     for (let si = 0; si < recStintBounds.length; si++) {
-      recWarmupFromModel += computeStintWarmupCost(recStintBounds[si].compound, si === 0);
+      recWarmupFromModel += computeStintWarmupCost(recStintBounds[si].compound, si === 0, trackTempAtStart);
     }
     // Use model-computed warmup (more precise) or breakdown warmup as fallback
     const recWarmup = recWarmupFromModel > 0 ? recWarmupFromModel : (recommendedStrategy.breakdown?.warmup_cost ?? 0);
@@ -1812,7 +1834,7 @@ export function computeVirtualRaceEngineer(
       const aBounds = buildStintBounds(a.pit_laps, a.compounds);
       let wTotal = 0;
       for (let si = 0; si < aBounds.length; si++) {
-        wTotal += computeStintWarmupCost(aBounds[si].compound, si === 0);
+        wTotal += computeStintWarmupCost(aBounds[si].compound, si === 0, trackTempAtStart);
       }
       return { name: a.name, warmup: wTotal, compounds: a.compounds };
     }).filter(a => a.warmup > 0);

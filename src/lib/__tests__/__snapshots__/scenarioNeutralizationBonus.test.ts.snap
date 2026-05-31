@@ -7,7 +7,7 @@ exports[`simulateStrategyCost — scenario neutralization/opportunity bonus > RE
       "HARD",
       "SOFT",
     ],
-    "estimated_delta_vs_actual": 2.3,
+    "estimated_delta_vs_actual": 1.5,
     "name": "Strategia compound invertiti",
     "pit_laps": [
       15,

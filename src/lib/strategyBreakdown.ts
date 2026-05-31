@@ -60,7 +60,9 @@ export function computeStrategyBreakdown(
   pitStopAnalyses: PitStopAnalysis[],
   modifiers: BreakdownModifiers = DEFAULT_BREAKDOWN_MODIFIERS,
   includeWarmup: boolean = true,
+  trackTempC?: number,
 ): StrategyBreakdown {
+
   // Build stint bounds
   const stintBounds: { start: number; end: number; compound: string }[] = [];
   let start = 1;
@@ -85,7 +87,7 @@ export function computeStrategyBreakdown(
       degCost += model.slope * tyreLife;
     }
     // Warmup cost: first stint has no warmup (tyres warm from formation lap)
-    warmupCost += includeWarmup ? computeStintWarmupCost(sb.compound, si === 0) : 0;
+    warmupCost += includeWarmup ? computeStintWarmupCost(sb.compound, si === 0, trackTempC) : 0;
   }
 
   if (!hasModel) {
