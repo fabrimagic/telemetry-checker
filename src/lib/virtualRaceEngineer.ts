@@ -129,6 +129,21 @@ export interface AlternativeStrategy {
   scoring_with_soft_sensors?: number;
   scoring_delta_soft_sensors?: number;
   intent?: IntentClassification;
+  /**
+   * Position-aware ranking adjustment, in seconds.
+   * Negative = strategy made more attractive by a net position-gain
+   * opportunity (attack). Positive = strategy penalized by exposed
+   * defensive position (risk of being undercut). 0 when no
+   * competitor_context is available (e.g. empty intervals/positions).
+   */
+  position_score_adjustment?: number;
+  /**
+   * Final ranking score in TIME units (lower = better).
+   * = (actual reference time − estimated_delta_vs_actual) + position_score_adjustment.
+   * estimated_delta_vs_actual and time_delta_vs_actual remain pure-pace deltas
+   * (unchanged) and are still consumed by UI/tests.
+   */
+  adjusted_score?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
