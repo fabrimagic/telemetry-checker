@@ -1253,6 +1253,13 @@ export function computeVirtualRaceEngineer(
     // Strategy intent for recommended (inferential)
     recommendedStrategy.intent = classifyStrategyIntent(recommendedStrategy.analysis.competitor_context);
 
+    // Position-aware ranking adjustment for recommended (diagnostic; does not
+    // mutate time_delta_vs_actual / estimated_gain_seconds).
+    const recPosAdj = computePositionAdjustment(recommendedStrategy.analysis.competitor_context, riskMode);
+    recommendedStrategy.position_score_adjustment = recPosAdj;
+    const recRefTime = actualAdjustedTime ?? 0;
+    recommendedStrategy.adjusted_score = (recRefTime - recommendedStrategy.estimated_gain_seconds) + recPosAdj;
+
     // Enrich actual strategy with the same analysis layer to classify its intent.
     if (actualPitLaps.length > 0 && actualAdjustedTime != null) {
       const actualEnriched = enrichStrategyAnalysis(
