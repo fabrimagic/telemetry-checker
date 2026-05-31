@@ -147,12 +147,14 @@ export interface AlternativeStrategy {
    */
   position_score_adjustment?: number;
   /**
-   * Final ranking score in TIME units (lower = better).
+   * Estimated absolute ranking time in seconds — LOWER = BETTER.
    * = (actual reference time − estimated_delta_vs_actual) + position_score_adjustment.
-   * estimated_delta_vs_actual and time_delta_vs_actual remain pure-pace deltas
-   * (unchanged) and are still consumed by UI/tests.
+   * NOTE: NOT the same convention as `ScoredStrategy.adjusted_score` from
+   * `riskAppetite.ts`, which is a delta-score where HIGHER = BETTER.
+   * estimated_delta_vs_actual and time_delta_vs_actual remain pure-pace
+   * deltas (unchanged) and are still consumed by UI/tests.
    */
-  adjusted_score?: number;
+  ranking_time_estimate?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
