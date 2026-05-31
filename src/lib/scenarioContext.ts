@@ -123,6 +123,20 @@ const DEFAULT_MODIFIERS: ScenarioModifiers = {
 };
 
 /* ══════════════════════════════════════════════════════════════════
+ *  SHARED NEUTRALIZATION PIT LOSS CONSTANTS
+ *  Single source of truth for the pit-loss reduction under
+ *  observed/simulated neutralisations. Used by both scenario
+ *  definitions (below) and the observed-data path in
+ *  virtualRaceEngineer.ts (getObservedPitLossMultiplier).
+ * ══════════════════════════════════════════════════════════════════ */
+
+export const NEUTRALIZATION_PIT_LOSS = {
+  SC: 0.62,    // ~38% reduction under full Safety Car
+  VSC: 0.78,   // ~22% reduction under Virtual Safety Car
+  MIXED: 0.90, // partial discount for mixed/transitional status
+} as const;
+
+/* ══════════════════════════════════════════════════════════════════
  *  SCENARIO DEFINITIONS
  *  Modifiers are calibrated to be realistic and moderate.
  *  Extreme values are avoided — contextual scaling handles intensity.
@@ -151,7 +165,7 @@ export const SCENARIO_DEFINITIONS: Record<ScenarioId, ScenarioDefinition> = {
     description: "Riduce il pit loss e aumenta il valore del pit opportunistico sotto SC",
     modifiers: {
       ...DEFAULT_MODIFIERS,
-      pit_loss_multiplier: 0.65,
+      pit_loss_multiplier: NEUTRALIZATION_PIT_LOSS.SC,
       traffic_weight: 0.85,
       opportunity_weight: 1.25,
       neutralization_weight: 1.45,
@@ -164,12 +178,13 @@ export const SCENARIO_DEFINITIONS: Record<ScenarioId, ScenarioDefinition> = {
     description: "Riduzione moderata del pit loss e pit opportunistico favorito sotto VSC",
     modifiers: {
       ...DEFAULT_MODIFIERS,
-      pit_loss_multiplier: 0.80,
+      pit_loss_multiplier: NEUTRALIZATION_PIT_LOSS.VSC,
       traffic_weight: 0.92,
       opportunity_weight: 1.12,
       neutralization_weight: 1.25,
     },
   },
+
   CLEAN_AIR: {
     id: "CLEAN_AIR",
     label: "Clean air",
