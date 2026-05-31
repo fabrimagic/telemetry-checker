@@ -808,7 +808,10 @@ export function computeVirtualRaceEngineer(
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
-        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        const warmupPenalty = isFirstStint
+          ? computeTyreWarmupPenalty(sb.compound, tyreLife) * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempAtStart)
+          : computeTyreWarmupPenalty(sb.compound, tyreLife);
+
         total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
       }
     }
