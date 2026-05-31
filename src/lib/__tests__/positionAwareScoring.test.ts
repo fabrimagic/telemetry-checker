@@ -135,3 +135,92 @@ describe("computeVirtualRaceEngineer — position-aware integration", () => {
     }
   });
 });
+
+/* ── Real sort path: exercises sortAlternativesByPositionAwareScore ── */
+
+describe("sortAlternativesByPositionAwareScore — real sort path", () => {
+  type Alt = {
+    name: string;
+    estimated_delta_vs_actual: number;
+    position_score_adjustment?: number;
+  };
+
+  function mkAlts(): Alt[] {
+    // Three pure-pace-equivalent alternatives (same delta).
+    return [
+      { name: "Undercut L18", estimated_delta_vs_actual: 5.0 },
+      { name: "Overcut L24",  estimated_delta_vs_actual: 5.0 },
+      { name: "Stay out",     estimated_delta_vs_actual: 5.0 },
+    ];
+  }
+  const scoringInput = [
+    { name: "Undercut L18", isRecommended: false },
+    { name: "Overcut L24",  isRecommended: false },
+    { name: "Stay out",     isRecommended: false },
+  ];
+
+  it("with empty position adjustments + identical scores: preserves original order (stable)", () => {
+    const alts = mkAlts();
+    const altScores = new Map([
+      [0, { adjusted_score: 5.0 }],
+      [1, { adjusted_score: 5.0 }],
+      [2, { adjusted_score: 5.0 }],
+    ]);
+    sortAlternativesByPositionAwareScore(alts, altScores, scoringInput);
+    expect(alts.map(a => a.name)).toEqual(["Undercut L18", "Overcut L24", "Stay out"]);
+  });
+
+  it("attack opportunity on Overcut L24 promotes it above tied siblings", () => {
+    const neutral = mkAlts();
+    const altScores = new Map([
+      [0, { adjusted_score: 5.0 }],
+      [1, { adjusted_score: 5.0 }],
+      [2, { adjusted_score: 5.0 }],
+    ]);
+    sortAlternativesByPositionAwareScore(neutral, altScores, scoringInput);
+    const neutralOrder = neutral.map(a => a.name);
+
+    const withOpp = mkAlts();
+    // Negative position_score_adjustment = attack bonus → should move UP.
+    withOpp[1].position_score_adjustment = -6;
+    // Apply a NEGATIVE adjustment to Overcut L24 specifically.
+    const idxBefore = withOpp.findIndex(a => a.name === "Overcut L24");
+    expect(idxBefore).toBeGreaterThan(0);
+
+    sortAlternativesByPositionAwareScore(withOpp, altScores, scoringInput);
+    const idxAfter = withOpp.findIndex(a => a.name === "Overcut L24");
+    expect(idxAfter).toBe(0); // promoted to top
+    expect(neutralOrder).not.toEqual(withOpp.map(a => a.name)); // order changed
+  });
+
+  it("exposed defense (positive adjustment) pushes the alternative DOWN", () => {
+    const alts = mkAlts();
+    const altScores = new Map([
+      [0, { adjusted_score: 5.0 }],
+      [1, { adjusted_score: 5.0 }],
+      [2, { adjusted_score: 5.0 }],
+    ]);
+    alts[0].position_score_adjustment = +6; // penalty on Undercut L18
+    sortAlternativesByPositionAwareScore(alts, altScores, scoringInput);
+    // Undercut L18 should now be LAST.
+    expect(alts[alts.length - 1].name).toBe("Undercut L18");
+  });
+
+  it("missing altScores entry: fallback (estimated_delta_vs_actual) is HIGHER=BETTER and stable", () => {
+    const alts: Alt[] = [
+      { name: "Fast missing",  estimated_delta_vs_actual: 10.0 }, // no altScores
+      { name: "Slow scored",   estimated_delta_vs_actual: 2.0  },
+    ];
+    const altScores = new Map([
+      // idx 0 missing on purpose
+      [1, { adjusted_score: 2.0 }],
+    ]);
+    const si = [
+      { name: "Fast missing", isRecommended: false },
+      { name: "Slow scored",  isRecommended: false },
+    ];
+    sortAlternativesByPositionAwareScore(alts, altScores, si);
+    // Fallback must keep higher=better convention → Fast missing first.
+    expect(alts[0].name).toBe("Fast missing");
+  });
+});
