@@ -744,8 +744,13 @@ export function computeVirtualRaceEngineer(
         const tyreLife = lap - sb.start;
         const baseLap = model.intercept;
         const degLap = model.slope * tyreLife * lapDegradationMult(lap);
-        // Tyre warmup penalty: temporary time loss in first laps after pit
-        const warmupPenalty = isFirstStint ? 0 : computeTyreWarmupPenalty(sb.compound, tyreLife);
+        // Tyre warmup penalty: temporary time loss in first laps after pit.
+        // First stint uses a reduced "start warmup" (formation lap pre-heats
+        // the tyres but cold tracks/Hard still cost time).
+        const warmupPenalty = isFirstStint
+          ? computeTyreWarmupPenalty(sb.compound, tyreLife) * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempAtStart)
+          : computeTyreWarmupPenalty(sb.compound, tyreLife);
+
         totalCost += baseLap + degLap + warmupPenalty;
       }
       // Cliff risk for this stint
