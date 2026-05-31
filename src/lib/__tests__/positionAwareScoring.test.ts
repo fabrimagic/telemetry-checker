@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import {
   computePositionAdjustment,
   computeVirtualRaceEngineer,
+  sortAlternativesByPositionAwareScore,
   POSITION_ADJUSTMENT_MAX,
 } from "../virtualRaceEngineer";
 import type {
