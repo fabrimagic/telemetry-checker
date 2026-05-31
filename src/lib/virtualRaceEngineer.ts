@@ -246,7 +246,61 @@ function predictLapTime(slope: number, intercept: number, tyreLife: number): num
   return slope * tyreLife + intercept;
 }
 
+/**
+ * Position-aware ranking adjustment for an alternative strategy.
+ *
+ * Translates the competitor context at the pit lap (undercut_opportunity vs
+ * undercut_risk, both 0–1) into a seconds-valued cost adjustment used to
+ * re-rank strategies AFTER the pure-pace simulation.
+ *
+ * Convention (TIME-units, lower-is-better target):
+ *  - opportunity > risk → NEGATIVE adjustment (attack: makes strategy more
+ *    attractive, since it would gain a contested position)
+ *  - risk > opportunity → POSITIVE adjustment (exposure: penalizes a
+ *    strategy that fails to cover a defensive threat)
+ *  - balanced or null → 0
+ *
+ * POSITION_VALUE_BASE represents the typical strategic value of one
+ * contested track position over the remainder of a stint (seconds equivalent
+ * of holding/losing a slot through pit cycles + dirty-air effects).
+ *
+ * The result is clamped to ±POSITION_ADJUSTMENT_MAX so it never overwhelms
+ * the pure-pace term: it tips ties and breaks neutral ranks, not the law of
+ * physics. Returns 0 when ctx is null (backward-compatible: empty
+ * intervals/positions ⇒ no behavioral change).
+ */
+export const POSITION_VALUE_BASE = 8; // seconds — value of one contested position
+export const POSITION_ADJUSTMENT_MAX = 12; // seconds — hard clamp
+
+export function computePositionAdjustment(
+  ctx: { undercut_opportunity: number; undercut_risk: number } | null | undefined,
+  riskMode: RiskMode,
+): number {
+  if (!ctx) return 0;
+  const opp = ctx.undercut_opportunity ?? 0;
+  const risk = ctx.undercut_risk ?? 0;
+
+  // Risk-mode weighting: AGGRESSIVE values opportunity more, CONSERVATIVE
+  // values defense more. BALANCED treats them symmetrically.
+  let oppWeight = 1;
+  let riskWeight = 1;
+  if (riskMode === "AGGRESSIVE") {
+    oppWeight = 1.3;
+    riskWeight = 0.8;
+  } else if (riskMode === "CONSERVATIVE") {
+    oppWeight = 0.8;
+    riskWeight = 1.3;
+  }
+
+  // Negative when opportunity dominates (bonus), positive when risk dominates.
+  const raw = -(opp * oppWeight - risk * riskWeight) * POSITION_VALUE_BASE;
+  if (raw > POSITION_ADJUSTMENT_MAX) return POSITION_ADJUSTMENT_MAX;
+  if (raw < -POSITION_ADJUSTMENT_MAX) return -POSITION_ADJUSTMENT_MAX;
+  return Math.round(raw * 100) / 100;
+}
+
 /* ── Main engine ── */
+
 
 export function computeVirtualRaceEngineer(
   driverNumber: number,
