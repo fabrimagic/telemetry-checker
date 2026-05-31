@@ -472,10 +472,8 @@ export function computeVirtualRaceEngineer(
 
   // ── Observed neutralisation pit loss multiplier ──
   // SC/VSC reduce effective pit loss because the field is bunched/slowed.
-  // These multipliers are applied to both actual and simulated strategies
-  // based on the REAL track status at the pit lap.
-  const SC_PIT_LOSS_MULT = 0.62;   // ~38% reduction under full SC
-  const VSC_PIT_LOSS_MULT = 0.78;  // ~22% reduction under VSC
+  // Values are read from the shared NEUTRALIZATION_PIT_LOSS constant
+  // (single source of truth, also used by SCENARIO_DEFINITIONS).
 
   /**
    * Returns the pit loss multiplier based on observed (real) track status at a given lap.
@@ -487,12 +485,12 @@ export function computeVirtualRaceEngineer(
     // In RACE_ENGINEER mode, simulated strategies don't benefit from SC/VSC knowledge
     if (isRaceEngineerMode && !forActualStrategy) return 1.0;
     const status = trackStatusMap.get(pitLap);
-    if (status === "SC") return SC_PIT_LOSS_MULT;
-    if (status === "VSC") return VSC_PIT_LOSS_MULT;
-    // MIXED could partially benefit, use a conservative partial discount
-    if (status === "MIXED") return 0.90;
+    if (status === "SC") return NEUTRALIZATION_PIT_LOSS.SC;
+    if (status === "VSC") return NEUTRALIZATION_PIT_LOSS.VSC;
+    if (status === "MIXED") return NEUTRALIZATION_PIT_LOSS.MIXED;
     return 1.0; // GREEN or no status
   }
+
 
   // Helper: check if a lap is inside the scenario window
   function isInScenarioWindow(lap: number): boolean {
