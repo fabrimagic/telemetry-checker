@@ -629,6 +629,31 @@ export function computeVirtualRaceEngineer(
     for (const pl of pitLapsArr) {
       totalCost += effectivePitLoss(pl);
       totalCost += estimateTrafficCost(pl);
+
+      // ── Scenario neutralization/opportunity bonus ──────────────────
+      // When a simulated neutralization scenario (SC/VSC/RAIN/etc.) is
+      // active AND the pit falls inside the scenario window, reward the
+      // candidate with a strategic bonus that scales with how much the
+      // scenario's neutralization_weight / opportunity_weight exceed 1.0.
+      // This is the strategic reason a pit under SC is attractive — without
+      // it, simulateStrategyCost only saw the pit_loss_multiplier (already
+      // applied inside effectivePitLoss) and underweighted SC scenarios.
+      //
+      // Bonus is SUBTRACTED from totalCost (not multiplied into pit loss)
+      // to avoid double-counting with effectivePitLoss.
+      // Realistic order of magnitude: an opportunistic SC pit is worth
+      // ~5-15s of strategic advantage → base ~8s × sum(weight − 1), clamped.
+      if (isSimulatedScenario(effectiveScenarioId) && isInScenarioWindow(pl)) {
+        const NEUTRALIZATION_PIT_BONUS_BASE = 8.0; // seconds per (weight − 1) unit
+        const NEUTRALIZATION_PIT_BONUS_MAX = 15.0; // hard clamp (s)
+        const neutExcess = Math.max(0, scenarioMods.neutralization_weight - 1.0);
+        const oppExcess = Math.max(0, scenarioMods.opportunity_weight - 1.0);
+        const bonus = Math.min(
+          NEUTRALIZATION_PIT_BONUS_MAX,
+          NEUTRALIZATION_PIT_BONUS_BASE * (neutExcess + oppExcess),
+        );
+        totalCost -= bonus;
+      }
     }
 
     // Opportunity modifier for aggressive mode: bonus for fewer pit stops
