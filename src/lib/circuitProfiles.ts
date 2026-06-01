@@ -58,8 +58,9 @@ export interface CircuitProfile {
 
 export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
   "Gran Premio d'Australia": {
+    // Albert Park: reprofiling 2022 (chicane T9-T10 rimossa), layout più fluente/veloce.
     gpName: "Gran Premio d'Australia",
-    top_speed: 0.65, slow_corner_traction: 0.55, medium_corner: 0.75, fast_corner: 0.70,
+    top_speed: 0.70, slow_corner_traction: 0.45, medium_corner: 0.70, fast_corner: 0.80,
     tyre_deg: 0.45, overtaking_difficulty: 0.55,
     confidence: "high", source: "historical",
   },
