@@ -35,6 +35,7 @@ interface Props {
   cursorTime: number | null;
   onCursorChange: (time: number | null) => void;
   onCursorClick: (time: number) => void;
+  lapSoftSensor?: SoftSensorsLapState | null;
 }
 
 const GRID_STROKE = "hsl(220 14% 16%)";
