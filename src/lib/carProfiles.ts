@@ -129,6 +129,21 @@ export interface ComputeCarProfilesOptions {
   onProgress?: (done: number, total: number) => void;
   /** Override "now" for testing. */
   now?: Date;
+  /**
+   * Optional injected analyzer for the per-GP corner-type dimension.
+   * Receives the QUALIFYING session and the list of driver_numbers to
+   * sample (one representative per team to bound /location load), and
+   * must return a SessionCornerAnalysis or null. When omitted the corner
+   * dimension is skipped — profiles are still computed, just without
+   * corner_type_strength (consumers fall back to sector_strength).
+   *
+   * Heavy: /location is one request per driver. Errors are absorbed
+   * (treated as no data → sector_fallback).
+   */
+  analyzeQualiCorners?: (
+    qualiSession: SessionInfo,
+    driverNumbers: number[],
+  ) => Promise<SessionCornerAnalysis | null>;
 }
 
 /**
