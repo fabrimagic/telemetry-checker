@@ -43,11 +43,15 @@ export interface TeamGpAffinity {
   /**
    * Which method produced the cornering signal for this team:
    *  - "location_geometry": granular slow/medium/fast strength matched
-   *                         against the circuit's per-corner-type weights;
-   *  - "sector_fallback":   aggregated sector_strength (the legacy path).
+   *                         against the circuit's per-corner-type weights
+   *                         (dato reale dalla geometria GPS);
+   *  - "sector_typed":      STIMA della corner-strength per tipo ottenuta
+   *                         pesando sector_strength via la matrice
+   *                         settore→tipo del circuito (sector_corner_map);
+   *  - "sector_fallback":   media piatta dei sector_strength (legacy).
    * Surfaced so the UI/narrative can be transparent about provenance.
    */
-  corner_source?: "location_geometry" | "sector_fallback";
+  corner_source?: "location_geometry" | "sector_typed" | "sector_fallback";
   /**
    * Aggregated /location coverage as measured by the analyzer. ALWAYS
    * propagated when the analyzer produced a measurement, including when
