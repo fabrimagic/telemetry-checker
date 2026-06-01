@@ -585,6 +585,76 @@ export async function computeCarProfiles(
       status = "fetch_failed";
     }
 
+    // ----- EXPERIMENTAL: per-corner-type strength from quali /location -----
+    // Heavy: one /location + /car_data per representative driver. Runs only
+    // when the caller injected an analyzer AND a Quali session exists for
+    // this GP. All failures are absorbed (treated as "no data" → eventually
+    // the team falls back to sector_strength). Recency weight `w` is the
+    // same one used by all other dimensions, so the recency model stays
+    // consistent across signals.
+    if (status === "used" && qualiSession && opts.analyzeQualiCorners) {
+      try {
+        const qDrivers = await getDrivers(qualiSession.session_key);
+        // One representative per team — lowest driver_number for
+        // determinism — to bound /location calls.
+        const repByTeam = new Map<string, number>();
+        for (const d of qDrivers) {
+          if (!d.team_name) continue;
+          const cur = repByTeam.get(d.team_name);
+          if (cur == null || d.driver_number < cur) {
+            repByTeam.set(d.team_name, d.driver_number);
+          }
+        }
+        const driverToTeam = new Map<number, string>();
+        for (const [team, num] of repByTeam.entries()) driverToTeam.set(num, team);
+        const driverNumbers = [...repByTeam.values()];
+        if (driverNumbers.length > 0) {
+          const analysis = await opts.analyzeQualiCorners(qualiSession, driverNumbers);
+          if (analysis && analysis.per_driver.length > 0) {
+            // Per-GP per-team RAW speeds (km/h) per corner type, plus the
+            // representative driver's coverage.
+            const rawByType: Record<"slow" | "medium" | "fast", Map<string, number>> = {
+              slow: new Map(),
+              medium: new Map(),
+              fast: new Map(),
+            };
+            const coverageByTeam = new Map<string, number>();
+            for (const pd of analysis.per_driver) {
+              const team = driverToTeam.get(pd.driver_number);
+              if (!team) continue;
+              if (pd.slow_corner_speed != null) rawByType.slow.set(team, pd.slow_corner_speed);
+              if (pd.medium_corner_speed != null) rawByType.medium.set(team, pd.medium_corner_speed);
+              if (pd.fast_corner_speed != null) rawByType.fast.set(team, pd.fast_corner_speed);
+              coverageByTeam.set(team, pd.coverage);
+            }
+            // Normalize per type within this GP (higher speed = stronger).
+            const normSlow = normalizeHigherIsBetter(rawByType.slow);
+            const normMed = normalizeHigherIsBetter(rawByType.medium);
+            const normFast = normalizeHigherIsBetter(rawByType.fast);
+            function pushNorm(
+              norm: Map<string, number>,
+              sumMap: Map<string, number>,
+              wMap: Map<string, number>,
+            ) {
+              for (const [team, v] of norm.entries()) {
+                sumMap.set(team, (sumMap.get(team) ?? 0) + v * w);
+                wMap.set(team, (wMap.get(team) ?? 0) + w);
+              }
+            }
+            pushNorm(normSlow, accCornerSum.slow, accCornerW.slow);
+            pushNorm(normMed, accCornerSum.medium, accCornerW.medium);
+            pushNorm(normFast, accCornerSum.fast, accCornerW.fast);
+            for (const [team, cov] of coverageByTeam.entries()) {
+              accCoverageSum.set(team, (accCoverageSum.get(team) ?? 0) + cov * w);
+              accCoverageW.set(team, (accCoverageW.get(team) ?? 0) + w);
+            }
+          }
+        }
+      } catch {
+        // Swallow: the corner dimension is optional. Sector fallback covers it.
+      }
+    }
+
     diagnostics.push({
       name: sessionDisplayName(session),
       date_end: session.date_end ?? "",
