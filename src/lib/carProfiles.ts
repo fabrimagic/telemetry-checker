@@ -292,7 +292,10 @@ export async function computeCarProfiles(
     .sort((a, b) => new Date(a.date_end!).getTime() - new Date(b.date_end!).getTime());
 
   const totalPastRaces = past.length;
-  const selected = past.slice(-lastN); // oldest → newest among the N
+  const selected =
+    typeof opts.lastNRaces === "number" && opts.lastNRaces > 0
+      ? past.slice(-opts.lastNRaces) // backward-compat: hard cap
+      : past; // default: ALL past races, recency handled by weight decay
   const total = selected.length;
 
   if (total === 0) {
@@ -306,9 +309,14 @@ export async function computeCarProfiles(
     };
   }
 
-  // weight: linear, most-recent has highest weight.
-  // weights[i] for selected[i] where higher i = more recent.
-  const weights = selected.map((_, i) => i + 1);
+  // Recency weights: continuous exponential decay with half-life
+  // RECENCY_HALFLIFE_RACES. selected is oldest→newest, so age of
+  // selected[i] is (lastIndex - i). The most recent race gets weight 1.
+  const lastIndex = selected.length - 1;
+  const weights = selected.map((_, i) => {
+    const age = lastIndex - i;
+    return Math.pow(0.5, age / RECENCY_HALFLIFE_RACES);
+  });
 
   // Accumulators: weighted sum and weight sum per (team, dimension).
   const accSum = {
@@ -325,6 +333,9 @@ export async function computeCarProfiles(
   };
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
+  // For each team, collect the weights of the races it contributed to —
+  // used to compute the Kish effective sample size.
+  const weightsByTeam = new Map<string, number[]>();
 
   const racesUsed: SessionInfo[] = [];
   const diagnostics: RaceDiagnostic[] = [];
