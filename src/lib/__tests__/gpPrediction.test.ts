@@ -123,7 +123,7 @@ describe("gpPrediction", () => {
     const out = predictGpAffinity(c, [
       car("A", 0.50, [0.50, 0.50, 0.50], "low"),
       car("B", 0.52, [0.52, 0.52, 0.52], "low"),
-      car("C", 0.05, [0.05, 0.05, 0.05], "high"),
+      car("C", 0.0, [0.0, 0.0, 0.0], "high"),
     ]);
     const group = out.indistinguishable_groups.find(
       (g) => g.includes("A") && g.includes("B"),
