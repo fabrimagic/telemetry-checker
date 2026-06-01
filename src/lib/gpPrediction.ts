@@ -159,9 +159,45 @@ export function predictGpAffinity(
 
   const ranked: TeamGpAffinity[] = cars.map((car) => {
     const topIdx = clamp01(car.top_speed_index);
-    const cornerIdx = clamp01(
-      mean([car.sector_strength.s1, car.sector_strength.s2, car.sector_strength.s3]),
-    );
+
+    // HYBRID cornering signal:
+    //  - If the car has a per-corner-type strength (location_geometry path),
+    //    weight slow/medium/fast by the circuit's slow/medium/fast weights.
+    //    This is the FIRST place where slow_corner_traction/medium_corner/
+    //    fast_corner enter the score (previously descriptive only).
+    //  - Otherwise fall back to the legacy sector-mean estimate, which does
+    //    NOT depend on spatial alignment.
+    let cornerIdx: number;
+    let cornerSource: "location_geometry" | "sector_fallback";
+    if (car.corner_type_strength) {
+      const wS = circuit.slow_corner_traction;
+      const wM = circuit.medium_corner;
+      const wF = circuit.fast_corner;
+      const sumW = wS + wM + wF;
+      if (sumW > 0) {
+        cornerIdx = clamp01(
+          (wS * car.corner_type_strength.slow +
+            wM * car.corner_type_strength.medium +
+            wF * car.corner_type_strength.fast) /
+            sumW,
+        );
+      } else {
+        cornerIdx = clamp01(
+          mean([
+            car.corner_type_strength.slow,
+            car.corner_type_strength.medium,
+            car.corner_type_strength.fast,
+          ]),
+        );
+      }
+      cornerSource = "location_geometry";
+    } else {
+      cornerIdx = clamp01(
+        mean([car.sector_strength.s1, car.sector_strength.s2, car.sector_strength.s3]),
+      );
+      cornerSource = "sector_fallback";
+    }
+
     const cTop = wTop * topIdx;
     const cCorner = wCorner * cornerIdx;
     const score = clamp01(cTop + cCorner);
@@ -177,6 +213,9 @@ export function predictGpAffinity(
       uncertainty,
       confidence: minConfidence(car.confidence, circuit.confidence),
       contributions: { top_speed: cTop, cornering: cCorner },
+      corner_source: cornerSource,
+      corner_coverage:
+        cornerSource === "location_geometry" ? car.corner_data_coverage : undefined,
     };
   });
 
