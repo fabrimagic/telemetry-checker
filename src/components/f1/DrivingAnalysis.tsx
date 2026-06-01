@@ -75,11 +75,12 @@ export function DrivingAnalysis({ drivers, raceAverageContext, onAvgChange }: Pr
   // Reset on context change (session / driver swap).
   useEffect(() => {
     setAvg(null);
+    onAvgChange?.(null);
     setProgress(null);
     abortRef.current?.abort();
     abortRef.current = null;
     setRunning(false);
-  }, [raceAverageContext?.sessionKey, raceAverageContext?.driverNumber]);
+  }, [raceAverageContext?.sessionKey, raceAverageContext?.driverNumber, onAvgChange]);
 
   const canCompareAvg =
     !!raceAverageContext?.enabled && analyses.length === 1;
