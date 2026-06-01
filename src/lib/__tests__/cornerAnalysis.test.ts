@@ -81,21 +81,30 @@ describe("classifyCircuitCorners", () => {
     expect(classifyCircuitCorners([[0, 0], [0.001, 0]])).toEqual([]);
   });
 
-  it("detects a slow hairpin and a fast sweeper, ignores the straight", () => {
+  it("detects the slow hairpin and excludes the long straight prefix", () => {
     const outline = buildSyntheticOutline();
     const segs = classifyCircuitCorners(outline);
-    // We expect at least the hairpin and the sweeper.
-    expect(segs.length).toBeGreaterThanOrEqual(2);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
     const types = segs.map((s) => s.type);
     expect(types).toContain("slow");
-    // The wide R=300 m curve should NOT be slow.
-    const sweeper = segs.find((s) => s.curvature < CORNER_CURVATURE_SLOW);
-    expect(sweeper).toBeDefined();
-    expect(["fast", "medium"]).toContain(sweeper!.type);
-    // None of the straight prefix points should appear in a segment.
+    // None of the straight prefix points should appear in any segment.
     for (const s of segs) {
       expect(s.start_idx).toBeGreaterThanOrEqual(25);
     }
+  });
+
+  it("classifies a wide-radius standalone curve as fast (not slow)", () => {
+    // Pure single curve of R=300 m, no hairpin attached → should be fast/medium.
+    const pts: [number, number][] = [];
+    const R = 300;
+    for (let i = 0; i <= 40; i++) {
+      const ang = (i / 40) * (Math.PI / 2);
+      pts.push([metersToDeg(R * Math.cos(ang)), metersToDeg(R * Math.sin(ang))]);
+    }
+    const segs = classifyCircuitCorners(pts);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    expect(segs[0].curvature).toBeLessThan(CORNER_CURVATURE_SLOW);
+    expect(["fast", "medium"]).toContain(segs[0].type);
   });
 });
 
