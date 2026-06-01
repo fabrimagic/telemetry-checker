@@ -9,6 +9,7 @@ import Documentation from "./pages/Documentation.tsx";
 import Compare from "./pages/Compare.tsx";
 import PreRace from "./pages/PreRace.tsx";
 import Championship from "./pages/Championship.tsx";
+import GpPreview from "./pages/GpPreview.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const InternalLiveDashboard = lazy(() => import("./pages/InternalLiveDashboard.tsx"));
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/compare" element={<Compare />} />
           <Route path="/pre-race" element={<PreRace />} />
           <Route path="/campionato" element={<Championship />} />
+          <Route path="/anteprima-gp" element={<GpPreview />} />
           <Route
             path="/internal-pitwall-live-x7k2m9"
             element={
