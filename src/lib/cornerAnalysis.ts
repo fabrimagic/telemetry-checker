@@ -78,6 +78,13 @@ export interface PerDriverCornerSpeeds {
   sample_counts: Record<CornerType, number>;
   /** Fraction of outline vertices touched by at least one location sample. */
   coverage: number;
+  /**
+   * Fraction of CORNER vertices (slow/medium/fast segments only, straights
+   * excluded) touched by at least one location sample. Diagnostic metric:
+   * compare with the global `coverage` — corners may be covered much better
+   * than the whole track. `null` when there are no corner vertices.
+   */
+  corner_coverage: number | null;
   /** True when /location or /car_data returned empty or fetch failed. */
   partial: boolean;
   notes: string[];
