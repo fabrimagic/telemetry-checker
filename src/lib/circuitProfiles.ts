@@ -47,6 +47,13 @@ export interface CircuitProfile {
   overtaking_difficulty: number;
   confidence: "high" | "medium" | "low";
   source: "historical" | "layout_estimate";
+  /**
+   * true se il circuito non è nel calendario attivo 2026 ma il profilo è pronto
+   * per un eventuale recupero/stagione futura. I profili dormienti NON devono
+   * comparire nel calendario e NON vengono usati da getCircuitProfileForNextGP
+   * finché il GP non entra nel calendario. Assenza = false (retrocompatibile).
+   */
+  dormant?: boolean;
 }
 
 export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
@@ -90,9 +97,10 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     confidence: "high", source: "historical",
   },
   "Gran Premio di Barcellona-Catalunya": {
-    // Barcelona: complete circuit, medium/fast corners dominant, classic tyre test.
+    // Barcelona: layout 2023 (chicane finale rimossa, T13-14 più veloci e fluenti);
+    // curve veloci dominanti, classic tyre test.
     gpName: "Gran Premio di Barcellona-Catalunya",
-    top_speed: 0.45, slow_corner_traction: 0.55, medium_corner: 0.85, fast_corner: 0.85,
+    top_speed: 0.45, slow_corner_traction: 0.50, medium_corner: 0.80, fast_corner: 0.90,
     tyre_deg: 0.80, overtaking_difficulty: 0.65,
     confidence: "high", source: "historical",
   },
@@ -195,11 +203,34 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     confidence: "medium", source: "historical",
   },
   "Gran Premio di Abu Dhabi": {
-    // Yas Marina: mixed, post-reprofiling more flowing, moderate everything.
+    // Yas Marina: post-reprofiling 2021 (chicane lente rimosse, banking aggiunto)
+    // più fluente; mix di medie con qualche veloce.
     gpName: "Gran Premio di Abu Dhabi",
-    top_speed: 0.65, slow_corner_traction: 0.60, medium_corner: 0.65, fast_corner: 0.50,
+    top_speed: 0.65, slow_corner_traction: 0.50, medium_corner: 0.65, fast_corner: 0.60,
     tyre_deg: 0.50, overtaking_difficulty: 0.55,
     confidence: "medium", source: "historical",
+  },
+  // ============================================================
+  // PROFILI DORMIENTI — non nel calendario 2026, pronti per recupero/2027.
+  // ============================================================
+  "Gran Premio del Bahrain": {
+    // Bahrain International Circuit (layout standard GP, non Outer):
+    // stop-and-go, trazione decisiva in uscita dalle lente, degrado termico
+    // gomme tra i più alti del calendario (asfalto abrasivo), sorpassi
+    // relativamente facili. DORMIENTE.
+    gpName: "Gran Premio del Bahrain",
+    top_speed: 0.80, slow_corner_traction: 0.80, medium_corner: 0.55, fast_corner: 0.35,
+    tyre_deg: 0.90, overtaking_difficulty: 0.35,
+    confidence: "medium", source: "historical", dormant: true,
+  },
+  "Gran Premio dell'Arabia Saudita": {
+    // Jeddah Corniche: circuito cittadino più veloce della storia F1,
+    // curvoni in pieno (la maggior parte delle 27 curve non richiede frenata),
+    // poche curve lente, asfalto liscio low-grip, molte zone di sorpasso. DORMIENTE.
+    gpName: "Gran Premio dell'Arabia Saudita",
+    top_speed: 0.90, slow_corner_traction: 0.30, medium_corner: 0.55, fast_corner: 0.95,
+    tyre_deg: 0.45, overtaking_difficulty: 0.35,
+    confidence: "medium", source: "historical", dormant: true,
   },
 };
 

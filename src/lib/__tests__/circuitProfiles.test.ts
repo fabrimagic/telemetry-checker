@@ -19,9 +19,33 @@ const WEIGHT_KEYS: (keyof CircuitProfile)[] = [
 describe("circuitProfiles", () => {
   const calendarGpNames = new Set(F1_CALENDAR_2026.map((s) => s.gpName));
 
-  it("has no orphan keys (every profile gpName exists in the calendar)", () => {
+  it("has no orphan keys (every non-dormant profile gpName exists in the calendar)", () => {
     for (const key of Object.keys(CIRCUIT_PROFILES)) {
-      expect(calendarGpNames.has(key)).toBe(true);
+      const isDormant = CIRCUIT_PROFILES[key].dormant === true;
+      expect(calendarGpNames.has(key) || isDormant).toBe(true);
+    }
+  });
+
+  it("dormant profiles (Bahrain, Arabia Saudita) exist, are marked dormant, and are NOT in the 2026 calendar", () => {
+    const dormantKeys = ["Gran Premio del Bahrain", "Gran Premio dell'Arabia Saudita"];
+    for (const k of dormantKeys) {
+      expect(CIRCUIT_PROFILES[k]).toBeDefined();
+      expect(CIRCUIT_PROFILES[k].dormant).toBe(true);
+      expect(calendarGpNames.has(k)).toBe(false);
+    }
+  });
+
+  it("getCircuitProfileForNextGP never returns a dormant profile (they are not in the calendar)", () => {
+    // Sample across the season: no next-GP resolution should ever yield a dormant profile.
+    const samples = [
+      new Date("2026-02-01T00:00:00Z"),
+      new Date("2026-06-01T00:00:00Z"),
+      new Date("2026-09-15T00:00:00Z"),
+      new Date("2026-11-20T00:00:00Z"),
+    ];
+    for (const now of samples) {
+      const p = getCircuitProfileForNextGP(now);
+      if (p) expect(p.dormant === true).toBe(false);
     }
   });
 
