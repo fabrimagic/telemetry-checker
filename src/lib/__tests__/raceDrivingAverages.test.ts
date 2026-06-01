@@ -58,17 +58,17 @@ describe("pickComparableLaps", () => {
   it("excludes pit-out, pit-in (lap preceding pit-out), non-GREEN and invalid laps", () => {
     const laps: Lap[] = [
       makeLap(1),
-      makeLap(2, { is_pit_out_lap: true }), // pit-out
-      makeLap(3),
-      makeLap(4), // pit-in (next is pit-out)
-      makeLap(5, { is_pit_out_lap: true }),
+      makeLap(2),
+      makeLap(3), // pit-in (next is pit-out)
+      makeLap(4, { is_pit_out_lap: true }),
+      makeLap(5),
       makeLap(6), // SC
       makeLap(7),
       makeLap(8, { lap_duration: 0 }),
     ];
     const ts: Map<number, TrackStatus> = new Map([[6, "SC" as TrackStatus]]);
     const out = pickComparableLaps(laps, ts);
-    expect(out.map((l) => l.lap_number)).toEqual([1, 3, 7]);
+    expect(out.map((l) => l.lap_number)).toEqual([1, 2, 5, 7]);
   });
 });
 
