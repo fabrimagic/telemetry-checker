@@ -441,6 +441,23 @@ export async function computeCarProfiles(
   let racesConsidered = 0;
   let done = 0;
 
+  // Helper that fetches one session's laps+drivers and returns the
+  // per-session normalized metrics. Returns:
+  //   { ok: true, metrics }            → session aggregated successfully
+  //   { ok: true, metrics: null }      → fetched but no usable data
+  //   { ok: false }                    → fetch failed
+  async function fetchSession(
+    sessionKey: number,
+  ): Promise<{ ok: true; metrics: RaceTeamMetrics | null } | { ok: false }> {
+    try {
+      const laps = await getAllLaps(sessionKey);
+      const drivers = await getDrivers(sessionKey);
+      return { ok: true, metrics: aggregateRace(laps, drivers) };
+    } catch {
+      return { ok: false };
+    }
+  }
+
   for (let i = 0; i < selected.length; i++) {
     if (signal?.aborted) {
       aborted = true;
@@ -450,54 +467,77 @@ export async function computeCarProfiles(
     const w = weights[i];
     racesConsidered++;
     let status: RaceDiagnosticStatus = "no_data";
-    try {
-      const [laps, drivers] = [
-        await getAllLaps(session.session_key),
-        await getDrivers(session.session_key),
-      ];
-      const agg = aggregateRace(laps, drivers);
-      if (agg) {
-        status = "used";
-        racesUsed.push(session);
+    let qualiAvailable = false;
+    let raceAvailable = false;
 
-        function add(
-          src: Map<string, number>,
-          sumMap: Map<string, number>,
-          wMap: Map<string, number>,
-        ) {
-          for (const [team, v] of src.entries()) {
-            sumMap.set(team, (sumMap.get(team) ?? 0) + v * w);
-            wMap.set(team, (wMap.get(team) ?? 0) + w);
-          }
-        }
-        add(agg.topSpeed, accSum.top, accW.top);
-        add(agg.s1, accSum.s1, accW.s1);
-        add(agg.s2, accSum.s2, accW.s2);
-        add(agg.s3, accSum.s3, accW.s3);
+    // Fetch race session.
+    const raceRes = await fetchSession(session.session_key);
+    let raceMetrics: RaceTeamMetrics | null = null;
+    let raceFetchFailed = false;
+    if (raceRes.ok) {
+      raceMetrics = raceRes.metrics;
+      raceAvailable = raceMetrics != null;
+    } else {
+      raceFetchFailed = true;
+    }
 
-        const teamsInRace = new Set<string>([
-          ...agg.topSpeed.keys(),
-          ...agg.s1.keys(),
-          ...agg.s2.keys(),
-          ...agg.s3.keys(),
-        ]);
-        for (const t of teamsInRace) {
-          racesByTeam.set(t, (racesByTeam.get(t) ?? 0) + 1);
-          const arr = weightsByTeam.get(t) ?? [];
-          arr.push(w);
-          weightsByTeam.set(t, arr);
-        }
-        for (const [t, n] of agg.lapsByTeam.entries()) {
-          lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
+    // Fetch matching Qualifying (same meeting_key), if any.
+    let qualiMetrics: RaceTeamMetrics | null = null;
+    const qualiSession = qualiByMeeting.get(session.meeting_key);
+    if (qualiSession) {
+      const qRes = await fetchSession(qualiSession.session_key);
+      if (qRes.ok) {
+        qualiMetrics = qRes.metrics;
+        qualiAvailable = qualiMetrics != null;
+      }
+      // qRes fetch failure is silently absorbed: quali is a "bonus" source.
+    }
+
+    const agg = combineSessions(qualiMetrics, raceMetrics);
+    if (agg) {
+      status = "used";
+      racesUsed.push(session);
+
+      function add(
+        src: Map<string, number>,
+        sumMap: Map<string, number>,
+        wMap: Map<string, number>,
+      ) {
+        for (const [team, v] of src.entries()) {
+          sumMap.set(team, (sumMap.get(team) ?? 0) + v * w);
+          wMap.set(team, (wMap.get(team) ?? 0) + w);
         }
       }
-    } catch {
+      add(agg.topSpeed, accSum.top, accW.top);
+      add(agg.s1, accSum.s1, accW.s1);
+      add(agg.s2, accSum.s2, accW.s2);
+      add(agg.s3, accSum.s3, accW.s3);
+
+      const teamsInRace = new Set<string>([
+        ...agg.topSpeed.keys(),
+        ...agg.s1.keys(),
+        ...agg.s2.keys(),
+        ...agg.s3.keys(),
+      ]);
+      for (const t of teamsInRace) {
+        racesByTeam.set(t, (racesByTeam.get(t) ?? 0) + 1);
+        const arr = weightsByTeam.get(t) ?? [];
+        arr.push(w);
+        weightsByTeam.set(t, arr);
+      }
+      for (const [t, n] of agg.lapsByTeam.entries()) {
+        lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
+      }
+    } else if (raceFetchFailed && !qualiAvailable) {
+      // Both sources unusable AND race fetch errored → fetch_failed.
       status = "fetch_failed";
     }
+
     diagnostics.push({
       name: sessionDisplayName(session),
       date_end: session.date_end ?? "",
       status,
+      sources: { quali: qualiAvailable, race: raceAvailable },
     });
     done++;
     opts.onProgress?.(done, total);
