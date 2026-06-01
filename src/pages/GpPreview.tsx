@@ -15,7 +15,11 @@ import {
   type CarProfile,
 } from "@/lib/carProfiles";
 import { predictGpAffinity, type GpPrediction } from "@/lib/gpPrediction";
-import { buildGpPreviewNarrative } from "@/lib/gpPreviewNarrative";
+import {
+  buildGpPreviewNarrative,
+  buildPerTeamExplanations,
+  strengthLabel,
+} from "@/lib/gpPreviewNarrative";
 
 
 // ----- Helpers -----
@@ -119,6 +123,16 @@ export function GpPredictionResultView({
     [circuit, prediction, dataContext],
   );
 
+  const perTeam = useMemo(
+    () => buildPerTeamExplanations(circuit, prediction),
+    [circuit, prediction],
+  );
+  const perTeamMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of perTeam) m.set(e.team_name, e.text);
+    return m;
+  }, [perTeam]);
+
 
   return (
     <div className="space-y-6">
@@ -148,10 +162,23 @@ export function GpPredictionResultView({
               Confidenza complessiva: {confidenceLabelIt(prediction.global_confidence)}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground pt-1">
-            Punteggio 0..1 con banda di incertezza. I team nello stesso gruppo sono
-            <span className="font-medium"> sostanzialmente equivalenti</span> dato il margine d'errore.
-          </p>
+          <div className="text-xs text-muted-foreground pt-1 space-y-2 leading-relaxed">
+            <p>
+              Il punteggio va da 0 a 1 ed è una <span className="font-medium">stima</span>,
+              non una misura esatta: per questo accanto a ogni numero compare un piccolo
+              margine (ad esempio &ldquo;0,72 ± 0,05&rdquo;), che rappresenta quanto la stima
+              potrebbe variare avendo a disposizione più dati.
+            </p>
+            <p>
+              Quando i margini di due team si sovrappongono, la loro differenza è troppo
+              piccola per essere considerata affidabile — un po&apos; come due pesi così
+              vicini che la bilancia non riesce a distinguerli con sicurezza. In quei
+              casi è più corretto considerarli <span className="font-medium">alla pari</span>{" "}
+              invece di metterli in ordine: è ciò che segnala il badge
+              &ldquo;Equivalenti entro l&apos;incertezza&rdquo; qui sotto.
+            </p>
+          </div>
+
         </CardHeader>
         <CardContent className="space-y-3">
           {ranked.length === 0 ? (
@@ -181,6 +208,7 @@ export function GpPredictionResultView({
                           variant="outline"
                           className="text-[10px] uppercase tracking-wider bg-amber-500/10 text-amber-300 border-amber-500/40"
                           data-testid="equivalent-badge"
+                          title="Con i dati attuali non si può dire con sicurezza chi dei team marcati così sia avanti: vanno considerati alla pari."
                         >
                           Equivalenti entro l'incertezza
                         </Badge>
@@ -204,8 +232,8 @@ export function GpPredictionResultView({
                       style={{ left: `calc(${t.affinity_score * 100}% - 1px)` }}
                     />
                   </div>
-                  {/* Contributions */}
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  {/* Contributions + verbal strength tag */}
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
                     <span>
                       Velocità di punta:&nbsp;
                       <span className="text-foreground font-medium tabular-nums">
@@ -218,10 +246,30 @@ export function GpPredictionResultView({
                         {Math.round(cornerPct)}%
                       </span>
                     </span>
+                    <span
+                      className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/40 text-foreground/80 border-border"
+                      data-testid={`strength-tag-${t.team_name}`}
+                    >
+                      Più forte in:{" "}
+                      {strengthLabel(topPct) === "rettilineo"
+                        ? "rettilineo"
+                        : strengthLabel(topPct) === "curve"
+                          ? "curve"
+                          : "equilibrato"}
+                    </span>
                     <span className="ml-auto opacity-70">
                       Confidenza team: {confidenceLabelIt(t.confidence)}
                     </span>
                   </div>
+                  {/* Per-team plain-language explanation */}
+                  {perTeamMap.get(t.team_name) && (
+                    <p
+                      className="text-xs text-foreground/80 leading-relaxed pt-1 border-t border-border/40"
+                      data-testid={`team-explanation-${t.team_name}`}
+                    >
+                      {perTeamMap.get(t.team_name)}
+                    </p>
+                  )}
                 </div>
               );
             })
@@ -229,6 +277,7 @@ export function GpPredictionResultView({
           <p className="text-[11px] text-muted-foreground italic pt-2">
             Linguaggio prudente: il circuito <em>sembra adattarsi</em> ai team in cima alla lista,
             sui dati raccolti finora. Non è una previsione del risultato di gara.
+
           </p>
         </CardContent>
       </Card>
