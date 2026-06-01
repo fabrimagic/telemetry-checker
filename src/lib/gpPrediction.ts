@@ -63,6 +63,8 @@ export interface TeamGpAffinity {
    * always show the user WHY the geometric branch was (or was not) used.
    */
   corner_coverage_status?: "ok" | "below_threshold" | "not_available";
+}
+
 
 export interface GpPrediction {
   ranked: TeamGpAffinity[];
