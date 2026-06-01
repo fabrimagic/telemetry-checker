@@ -368,6 +368,19 @@ export async function computeCarProfiles(
     };
   }
 
+  // Fetch standard Qualifying sessions (NOT Sprint Qualifying) and index by
+  // meeting_key. Failure is non-fatal: we just proceed without quali data
+  // for any race, falling back to race-only aggregation per GP.
+  let qualiByMeeting = new Map<number, SessionInfo>();
+  try {
+    const qSessions = await getQualifyingSessionsByYear(2026);
+    for (const q of qSessions ?? []) {
+      if (q?.meeting_key != null) qualiByMeeting.set(q.meeting_key, q);
+    }
+  } catch {
+    qualiByMeeting = new Map();
+  }
+
   const past = sessions
     .filter((s) => {
       if (!s.date_end) return false;
