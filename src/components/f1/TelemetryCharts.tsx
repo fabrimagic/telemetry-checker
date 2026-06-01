@@ -207,7 +207,7 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
           <XAxis {...commonXAxis} hide={!showXAxis} />
           <YAxis width={42} tick={AXIS_TICK} axisLine={false} tickLine={false} {...yProps} />
-          <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTimeAxis} />
+          <Tooltip content={tooltipContent} />
           {refLine}
           {drivers.map((d) => (
             <Line
