@@ -285,3 +285,83 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
   });
 });
 
+
+describe("buildPerTeamExplanations — accessible per-team prose", () => {
+  // Re-import lazily to keep prior describe scopes unaffected.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { buildPerTeamExplanations } = require("../gpPreviewNarrative");
+
+  function c(over: Partial<CircuitProfile> = {}): CircuitProfile {
+    return {
+      gpName: "Test GP",
+      top_speed: 0.5,
+      slow_corner_traction: 0.5,
+      medium_corner: 0.5,
+      fast_corner: 0.5,
+      tyre_deg: 0.5,
+      overtaking_difficulty: 0.5,
+      confidence: "high",
+      source: "historical",
+      ...over,
+    };
+  }
+
+  it("returns one explanation per ranked team, all non-empty", () => {
+    const circ = c();
+    const cars = [
+      car("A", 0.8, [0.5, 0.5, 0.5]),
+      car("B", 0.5, [0.5, 0.5, 0.5]),
+      car("C", 0.2, [0.5, 0.5, 0.5]),
+    ];
+    const pred = predictGpAffinity(circ, cars);
+    const out = buildPerTeamExplanations(circ, pred);
+    expect(out).toHaveLength(pred.ranked.length);
+    for (const e of out) {
+      expect(e.team_name).toBeTruthy();
+      expect(e.text.length).toBeGreaterThan(20);
+    }
+  });
+
+  it("top-speed-dominant contributions ⇒ mentions 'velocità in rettilineo' as strength", () => {
+    const circ = c({ top_speed: 1.0, slow_corner_traction: 0.1, medium_corner: 0.1, fast_corner: 0.1 });
+    const cars = [car("Fast", 0.95, [0.2, 0.2, 0.2]), car("Slow", 0.2, [0.5, 0.5, 0.5])];
+    const pred = predictGpAffinity(circ, cars);
+    const out = buildPerTeamExplanations(circ, pred);
+    const fastText = out.find((e: { team_name: string; text: string }) => e.team_name === "Fast")!.text;
+    expect(fastText).toMatch(/velocità in rettilineo/i);
+  });
+
+  it("corner-dominant contributions ⇒ mentions 'tenuta in curva' as strength", () => {
+    const circ = c({ top_speed: 0.1, slow_corner_traction: 1.0, medium_corner: 1.0, fast_corner: 1.0 });
+    const cars = [car("Corner", 0.2, [0.95, 0.95, 0.95]), car("Drag", 0.9, [0.3, 0.3, 0.3])];
+    const pred = predictGpAffinity(circ, cars);
+    const out = buildPerTeamExplanations(circ, pred);
+    const cornerText = out.find((e: { team_name: string; text: string }) => e.team_name === "Corner")!.text;
+    expect(cornerText).toMatch(/tenuta in curva/i);
+  });
+
+  it("teams in an indistinguishable group name each other and say 'alla pari'", () => {
+    const circ = c({ confidence: "high" });
+    const cars = [
+      car("A", 0.50, [0.50, 0.50, 0.50], "low"),
+      car("B", 0.52, [0.52, 0.52, 0.52], "low"),
+      car("C", 0.0, [0.0, 0.0, 0.0], "high"),
+    ];
+    const pred = predictGpAffinity(circ, cars);
+    const out = buildPerTeamExplanations(circ, pred);
+    const aText = out.find((e: { team_name: string; text: string }) => e.team_name === "A")!.text;
+    const bText = out.find((e: { team_name: string; text: string }) => e.team_name === "B")!.text;
+    const cText = out.find((e: { team_name: string; text: string }) => e.team_name === "C")!.text;
+    expect(aText).toMatch(/\bB\b/);
+    expect(aText).toMatch(/alla pari/i);
+    expect(bText).toMatch(/\bA\b/);
+    expect(bText).toMatch(/alla pari/i);
+    expect(cText).not.toMatch(/alla pari/i);
+  });
+
+  it("empty ranking ⇒ empty array, no crash", () => {
+    const circ = c();
+    const pred = predictGpAffinity(circ, []);
+    expect(buildPerTeamExplanations(circ, pred)).toEqual([]);
+  });
+});
