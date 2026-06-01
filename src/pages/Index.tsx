@@ -323,6 +323,7 @@ export default function Index() {
                 cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
               }
             } catch { /* optional */ }
+            setCumDevResult(cumDevForVre);
 
             // diaryForVre captured from diary build above
 
