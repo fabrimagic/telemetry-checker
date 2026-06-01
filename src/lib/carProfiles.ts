@@ -79,6 +79,14 @@ export interface CarProfile {
    */
   corner_data_coverage?: number | null;
   /**
+   * Diagnostic-only: aggregated 0..1 coverage restricted to CORNER vertices
+   * (slow/medium/fast segments, straights excluded). Lets us tell whether
+   * corners are covered better/worse than the full track. Does NOT affect
+   * the gate (which still uses corner_data_coverage). `null` when not
+   * measurable for this team.
+   */
+  corner_coverage_curve?: number | null;
+  /**
    * Which method produced the cornering signal for this team:
    *  - "location_geometry": derived from GPS + circuit layout (granular)
    *  - "sector_fallback":   coverage too low / no data → use sector_strength
