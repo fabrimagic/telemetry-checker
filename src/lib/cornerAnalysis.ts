@@ -78,6 +78,13 @@ export interface PerDriverCornerSpeeds {
   sample_counts: Record<CornerType, number>;
   /** Fraction of outline vertices touched by at least one location sample. */
   coverage: number;
+  /**
+   * Fraction of CORNER vertices (slow/medium/fast segments only, straights
+   * excluded) touched by at least one location sample. Diagnostic metric:
+   * compare with the global `coverage` — corners may be covered much better
+   * than the whole track. `null` when there are no corner vertices.
+   */
+  corner_coverage: number | null;
   /** True when /location or /car_data returned empty or fetch failed. */
   partial: boolean;
   notes: string[];
@@ -293,6 +300,7 @@ export function aggregateDriverCornerSpeeds(params: {
     fast_corner_speed: null,
     sample_counts: { slow: 0, medium: 0, fast: 0, straight: 0 },
     coverage: 0,
+    corner_coverage: null,
     partial: true,
     notes,
   };
@@ -310,6 +318,22 @@ export function aggregateDriverCornerSpeeds(params: {
   const touched = new Set<number>();
   for (const v of locIdxToOutlineIdx) touched.add(v);
   const coverage = outline.length > 0 ? touched.size / outline.length : 0;
+
+  // Corner-only coverage: fraction of CORNER vertices (slow/medium/fast)
+  // touched. Straights excluded. `null` when no corner vertices exist.
+  let cornerVerticesTotal = 0;
+  let cornerVerticesTouched = 0;
+  for (let v = 0; v < outline.length; v++) {
+    const segIdx = idxToSeg[v];
+    if (segIdx < 0) continue;
+    const segType = segments[segIdx]?.type;
+    if (segType !== "slow" && segType !== "medium" && segType !== "fast") continue;
+    cornerVerticesTotal++;
+    if (touched.has(v)) cornerVerticesTouched++;
+  }
+  const corner_coverage = cornerVerticesTotal > 0
+    ? cornerVerticesTouched / cornerVerticesTotal
+    : null;
 
   // Sort locations by timestamp once for binary search.
   const locTimes = locations
@@ -364,6 +388,7 @@ export function aggregateDriverCornerSpeeds(params: {
     fast_corner_speed: minSpeed.fast,
     sample_counts: counts,
     coverage,
+    corner_coverage,
     partial: coverage < 0.5 || counts.slow + counts.medium + counts.fast === 0,
     notes,
   };
@@ -435,6 +460,7 @@ export async function analyzeCornersForSession(
         fast_corner_speed: null,
         sample_counts: { slow: 0, medium: 0, fast: 0, straight: 0 },
         coverage: 0,
+        corner_coverage: null,
         partial: true,
         notes: ["fetch_error"],
       });

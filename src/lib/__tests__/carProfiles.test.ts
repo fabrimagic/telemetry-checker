@@ -525,8 +525,8 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     const analyzeQualiCorners = vi.fn(async () => ({
       gpName: "Test", sessionKey: 2, segments: [],
       per_driver: [
-        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.8, partial: false, notes: [] },
-        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.75, partial: false, notes: [] },
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.8, corner_coverage: 0.9, partial: false, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.75, corner_coverage: 0.85, partial: false, notes: [] },
       ],
       notes: [], aborted: false,
     }));
@@ -550,8 +550,8 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     const analyzeQualiCorners = vi.fn(async () => ({
       gpName: "Test", sessionKey: 2, segments: [],
       per_driver: [
-        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.2, partial: true, notes: [] },
-        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.1, partial: true, notes: [] },
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.2, corner_coverage: 0.3, partial: true, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.1, corner_coverage: 0.15, partial: true, notes: [] },
       ],
       notes: [], aborted: false,
     }));
@@ -587,7 +587,30 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
       expect(p.corner_source).toBe("sector_fallback");
       expect(p.corner_type_strength).toBeNull();
       expect(p.corner_data_coverage).toBeNull();
+      expect(p.corner_coverage_curve ?? null).toBeNull();
       expect(p.corner_coverage_status).toBe("not_available");
+    }
+  });
+
+  it("(e) corner_coverage_curve is propagated in ALL branches (above/below gate) without affecting it", async () => {
+    setupOneGpWithQuali();
+    // Below-threshold global coverage, but curve coverage measured.
+    const analyzeQualiCorners = vi.fn(async () => ({
+      gpName: "Test", sessionKey: 2, segments: [],
+      per_driver: [
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.2, corner_coverage: 0.85, partial: true, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.15, corner_coverage: 0.75, partial: true, notes: [] },
+      ],
+      notes: [], aborted: false,
+    }));
+    const { profiles } = await computeCarProfiles({ now: NOW, analyzeQualiCorners });
+    for (const p of profiles) {
+      // Gate still fired on the GLOBAL coverage — sector_fallback applies.
+      expect(p.corner_source).toBe("sector_fallback");
+      expect(p.corner_coverage_status).toBe("below_threshold");
+      // Diagnostic corner coverage is preserved even in fallback.
+      expect(typeof p.corner_coverage_curve).toBe("number");
+      expect(p.corner_coverage_curve!).toBeGreaterThan(p.corner_data_coverage!);
     }
   });
 });

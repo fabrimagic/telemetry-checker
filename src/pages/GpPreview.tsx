@@ -282,11 +282,16 @@ export function GpPredictionResultView({
                     <span
                       className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/20 text-muted-foreground border-border/60"
                       data-testid={`corner-coverage-${t.team_name}`}
-                      title="Indica quanto i dati GPS della qualifica coprono il tracciato per questo team. Sotto il 50% si usa la stima dai settori (valore solo diagnostico, non incide sul punteggio)."
+                      title="Globale = % di vertici dell'intero tracciato (rettilinei inclusi) toccati dal GPS. Curve = % dei soli vertici nei tratti in curva (slow/medium/fast). La metrica 'curve' è quella che conta per la classificazione per tipo di curva; mostrata a fini diagnostici, non incide sul punteggio."
                     >
                       {typeof t.corner_coverage === "number"
                         ? <>Copertura dati posizione: {Math.round(t.corner_coverage * 100)}%</>
                         : <>Copertura non disponibile</>}
+                      {typeof t.corner_coverage_curve === "number"
+                        ? <> · di cui curve: {Math.round(t.corner_coverage_curve * 100)}%</>
+                        : t.corner_coverage_curve === null && typeof t.corner_coverage === "number"
+                          ? <> · curve: n/d</>
+                          : null}
                     </span>
 
                     <span className="ml-auto opacity-70">

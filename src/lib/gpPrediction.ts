@@ -58,6 +58,13 @@ export interface TeamGpAffinity {
    */
   corner_coverage?: number | null;
   /**
+   * Diagnostic-only: aggregated coverage restricted to CORNER vertices
+   * (slow/medium/fast). Compare against `corner_coverage` (global) to see
+   * whether corners were covered better/worse than the full track. Does
+   * NOT affect the affinity score. `null` when not measurable.
+   */
+  corner_coverage_curve?: number | null;
+  /**
    * Diagnostic gate outcome propagated verbatim from CarProfile:
    * "ok" | "below_threshold" | "not_available". Surfaced so the UI can
    * always show the user WHY the geometric branch was (or was not) used.
@@ -255,6 +262,8 @@ export function predictGpAffinity(
       // so the UI can always show the measured value. Does not affect score.
       corner_coverage:
         car.corner_data_coverage === undefined ? null : car.corner_data_coverage,
+      corner_coverage_curve:
+        car.corner_coverage_curve === undefined ? null : car.corner_coverage_curve,
       corner_coverage_status: car.corner_coverage_status ?? "not_available",
     };
   });

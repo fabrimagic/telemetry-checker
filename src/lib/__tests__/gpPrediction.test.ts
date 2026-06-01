@@ -332,6 +332,33 @@ describe("gpPrediction", () => {
     expect(b).toBeCloseTo(a, 10);
     expect(d).toBeCloseTo(a, 10);
   });
+
+  it("propagates corner_coverage_curve (diagnostic) in both branches without affecting score", () => {
+    const c = circuit();
+    const baseCar: CarProfile = car("X", 0.7, [0.5, 0.5, 0.5], "high");
+    const withCurve: CarProfile = {
+      ...baseCar,
+      corner_data_coverage: 0.3,
+      corner_coverage_curve: 0.85,
+      corner_source: "sector_fallback",
+      corner_coverage_status: "below_threshold",
+    };
+    const withNullCurve: CarProfile = {
+      ...baseCar,
+      corner_data_coverage: 0.3,
+      corner_coverage_curve: null,
+      corner_source: "sector_fallback",
+      corner_coverage_status: "below_threshold",
+    };
+    const baseScore = predictGpAffinity(c, [baseCar]).ranked[0].affinity_score;
+    const r1 = predictGpAffinity(c, [withCurve]).ranked[0];
+    const r2 = predictGpAffinity(c, [withNullCurve]).ranked[0];
+    expect(r1.corner_coverage_curve).toBeCloseTo(0.85, 5);
+    expect(r2.corner_coverage_curve).toBeNull();
+    // Score invariance — diagnostic field never changes the result.
+    expect(r1.affinity_score).toBeCloseTo(baseScore, 10);
+    expect(r2.affinity_score).toBeCloseTo(baseScore, 10);
+  });
 });
 
 

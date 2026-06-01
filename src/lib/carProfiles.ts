@@ -79,6 +79,14 @@ export interface CarProfile {
    */
   corner_data_coverage?: number | null;
   /**
+   * Diagnostic-only: aggregated 0..1 coverage restricted to CORNER vertices
+   * (slow/medium/fast segments, straights excluded). Lets us tell whether
+   * corners are covered better/worse than the full track. Does NOT affect
+   * the gate (which still uses corner_data_coverage). `null` when not
+   * measurable for this team.
+   */
+  corner_coverage_curve?: number | null;
+  /**
    * Which method produced the cornering signal for this team:
    *  - "location_geometry": derived from GPS + circuit layout (granular)
    *  - "sector_fallback":   coverage too low / no data → use sector_strength
@@ -498,6 +506,9 @@ export async function computeCarProfiles(
   };
   const accCoverageSum = new Map<string, number>();
   const accCoverageW = new Map<string, number>();
+  // Diagnostic-only: corner-vertices coverage (slow/medium/fast only).
+  const accCornerCovSum = new Map<string, number>();
+  const accCornerCovW = new Map<string, number>();
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
   // For each team, collect the weights of the races it contributed to —
@@ -636,6 +647,7 @@ export async function computeCarProfiles(
               fast: new Map(),
             };
             const coverageByTeam = new Map<string, number>();
+            const cornerCoverageByTeam = new Map<string, number>();
             for (const pd of analysis.per_driver) {
               const team = driverToTeam.get(pd.driver_number);
               if (!team) continue;
@@ -643,6 +655,7 @@ export async function computeCarProfiles(
               if (pd.medium_corner_speed != null) rawByType.medium.set(team, pd.medium_corner_speed);
               if (pd.fast_corner_speed != null) rawByType.fast.set(team, pd.fast_corner_speed);
               coverageByTeam.set(team, pd.coverage);
+              if (pd.corner_coverage != null) cornerCoverageByTeam.set(team, pd.corner_coverage);
             }
             // Normalize per type within this GP (higher speed = stronger).
             const normSlow = normalizeHigherIsBetter(rawByType.slow);
@@ -664,6 +677,10 @@ export async function computeCarProfiles(
             for (const [team, cov] of coverageByTeam.entries()) {
               accCoverageSum.set(team, (accCoverageSum.get(team) ?? 0) + cov * w);
               accCoverageW.set(team, (accCoverageW.get(team) ?? 0) + w);
+            }
+            for (const [team, cov] of cornerCoverageByTeam.entries()) {
+              accCornerCovSum.set(team, (accCornerCovSum.get(team) ?? 0) + cov * w);
+              accCornerCovW.set(team, (accCornerCovW.get(team) ?? 0) + w);
             }
           }
         }
@@ -751,6 +768,10 @@ export async function computeCarProfiles(
     const covS = accCoverageSum.get(team) ?? 0;
     const coverageAgg = covW > 0 ? covS / covW : 0;
     const coverageMeasured = covW > 0;
+    // Diagnostic-only: aggregate corner-vertices coverage.
+    const ccW = accCornerCovW.get(team) ?? 0;
+    const ccS = accCornerCovSum.get(team) ?? 0;
+    const cornerCoverageCurve = ccW > 0 ? ccS / ccW : null;
 
     let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
     let cornerSource: CarProfile["corner_source"] = "sector_fallback";
@@ -793,6 +814,7 @@ export async function computeCarProfiles(
       // Preserve real coverage value in every branch (even below threshold)
       // so downstream consumers can diagnose; null only when not measurable.
       corner_data_coverage: coverageMeasured ? coverageAgg : null,
+      corner_coverage_curve: cornerCoverageCurve,
       corner_source: cornerSource,
       corner_coverage_status: coverageStatus,
     });
