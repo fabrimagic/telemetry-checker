@@ -31,6 +31,7 @@ function car(
     top_speed_index: top,
     sector_strength: { s1: sectors[0], s2: sectors[1], s3: sectors[2] },
     sample_races: sampleRaces,
+    effective_sample_races: sampleRaces,
     sample_laps: 200,
     confidence,
   };
@@ -184,6 +185,47 @@ describe("buildGpPreviewNarrative — extended data-context paragraph (Part B)",
     const lines = buildGpPreviewNarrative(c, pred);
     expect(lines.length).toBeGreaterThan(0);
     expect(lines.join(" ")).not.toMatch(/esclus/i);
+  });
+
+  it("(NEW) when racesConsidered === totalPastRaces (new default), prose says 'considera tutte' with recency weighting", () => {
+    const c = circuit();
+    const cars = [car("A", 0.5, [0.5, 0.5, 0.5], "high", 7)];
+    const pred = predictGpAffinity(c, cars, { racesConsidered: 7 });
+    const lines = buildGpPreviewNarrative(c, pred, {
+      totalPastRaces: 7,
+      racesConsidered: 7,
+      racesWithData: 7,
+      diagnostics: [],
+    });
+    const all = lines.join("\n");
+    expect(all).toMatch(/considera tutte/i);
+    expect(all).toMatch(/peso maggiore alle più recenti/i);
+    expect(all).not.toMatch(/solo le ultime/i);
+  });
+
+  it("(NEW) considering all races with some missing data ⇒ explains exclusions + effective-sample caveat", () => {
+    const c = circuit();
+    const cars = [car("A", 0.5, [0.5, 0.5, 0.5], "medium", 4)];
+    const pred = predictGpAffinity(c, cars, { racesConsidered: 6 });
+    const lines = buildGpPreviewNarrative(c, pred, {
+      totalPastRaces: 6,
+      racesConsidered: 6,
+      racesWithData: 4,
+      diagnostics: [
+        { name: "Bahrain", date_end: "2026-03-01", status: "used" },
+        { name: "Jeddah", date_end: "2026-04-01", status: "used" },
+        { name: "Melbourne", date_end: "2026-04-15", status: "used" },
+        { name: "Suzuka", date_end: "2026-05-01", status: "used" },
+        { name: "Imola", date_end: "2026-05-15", status: "no_data" },
+        { name: "Monaco", date_end: "2026-05-29", status: "no_data" },
+      ],
+    });
+    const all = lines.join("\n");
+    expect(all).toMatch(/considera tutte/i);
+    expect(all).toMatch(/solo 4/);
+    expect(all).toMatch(/Imola/);
+    expect(all).toMatch(/Monaco/);
+    expect(all).toMatch(/campione effettivo/i);
   });
 });
 

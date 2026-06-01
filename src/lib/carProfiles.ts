@@ -40,7 +40,17 @@ export interface CarProfile {
   team_name: string;
   top_speed_index: number; // 0..1, 1 = best in field
   sector_strength: { s1: number; s2: number; s3: number }; // 0..1, 1 = best
+  /** Number of races with usable data that contributed to this team. */
   sample_races: number;
+  /**
+   * Kish effective sample size for this team:
+   *   (Σ w_i)² / Σ(w_i²)
+   * where w_i is the recency weight of each contributing race. Equals
+   * sample_races with uniform weights, lower when a few high-weight races
+   * dominate. Used for confidence so that including many low-weight old
+   * races does NOT inflate confidence.
+   */
+  effective_sample_races: number;
   sample_laps: number;
   confidence: "high" | "medium" | "low";
 }
@@ -57,11 +67,11 @@ export interface ComputeCarProfilesResult {
   profiles: CarProfile[];
   races_used: SessionInfo[];
   aborted: boolean;
-  /** Diagnostics for each of the last-N selected races (used | no_data | fetch_failed). */
+  /** Diagnostics for each considered race (used | no_data | fetch_failed). */
   races_diagnostics: RaceDiagnostic[];
-  /** Number of races among the last-N effectively iterated (== selected.length, minus aborted tail). */
+  /** Number of races effectively iterated. */
   races_considered: number;
-  /** Total number of past 2026 races known BEFORE the slice to last-N. */
+  /** Total number of past 2026 races. */
   total_past_races: number;
 }
 
@@ -70,6 +80,12 @@ function sessionDisplayName(s: SessionInfo): string {
 }
 
 export interface ComputeCarProfilesOptions {
+  /**
+   * Optional cap on how many of the most recent past races to consider.
+   * When omitted (default) ALL past 2026 races are included; recency is
+   * handled via continuous weight decay (see RECENCY_HALFLIFE_RACES), not
+   * via a hard cutoff. The parameter remains for backward-compat / tests.
+   */
   lastNRaces?: number;
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
@@ -77,7 +93,21 @@ export interface ComputeCarProfilesOptions {
   now?: Date;
 }
 
-const DEFAULT_LAST_N = 4;
+/**
+ * Half-life of the recency weight, in races.
+ *
+ * For a race with age a (a = 0 for the most recent, 1 for the previous, ...)
+ * the weight is:
+ *
+ *     w(a) = 0.5 ^ (a / RECENCY_HALFLIFE_RACES)
+ *
+ * The decay is smooth and continuous; there is no hard cutoff. A race that
+ * is RECENCY_HALFLIFE_RACES old contributes half as much as the most
+ * recent one. Rationale: 2026 has a new technical regulation and few
+ * races, so discarding old races wastes signal; at the same time, ongoing
+ * upgrades make recent races more representative of the current cars.
+ */
+export const RECENCY_HALFLIFE_RACES = 3;
 
 // ----- statistic helpers -----
 
@@ -235,7 +265,6 @@ function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
 export async function computeCarProfiles(
   opts: ComputeCarProfilesOptions = {},
 ): Promise<ComputeCarProfilesResult> {
-  const lastN = opts.lastNRaces ?? DEFAULT_LAST_N;
   const now = opts.now ?? new Date();
   const signal = opts.signal;
 
@@ -262,7 +291,10 @@ export async function computeCarProfiles(
     .sort((a, b) => new Date(a.date_end!).getTime() - new Date(b.date_end!).getTime());
 
   const totalPastRaces = past.length;
-  const selected = past.slice(-lastN); // oldest → newest among the N
+  const selected =
+    typeof opts.lastNRaces === "number" && opts.lastNRaces > 0
+      ? past.slice(-opts.lastNRaces) // backward-compat: hard cap
+      : past; // default: ALL past races, recency handled by weight decay
   const total = selected.length;
 
   if (total === 0) {
@@ -276,9 +308,14 @@ export async function computeCarProfiles(
     };
   }
 
-  // weight: linear, most-recent has highest weight.
-  // weights[i] for selected[i] where higher i = more recent.
-  const weights = selected.map((_, i) => i + 1);
+  // Recency weights: continuous exponential decay with half-life
+  // RECENCY_HALFLIFE_RACES. selected is oldest→newest, so age of
+  // selected[i] is (lastIndex - i). The most recent race gets weight 1.
+  const lastIndex = selected.length - 1;
+  const weights = selected.map((_, i) => {
+    const age = lastIndex - i;
+    return Math.pow(0.5, age / RECENCY_HALFLIFE_RACES);
+  });
 
   // Accumulators: weighted sum and weight sum per (team, dimension).
   const accSum = {
@@ -295,6 +332,9 @@ export async function computeCarProfiles(
   };
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
+  // For each team, collect the weights of the races it contributed to —
+  // used to compute the Kish effective sample size.
+  const weightsByTeam = new Map<string, number[]>();
 
   const racesUsed: SessionInfo[] = [];
   const diagnostics: RaceDiagnostic[] = [];
@@ -344,6 +384,9 @@ export async function computeCarProfiles(
         ]);
         for (const t of teamsInRace) {
           racesByTeam.set(t, (racesByTeam.get(t) ?? 0) + 1);
+          const arr = weightsByTeam.get(t) ?? [];
+          arr.push(w);
+          weightsByTeam.set(t, arr);
         }
         for (const [t, n] of agg.lapsByTeam.entries()) {
           lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
@@ -401,10 +444,22 @@ export async function computeCarProfiles(
   for (const team of teams) {
     const sampleRaces = racesByTeam.get(team) ?? 0;
     const sampleLaps = lapsByTeam.get(team) ?? 0;
-    // confidence thresholds (cautious; 2026 has few races and new regs).
+    // Kish effective sample size from the recency weights of the races
+    // this team actually contributed to: (Σ w)² / Σ(w²). Equals the count
+    // with uniform weights; decreases when a few races dominate.
+    const ws = weightsByTeam.get(team) ?? [];
+    let effective = 0;
+    if (ws.length > 0) {
+      const sumW = ws.reduce((s, x) => s + x, 0);
+      const sumW2 = ws.reduce((s, x) => s + x * x, 0);
+      effective = sumW2 > 0 ? (sumW * sumW) / sumW2 : 0;
+    }
+    // Confidence thresholds (cautious; 2026 has few races and new regs).
+    // Driven by the EFFECTIVE sample so that including many low-weight old
+    // races does NOT inflate confidence.
     let confidence: CarProfile["confidence"];
-    if (sampleRaces < 2 || sampleLaps < 20) confidence = "low";
-    else if (sampleRaces < 4 || sampleLaps < 60) confidence = "medium";
+    if (effective < 2 || sampleLaps < 20) confidence = "low";
+    else if (effective < 6 || sampleLaps < 60) confidence = "medium";
     else confidence = "high";
 
     profiles.push({
@@ -416,6 +471,7 @@ export async function computeCarProfiles(
         s3: normS3.get(team) ?? 0,
       },
       sample_races: sampleRaces,
+      effective_sample_races: effective,
       sample_laps: sampleLaps,
       confidence,
     });

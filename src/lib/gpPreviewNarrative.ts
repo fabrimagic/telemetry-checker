@@ -249,6 +249,32 @@ function appendDataContextParagraph(
   const total = dataContext.totalPastRaces;
   if (typeof considered !== "number" || typeof withData !== "number") return;
 
+  // Detect the new "include all races, decay weights" mode: when considered
+  // equals the total number of past races, no hard cutoff was applied.
+  const consideringAll =
+    typeof total === "number" && total > 0 && considered >= total;
+
+  if (consideringAll) {
+    if (withData >= considered) {
+      sentences.push(
+        `Nel 2026 si sono finora disputate ${total} gare; l'analisi le considera tutte, dando un peso maggiore alle più recenti per riflettere gli aggiornamenti tecnici delle vetture. Tutte le gare hanno fornito dati utilizzabili.`,
+      );
+      return;
+    }
+    sentences.push(
+      `Nel 2026 si sono finora disputate ${total} gare; l'analisi le considera tutte, con peso maggiore alle più recenti per riflettere gli aggiornamenti tecnici delle vetture.`,
+    );
+    sentences.push(
+      `Di queste ${considered}, solo ${withData} hanno fornito dati telemetrici completi (velocità ai rilevamenti e tempi di settore validi).`,
+    );
+    appendExclusionDetail(sentences, dataContext.diagnostics ?? []);
+    sentences.push(
+      "Meno gare con dati utilizzabili — soprattutto se mancano fra le più recenti, che pesano di più — significa che il campione effettivo (a peso pieno) resta limitato: è questo il motivo della confidenza più cauta. Quando i dati delle gare mancanti saranno disponibili, vale la pena rileggere l'analisi.",
+    );
+    return;
+  }
+
+  // Backward-compat branch: explicit lastNRaces cap was used.
   if (withData >= considered) {
     if (typeof total === "number" && total > 0) {
       sentences.push(
@@ -262,15 +288,6 @@ function appendDataContextParagraph(
     return;
   }
 
-  // racesWithData < racesConsidered → extended explanation.
-  const diagnostics = dataContext.diagnostics ?? [];
-  const excluded = diagnostics.filter((d) => d.status !== "used");
-  const noData = excluded.filter((d) => d.status === "no_data").map((d) => d.name);
-  const fetchFailed = excluded
-    .filter((d) => d.status === "fetch_failed")
-    .map((d) => d.name);
-
-  // Frase 1: contesto generale.
   if (typeof total === "number" && total > 0) {
     sentences.push(
       `Nel 2026 si sono finora disputate ${total} gare; per restare aderente all'evoluzione recente delle vetture, l'analisi considera solo le ultime ${considered}.`,
@@ -280,13 +297,25 @@ function appendDataContextParagraph(
       `Per restare aderente all'evoluzione recente delle vetture, l'analisi considera solo le ultime ${considered} gare.`,
     );
   }
-
-  // Frase 2: di queste, quante con dati utili.
   sentences.push(
     `Di queste ${considered}, solo ${withData} hanno fornito dati telemetrici completi (velocità ai rilevamenti e tempi di settore validi).`,
   );
+  appendExclusionDetail(sentences, dataContext.diagnostics ?? []);
+  sentences.push(
+    "Meno gare con dati utilizzabili significa stime più incerte: è questo il motivo della confidenza ridotta. Quando i dati delle gare mancanti saranno disponibili, vale la pena rileggere l'analisi.",
+  );
+}
 
-  // Frase 3: perché le altre sono state escluse, nominandole.
+function appendExclusionDetail(
+  sentences: string[],
+  diagnostics: RaceDiagnosticLite[],
+): void {
+  const excluded = diagnostics.filter((d) => d.status !== "used");
+  const noData = excluded.filter((d) => d.status === "no_data").map((d) => d.name);
+  const fetchFailed = excluded
+    .filter((d) => d.status === "fetch_failed")
+    .map((d) => d.name);
+
   const reasonParts: string[] = [];
   if (noData.length > 0) {
     const list = joinNames(noData);
@@ -303,9 +332,4 @@ function appendDataContextParagraph(
   if (reasonParts.length > 0) {
     sentences.push(reasonParts.join("; ") + ".");
   }
-
-  // Frase 4: cosa significa per l'affidabilità.
-  sentences.push(
-    "Meno gare con dati utilizzabili significa stime più incerte: è questo il motivo della confidenza ridotta. Quando i dati delle gare mancanti saranno disponibili, vale la pena rileggere l'analisi.",
-  );
 }
