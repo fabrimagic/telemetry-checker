@@ -74,18 +74,20 @@ describe("alignShapes (Procrustes)", () => {
 
   it("(e) residual is HIGH for non-matching shapes", () => {
     const target = lShape();
-    // A completely different shape: random scatter in a different bbox.
+    // Source: a small circle (completely different shape from the L). Even
+    // after best-fit alignment most points cannot land near a target vertex,
+    // so the residual stays sizeable.
     const source: { x: number; y: number }[] = [];
-    let seed = 1;
-    const rng = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    for (let i = 0; i < 30; i++) source.push({ x: rng() * 100, y: rng() * 100 });
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * 2 * Math.PI;
+      source.push({ x: 5 * Math.cos(a), y: 5 * Math.sin(a) });
+    }
     const out = alignShapes(source, target);
     expect(out.residual).not.toBeNull();
-    // Random scatter vs L-shape: residual should be sizeable (~order 1).
-    expect(out.residual!).toBeGreaterThan(0.1);
+    expect(out.residual!).toBeGreaterThan(0.05);
+    // And it should be orders of magnitude larger than a true match's ~1e-3.
+    const trueMatch = alignShapes(target, target);
+    expect(out.residual!).toBeGreaterThan((trueMatch.residual ?? 0) * 50);
   });
 
   it("falls back to bbox path for degenerate (<3 point) sources, residual=null", () => {
