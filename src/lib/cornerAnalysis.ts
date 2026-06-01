@@ -702,7 +702,7 @@ export async function analyzeCornersForSession(
 
   if (!outline || outline.length < MIN_CORNER_POINTS + 2) {
     notes.push("no_circuit_layout_available");
-    return { gpName, sessionKey, segments: [], per_driver: [], notes, aborted: false };
+    return { gpName, sessionKey, segments: [], per_driver: [], notes, aborted: false, alignment_error: null };
   }
 
   const segments = classifyCircuitCorners(outline);
@@ -737,6 +737,7 @@ export async function analyzeCornersForSession(
         sample_counts: { slow: 0, medium: 0, fast: 0, straight: 0 },
         coverage: 0,
         corner_coverage: null,
+        alignment_error: null,
         partial: true,
         notes: ["fetch_error"],
       });
@@ -745,7 +746,17 @@ export async function analyzeCornersForSession(
     opts.onProgress?.(done, driverNumbers.length);
   }
 
-  return { gpName, sessionKey, segments, per_driver: perDriver, notes, aborted };
+  // Aggregated diagnostic: mean alignment_error across drivers that
+  // produced one. `null` when nobody did (no GPS data, all bbox-fallback,
+  // or all errors).
+  const errs = perDriver
+    .map((d) => d.alignment_error)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const alignment_error = errs.length > 0
+    ? errs.reduce((s, x) => s + x, 0) / errs.length
+    : null;
+
+  return { gpName, sessionKey, segments, per_driver: perDriver, notes, aborted, alignment_error };
 }
 
 // ---------------------------------------------------------------------------
