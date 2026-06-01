@@ -106,6 +106,7 @@ export function DrivingAnalysis({ drivers, raceAverageContext, onAvgChange }: Pr
         },
       );
       setAvg(result);
+      onAvgChange?.(result);
     } finally {
       setRunning(false);
       abortRef.current = null;
