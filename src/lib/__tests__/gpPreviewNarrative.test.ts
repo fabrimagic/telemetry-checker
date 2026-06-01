@@ -227,6 +227,7 @@ describe("buildGpPreviewNarrative — extended data-context paragraph (Part B)",
     expect(all).toMatch(/Monaco/);
     expect(all).toMatch(/campione effettivo/i);
   });
+});
 
 describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", () => {
   it("includes the didactic score sentence and the uncertainty-band explanation", () => {
