@@ -6,7 +6,7 @@ vi.mock("../openf1", () => ({
   getDrivers: vi.fn(),
 }));
 
-import { computeCarProfiles } from "../carProfiles";
+import { computeCarProfiles, RECENCY_HALFLIFE_RACES } from "../carProfiles";
 import {
   getRaceSessionsByYear,
   getAllLaps,
