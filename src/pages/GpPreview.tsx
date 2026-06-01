@@ -162,10 +162,23 @@ export function GpPredictionResultView({
               Confidenza complessiva: {confidenceLabelIt(prediction.global_confidence)}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground pt-1">
-            Punteggio 0..1 con banda di incertezza. I team nello stesso gruppo sono
-            <span className="font-medium"> sostanzialmente equivalenti</span> dato il margine d'errore.
-          </p>
+          <div className="text-xs text-muted-foreground pt-1 space-y-2 leading-relaxed">
+            <p>
+              Il punteggio va da 0 a 1 ed è una <span className="font-medium">stima</span>,
+              non una misura esatta: per questo accanto a ogni numero compare un piccolo
+              margine (ad esempio &ldquo;0,72 ± 0,05&rdquo;), che rappresenta quanto la stima
+              potrebbe variare avendo a disposizione più dati.
+            </p>
+            <p>
+              Quando i margini di due team si sovrappongono, la loro differenza è troppo
+              piccola per essere considerata affidabile — un po&apos; come due pesi così
+              vicini che la bilancia non riesce a distinguerli con sicurezza. In quei
+              casi è più corretto considerarli <span className="font-medium">alla pari</span>{" "}
+              invece di metterli in ordine: è ciò che segnala il badge
+              &ldquo;Equivalenti entro l&apos;incertezza&rdquo; qui sotto.
+            </p>
+          </div>
+
         </CardHeader>
         <CardContent className="space-y-3">
           {ranked.length === 0 ? (
