@@ -85,6 +85,16 @@ export interface PerDriverCornerSpeeds {
    * than the whole track. `null` when there are no corner vertices.
    */
   corner_coverage: number | null;
+  /**
+   * Diagnostic-only: residual error of the Procrustes shape alignment
+   * (RMS distance between transformed GPS samples and their nearest
+   * outline vertex, normalised by the outline's RMS spread). Lower is
+   * better; values ≪ 1 mean the alignment locked correctly. `null` when
+   * not computable (degenerate inputs / bbox fallback). Does NOT affect
+   * the gate or score; surfaced so the UI can show whether the shape
+   * alignment succeeded.
+   */
+  alignment_error: number | null;
   /** True when /location or /car_data returned empty or fetch failed. */
   partial: boolean;
   notes: string[];
@@ -97,6 +107,12 @@ export interface SessionCornerAnalysis {
   per_driver: PerDriverCornerSpeeds[];
   notes: string[];
   aborted: boolean;
+  /**
+   * Diagnostic-only: mean alignment_error across drivers (drivers with
+   * null excluded). `null` when no driver produced a measurable
+   * alignment.
+   */
+  alignment_error: number | null;
 }
 
 // ---------------------------------------------------------------------------
