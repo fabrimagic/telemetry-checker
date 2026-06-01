@@ -630,7 +630,7 @@ export function computeVirtualRaceEngineer(
   // ── 2. Simulate strategies ──
 
   // Build a simple lap time predictor per compound (race data first)
-  const compoundModels = new Map<string, { slope: number; intercept: number; source: string }>();
+  const compoundModels = new Map<string, { slope: number; intercept: number; source: string; slopeStdError: number | null }>();
   const compoundCandidateBest = new Map<string, CompoundModelCandidate>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
@@ -644,7 +644,17 @@ export function computeVirtualRaceEngineer(
     };
     const existing = compoundCandidateBest.get(sa.compound);
     if (!existing || isBetterCompoundModel(candidate, existing)) {
-      compoundModels.set(sa.compound, { ...model, source: "race" });
+      // Resolve slopeStdError from the underlying DegradationResult, preferring
+      // the corrected stage-B std error when available (matches the convention
+      // used by degradationValidation.ts for t-stat computation).
+      const orig = dv.original as DegradationResult & { slope_corrected_std_error?: number | null };
+      const corrSe = orig.slope_corrected_std_error;
+      const rawSe = orig.slopeStdError;
+      const resolvedSe =
+        (corrSe != null && Number.isFinite(corrSe) && corrSe > 0) ? corrSe :
+        (rawSe != null && Number.isFinite(rawSe) && rawSe > 0) ? rawSe :
+        null;
+      compoundModels.set(sa.compound, { ...model, source: "race", slopeStdError: resolvedSe });
       compoundCandidateBest.set(sa.compound, candidate);
     }
   }
@@ -666,10 +676,15 @@ export function computeVirtualRaceEngineer(
         slope: pm.slope,
         intercept: pm.intercept + paceOffset,
         source: pm.source,
+        // Practice models do not currently expose a slope std error → null.
+        // Uncertainty propagation falls back to the systematic
+        // TRACK_EVOLUTION_SLOPE_UNCERTAINTY term only.
+        slopeStdError: null,
       });
       practiceCompoundsUsed.push(pm.compound);
     }
   }
+
 
   // F1 regulation: at least 2 different compounds must be used during a dry race
   function hasMinTwoCompounds(compounds: string[]): boolean {
