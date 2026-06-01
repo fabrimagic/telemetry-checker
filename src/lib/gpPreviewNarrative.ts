@@ -337,6 +337,19 @@ function appendExclusionDetail(
   if (reasonParts.length > 0) {
     sentences.push(reasonParts.join("; ") + ".");
   }
+
+  // Qualifying-source caveat: among the USED GPs, count those for which
+  // the standard Qualifying session was not available. In those GPs the
+  // top-speed signal comes from race trim only, which is depressed by
+  // engine/fuel/ERS management → flag it for honesty.
+  const usedDiags = diagnostics.filter((d) => d.status === "used");
+  const missingQuali = usedDiags.filter((d) => d.sources && d.sources.quali === false);
+  if (usedDiags.length > 0 && missingQuali.length > 0) {
+    const names = missingQuali.map((d) => d.name);
+    sentences.push(
+      `Inoltre, per ${missingQuali.length === 1 ? "la gara" : `${missingQuali.length} gare`} (${joinNames(names)}) non era disponibile la sessione di qualifica: per ${missingQuali.length === 1 ? "quella" : "quelle"} il dato di velocità di punta arriva solo dal passo gara, che è meno indicativo del vero potenziale del motore.`,
+    );
+  }
 }
 
 // =====================================================================
