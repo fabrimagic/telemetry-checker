@@ -1045,6 +1045,7 @@ export default function Index() {
                         cursorTime={cursorTime}
                         onCursorChange={setCursorTime}
                         onCursorClick={setClickedTime}
+                        lapSoftSensor={selectedLapSoftSensor}
                       />
                     </section>
                     <aside className="space-y-4 min-w-0">
