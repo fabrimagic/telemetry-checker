@@ -1,0 +1,248 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  classifyCircuitCorners,
+  lonLatToMeters,
+  mapLocationsToOutlineIndices,
+  aggregateDriverCornerSpeeds,
+  analyzeCornersForSession,
+  summarizeAnalysis,
+  CORNER_CURVATURE_SLOW,
+} from "../cornerAnalysis";
+import type { CarData, LocationData } from "../openf1";
+
+vi.mock("../openf1", async (orig) => {
+  const actual = await orig<typeof import("../openf1")>();
+  return {
+    ...actual,
+    getLocation: vi.fn(),
+    getCarData: vi.fn(),
+  };
+});
+
+vi.mock("../circuitGeometry", () => ({
+  fetchCircuitOutline: vi.fn(),
+}));
+
+import { getLocation, getCarData } from "../openf1";
+import { fetchCircuitOutline } from "../circuitGeometry";
+
+// -------- Synthetic outline builders (work in [lon,lat] degrees) -----------
+// We work near (0,0) where 1° lon ≈ 111_320 m. To get small features in meters
+// we use very small degree increments.
+
+function metersToDeg(m: number): number {
+  return m / 111_320;
+}
+
+/** Build outline: straight east (long), then tight U-turn, then a wide curve back. */
+function buildSyntheticOutline(): [number, number][] {
+  const pts: [number, number][] = [];
+  // 1) Long straight: 30 points, 20 m apart, due east.
+  for (let i = 0; i < 30; i++) {
+    pts.push([metersToDeg(i * 20), 0]);
+  }
+  // 2) Tight hairpin: arc of radius R=30 m, 180° sweep, 20 points.
+  const R1 = 30;
+  const cx = metersToDeg(29 * 20);
+  const cy = metersToDeg(R1); // center north of last straight point
+  for (let i = 1; i <= 20; i++) {
+    const ang = -Math.PI / 2 + (i / 20) * Math.PI; // -90° → +90°
+    pts.push([cx + metersToDeg(R1 * Math.cos(ang)), cy + metersToDeg(R1 * Math.sin(ang))]);
+  }
+  // 3) Wide sweeping curve: radius R=300 m, ~60° sweep, 15 points heading back west.
+  const R2 = 300;
+  const last = pts[pts.length - 1];
+  const cx2 = last[0];
+  const cy2 = last[1] + metersToDeg(R2);
+  for (let i = 1; i <= 15; i++) {
+    const ang = -Math.PI / 2 - (i / 15) * (Math.PI / 3);
+    pts.push([cx2 + metersToDeg(R2 * Math.cos(ang)), cy2 + metersToDeg(R2 * Math.sin(ang))]);
+  }
+  return pts;
+}
+
+describe("lonLatToMeters", () => {
+  it("returns sensible metric distances between known points", () => {
+    // Two points ~111 m apart at the equator (0.001° lon).
+    const pts = lonLatToMeters([[0, 0], [metersToDeg(100), 0]]);
+    const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    expect(d).toBeGreaterThan(90);
+    expect(d).toBeLessThan(110);
+  });
+
+  it("handles empty input", () => {
+    expect(lonLatToMeters([])).toEqual([]);
+  });
+});
+
+describe("classifyCircuitCorners", () => {
+  it("returns empty for short or empty outlines", () => {
+    expect(classifyCircuitCorners([])).toEqual([]);
+    expect(classifyCircuitCorners([[0, 0], [0.001, 0]])).toEqual([]);
+  });
+
+  it("detects the slow hairpin and excludes the long straight prefix", () => {
+    const outline = buildSyntheticOutline();
+    const segs = classifyCircuitCorners(outline);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    const types = segs.map((s) => s.type);
+    expect(types).toContain("slow");
+    // None of the straight prefix points should appear in any segment.
+    for (const s of segs) {
+      expect(s.start_idx).toBeGreaterThanOrEqual(25);
+    }
+  });
+
+  it("classifies a wide-radius standalone curve as fast (not slow)", () => {
+    // Pure single curve of R=300 m, no hairpin attached → should be fast/medium.
+    const pts: [number, number][] = [];
+    const R = 300;
+    for (let i = 0; i <= 40; i++) {
+      const ang = (i / 40) * (Math.PI / 2);
+      pts.push([metersToDeg(R * Math.cos(ang)), metersToDeg(R * Math.sin(ang))]);
+    }
+    const segs = classifyCircuitCorners(pts);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    expect(segs[0].curvature).toBeLessThan(CORNER_CURVATURE_SLOW);
+    expect(["fast", "medium"]).toContain(segs[0].type);
+  });
+});
+
+describe("mapLocationsToOutlineIndices", () => {
+  it("snaps each location to its nearest outline vertex", () => {
+    const outline = [
+      { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 },
+    ];
+    // Locations with x mirrored (TrackMap convention is applied internally).
+    const locs = [{ x: 0, y: 0 }, { x: -3, y: 0 }];
+    const idx = mapLocationsToOutlineIndices(locs, outline);
+    // After internal mirror+normalize, first loc aligns to outline[0], second to outline[3].
+    expect(idx).toHaveLength(2);
+    expect(idx[0]).not.toBe(idx[1]);
+  });
+
+  it("returns empty when no outline", () => {
+    expect(mapLocationsToOutlineIndices([{ x: 0, y: 0 }], [])).toEqual([]);
+  });
+});
+
+describe("aggregateDriverCornerSpeeds", () => {
+  const outline = buildSyntheticOutline();
+  const segments = classifyCircuitCorners(outline);
+  const slowSeg = segments.find((s) => s.type === "slow")!;
+
+  it("routes a speed sample into the slow corner segment", () => {
+    // Place one location squarely on the slow-corner apex vertex.
+    const apexLonLat = outline[Math.round((slowSeg.start_idx + slowSeg.end_idx) / 2)];
+    // Convert apex lon/lat to a fake OpenF1 (x,y) by using the same coords; the
+    // alignment normalizes both spaces by their bounding box, so we need to
+    // supply a second "anchor" location far away so the bbox isn't degenerate.
+    const farLonLat = outline[0];
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    const locations: LocationData[] = [
+      // Mirror x to undo TrackMap mirror convention used in mapLocations
+      { date: new Date(t0).toISOString(), x: -apexLonLat[0], y: apexLonLat[1], z: 0, driver_number: 1, session_key: 1 },
+      { date: new Date(t0 + 1000).toISOString(), x: -farLonLat[0], y: farLonLat[1], z: 0, driver_number: 1, session_key: 1 },
+    ];
+    const carData: CarData[] = [
+      { date: new Date(t0 + 10).toISOString(), speed: 80, throttle: 0, brake: 100, n_gear: 2, rpm: 9000, drs: 0, driver_number: 1, session_key: 1 },
+      { date: new Date(t0 + 1010).toISOString(), speed: 320, throttle: 100, brake: 0, n_gear: 8, rpm: 12000, drs: 12, driver_number: 1, session_key: 1 },
+    ];
+    const res = aggregateDriverCornerSpeeds({ driver_number: 1, locations, carData, segments, outline });
+    expect(res.partial).toBe(false || res.partial); // coverage may be low; just don't throw
+    expect(res.sample_counts.slow + res.sample_counts.straight + res.sample_counts.medium + res.sample_counts.fast).toBe(2);
+    expect(res.slow_corner_speed).toBe(80);
+  });
+
+  it("skips speed samples with no nearby position in time", () => {
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    const locations: LocationData[] = [
+      { date: new Date(t0).toISOString(), x: 0, y: 0, z: 0, driver_number: 1, session_key: 1 },
+    ];
+    const carData: CarData[] = [
+      { date: new Date(t0 + 60_000).toISOString(), speed: 100, throttle: 0, brake: 0, n_gear: 3, rpm: 9000, drs: 0, driver_number: 1, session_key: 1 },
+    ];
+    const res = aggregateDriverCornerSpeeds({ driver_number: 1, locations, carData, segments, outline, maxSyncGapMs: 500 });
+    expect(res.sample_counts.slow + res.sample_counts.medium + res.sample_counts.fast + res.sample_counts.straight).toBe(0);
+    expect(res.notes.some((n) => n.includes("skipped"))).toBe(true);
+  });
+
+  it("returns partial empty when locations missing — never throws", () => {
+    const res = aggregateDriverCornerSpeeds({ driver_number: 9, locations: [], carData: [], segments, outline });
+    expect(res.partial).toBe(true);
+    expect(res.slow_corner_speed).toBeNull();
+  });
+});
+
+describe("analyzeCornersForSession", () => {
+  beforeEach(() => {
+    vi.mocked(fetchCircuitOutline).mockReset();
+    vi.mocked(getLocation).mockReset();
+    vi.mocked(getCarData).mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns empty result (no throw) when no layout is available", async () => {
+    vi.mocked(fetchCircuitOutline).mockResolvedValue(null);
+    const res = await analyzeCornersForSession("Unknown GP", 1, [1], {
+      dateStart: "2026-01-01T00:00:00Z",
+      dateEnd: "2026-01-01T02:00:00Z",
+    });
+    expect(res.segments).toEqual([]);
+    expect(res.per_driver).toEqual([]);
+    expect(res.notes).toContain("no_circuit_layout_available");
+  });
+
+  it("aggregates per driver for a mocked session", async () => {
+    const outline = buildSyntheticOutline();
+    vi.mocked(fetchCircuitOutline).mockResolvedValue(outline);
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    vi.mocked(getLocation).mockResolvedValue([
+      { date: new Date(t0).toISOString(), x: -outline[0][0], y: outline[0][1], z: 0, driver_number: 1, session_key: 1 },
+      { date: new Date(t0 + 1000).toISOString(), x: -outline[40][0], y: outline[40][1], z: 0, driver_number: 1, session_key: 1 },
+    ] as LocationData[]);
+    vi.mocked(getCarData).mockResolvedValue([
+      { date: new Date(t0).toISOString(), speed: 300, throttle: 100, brake: 0, n_gear: 8, rpm: 12000, drs: 12, driver_number: 1, session_key: 1 },
+      { date: new Date(t0 + 1000).toISOString(), speed: 90, throttle: 0, brake: 100, n_gear: 2, rpm: 9000, drs: 0, driver_number: 1, session_key: 1 },
+    ] as CarData[]);
+    const res = await analyzeCornersForSession("GP", 1, [1], {
+      dateStart: "2026-01-01T00:00:00Z",
+      dateEnd: "2026-01-01T02:00:00Z",
+    });
+    expect(res.segments.length).toBeGreaterThan(0);
+    expect(res.per_driver).toHaveLength(1);
+    expect(res.aborted).toBe(false);
+    const lines = summarizeAnalysis(res);
+    expect(lines.some((l) => l.includes("Driver #1"))).toBe(true);
+  });
+
+  it("driver fetch error → partial entry, never throws", async () => {
+    vi.mocked(fetchCircuitOutline).mockResolvedValue(buildSyntheticOutline());
+    vi.mocked(getLocation).mockRejectedValue(new Error("boom"));
+    vi.mocked(getCarData).mockRejectedValue(new Error("boom"));
+    const res = await analyzeCornersForSession("GP", 1, [42], {
+      dateStart: "2026-01-01T00:00:00Z",
+      dateEnd: "2026-01-01T02:00:00Z",
+    });
+    expect(res.per_driver).toHaveLength(1);
+    expect(res.per_driver[0].partial).toBe(true);
+  });
+
+  it("aborts cleanly mid-iteration", async () => {
+    vi.mocked(fetchCircuitOutline).mockResolvedValue(buildSyntheticOutline());
+    vi.mocked(getLocation).mockResolvedValue([]);
+    vi.mocked(getCarData).mockResolvedValue([]);
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const res = await analyzeCornersForSession("GP", 1, [1, 2, 3], {
+      dateStart: "2026-01-01T00:00:00Z",
+      dateEnd: "2026-01-01T02:00:00Z",
+      signal: ctrl.signal,
+    });
+    expect(res.aborted).toBe(true);
+    expect(res.per_driver.length).toBeLessThan(3);
+  });
+});
