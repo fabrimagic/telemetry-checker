@@ -506,6 +506,9 @@ export async function computeCarProfiles(
   };
   const accCoverageSum = new Map<string, number>();
   const accCoverageW = new Map<string, number>();
+  // Diagnostic-only: corner-vertices coverage (slow/medium/fast only).
+  const accCornerCovSum = new Map<string, number>();
+  const accCornerCovW = new Map<string, number>();
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
   // For each team, collect the weights of the races it contributed to —
