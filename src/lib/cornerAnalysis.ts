@@ -664,6 +664,7 @@ export function aggregateDriverCornerSpeeds(params: {
     sample_counts: counts,
     coverage,
     corner_coverage,
+    alignment_error,
     partial: coverage < 0.5 || counts.slow + counts.medium + counts.fast === 0,
     notes,
   };
