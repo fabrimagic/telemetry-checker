@@ -263,6 +263,76 @@ describe("gpPrediction", () => {
     // wTop=0, wCorner=1, cornerIdx=1 → score=1.
     expect(out.ranked[0].affinity_score).toBeCloseTo(1, 5);
   });
+
+  // ---- Diagnostic coverage propagation (does NOT affect score) ----
+  it("propagates corner_coverage and corner_coverage_status in the geometric branch", () => {
+    const c = circuit();
+    const geomCar: CarProfile = {
+      ...car("G", 0.5, [0.5, 0.5, 0.5], "high"),
+      corner_type_strength: { slow: 0.5, medium: 0.5, fast: 0.5 },
+      corner_data_coverage: 0.73,
+      corner_source: "location_geometry",
+      corner_coverage_status: "ok",
+    };
+    const out = predictGpAffinity(c, [geomCar]);
+    expect(out.ranked[0].corner_source).toBe("location_geometry");
+    expect(out.ranked[0].corner_coverage).toBeCloseTo(0.73, 5);
+    expect(out.ranked[0].corner_coverage_status).toBe("ok");
+  });
+
+  it("propagates measured coverage EVEN in sector_fallback (diagnostic)", () => {
+    const c = circuit();
+    const fallbackCar: CarProfile = {
+      ...car("F", 0.5, [0.5, 0.5, 0.5], "high"),
+      corner_type_strength: null,
+      corner_data_coverage: 0.23,
+      corner_source: "sector_fallback",
+      corner_coverage_status: "below_threshold",
+    };
+    const out = predictGpAffinity(c, [fallbackCar]);
+    expect(out.ranked[0].corner_source).toBe("sector_fallback");
+    expect(out.ranked[0].corner_coverage).toBeCloseTo(0.23, 5);
+    expect(out.ranked[0].corner_coverage_status).toBe("below_threshold");
+  });
+
+  it("propagates null coverage with not_available when not measurable", () => {
+    const c = circuit();
+    const noCovCar: CarProfile = {
+      ...car("N", 0.5, [0.5, 0.5, 0.5], "high"),
+      corner_data_coverage: null,
+      corner_coverage_status: "not_available",
+    };
+    const out = predictGpAffinity(c, [noCovCar]);
+    expect(out.ranked[0].corner_coverage).toBeNull();
+    expect(out.ranked[0].corner_coverage_status).toBe("not_available");
+  });
+
+  it("affinity_score is invariant w.r.t. coverage / status (diagnostic-only fields)", () => {
+    const c = circuit({
+      top_speed: 0.4,
+      slow_corner_traction: 0.6,
+      medium_corner: 0.6,
+      fast_corner: 0.6,
+    });
+    const baseCar: CarProfile = car("X", 0.7, [0.5, 0.5, 0.5], "high");
+    const withLowCov: CarProfile = {
+      ...baseCar,
+      corner_data_coverage: 0.05,
+      corner_source: "sector_fallback",
+      corner_coverage_status: "below_threshold",
+    };
+    const withNullCov: CarProfile = {
+      ...baseCar,
+      corner_data_coverage: null,
+      corner_coverage_status: "not_available",
+    };
+    const a = predictGpAffinity(c, [baseCar]).ranked[0].affinity_score;
+    const b = predictGpAffinity(c, [withLowCov]).ranked[0].affinity_score;
+    const d = predictGpAffinity(c, [withNullCov]).ranked[0].affinity_score;
+    expect(b).toBeCloseTo(a, 10);
+    expect(d).toBeCloseTo(a, 10);
+  });
 });
+
 
 
