@@ -1065,6 +1065,7 @@ export default function Index() {
                         return <DrivingAnalysis drivers={analysisDrivers} />;
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
+                      {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
                       {(() => {
                         const driversForMiniSectors = [...driverStates.values()]
                           .filter((s) => s.selectedLap != null)
