@@ -56,8 +56,8 @@ export interface RaceAverageContext {
 interface Props {
   drivers: DriverAnalysis[];
   raceAverageContext?: RaceAverageContext | null;
-  /** Single-driver cumulative deviation series (lap-by-lap). Optional. */
-  driverCumulativeDeviation?: LapDeviation[] | null;
+  /** Called when the race-average comparison result changes (including reset to null). */
+  onAvgChange?: (avg: RaceDrivingAverages | null) => void;
 }
 
 export function DrivingAnalysis({ drivers, raceAverageContext, driverCumulativeDeviation }: Props) {
