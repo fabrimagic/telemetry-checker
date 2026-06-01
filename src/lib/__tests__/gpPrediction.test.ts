@@ -32,6 +32,7 @@ function car(
     top_speed_index: top,
     sector_strength: { s1: sectors[0], s2: sectors[1], s3: sectors[2] },
     sample_races: 4,
+    effective_sample_races: 4,
     sample_laps: 200,
     confidence,
   };
