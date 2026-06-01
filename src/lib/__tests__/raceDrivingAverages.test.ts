@@ -104,7 +104,7 @@ describe("computeRaceDrivingAverages", () => {
   it("skips failed lap downloads and flags low_sample when <3 succeed", async () => {
     const laps: Lap[] = [makeLap(1), makeLap(2), makeLap(3)];
     let call = 0;
-    const fetcher: typeof getCarDataMock = async (_s, _d, start) => {
+    const fetcher: getCarDataMock = async (_s, _d, start) => {
       call++;
       if (call === 2) throw new Error("boom");
       return syntheticLapData(start);
@@ -120,7 +120,7 @@ describe("computeRaceDrivingAverages", () => {
     const laps: Lap[] = Array.from({ length: 6 }, (_, i) => makeLap(i + 1));
     const ctrl = new AbortController();
     let calls = 0;
-    const fetcher: typeof getCarDataMock = async (_s, _d, start) => {
+    const fetcher: getCarDataMock = async (_s, _d, start) => {
       calls++;
       if (calls === 2) ctrl.abort();
       return syntheticLapData(start);
