@@ -90,7 +90,8 @@ export function DrivingAnalysis({ drivers, raceAverageContext, onAvgChange }: Pr
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setRunning(true);
-    setAvg(null);
+      setAvg(null);
+      onAvgChange?.(null);
     setProgress({ done: 0, total: 0 });
     try {
       const result = await computeRaceDrivingAverages(
