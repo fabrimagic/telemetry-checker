@@ -468,6 +468,19 @@ export async function computeCarProfiles(
     s2: new Map<string, number>(),
     s3: new Map<string, number>(),
   };
+  // Per-corner-type accumulators (location_geometry dimension, optional).
+  const accCornerSum = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
+  const accCornerW = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
+  const accCoverageSum = new Map<string, number>();
+  const accCoverageW = new Map<string, number>();
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
   // For each team, collect the weights of the races it contributed to —
