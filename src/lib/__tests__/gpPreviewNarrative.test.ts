@@ -287,9 +287,7 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
 
 
 describe("buildPerTeamExplanations — accessible per-team prose", () => {
-  // Re-import lazily to keep prior describe scopes unaffected.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { buildPerTeamExplanations } = require("../gpPreviewNarrative");
+
 
   function c(over: Partial<CircuitProfile> = {}): CircuitProfile {
     return {
