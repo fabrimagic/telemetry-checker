@@ -7,6 +7,7 @@ import {
   analyzeCornersForSession,
   summarizeAnalysis,
   CORNER_CURVATURE_SLOW,
+  CORNER_CURVATURE_STRAIGHT_MAX,
 } from "../cornerAnalysis";
 import type { CarData, LocationData } from "../openf1";
 
