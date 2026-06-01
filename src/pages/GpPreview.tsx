@@ -107,8 +107,31 @@ export function GpPredictionResultView({
     return m;
   }, [prediction.indistinguishable_groups]);
 
+  const narrative = useMemo(
+    () => buildGpPreviewNarrative(circuit, prediction),
+    [circuit, prediction],
+  );
+
   return (
     <div className="space-y-6">
+      {narrative.length > 0 && (
+        <Card data-testid="narrative-card" className="border-[hsl(var(--f1-red))]/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+              In sintesi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm leading-relaxed">
+            {narrative.map((s, i) => (
+              <p key={i} className="text-foreground/90">
+                {s}
+              </p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
