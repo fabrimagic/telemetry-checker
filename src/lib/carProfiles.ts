@@ -647,6 +647,7 @@ export async function computeCarProfiles(
               fast: new Map(),
             };
             const coverageByTeam = new Map<string, number>();
+            const cornerCoverageByTeam = new Map<string, number>();
             for (const pd of analysis.per_driver) {
               const team = driverToTeam.get(pd.driver_number);
               if (!team) continue;
@@ -654,6 +655,7 @@ export async function computeCarProfiles(
               if (pd.medium_corner_speed != null) rawByType.medium.set(team, pd.medium_corner_speed);
               if (pd.fast_corner_speed != null) rawByType.fast.set(team, pd.fast_corner_speed);
               coverageByTeam.set(team, pd.coverage);
+              if (pd.corner_coverage != null) cornerCoverageByTeam.set(team, pd.corner_coverage);
             }
             // Normalize per type within this GP (higher speed = stronger).
             const normSlow = normalizeHigherIsBetter(rawByType.slow);
@@ -675,6 +677,10 @@ export async function computeCarProfiles(
             for (const [team, cov] of coverageByTeam.entries()) {
               accCoverageSum.set(team, (accCoverageSum.get(team) ?? 0) + cov * w);
               accCoverageW.set(team, (accCoverageW.get(team) ?? 0) + w);
+            }
+            for (const [team, cov] of cornerCoverageByTeam.entries()) {
+              accCornerCovSum.set(team, (accCornerCovSum.get(team) ?? 0) + cov * w);
+              accCornerCovW.set(team, (accCornerCovW.get(team) ?? 0) + w);
             }
           }
         }
