@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildGpPreviewNarrative } from "../gpPreviewNarrative";
+import { buildGpPreviewNarrative, buildPerTeamExplanations } from "../gpPreviewNarrative";
 import { predictGpAffinity } from "../gpPrediction";
 import type { CircuitProfile } from "../circuitProfiles";
 import type { CarProfile } from "../carProfiles";
