@@ -141,8 +141,8 @@ describe("calculateCorrectedTyreDegradation — physical fuel path", () => {
     // (work-remaining decreases monotonically with > 15% relative range).
     const lapWorkEstimates = laps.map((l, i) => ({
       lap_number: l.lap_number,
-      // Per-lap "work" with strong variance — totalEstimatedWork - cumulative
-      estimated_work: 1000 + i * 5,
+      cumulative_work: 1000 + i * 400,
+      coverage: 1,
     }));
     const totalEstimatedWork = 10_000;
 
