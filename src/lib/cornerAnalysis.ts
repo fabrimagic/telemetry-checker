@@ -584,7 +584,9 @@ export function aggregateDriverCornerSpeeds(params: {
 
   // Pre-compute position→segment mapping for this driver's locations.
   const outlineM = lonLatToMeters(outline);
-  const locIdxToOutlineIdx = mapLocationsToOutlineIndices(locations, outlineM);
+  const mapping = mapLocationsToOutlineIndicesWithError(locations, outlineM);
+  const locIdxToOutlineIdx = mapping.indices;
+  const alignment_error = mapping.alignment_error;
   const idxToSeg = buildIndexToSegmentMap(outline.length, segments);
 
   // Coverage: unique outline vertices touched.
