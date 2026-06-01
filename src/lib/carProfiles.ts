@@ -30,6 +30,7 @@
 import {
   getAllLaps,
   getDrivers,
+  getQualifyingSessionsByYear,
   getRaceSessionsByYear,
   type Driver,
   type Lap,
@@ -38,7 +39,14 @@ import {
 
 export interface CarProfile {
   team_name: string;
-  top_speed_index: number; // 0..1, 1 = best in field
+  /**
+   * 0..1, 1 = best in field. Represents primarily the QUALIFYING potential
+   * of the engine + low-fuel package (see TOP_SPEED_QUALI_WEIGHT below): in
+   * race conditions the trap speed is depressed by lift&coast, ERS
+   * management, fuel weight and conservative engine maps, so qualifying is
+   * a much cleaner proxy of raw straight-line capability.
+   */
+  top_speed_index: number;
   sector_strength: { s1: number; s2: number; s3: number }; // 0..1, 1 = best
   /** Number of races with usable data that contributed to this team. */
   sample_races: number;
@@ -61,6 +69,12 @@ export interface RaceDiagnostic {
   name: string;
   date_end: string;
   status: RaceDiagnosticStatus;
+  /**
+   * Which sessions were actually available and contributed to this GP's
+   * aggregation. Both can be true (ideal), or just one (fallback). Both
+   * false implies status !== "used".
+   */
+  sources?: { quali: boolean; race: boolean };
 }
 
 export interface ComputeCarProfilesResult {
@@ -108,6 +122,32 @@ export interface ComputeCarProfilesOptions {
  * upgrades make recent races more representative of the current cars.
  */
 export const RECENCY_HALFLIFE_RACES = 3;
+
+/**
+ * Weights for combining the two SOURCES (qualifying vs race) WITHIN the
+ * same GP. These are differentiated per-dimension because the two sessions
+ * carry different physical information:
+ *
+ *  - Top speed: in race trim st_speed is depressed by lift&coast, ERS
+ *    deployment strategy, fuel weight and conservative engine maps. In
+ *    qualifying everything is at its peak (party mode, ERS dumped, light
+ *    car, fresh tyres). Qualifying is therefore the much cleaner proxy of
+ *    raw straight-line capability and is given a dominant weight.
+ *
+ *  - Cornering (sector medians): in race the sustainable corner pace —
+ *    which factors in tyre management — is real, useful information, not
+ *    just noise. We therefore balance qualifying and race more evenly so
+ *    that long-run grip contributes to the cornering index too.
+ *
+ * NOTE: this within-GP combination is ORTHOGONAL to the across-GP recency
+ * weighting (RECENCY_HALFLIFE_RACES). Pipeline:
+ *   1. combine quali + race INSIDE the same GP → one normalized map per GP
+ *   2. combine GPs across each other with the recency decay above
+ */
+export const TOP_SPEED_QUALI_WEIGHT = 0.75;
+export const TOP_SPEED_RACE_WEIGHT = 0.25;
+export const CORNER_QUALI_WEIGHT = 0.5;
+export const CORNER_RACE_WEIGHT = 0.5;
 
 // ----- statistic helpers -----
 
@@ -260,6 +300,52 @@ function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
   };
 }
 
+/**
+ * Combine two per-session normalized maps (quali + race) into a single
+ * per-GP map using the provided weights. If a team is present in only
+ * one of the two sources, that source is used as-is for the team. Both
+ * sources missing → undefined.
+ */
+function combineMaps(
+  qMap: Map<string, number> | undefined,
+  rMap: Map<string, number> | undefined,
+  wQ: number,
+  wR: number,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const teams = new Set<string>([
+    ...(qMap ? qMap.keys() : []),
+    ...(rMap ? rMap.keys() : []),
+  ]);
+  for (const t of teams) {
+    const q = qMap?.get(t);
+    const r = rMap?.get(t);
+    if (q != null && r != null) out.set(t, (wQ * q + wR * r) / (wQ + wR));
+    else if (q != null) out.set(t, q);
+    else if (r != null) out.set(t, r);
+  }
+  return out;
+}
+
+function combineSessions(
+  quali: RaceTeamMetrics | null,
+  race: RaceTeamMetrics | null,
+): RaceTeamMetrics | null {
+  if (!quali && !race) return null;
+  const laps = new Map<string, number>();
+  for (const m of [quali?.lapsByTeam, race?.lapsByTeam]) {
+    if (!m) continue;
+    for (const [t, n] of m.entries()) laps.set(t, (laps.get(t) ?? 0) + n);
+  }
+  return {
+    topSpeed: combineMaps(quali?.topSpeed, race?.topSpeed, TOP_SPEED_QUALI_WEIGHT, TOP_SPEED_RACE_WEIGHT),
+    s1: combineMaps(quali?.s1, race?.s1, CORNER_QUALI_WEIGHT, CORNER_RACE_WEIGHT),
+    s2: combineMaps(quali?.s2, race?.s2, CORNER_QUALI_WEIGHT, CORNER_RACE_WEIGHT),
+    s3: combineMaps(quali?.s3, race?.s3, CORNER_QUALI_WEIGHT, CORNER_RACE_WEIGHT),
+    lapsByTeam: laps,
+  };
+}
+
 // ----- public API -----
 
 export async function computeCarProfiles(
@@ -280,6 +366,19 @@ export async function computeCarProfiles(
       races_considered: 0,
       total_past_races: 0,
     };
+  }
+
+  // Fetch standard Qualifying sessions (NOT Sprint Qualifying) and index by
+  // meeting_key. Failure is non-fatal: we just proceed without quali data
+  // for any race, falling back to race-only aggregation per GP.
+  let qualiByMeeting = new Map<number, SessionInfo>();
+  try {
+    const qSessions = await getQualifyingSessionsByYear(2026);
+    for (const q of qSessions ?? []) {
+      if (q?.meeting_key != null) qualiByMeeting.set(q.meeting_key, q);
+    }
+  } catch {
+    qualiByMeeting = new Map();
   }
 
   const past = sessions
@@ -342,6 +441,23 @@ export async function computeCarProfiles(
   let racesConsidered = 0;
   let done = 0;
 
+  // Helper that fetches one session's laps+drivers and returns the
+  // per-session normalized metrics. Returns:
+  //   { ok: true, metrics }            → session aggregated successfully
+  //   { ok: true, metrics: null }      → fetched but no usable data
+  //   { ok: false }                    → fetch failed
+  async function fetchSession(
+    sessionKey: number,
+  ): Promise<{ ok: true; metrics: RaceTeamMetrics | null } | { ok: false }> {
+    try {
+      const laps = await getAllLaps(sessionKey);
+      const drivers = await getDrivers(sessionKey);
+      return { ok: true, metrics: aggregateRace(laps, drivers) };
+    } catch {
+      return { ok: false };
+    }
+  }
+
   for (let i = 0; i < selected.length; i++) {
     if (signal?.aborted) {
       aborted = true;
@@ -351,54 +467,77 @@ export async function computeCarProfiles(
     const w = weights[i];
     racesConsidered++;
     let status: RaceDiagnosticStatus = "no_data";
-    try {
-      const [laps, drivers] = [
-        await getAllLaps(session.session_key),
-        await getDrivers(session.session_key),
-      ];
-      const agg = aggregateRace(laps, drivers);
-      if (agg) {
-        status = "used";
-        racesUsed.push(session);
+    let qualiAvailable = false;
+    let raceAvailable = false;
 
-        function add(
-          src: Map<string, number>,
-          sumMap: Map<string, number>,
-          wMap: Map<string, number>,
-        ) {
-          for (const [team, v] of src.entries()) {
-            sumMap.set(team, (sumMap.get(team) ?? 0) + v * w);
-            wMap.set(team, (wMap.get(team) ?? 0) + w);
-          }
-        }
-        add(agg.topSpeed, accSum.top, accW.top);
-        add(agg.s1, accSum.s1, accW.s1);
-        add(agg.s2, accSum.s2, accW.s2);
-        add(agg.s3, accSum.s3, accW.s3);
+    // Fetch race session.
+    const raceRes = await fetchSession(session.session_key);
+    let raceMetrics: RaceTeamMetrics | null = null;
+    let raceFetchFailed = false;
+    if (raceRes.ok) {
+      raceMetrics = raceRes.metrics;
+      raceAvailable = raceMetrics != null;
+    } else {
+      raceFetchFailed = true;
+    }
 
-        const teamsInRace = new Set<string>([
-          ...agg.topSpeed.keys(),
-          ...agg.s1.keys(),
-          ...agg.s2.keys(),
-          ...agg.s3.keys(),
-        ]);
-        for (const t of teamsInRace) {
-          racesByTeam.set(t, (racesByTeam.get(t) ?? 0) + 1);
-          const arr = weightsByTeam.get(t) ?? [];
-          arr.push(w);
-          weightsByTeam.set(t, arr);
-        }
-        for (const [t, n] of agg.lapsByTeam.entries()) {
-          lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
+    // Fetch matching Qualifying (same meeting_key), if any.
+    let qualiMetrics: RaceTeamMetrics | null = null;
+    const qualiSession = qualiByMeeting.get(session.meeting_key);
+    if (qualiSession) {
+      const qRes = await fetchSession(qualiSession.session_key);
+      if (qRes.ok) {
+        qualiMetrics = qRes.metrics;
+        qualiAvailable = qualiMetrics != null;
+      }
+      // qRes fetch failure is silently absorbed: quali is a "bonus" source.
+    }
+
+    const agg = combineSessions(qualiMetrics, raceMetrics);
+    if (agg) {
+      status = "used";
+      racesUsed.push(session);
+
+      function add(
+        src: Map<string, number>,
+        sumMap: Map<string, number>,
+        wMap: Map<string, number>,
+      ) {
+        for (const [team, v] of src.entries()) {
+          sumMap.set(team, (sumMap.get(team) ?? 0) + v * w);
+          wMap.set(team, (wMap.get(team) ?? 0) + w);
         }
       }
-    } catch {
+      add(agg.topSpeed, accSum.top, accW.top);
+      add(agg.s1, accSum.s1, accW.s1);
+      add(agg.s2, accSum.s2, accW.s2);
+      add(agg.s3, accSum.s3, accW.s3);
+
+      const teamsInRace = new Set<string>([
+        ...agg.topSpeed.keys(),
+        ...agg.s1.keys(),
+        ...agg.s2.keys(),
+        ...agg.s3.keys(),
+      ]);
+      for (const t of teamsInRace) {
+        racesByTeam.set(t, (racesByTeam.get(t) ?? 0) + 1);
+        const arr = weightsByTeam.get(t) ?? [];
+        arr.push(w);
+        weightsByTeam.set(t, arr);
+      }
+      for (const [t, n] of agg.lapsByTeam.entries()) {
+        lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
+      }
+    } else if (raceFetchFailed && !qualiAvailable) {
+      // Both sources unusable AND race fetch errored → fetch_failed.
       status = "fetch_failed";
     }
+
     diagnostics.push({
       name: sessionDisplayName(session),
       date_end: session.date_end ?? "",
       status,
+      sources: { quali: qualiAvailable, race: raceAvailable },
     });
     done++;
     opts.onProgress?.(done, total);

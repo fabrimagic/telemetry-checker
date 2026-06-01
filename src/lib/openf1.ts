@@ -510,6 +510,13 @@ export function getRaceSessionsByYear(year: number) {
   return fetchApi<SessionInfo[]>(`/sessions?year=${year}&session_name=Race`);
 }
 
+/** Returns all standard "Qualifying" sessions for a given year.
+ *  Explicitly filters by session_name=Qualifying, so Sprint Qualifying and
+ *  Sprint Shootout are NOT included. */
+export function getQualifyingSessionsByYear(year: number) {
+  return fetchApi<SessionInfo[]>(`/sessions?year=${year}&session_name=Qualifying`);
+}
+
 /** Returns all Sprint sessions for a given year (Sprint race only,
  *  not Sprint Qualifying). Used to include sprint points in standings. */
 export function getSprintSessionsByYear(year: number) {

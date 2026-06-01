@@ -20,6 +20,8 @@ export interface RaceDiagnosticLite {
   name: string;
   date_end: string;
   status: "used" | "no_data" | "fetch_failed";
+  /** Which sessions contributed to this GP. Optional for back-compat. */
+  sources?: { quali: boolean; race: boolean };
 }
 
 export interface NarrativeDataContext {
@@ -108,6 +110,9 @@ export function buildGpPreviewNarrative(
   // ----- 2. COSA RAPPRESENTA IL PUNTEGGIO (didattica) -----
   sentences.push(
     "Il punteggio di affinità è un indice da 0 a 1 che stima quanto le caratteristiche misurate di ogni vettura — velocità di punta e tenuta in curva aggregata sui tre settori — si sposano con ciò che questo circuito richiede. Non è una previsione del risultato della gara, ma una lettura tecnica del match circuito-vettura sui dati raccolti finora.",
+  );
+  sentences.push(
+    "La velocità di punta riflette soprattutto il potenziale espresso in qualifica, quando le vetture spingono al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova; in gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
   );
 
   // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
@@ -259,6 +264,7 @@ function appendDataContextParagraph(
       sentences.push(
         `Nel 2026 si sono finora disputate ${total} gare; l'analisi le considera tutte, dando un peso maggiore alle più recenti per riflettere gli aggiornamenti tecnici delle vetture. Tutte le gare hanno fornito dati utilizzabili.`,
       );
+      appendExclusionDetail(sentences, dataContext.diagnostics ?? []);
       return;
     }
     sentences.push(
@@ -285,6 +291,7 @@ function appendDataContextParagraph(
         `L'analisi si basa sui dati telemetrici delle ultime ${considered} gare, tutte con dati utilizzabili.`,
       );
     }
+    appendExclusionDetail(sentences, dataContext.diagnostics ?? []);
     return;
   }
 
@@ -331,6 +338,19 @@ function appendExclusionDetail(
   }
   if (reasonParts.length > 0) {
     sentences.push(reasonParts.join("; ") + ".");
+  }
+
+  // Qualifying-source caveat: among the USED GPs, count those for which
+  // the standard Qualifying session was not available. In those GPs the
+  // top-speed signal comes from race trim only, which is depressed by
+  // engine/fuel/ERS management → flag it for honesty.
+  const usedDiags = diagnostics.filter((d) => d.status === "used");
+  const missingQuali = usedDiags.filter((d) => d.sources && d.sources.quali === false);
+  if (usedDiags.length > 0 && missingQuali.length > 0) {
+    const names = missingQuali.map((d) => d.name);
+    sentences.push(
+      `Inoltre, per ${missingQuali.length === 1 ? "la gara" : `${missingQuali.length} gare`} (${joinNames(names)}) non era disponibile la sessione di qualifica: per ${missingQuali.length === 1 ? "quella" : "quelle"} il dato di velocità di punta arriva solo dal passo gara, che è meno indicativo del vero potenziale del motore.`,
+    );
   }
 }
 

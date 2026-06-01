@@ -2,13 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../openf1", () => ({
   getRaceSessionsByYear: vi.fn(),
+  getQualifyingSessionsByYear: vi.fn(),
   getAllLaps: vi.fn(),
   getDrivers: vi.fn(),
 }));
 
-import { computeCarProfiles, RECENCY_HALFLIFE_RACES } from "../carProfiles";
+import {
+  computeCarProfiles,
+  RECENCY_HALFLIFE_RACES,
+  TOP_SPEED_QUALI_WEIGHT,
+  TOP_SPEED_RACE_WEIGHT,
+  CORNER_QUALI_WEIGHT,
+  CORNER_RACE_WEIGHT,
+} from "../carProfiles";
 import {
   getRaceSessionsByYear,
+  getQualifyingSessionsByYear,
   getAllLaps,
   getDrivers,
   type Driver,
@@ -17,6 +26,7 @@ import {
 } from "../openf1";
 
 const mockedSessions = getRaceSessionsByYear as unknown as ReturnType<typeof vi.fn>;
+const mockedQuali = getQualifyingSessionsByYear as unknown as ReturnType<typeof vi.fn>;
 const mockedLaps = getAllLaps as unknown as ReturnType<typeof vi.fn>;
 const mockedDrivers = getDrivers as unknown as ReturnType<typeof vi.fn>;
 
@@ -75,8 +85,12 @@ function mkLap(
 
 beforeEach(() => {
   mockedSessions.mockReset();
+  mockedQuali.mockReset();
   mockedLaps.mockReset();
   mockedDrivers.mockReset();
+  // Default: no qualifying sessions available → all GPs use race-only
+  // fallback. Individual tests can override.
+  mockedQuali.mockResolvedValue([]);
 });
 
 describe("computeCarProfiles", () => {
@@ -327,5 +341,166 @@ describe("computeCarProfiles", () => {
     expect(res.total_past_races).toBe(7);
     expect(res.races_considered).toBe(4);
     expect(res.races_diagnostics).toHaveLength(4);
+  });
+});
+
+// =====================================================================
+// Quali + Race source combination (per-GP, before recency weighting).
+// =====================================================================
+describe("computeCarProfiles — qualifying + race combination", () => {
+  const NOW = new Date("2026-12-01T00:00:00Z");
+
+  function mkSession2(
+    key: number,
+    meeting: number,
+    name: string,
+    dateEnd: string,
+  ): SessionInfo {
+    return {
+      session_key: key,
+      session_type: name === "Race" ? "Race" : "Qualifying",
+      session_name: name,
+      meeting_key: meeting,
+      date_start: dateEnd,
+      date_end: dateEnd,
+    };
+  }
+  function mkDriver2(num: number, team: string): Driver {
+    return {
+      driver_number: num,
+      broadcast_name: `D${num}`,
+      full_name: `Driver ${num}`,
+      name_acronym: `D${num}`,
+      team_name: team,
+      team_colour: "fff",
+      headshot_url: null,
+      session_key: 0,
+    };
+  }
+  function mkLap2(driver: number, speed: number, s1: number): Lap {
+    return {
+      lap_number: 2,
+      lap_duration: 90,
+      duration_sector_1: s1,
+      duration_sector_2: 30,
+      duration_sector_3: 30,
+      st_speed: speed,
+      date_start: null,
+      is_pit_out_lap: false,
+      driver_number: driver,
+      session_key: 0,
+      segments_sector_1: null,
+      segments_sector_2: null,
+      segments_sector_3: null,
+    };
+  }
+
+  it("(a) both quali+race present: quali-weighted top speed (0.75) flips ranking vs race-only", async () => {
+    // Race: A fast (320), B slow (300). Quali: REVERSED — A slow, B fast.
+    // With race-only, A would win top speed. With quali weighted 0.75, B
+    // wins. We assert the quali-dominant outcome to prove combination.
+    mockedSessions.mockResolvedValue([mkSession2(1, 10, "Race", "2026-04-01T15:00:00Z")]);
+    mockedQuali.mockResolvedValue([mkSession2(2, 10, "Qualifying", "2026-03-31T15:00:00Z")]);
+    mockedDrivers.mockResolvedValue([mkDriver2(1, "A"), mkDriver2(2, "B")]);
+    mockedLaps.mockImplementation(async (key: number) => {
+      if (key === 1) return [
+        ...Array.from({ length: 5 }, () => mkLap2(1, 320, 28)),
+        ...Array.from({ length: 5 }, () => mkLap2(2, 300, 32)),
+      ];
+      if (key === 2) return [
+        ...Array.from({ length: 5 }, () => mkLap2(1, 300, 32)),
+        ...Array.from({ length: 5 }, () => mkLap2(2, 320, 28)),
+      ];
+      return [];
+    });
+    const res = await computeCarProfiles({ now: NOW });
+    const A = res.profiles.find((p) => p.team_name === "A")!;
+    const B = res.profiles.find((p) => p.team_name === "B")!;
+    expect(B.top_speed_index).toBeGreaterThan(A.top_speed_index);
+    const diag = res.races_diagnostics[0];
+    expect(diag.sources?.quali).toBe(true);
+    expect(diag.sources?.race).toBe(true);
+  });
+
+  it("(b) qualifying missing → race-only fallback, diagnostics.sources.quali=false, no crash", async () => {
+    mockedSessions.mockResolvedValue([mkSession2(1, 10, "Race", "2026-04-01T15:00:00Z")]);
+    mockedQuali.mockResolvedValue([]);
+    mockedDrivers.mockResolvedValue([mkDriver2(1, "A"), mkDriver2(2, "B")]);
+    mockedLaps.mockResolvedValue([mkLap2(1, 320, 28), mkLap2(2, 300, 32)]);
+    const res = await computeCarProfiles({ now: NOW });
+    expect(res.profiles).toHaveLength(2);
+    const diag = res.races_diagnostics[0];
+    expect(diag.status).toBe("used");
+    expect(diag.sources?.quali).toBe(false);
+    expect(diag.sources?.race).toBe(true);
+  });
+
+  it("(c) race fetch fails but quali present → uses quali only, status=used", async () => {
+    mockedSessions.mockResolvedValue([mkSession2(1, 10, "Race", "2026-04-01T15:00:00Z")]);
+    mockedQuali.mockResolvedValue([mkSession2(2, 10, "Qualifying", "2026-03-31T15:00:00Z")]);
+    mockedDrivers.mockImplementation(async (k: number) => {
+      if (k === 1) throw new Error("race fetch boom");
+      return [mkDriver2(1, "A"), mkDriver2(2, "B")];
+    });
+    mockedLaps.mockImplementation(async (k: number) => {
+      if (k === 1) throw new Error("race fetch boom");
+      return [mkLap2(1, 320, 28), mkLap2(2, 300, 32)];
+    });
+    const res = await computeCarProfiles({ now: NOW });
+    expect(res.profiles).toHaveLength(2);
+    const diag = res.races_diagnostics[0];
+    expect(diag.status).toBe("used");
+    expect(diag.sources?.quali).toBe(true);
+    expect(diag.sources?.race).toBe(false);
+  });
+
+  it("(d) recency weighting still applies on top of per-GP quali/race combination", async () => {
+    mockedSessions.mockResolvedValue([
+      mkSession2(11, 100, "Race", "2026-03-01T15:00:00Z"),
+      mkSession2(21, 200, "Race", "2026-05-01T15:00:00Z"),
+    ]);
+    mockedQuali.mockResolvedValue([
+      mkSession2(12, 100, "Qualifying", "2026-02-28T15:00:00Z"),
+      mkSession2(22, 200, "Qualifying", "2026-04-30T15:00:00Z"),
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver2(1, "A"), mkDriver2(2, "B")]);
+    mockedLaps.mockImplementation(async (k: number) => {
+      if (k === 11 || k === 12) return [
+        ...Array.from({ length: 5 }, () => mkLap2(1, 320, 28)),
+        ...Array.from({ length: 5 }, () => mkLap2(2, 300, 32)),
+      ];
+      if (k === 21 || k === 22) return [
+        ...Array.from({ length: 5 }, () => mkLap2(2, 320, 28)),
+        ...Array.from({ length: 5 }, () => mkLap2(1, 300, 32)),
+      ];
+      return [];
+    });
+    const res = await computeCarProfiles({ now: NOW });
+    const A = res.profiles.find((p) => p.team_name === "A")!;
+    const B = res.profiles.find((p) => p.team_name === "B")!;
+    // Newer GP (B faster) wins after recency decay.
+    expect(B.top_speed_index).toBeGreaterThan(A.top_speed_index);
+  });
+
+  it("(e) getQualifyingSessionsByYear is called with year 2026", async () => {
+    mockedSessions.mockResolvedValue([]);
+    await computeCarProfiles({ now: NOW });
+    expect(mockedQuali).toHaveBeenCalledWith(2026);
+  });
+
+  it("(f) quali sessions for OTHER meetings are ignored (matched by meeting_key)", async () => {
+    mockedSessions.mockResolvedValue([mkSession2(1, 10, "Race", "2026-04-01T15:00:00Z")]);
+    mockedQuali.mockResolvedValue([mkSession2(2, 999, "Qualifying", "2026-03-31T15:00:00Z")]);
+    mockedDrivers.mockResolvedValue([mkDriver2(1, "A"), mkDriver2(2, "B")]);
+    mockedLaps.mockResolvedValue([mkLap2(1, 320, 28), mkLap2(2, 300, 32)]);
+    const res = await computeCarProfiles({ now: NOW });
+    expect(res.races_diagnostics[0].sources?.quali).toBe(false);
+  });
+
+  it("(g) source weight constants are the documented values", () => {
+    expect(TOP_SPEED_QUALI_WEIGHT).toBe(0.75);
+    expect(TOP_SPEED_RACE_WEIGHT).toBe(0.25);
+    expect(CORNER_QUALI_WEIGHT).toBe(0.5);
+    expect(CORNER_RACE_WEIGHT).toBe(0.5);
   });
 });
