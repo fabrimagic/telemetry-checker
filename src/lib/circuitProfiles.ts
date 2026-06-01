@@ -122,6 +122,12 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.20, slow_corner_traction: 1.00, medium_corner: 0.60, fast_corner: 0.15,
     tyre_deg: 0.20, overtaking_difficulty: 1.00,
     confidence: "high", source: "historical",
+    // PILOTA: settori prevalentemente lenti. S2 mescola tornante lento + tunnel veloce.
+    sector_corner_map: {
+      s1: { slow: 0.7, medium: 0.3, fast: 0.0 },
+      s2: { slow: 0.6, medium: 0.2, fast: 0.2 },
+      s3: { slow: 0.8, medium: 0.2, fast: 0.0 },
+    },
   },
   "Gran Premio di Barcellona-Catalunya": {
     // Barcelona: layout 2023 (chicane finale rimossa, T13-14 più veloci e fluenti);
@@ -130,6 +136,12 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.45, slow_corner_traction: 0.50, medium_corner: 0.80, fast_corner: 0.90,
     tyre_deg: 0.80, overtaking_difficulty: 0.65,
     confidence: "high", source: "historical",
+    // PILOTA: S1/S2 medio-veloci, S3 lento (proxy Monaco).
+    sector_corner_map: {
+      s1: { slow: 0.1, medium: 0.4, fast: 0.5 },
+      s2: { slow: 0.2, medium: 0.4, fast: 0.4 },
+      s3: { slow: 0.7, medium: 0.3, fast: 0.0 },
+    },
   },
   "Gran Premio d'Austria": {
     // Spielberg: short, mostly slow corners + straights.
