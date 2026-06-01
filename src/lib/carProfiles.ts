@@ -814,6 +814,7 @@ export async function computeCarProfiles(
       // Preserve real coverage value in every branch (even below threshold)
       // so downstream consumers can diagnose; null only when not measurable.
       corner_data_coverage: coverageMeasured ? coverageAgg : null,
+      corner_coverage_curve: cornerCoverageCurve,
       corner_source: cornerSource,
       corner_coverage_status: coverageStatus,
     });
