@@ -204,6 +204,18 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
     <ReferenceLine x={cursorTime} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
   ) : null;
 
+  const zoneAreas = zoneIntervals.map((iv, i) => (
+    <ReferenceArea
+      key={`zone-${i}`}
+      x1={iv.startTime}
+      x2={iv.endTime}
+      fill={ZONE_COLORS[iv.type]}
+      fillOpacity={0.14}
+      stroke="none"
+      ifOverflow="hidden"
+    />
+  ));
+
   const tooltipContent = buildTooltipContent(lapSoftSensor);
 
   if (!drivers.length || !drivers.some((d) => d.data.length > 0)) return null;
