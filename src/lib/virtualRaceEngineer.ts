@@ -1400,6 +1400,31 @@ export function computeVirtualRaceEngineer(
     alt.ranking_time_estimate = (refTime - alt.estimated_delta_vs_actual) + posAdj;
   }
 
+  // ── 4d-bis. Propagate degradation-slope uncertainty into a ± band on the
+  // alternative-vs-actual delta. Additive, informative — does NOT change
+  // ranking or pure-pace fields. Approximations: stints inside a strategy
+  // are treated as independent, and the alt and actual variances are added
+  // as if independent (var(Δ) = var_alt + var_actual). See JSDoc on
+  // computeStrategyDeltaUncertainty for the linear-propagation derivation
+  // and the role of TRACK_EVOLUTION_SLOPE_UNCERTAINTY.
+  const actualUnc = computeStrategyDeltaUncertainty(
+    buildStintBounds(actualPitLaps, actualCompounds),
+    compoundModels,
+  );
+  for (const alt of alternatives) {
+    const altUnc = computeStrategyDeltaUncertainty(
+      buildStintBounds(alt.pit_laps, alt.compounds),
+      compoundModels,
+    );
+    const deltaStd = Math.sqrt(altUnc.stdDev * altUnc.stdDev + actualUnc.stdDev * actualUnc.stdDev);
+    alt.delta_uncertainty_std = Math.round(deltaStd * 100) / 100;
+    alt.indistinguishable_from_actual =
+      Math.abs(alt.estimated_delta_vs_actual) < DELTA_SIGNIFICANCE_K * deltaStd;
+  }
+
+
+
+
 
   // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
   {
