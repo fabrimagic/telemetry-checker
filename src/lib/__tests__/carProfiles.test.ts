@@ -85,8 +85,12 @@ function mkLap(
 
 beforeEach(() => {
   mockedSessions.mockReset();
+  mockedQuali.mockReset();
   mockedLaps.mockReset();
   mockedDrivers.mockReset();
+  // Default: no qualifying sessions available → all GPs use race-only
+  // fallback. Individual tests can override.
+  mockedQuali.mockResolvedValue([]);
 });
 
 describe("computeCarProfiles", () => {
