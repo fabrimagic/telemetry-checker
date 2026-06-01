@@ -155,6 +155,22 @@ export interface AlternativeStrategy {
    * deltas (unchanged) and are still consumed by UI/tests.
    */
   ranking_time_estimate?: number;
+  /**
+   * Standard deviation (±, seconds) on `estimated_delta_vs_actual` obtained by
+   * analytical propagation of per-compound slope uncertainties through the
+   * stint sum. Includes both the statistical slopeStdError and the systematic
+   * TRACK_EVOLUTION_SLOPE_UNCERTAINTY term. Independence between stints and
+   * between strategies is assumed (approximation, documented).
+   */
+  delta_uncertainty_std?: number;
+  /**
+   * True when |estimated_delta_vs_actual| < DELTA_SIGNIFICANCE_K *
+   * delta_uncertainty_std — i.e. the pace delta vs the actual strategy is
+   * within the propagated uncertainty band of the degradation model. UI and
+   * narrative can use this to mark the comparison as "within margin".
+   * Informative only — does NOT change the sort order.
+   */
+  indistinguishable_from_actual?: boolean;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
@@ -346,6 +362,80 @@ export function sortAlternativesByPositionAwareScore<
     return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
   });
 }
+
+
+/**
+ * Systematic (non-statistical) component of the uncertainty on the tyre
+ * degradation slope, in s/lap. Captures the track-evolution effect (the
+ * rubbering-in that makes the surface faster as the race progresses): the
+ * model does NOT correct for it because the per-circuit coefficient is
+ * unknown, so we declare the resulting bias as an additional uncertainty
+ * (added in quadrature to the regression slopeStdError). The true tyre
+ * degradation is in general ≥ the estimated one — this constant gives an
+ * indicative ±5 ms/lap envelope.
+ */
+export const TRACK_EVOLUTION_SLOPE_UNCERTAINTY = 0.005; // s/lap
+
+/**
+ * k-factor used to flag an alternative as statistically indistinguishable
+ * from the actual strategy: |Δt| < K × delta_uncertainty_std. K = 1.0 ≈ 1σ
+ * (≈ 68% confidence the difference is real). Raise to ~2.0 for a stricter
+ * 95% test. The flag is informative only — it does not change the ranking.
+ */
+export const DELTA_SIGNIFICANCE_K = 1.0;
+
+export interface StintBoundForUncertainty {
+  start: number;
+  end: number;
+  compound: string;
+}
+
+/**
+ * Analytically propagate the per-compound slope uncertainty through a full
+ * strategy and return the standard deviation of the total stint time.
+ *
+ * For a stint of length T laps, lap time = slope × tyreLife + intercept, so
+ *   stintTime  = Σ_{k=0..T-1} (slope × k + intercept)
+ *   ∂stintTime/∂slope = Σ_{k=0..T-1} k = T(T−1)/2
+ *   var(stintTime)    = (T(T−1)/2)² × σ_effective²
+ * where σ_effective² = slopeStdError² + TRACK_EVOLUTION_SLOPE_UNCERTAINTY².
+ *
+ * Stint variances are summed under the assumption of independence across
+ * stints (and across strategies, when propagating the delta uncertainty as
+ * √(var_alt + var_actual)). This is a documented approximation: residual
+ * correlation can exist (shared track conditions, shared regression noise),
+ * but the band is meant as an indicative ± envelope, not a strict CI.
+ *
+ * When slopeStdError is null for a compound we still contribute the
+ * track-evolution term and signal reduced reliability via `missingStdError`.
+ */
+export function computeStrategyDeltaUncertainty(
+  stintBounds: StintBoundForUncertainty[],
+  compoundModels: Map<string, { slopeStdError: number | null }>,
+): { stdDev: number; missingStdError: boolean } {
+  let variance = 0;
+  let missing = false;
+  const sysSq = TRACK_EVOLUTION_SLOPE_UNCERTAINTY * TRACK_EVOLUTION_SLOPE_UNCERTAINTY;
+  for (const sb of stintBounds) {
+    const T = Math.max(0, sb.end - sb.start + 1);
+    if (T <= 1) continue;
+    const sensitivity = (T * (T - 1)) / 2; // = Σ tyre_life over the stint
+    const m = compoundModels.get(sb.compound);
+    const stat = m?.slopeStdError;
+    let statSq = 0;
+    if (stat != null && Number.isFinite(stat) && stat > 0) {
+      statSq = stat * stat;
+    } else {
+      missing = true;
+    }
+    const sigmaSq = statSq + sysSq;
+    variance += sensitivity * sensitivity * sigmaSq;
+  }
+  return { stdDev: Math.sqrt(variance), missingStdError: missing };
+}
+
+
+
 
 
 
@@ -540,7 +630,7 @@ export function computeVirtualRaceEngineer(
   // ── 2. Simulate strategies ──
 
   // Build a simple lap time predictor per compound (race data first)
-  const compoundModels = new Map<string, { slope: number; intercept: number; source: string }>();
+  const compoundModels = new Map<string, { slope: number; intercept: number; source: string; slopeStdError: number | null }>();
   const compoundCandidateBest = new Map<string, CompoundModelCandidate>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
@@ -554,7 +644,17 @@ export function computeVirtualRaceEngineer(
     };
     const existing = compoundCandidateBest.get(sa.compound);
     if (!existing || isBetterCompoundModel(candidate, existing)) {
-      compoundModels.set(sa.compound, { ...model, source: "race" });
+      // Resolve slopeStdError from the underlying DegradationResult, preferring
+      // the corrected stage-B std error when available (matches the convention
+      // used by degradationValidation.ts for t-stat computation).
+      const orig = dv.original as DegradationResult & { slope_corrected_std_error?: number | null };
+      const corrSe = orig.slope_corrected_std_error;
+      const rawSe = orig.slopeStdError;
+      const resolvedSe =
+        (corrSe != null && Number.isFinite(corrSe) && corrSe > 0) ? corrSe :
+        (rawSe != null && Number.isFinite(rawSe) && rawSe > 0) ? rawSe :
+        null;
+      compoundModels.set(sa.compound, { ...model, source: "race", slopeStdError: resolvedSe });
       compoundCandidateBest.set(sa.compound, candidate);
     }
   }
@@ -576,10 +676,15 @@ export function computeVirtualRaceEngineer(
         slope: pm.slope,
         intercept: pm.intercept + paceOffset,
         source: pm.source,
+        // Practice models do not currently expose a slope std error → null.
+        // Uncertainty propagation falls back to the systematic
+        // TRACK_EVOLUTION_SLOPE_UNCERTAINTY term only.
+        slopeStdError: null,
       });
       practiceCompoundsUsed.push(pm.compound);
     }
   }
+
 
   // F1 regulation: at least 2 different compounds must be used during a dry race
   function hasMinTwoCompounds(compounds: string[]): boolean {
@@ -1294,6 +1399,31 @@ export function computeVirtualRaceEngineer(
     const refTime = actualAdjustedTime ?? 0;
     alt.ranking_time_estimate = (refTime - alt.estimated_delta_vs_actual) + posAdj;
   }
+
+  // ── 4d-bis. Propagate degradation-slope uncertainty into a ± band on the
+  // alternative-vs-actual delta. Additive, informative — does NOT change
+  // ranking or pure-pace fields. Approximations: stints inside a strategy
+  // are treated as independent, and the alt and actual variances are added
+  // as if independent (var(Δ) = var_alt + var_actual). See JSDoc on
+  // computeStrategyDeltaUncertainty for the linear-propagation derivation
+  // and the role of TRACK_EVOLUTION_SLOPE_UNCERTAINTY.
+  const actualUnc = computeStrategyDeltaUncertainty(
+    buildStintBounds(actualPitLaps, actualCompounds),
+    compoundModels,
+  );
+  for (const alt of alternatives) {
+    const altUnc = computeStrategyDeltaUncertainty(
+      buildStintBounds(alt.pit_laps, alt.compounds),
+      compoundModels,
+    );
+    const deltaStd = Math.sqrt(altUnc.stdDev * altUnc.stdDev + actualUnc.stdDev * actualUnc.stdDev);
+    alt.delta_uncertainty_std = Math.round(deltaStd * 100) / 100;
+    alt.indistinguishable_from_actual =
+      Math.abs(alt.estimated_delta_vs_actual) < DELTA_SIGNIFICANCE_K * deltaStd;
+  }
+
+
+
 
 
   // ── 4e. Enrich recommended strategy with same explanation layer as alternatives ──
@@ -2228,6 +2358,24 @@ export function computeVirtualRaceEngineer(
     if (recScored && recScored.adjustment_reason !== "Nessun aggiustamento") {
       confidenceFactors.push(`Risk scoring (${riskMode}): ${recScored.adjustment_reason}`);
     }
+
+    // Uncertainty band check: if the recommended strategy was promoted from an
+    // alternative whose pace delta vs actual is within the propagated
+    // degradation-slope band, flag it as "within margin" so the UI/narrative
+    // can warn the user. Pure-pace fields and ranking remain unchanged.
+    {
+      const matchedAlt = alternatives.find(a =>
+        a.pit_laps.length === recommendedStrategy.pit_windows.length &&
+        a.pit_laps.every((p, i) => p === recommendedStrategy.pit_windows[i]?.ideal_lap) &&
+        a.compounds.join(",") === recommendedStrategy.compounds.join(",")
+      );
+      if (matchedAlt && matchedAlt.indistinguishable_from_actual) {
+        confidenceFactors.push(
+          `Il vantaggio stimato (${matchedAlt.estimated_delta_vs_actual.toFixed(1)}s) rientra nel margine di incertezza del modello di degrado (±${(matchedAlt.delta_uncertainty_std ?? 0).toFixed(1)}s)`,
+        );
+      }
+    }
+
 
     // Soft sensor scoring narrative
     if (softSensorScoringGate.soft_sensor_scoring_enabled) {
