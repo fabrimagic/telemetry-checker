@@ -43,11 +43,15 @@ export interface TeamGpAffinity {
   /**
    * Which method produced the cornering signal for this team:
    *  - "location_geometry": granular slow/medium/fast strength matched
-   *                         against the circuit's per-corner-type weights;
-   *  - "sector_fallback":   aggregated sector_strength (the legacy path).
+   *                         against the circuit's per-corner-type weights
+   *                         (dato reale dalla geometria GPS);
+   *  - "sector_typed":      STIMA della corner-strength per tipo ottenuta
+   *                         pesando sector_strength via la matrice
+   *                         settore→tipo del circuito (sector_corner_map);
+   *  - "sector_fallback":   media piatta dei sector_strength (legacy).
    * Surfaced so the UI/narrative can be transparent about provenance.
    */
-  corner_source?: "location_geometry" | "sector_fallback";
+  corner_source?: "location_geometry" | "sector_typed" | "sector_fallback";
   /**
    * Aggregated /location coverage as measured by the analyzer. ALWAYS
    * propagated when the analyzer produced a measurement, including when
@@ -219,7 +223,7 @@ export function predictGpAffinity(
     //  - Otherwise fall back to the legacy sector-mean estimate, which does
     //    NOT depend on spatial alignment.
     let cornerIdx: number;
-    let cornerSource: "location_geometry" | "sector_fallback";
+    let cornerSource: "location_geometry" | "sector_typed" | "sector_fallback";
     if (car.corner_type_strength) {
       const wS = circuit.slow_corner_traction;
       const wM = circuit.medium_corner;
@@ -242,6 +246,46 @@ export function predictGpAffinity(
         );
       }
       cornerSource = "location_geometry";
+    } else if (circuit.sector_corner_map) {
+      // RAMO sector_typed (Opzione 2): stima della corner-strength per tipo
+      // dai sector_strength della vettura via la matrice settore→tipo del
+      // circuito. È una stima a grana di settore, NON una misura pura.
+      const map = circuit.sector_corner_map;
+      const s = car.sector_strength;
+      // Per ciascun tipo: Σ_sec (mappa[sec][tipo] * sector_strength[sec]) / Σ_sec mappa[sec][tipo]
+      const estimate = (
+        key: "slow" | "medium" | "fast",
+      ): number | null => {
+        const wSum = map.s1[key] + map.s2[key] + map.s3[key];
+        if (wSum <= 0) return null;
+        const num =
+          map.s1[key] * s.s1 + map.s2[key] * s.s2 + map.s3[key] * s.s3;
+        return num / wSum;
+      };
+      const estSlow = estimate("slow");
+      const estMed = estimate("medium");
+      const estFast = estimate("fast");
+      const wS = circuit.slow_corner_traction;
+      const wM = circuit.medium_corner;
+      const wF = circuit.fast_corner;
+      let num = 0;
+      let den = 0;
+      if (estSlow !== null) { num += wS * estSlow; den += wS; }
+      if (estMed !== null)  { num += wM * estMed;  den += wM; }
+      if (estFast !== null) { num += wF * estFast; den += wF; }
+      if (den > 0) {
+        cornerIdx = clamp01(num / den);
+      } else {
+        // Tutti i pesi del circuito sono 0 sui tipi disponibili — usa la
+        // media degli est disponibili, oppure la media piatta dei settori.
+        const ests = [estSlow, estMed, estFast].filter(
+          (x): x is number => x !== null,
+        );
+        cornerIdx = clamp01(
+          ests.length > 0 ? mean(ests) : mean([s.s1, s.s2, s.s3]),
+        );
+      }
+      cornerSource = "sector_typed";
     } else {
       cornerIdx = clamp01(
         mean([car.sector_strength.s1, car.sector_strength.s2, car.sector_strength.s3]),

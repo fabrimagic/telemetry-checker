@@ -359,6 +359,116 @@ describe("gpPrediction", () => {
     expect(r1.affinity_score).toBeCloseTo(baseScore, 10);
     expect(r2.affinity_score).toBeCloseTo(baseScore, 10);
   });
+
+  // ---- sector_typed branch (Opzione 2): stima dai settori ----
+  describe("sector_typed branch (sector_corner_map)", () => {
+    const monacoLikeMap = {
+      s1: { slow: 0.7, medium: 0.3, fast: 0.0 },
+      s2: { slow: 0.6, medium: 0.2, fast: 0.2 },
+      s3: { slow: 0.8, medium: 0.2, fast: 0.0 },
+    };
+
+    it("uses sector_typed when map is present and car has no corner_type_strength", () => {
+      const c = circuit({
+        top_speed: 0,
+        slow_corner_traction: 1.0,
+        medium_corner: 0.2,
+        fast_corner: 0.0,
+        sector_corner_map: monacoLikeMap,
+      });
+      const strongInSlow = car("Slow", 0.5, [0.95, 0.95, 0.95]);
+      const out = predictGpAffinity(c, [strongInSlow]);
+      expect(out.ranked[0].corner_source).toBe("sector_typed");
+      expect(out.ranked[0].affinity_score).toBeGreaterThan(0.9);
+    });
+
+    it("granularità: stessa media settori, distribuzione diversa → punteggi diversi", () => {
+      const c = circuit({
+        top_speed: 0,
+        slow_corner_traction: 1.0,
+        medium_corner: 0.2,
+        fast_corner: 0.0,
+        sector_corner_map: monacoLikeMap,
+      });
+      const A = car("FrontInSlow", 0.5, [0.5, 0.5, 0.8]);
+      const B = car("FrontInFast", 0.5, [0.8, 0.5, 0.5]);
+      const out = predictGpAffinity(c, [A, B]);
+      const sA = out.ranked.find((t) => t.team_name === "FrontInSlow")!.affinity_score;
+      const sB = out.ranked.find((t) => t.team_name === "FrontInFast")!.affinity_score;
+      expect(sA).toBeGreaterThan(sB);
+      // CONFRONTO con sector_fallback (no mappa): media piatta → punteggi uguali.
+      const cFlat = circuit({
+        top_speed: 0, slow_corner_traction: 1.0, medium_corner: 0.2, fast_corner: 0.0,
+      });
+      const outFlat = predictGpAffinity(cFlat, [A, B]);
+      const fA = outFlat.ranked.find((t) => t.team_name === "FrontInSlow")!.affinity_score;
+      const fB = outFlat.ranked.find((t) => t.team_name === "FrontInFast")!.affinity_score;
+      expect(fA).toBeCloseTo(fB, 10);
+      expect(outFlat.ranked[0].corner_source).toBe("sector_fallback");
+    });
+
+    it("circuito senza mappa → sector_fallback (non-regressione)", () => {
+      const c = circuit({ sector_corner_map: undefined });
+      const out = predictGpAffinity(c, [car("X", 0.5, [0.6, 0.6, 0.6])]);
+      expect(out.ranked[0].corner_source).toBe("sector_fallback");
+    });
+
+    it("corner_type_strength reale vince sulla mappa (priorità rispettata)", () => {
+      const c = circuit({
+        top_speed: 0, slow_corner_traction: 1.0, medium_corner: 0, fast_corner: 0,
+        sector_corner_map: monacoLikeMap,
+      });
+      const geomCar: CarProfile = {
+        ...car("G", 0.5, [0.1, 0.1, 0.1]),
+        corner_type_strength: { slow: 1.0, medium: 0, fast: 0 },
+        corner_data_coverage: 0.8,
+        corner_source: "location_geometry",
+      };
+      const out = predictGpAffinity(c, [geomCar]);
+      expect(out.ranked[0].corner_source).toBe("location_geometry");
+      expect(out.ranked[0].affinity_score).toBeCloseTo(1, 5);
+    });
+
+    it("gestisce pesi-tipo nulli (sumW=0 e weights del circuito 0) senza NaN", () => {
+      const zeroMap = {
+        s1: { slow: 0, medium: 0, fast: 0 },
+        s2: { slow: 0, medium: 0, fast: 0 },
+        s3: { slow: 0, medium: 0, fast: 0 },
+      };
+      const c = circuit({
+        top_speed: 0, slow_corner_traction: 0, medium_corner: 0, fast_corner: 0,
+        sector_corner_map: zeroMap,
+      });
+      const out = predictGpAffinity(c, [car("Z", 0.4, [0.8, 0.8, 0.8])]);
+      const s = out.ranked[0].affinity_score;
+      expect(Number.isFinite(s)).toBe(true);
+      expect(out.ranked[0].corner_source).toBe("sector_typed");
+    });
+
+    it("i 3 circuiti pilota hanno sector_corner_map valida", async () => {
+      const { CIRCUIT_PROFILES } = await import("../circuitProfiles");
+      const pilots = [
+        "Gran Premio di Monaco",
+        "Gran Premio d'Italia",
+        "Gran Premio di Barcellona-Catalunya",
+      ];
+      for (const name of pilots) {
+        const p = CIRCUIT_PROFILES[name];
+        expect(p.sector_corner_map).toBeDefined();
+        const map = p.sector_corner_map!;
+        for (const sec of ["s1", "s2", "s3"] as const) {
+          const w = map[sec];
+          for (const k of ["slow", "medium", "fast"] as const) {
+            expect(w[k]).toBeGreaterThanOrEqual(0);
+            expect(w[k]).toBeLessThanOrEqual(1);
+          }
+          const sum = w.slow + w.medium + w.fast;
+          expect(sum).toBeGreaterThan(0.5);
+          expect(sum).toBeLessThanOrEqual(1.5);
+        }
+      }
+    });
+  });
 });
 
 

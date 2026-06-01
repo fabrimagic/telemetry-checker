@@ -25,6 +25,26 @@
 
 import { getNextSession } from "./f1Calendar2026";
 
+export interface CornerTypeWeights {
+  slow: number;
+  medium: number;
+  fast: number;
+}
+
+/**
+ * STIMA del carattere di ciascun settore in termini di tipi di curva.
+ * Additiva/opzionale: se assente, il modello usa il comportamento attuale
+ * (media piatta dei sector_strength). I valori 0..1 indicano quanto il
+ * settore è rappresentativo di un tipo di curva (idealmente Σ≈1 per
+ * settore, non vincolante). NON è una misura pura: un settore è una
+ * miscela (es. S2 Monaco contiene tornante lento + tunnel veloce).
+ */
+export interface SectorCornerMap {
+  s1: CornerTypeWeights;
+  s2: CornerTypeWeights;
+  s3: CornerTypeWeights;
+}
+
 export interface CircuitProfile {
   /** Must match exactly an F1_CALENDAR_2026 gpName. */
   gpName: string;
@@ -54,6 +74,12 @@ export interface CircuitProfile {
    * finché il GP non entra nel calendario. Assenza = false (retrocompatibile).
    */
   dormant?: boolean;
+  /**
+   * STIMA opzionale del carattere dei settori (matrice settore→tipo di
+   * curva). Quando presente abilita il ramo "sector_typed" in
+   * gpPrediction. Assente → ramo legacy sector_fallback (media piatta).
+   */
+  sector_corner_map?: SectorCornerMap;
 }
 
 export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
@@ -96,6 +122,12 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.20, slow_corner_traction: 1.00, medium_corner: 0.60, fast_corner: 0.15,
     tyre_deg: 0.20, overtaking_difficulty: 1.00,
     confidence: "high", source: "historical",
+    // PILOTA: settori prevalentemente lenti. S2 mescola tornante lento + tunnel veloce.
+    sector_corner_map: {
+      s1: { slow: 0.7, medium: 0.3, fast: 0.0 },
+      s2: { slow: 0.6, medium: 0.2, fast: 0.2 },
+      s3: { slow: 0.8, medium: 0.2, fast: 0.0 },
+    },
   },
   "Gran Premio di Barcellona-Catalunya": {
     // Barcelona: layout 2023 (chicane finale rimossa, T13-14 più veloci e fluenti);
@@ -104,6 +136,12 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.45, slow_corner_traction: 0.50, medium_corner: 0.80, fast_corner: 0.90,
     tyre_deg: 0.80, overtaking_difficulty: 0.65,
     confidence: "high", source: "historical",
+    // PILOTA: S1/S2 medio-veloci, S3 lento (proxy Monaco).
+    sector_corner_map: {
+      s1: { slow: 0.1, medium: 0.4, fast: 0.5 },
+      s2: { slow: 0.2, medium: 0.4, fast: 0.4 },
+      s3: { slow: 0.7, medium: 0.3, fast: 0.0 },
+    },
   },
   "Gran Premio d'Austria": {
     // Spielberg: short, mostly slow corners + straights.
@@ -146,6 +184,12 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 1.00, slow_corner_traction: 0.45, medium_corner: 0.25, fast_corner: 0.30,
     tyre_deg: 0.40, overtaking_difficulty: 0.20,
     confidence: "high", source: "historical",
+    // PILOTA: S1 dominato da velocità (Rettifilo chicane), S2 Lesmo medie/veloci, S3 Ascari/Parabolica veloci.
+    sector_corner_map: {
+      s1: { slow: 0.2, medium: 0.3, fast: 0.5 },
+      s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
+      s3: { slow: 0.2, medium: 0.3, fast: 0.5 },
+    },
   },
   "Gran Premio di Spagna": {
     // Madrid (Madring) — new circuit 2026, no representative history.
