@@ -188,6 +188,8 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
     <ReferenceLine x={cursorTime} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
   ) : null;
 
+  const tooltipContent = buildTooltipContent(lapSoftSensor);
+
   if (!drivers.length || !drivers.some((d) => d.data.length > 0)) return null;
 
   const renderLineChart = (
