@@ -123,6 +123,32 @@ export interface ComputeCarProfilesOptions {
  */
 export const RECENCY_HALFLIFE_RACES = 3;
 
+/**
+ * Weights for combining the two SOURCES (qualifying vs race) WITHIN the
+ * same GP. These are differentiated per-dimension because the two sessions
+ * carry different physical information:
+ *
+ *  - Top speed: in race trim st_speed is depressed by lift&coast, ERS
+ *    deployment strategy, fuel weight and conservative engine maps. In
+ *    qualifying everything is at its peak (party mode, ERS dumped, light
+ *    car, fresh tyres). Qualifying is therefore the much cleaner proxy of
+ *    raw straight-line capability and is given a dominant weight.
+ *
+ *  - Cornering (sector medians): in race the sustainable corner pace —
+ *    which factors in tyre management — is real, useful information, not
+ *    just noise. We therefore balance qualifying and race more evenly so
+ *    that long-run grip contributes to the cornering index too.
+ *
+ * NOTE: this within-GP combination is ORTHOGONAL to the across-GP recency
+ * weighting (RECENCY_HALFLIFE_RACES). Pipeline:
+ *   1. combine quali + race INSIDE the same GP → one normalized map per GP
+ *   2. combine GPs across each other with the recency decay above
+ */
+export const TOP_SPEED_QUALI_WEIGHT = 0.75;
+export const TOP_SPEED_RACE_WEIGHT = 0.25;
+export const CORNER_QUALI_WEIGHT = 0.5;
+export const CORNER_RACE_WEIGHT = 0.5;
+
 // ----- statistic helpers -----
 
 function quantile(sortedAsc: number[], q: number): number {
