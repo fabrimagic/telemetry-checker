@@ -134,7 +134,19 @@ function buildTooltipContent(lapSoftSensor: SoftSensorsLapState | null | undefin
   };
 }
 
-export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick, lapSoftSensor }: Props) {
+export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick, lapSoftSensor, zones }: Props) {
+  // Build zone bands only when there's a single driver in view (avoid color ambiguity).
+  const zoneIntervals: ZoneInterval[] = useMemo(() => {
+    if (!zones || drivers.length !== 1) return [];
+    const ref = drivers[0].data;
+    if (!ref.length) return [];
+    return [
+      ...groupDatesToIntervals(zones.superclipping ?? [], "superclipping", ref),
+      ...groupDatesToIntervals(zones.liftcoast ?? [], "liftcoast", ref),
+    ];
+  }, [zones, drivers]);
+  const hasZones = zoneIntervals.length > 0;
+
   const domain = useMemo(() => {
     let min = Infinity, max = -Infinity;
     for (const d of drivers) {
