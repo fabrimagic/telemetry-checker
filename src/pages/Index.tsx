@@ -19,6 +19,7 @@ import { calculateCorrectedTyreDegradation } from "@/lib/correctedDegradation";
 import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
+import { SoftSensorsLapCard } from "@/components/f1/SoftSensorsLapCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
