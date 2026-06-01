@@ -1704,6 +1704,22 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
                     {/* Description */}
                     <p className="text-[10px] text-muted-foreground">{alt.description}</p>
 
+                    {/* Compound timeline (visual only, mirrors Reale/Ottimale strip) */}
+                    {(() => {
+                      const totalLaps = actual_strategy.stints.length > 0
+                        ? Math.max(...actual_strategy.stints.map(s => s.lap_end))
+                        : 0;
+                      const startLap = actual_strategy.stints[0]?.lap_start ?? 1;
+                      return (
+                        <AlternativeCompoundStrip
+                          pitLaps={alt.pit_laps}
+                          compounds={alt.compounds}
+                          startLap={startLap}
+                          totalLaps={totalLaps}
+                        />
+                      );
+                    })()}
+
                     {/* Risk adjustment reason */}
                     {risk_mode !== "BALANCED" && alt.adjustment_reason && alt.adjustment_reason !== "Nessun aggiustamento" && (
                       <p className="text-[9px] text-muted-foreground italic">
