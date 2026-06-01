@@ -15,6 +15,8 @@ import {
   type CarProfile,
 } from "@/lib/carProfiles";
 import { predictGpAffinity, type GpPrediction } from "@/lib/gpPrediction";
+import { buildGpPreviewNarrative } from "@/lib/gpPreviewNarrative";
+
 
 // ----- Helpers -----
 
@@ -105,8 +107,31 @@ export function GpPredictionResultView({
     return m;
   }, [prediction.indistinguishable_groups]);
 
+  const narrative = useMemo(
+    () => buildGpPreviewNarrative(circuit, prediction),
+    [circuit, prediction],
+  );
+
   return (
     <div className="space-y-6">
+      {narrative.length > 0 && (
+        <Card data-testid="narrative-card" className="border-[hsl(var(--f1-red))]/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+              In sintesi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm leading-relaxed">
+            {narrative.map((s, i) => (
+              <p key={i} className="text-foreground/90">
+                {s}
+              </p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -246,13 +271,14 @@ export default function GpPreview() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<CarProfile[] | null>(null);
+  const [racesConsidered, setRacesConsidered] = useState<number>(0);
   const [aborted, setAborted] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const prediction = useMemo(() => {
     if (!circuit || !profiles) return null;
-    return predictGpAffinity(circuit, profiles);
-  }, [circuit, profiles]);
+    return predictGpAffinity(circuit, profiles, { racesConsidered });
+  }, [circuit, profiles, racesConsidered]);
 
   const handleRun = useCallback(async () => {
     if (!circuit) return;
@@ -262,6 +288,7 @@ export default function GpPreview() {
     setError(null);
     setAborted(false);
     setProfiles(null);
+    setRacesConsidered(0);
     setProgress({ done: 0, total: 0 });
     try {
       const res = await computeCarProfiles({
@@ -269,7 +296,9 @@ export default function GpPreview() {
         onProgress: (done, total) => setProgress({ done, total }),
       });
       setProfiles(res.profiles);
+      setRacesConsidered(res.races_used.length);
       setAborted(res.aborted);
+
     } catch (e: any) {
       setError(e?.message ?? "Errore durante il calcolo dei profili vettura");
     } finally {

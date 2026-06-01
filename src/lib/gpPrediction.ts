@@ -51,6 +51,12 @@ export interface GpPrediction {
   notes: string[];
 }
 
+export interface GpPredictionMeta {
+  /** Number of races the system actually considered (e.g. last 4). */
+  racesConsidered?: number;
+}
+
+
 /** Map a qualitative confidence to a half-band width in score units (0..1). */
 const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = {
   high: 0.05,
@@ -106,7 +112,9 @@ function medianConfidence(cars: CarProfile[]): ConfidenceLevel {
 export function predictGpAffinity(
   circuit: CircuitProfile,
   cars: CarProfile[],
+  meta?: GpPredictionMeta,
 ): GpPrediction {
+
   const notes: string[] = [];
 
   // Aggregated corner weight (simple mean of the three corner-type weights).
@@ -195,11 +203,23 @@ export function predictGpAffinity(
   }
   if (current.length > 1) groups.push(current.map((x) => x.team_name));
 
-  // Generic caveat for the regulation context — always declared in Phase 3.
-  const racesSample = cars.reduce((m, c) => Math.max(m, c.sample_races), 0);
-  notes.push(
-    `Profili vettura basati su ${racesSample} gare di un regolamento nuovo`,
-  );
+  // Generic caveat for the regulation context — always declared.
+  const withData = cars.reduce((m, c) => Math.max(m, c.sample_races), 0);
+  const considered = meta?.racesConsidered;
+  if (typeof considered === "number" && considered > 0 && withData < considered) {
+    notes.push(
+      `Profili vettura basati sui dati disponibili di ${withData} delle ultime ${considered} gare (regolamento 2026 ancora recente).`,
+    );
+    notes.push(
+      "Per alcune delle gare considerate i dati di telemetria/settore non erano ancora disponibili.",
+    );
+  } else {
+    const n = typeof considered === "number" && considered > 0 ? considered : withData;
+    notes.push(
+      `Profili vettura basati sui dati disponibili di ${n} gare (regolamento 2026 ancora recente).`,
+    );
+  }
+
 
   return {
     ranked,
