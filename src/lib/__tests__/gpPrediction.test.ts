@@ -119,7 +119,7 @@ describe("gpPrediction", () => {
   });
 
   it("teams with close scores and wide bands end up in the same indistinguishable group", () => {
-    const c = circuit({ confidence: "low" });
+    const c = circuit({ confidence: "high" });
     const out = predictGpAffinity(c, [
       car("A", 0.50, [0.50, 0.50, 0.50], "low"),
       car("B", 0.52, [0.52, 0.52, 0.52], "low"),
