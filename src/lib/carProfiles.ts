@@ -723,6 +723,34 @@ export async function computeCarProfiles(
     else if (effective < 6 || sampleLaps < 60) confidence = "medium";
     else confidence = "high";
 
+    // ----- Per-corner-type strength (gated by coverage) -----
+    function avgCorner(type: "slow" | "medium" | "fast"): number | null {
+      const s = accCornerSum[type].get(team);
+      const wt = accCornerW[type].get(team);
+      if (s == null || !wt || wt <= 0) return null;
+      return s / wt;
+    }
+    const covW = accCoverageW.get(team) ?? 0;
+    const covS = accCoverageSum.get(team) ?? 0;
+    const coverageAgg = covW > 0 ? covS / covW : 0;
+
+    let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
+    let cornerSource: CarProfile["corner_source"] = "sector_fallback";
+    if (covW > 0 && coverageAgg >= CORNER_COVERAGE_MIN) {
+      const slow = avgCorner("slow");
+      const medium = avgCorner("medium");
+      const fast = avgCorner("fast");
+      // Require at least one type to be present; missing types default to 0.
+      if (slow != null || medium != null || fast != null) {
+        cornerTypeStrength = {
+          slow: slow ?? 0,
+          medium: medium ?? 0,
+          fast: fast ?? 0,
+        };
+        cornerSource = "location_geometry";
+      }
+    }
+
     profiles.push({
       team_name: team,
       top_speed_index: normTop.get(team) ?? 0,
@@ -735,6 +763,9 @@ export async function computeCarProfiles(
       effective_sample_races: effective,
       sample_laps: sampleLaps,
       confidence,
+      corner_type_strength: cornerTypeStrength,
+      corner_data_coverage: covW > 0 ? coverageAgg : 0,
+      corner_source: cornerSource,
     });
   }
 
