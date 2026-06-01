@@ -60,7 +60,7 @@ interface Props {
   onAvgChange?: (avg: RaceDrivingAverages | null) => void;
 }
 
-export function DrivingAnalysis({ drivers, raceAverageContext, driverCumulativeDeviation }: Props) {
+export function DrivingAnalysis({ drivers, raceAverageContext, onAvgChange }: Props) {
   const analyses = useMemo(
     () => drivers.map((d) => ({ ...d, zones: computeZones(d.carData) })),
     [drivers],
