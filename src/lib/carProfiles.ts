@@ -30,6 +30,7 @@
 import {
   getAllLaps,
   getDrivers,
+  getQualifyingSessionsByYear,
   getRaceSessionsByYear,
   type Driver,
   type Lap,
@@ -38,7 +39,14 @@ import {
 
 export interface CarProfile {
   team_name: string;
-  top_speed_index: number; // 0..1, 1 = best in field
+  /**
+   * 0..1, 1 = best in field. Represents primarily the QUALIFYING potential
+   * of the engine + low-fuel package (see TOP_SPEED_QUALI_WEIGHT below): in
+   * race conditions the trap speed is depressed by lift&coast, ERS
+   * management, fuel weight and conservative engine maps, so qualifying is
+   * a much cleaner proxy of raw straight-line capability.
+   */
+  top_speed_index: number;
   sector_strength: { s1: number; s2: number; s3: number }; // 0..1, 1 = best
   /** Number of races with usable data that contributed to this team. */
   sample_races: number;
@@ -61,6 +69,12 @@ export interface RaceDiagnostic {
   name: string;
   date_end: string;
   status: RaceDiagnosticStatus;
+  /**
+   * Which sessions were actually available and contributed to this GP's
+   * aggregation. Both can be true (ideal), or just one (fallback). Both
+   * false implies status !== "used".
+   */
+  sources?: { quali: boolean; race: boolean };
 }
 
 export interface ComputeCarProfilesResult {
