@@ -102,6 +102,14 @@ export interface CarProfile {
    *                       analyzer error) → corner_data_coverage is null
    */
   corner_coverage_status?: "ok" | "below_threshold" | "not_available";
+  /**
+   * Diagnostic-only: aggregated Procrustes residual (normalised RMS) of
+   * the GPS↔layout shape alignment. Lower is better; values around 1 mean
+   * the alignment failed to lock. `null` when not measured (no analyzer /
+   * no GPS data / degenerate-bbox-fallback for every contributing GP).
+   * Does NOT affect the gate or the affinity score.
+   */
+  corner_alignment_error?: number | null;
 }
 
 /**
@@ -509,6 +517,9 @@ export async function computeCarProfiles(
   // Diagnostic-only: corner-vertices coverage (slow/medium/fast only).
   const accCornerCovSum = new Map<string, number>();
   const accCornerCovW = new Map<string, number>();
+  // Diagnostic-only: aggregated Procrustes alignment error per team.
+  const accAlignErrSum = new Map<string, number>();
+  const accAlignErrW = new Map<string, number>();
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
   // For each team, collect the weights of the races it contributed to —
@@ -648,6 +659,7 @@ export async function computeCarProfiles(
             };
             const coverageByTeam = new Map<string, number>();
             const cornerCoverageByTeam = new Map<string, number>();
+            const alignErrByTeam = new Map<string, number>();
             for (const pd of analysis.per_driver) {
               const team = driverToTeam.get(pd.driver_number);
               if (!team) continue;
@@ -656,6 +668,9 @@ export async function computeCarProfiles(
               if (pd.fast_corner_speed != null) rawByType.fast.set(team, pd.fast_corner_speed);
               coverageByTeam.set(team, pd.coverage);
               if (pd.corner_coverage != null) cornerCoverageByTeam.set(team, pd.corner_coverage);
+              if (pd.alignment_error != null && Number.isFinite(pd.alignment_error)) {
+                alignErrByTeam.set(team, pd.alignment_error);
+              }
             }
             // Normalize per type within this GP (higher speed = stronger).
             const normSlow = normalizeHigherIsBetter(rawByType.slow);
@@ -681,6 +696,10 @@ export async function computeCarProfiles(
             for (const [team, cov] of cornerCoverageByTeam.entries()) {
               accCornerCovSum.set(team, (accCornerCovSum.get(team) ?? 0) + cov * w);
               accCornerCovW.set(team, (accCornerCovW.get(team) ?? 0) + w);
+            }
+            for (const [team, err] of alignErrByTeam.entries()) {
+              accAlignErrSum.set(team, (accAlignErrSum.get(team) ?? 0) + err * w);
+              accAlignErrW.set(team, (accAlignErrW.get(team) ?? 0) + w);
             }
           }
         }
@@ -772,6 +791,10 @@ export async function computeCarProfiles(
     const ccW = accCornerCovW.get(team) ?? 0;
     const ccS = accCornerCovSum.get(team) ?? 0;
     const cornerCoverageCurve = ccW > 0 ? ccS / ccW : null;
+    // Diagnostic-only: aggregate Procrustes alignment error.
+    const aeW = accAlignErrW.get(team) ?? 0;
+    const aeS = accAlignErrSum.get(team) ?? 0;
+    const cornerAlignmentError = aeW > 0 ? aeS / aeW : null;
 
     let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
     let cornerSource: CarProfile["corner_source"] = "sector_fallback";
@@ -817,6 +840,7 @@ export async function computeCarProfiles(
       corner_coverage_curve: cornerCoverageCurve,
       corner_source: cornerSource,
       corner_coverage_status: coverageStatus,
+      corner_alignment_error: cornerAlignmentError,
     });
   }
 

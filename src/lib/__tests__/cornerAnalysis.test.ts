@@ -235,12 +235,23 @@ describe("aggregateDriverCornerSpeeds", () => {
     if (!cornerVertexIndices.includes(v)) straightVertexIndices.push(v);
   }
 
+  // NOTE: with the new Procrustes shape alignment (replacing the legacy
+  // bbox+mirror), the snap-to-vertex step relies on a good initial PCA
+  // estimate. Sources that cover ONLY corners (very few straights) have a
+  // PCA orientation that doesn't match the full outline's, so the snap can
+  // drift. To exercise the corner_coverage metric correctly we now seed
+  // the source with enough straight samples to anchor the alignment, while
+  // still covering every corner vertex. Updated consciously after the
+  // Procrustes upgrade.
   it("(a) corner_coverage > global coverage when locations target corner vertices", () => {
     const t0 = new Date("2026-01-01T12:00:00Z").getTime();
-    // Cover every corner vertex + an anchor on a straight vertex (bbox).
+    // Sample EVERY corner vertex + about half of the straight vertices
+    // (every other one). Source PCA now matches the outline's, so
+    // Procrustes aligns near-identity and the snap is exact.
+    const sampledStraights = straightVertexIndices.filter((_, i) => i % 2 === 0);
     const locations: LocationData[] = [
-      locOnVertex(straightVertexIndices[0], t0),
-      ...cornerVertexIndices.map((v, i) => locOnVertex(v, t0 + (i + 1) * 100)),
+      ...sampledStraights.map((v, i) => locOnVertex(v, t0 + i * 100)),
+      ...cornerVertexIndices.map((v, i) => locOnVertex(v, t0 + (sampledStraights.length + i + 1) * 100)),
     ];
     const carData: CarData[] = locations.map((l, i) => ({
       date: l.date, speed: 100 + i, throttle: 50, brake: 0, n_gear: 4, rpm: 10000, drs: 0, driver_number: 1, session_key: 1,

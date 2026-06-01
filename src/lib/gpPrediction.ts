@@ -70,6 +70,13 @@ export interface TeamGpAffinity {
    * always show the user WHY the geometric branch was (or was not) used.
    */
   corner_coverage_status?: "ok" | "below_threshold" | "not_available";
+  /**
+   * Diagnostic-only: aggregated Procrustes alignment residual propagated
+   * verbatim from CarProfile. Lower is better; ≪1 means the GPS↔layout
+   * shape alignment locked. `null` when not measurable. Does NOT affect
+   * the affinity score.
+   */
+  corner_alignment_error?: number | null;
 }
 
 
@@ -265,6 +272,8 @@ export function predictGpAffinity(
       corner_coverage_curve:
         car.corner_coverage_curve === undefined ? null : car.corner_coverage_curve,
       corner_coverage_status: car.corner_coverage_status ?? "not_available",
+      corner_alignment_error:
+        car.corner_alignment_error === undefined ? null : car.corner_alignment_error,
     };
   });
 

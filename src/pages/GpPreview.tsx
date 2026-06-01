@@ -293,6 +293,16 @@ export function GpPredictionResultView({
                           ? <> · curve: n/d</>
                           : null}
                     </span>
+                    {/* Diagnostic-only: shape-alignment residual (Procrustes). */}
+                    {typeof t.corner_alignment_error === "number" && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/20 text-muted-foreground border-border/60"
+                        data-testid={`alignment-error-${t.team_name}`}
+                        title="Errore residuo dell'allineamento di forma (Procrustes) fra la nuvola di punti GPS e la geometria del tracciato. Più basso è meglio: valori ≪1 indicano che le due forme si sovrappongono bene; valori vicini o sopra 1 segnalano che l'allineamento non è riuscito. Diagnostica: non incide sul punteggio."
+                      >
+                        Errore allineamento: {t.corner_alignment_error.toFixed(2)}
+                      </span>
+                    )}
 
                     <span className="ml-auto opacity-70">
                       Confidenza team: {confidenceLabelIt(t.confidence)}
