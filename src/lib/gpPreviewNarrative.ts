@@ -333,3 +333,94 @@ function appendExclusionDetail(
     sentences.push(reasonParts.join("; ") + ".");
   }
 }
+
+// =====================================================================
+// PER-TEAM explanations (Part 2) — accessible prose, one item per team.
+// =====================================================================
+
+export interface PerTeamExplanation {
+  team_name: string;
+  text: string;
+}
+
+/** Verbal label describing where the team's strength lies (for the UI mini-tag). */
+export function strengthLabel(topPct: number): "rettilineo" | "curve" | "equilibrato" {
+  if (topPct >= 60) return "rettilineo";
+  if (topPct <= 40) return "curve";
+  return "equilibrato";
+}
+
+function positionPhrase(index: number, total: number): string {
+  if (total <= 1) return "è l'unico team analizzato in questa anteprima";
+  const ratio = index / (total - 1);
+  if (index === 0) return "risulta tra i team più in linea con questo circuito";
+  if (ratio <= 0.34) return "si colloca tra i team più in linea con questo circuito";
+  if (ratio >= 0.67) return "si colloca tra i meno favoriti su questo tracciato";
+  return "si trova in una posizione intermedia della classifica di affinità";
+}
+
+function circuitFavoursTopSpeed(circuit: CircuitProfile): boolean {
+  const cornerMean =
+    (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
+  return circuit.top_speed > cornerMean;
+}
+
+function circuitDimensionGap(circuit: CircuitProfile): number {
+  const cornerMean =
+    (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
+  return Math.abs(circuit.top_speed - cornerMean);
+}
+
+export function buildPerTeamExplanations(
+  circuit: CircuitProfile,
+  prediction: GpPrediction,
+): PerTeamExplanation[] {
+  const ranked = prediction.ranked;
+  if (ranked.length === 0) return [];
+
+  const groupByTeam = new Map<string, string[]>();
+  for (const g of prediction.indistinguishable_groups) {
+    for (const name of g) groupByTeam.set(name, g);
+  }
+
+  const favoursTop = circuitFavoursTopSpeed(circuit);
+  const circuitHasClearChar = circuitDimensionGap(circuit) >= 0.15;
+
+  return ranked.map((t, i) => {
+    const total = t.contributions.top_speed + t.contributions.cornering;
+    const topPct = total > 0 ? Math.round((t.contributions.top_speed / total) * 100) : 50;
+    const cornerPct = 100 - topPct;
+    const where = positionPhrase(i, ranked.length);
+
+    let strengthClause: string;
+    if (topPct >= 60) {
+      strengthClause = `Il suo punto di forza qui è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
+    } else if (cornerPct >= 60) {
+      strengthClause = `Il suo punto di forza qui è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
+    } else {
+      strengthClause = `Velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
+    }
+
+    let circuitLink = "";
+    if (circuitHasClearChar) {
+      if (favoursTop) {
+        if (topPct >= 60) circuitLink = ", e questo circuito premia proprio i rettilinei: una combinazione favorevole";
+        else if (cornerPct >= 60) circuitLink = ", ma questo circuito premia di più i rettilinei: una combinazione meno favorevole";
+      } else {
+        if (cornerPct >= 60) circuitLink = ", e questo circuito premia proprio la guida in curva: una combinazione favorevole";
+        else if (topPct >= 60) circuitLink = ", ma questo circuito premia di più la guida in curva: una combinazione meno favorevole";
+      }
+    }
+
+    let equivClause = "";
+    const group = groupByTeam.get(t.team_name);
+    if (group && group.length > 1) {
+      const others = group.filter((n) => n !== t.team_name);
+      equivClause = ` Il suo punteggio è troppo vicino a quello di ${joinNames(others)} per distinguerli con certezza con i dati attuali: vanno considerati alla pari.`;
+    }
+
+    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}`;
+    return { team_name: t.team_name, text };
+  });
+}
+
