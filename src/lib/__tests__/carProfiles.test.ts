@@ -550,8 +550,8 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     const analyzeQualiCorners = vi.fn(async () => ({
       gpName: "Test", sessionKey: 2, segments: [],
       per_driver: [
-        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.2, partial: true, notes: [] },
-        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.1, partial: true, notes: [] },
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.2, corner_coverage: 0.3, partial: true, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.1, corner_coverage: 0.15, partial: true, notes: [] },
       ],
       notes: [], aborted: false,
     }));
