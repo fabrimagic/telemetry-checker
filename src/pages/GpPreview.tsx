@@ -20,6 +20,8 @@ import {
   buildPerTeamExplanations,
   strengthLabel,
 } from "@/lib/gpPreviewNarrative";
+import { analyzeCornersForSession } from "@/lib/cornerAnalysis";
+import type { SessionInfo } from "@/lib/openf1";
 
 
 // ----- Helpers -----
