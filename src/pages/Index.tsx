@@ -20,6 +20,8 @@ import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { SoftSensorsLapCard } from "@/components/f1/SoftSensorsLapCard";
+import { LapPrecipOutlookCard } from "@/components/f1/LapPrecipOutlookCard";
+import { fetchLapPrecipOutlook, type LapPrecipOutlook } from "@/lib/precipForecast";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
@@ -99,6 +101,9 @@ export default function Index() {
   const [loadingLaps, setLoadingLaps] = useState<Set<number>>(new Set());
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  // Purely informative; never feeds any computation.
+  const [lapPrecip, setLapPrecip] = useState<LapPrecipOutlook | null>(null);
+  const [circuitKey, setCircuitKey] = useState<string | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [overtakesReceivedData, setOvertakesReceivedData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
