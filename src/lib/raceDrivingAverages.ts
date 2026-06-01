@@ -90,6 +90,14 @@ export function computeZones(carData: CarData[]): DrivingZoneStats {
 
 // ───────────────────────── Race average aggregation ─────────────────────────
 
+export interface PerLapDrivingPoint {
+  lap_number: number;
+  superclip_duration: number;
+  superclip_count: number;
+  liftcoast_duration: number;
+  liftcoast_count: number;
+}
+
 export interface RaceDrivingAverages {
   laps_used: number;
   laps_total_comparable: number;
@@ -103,6 +111,8 @@ export interface RaceDrivingAverages {
   low_sample: boolean;
   /** True when computation was aborted before completing all comparable laps. */
   aborted: boolean;
+  /** Per-lap driving series for successfully downloaded comparable laps, ordered by lap_number. */
+  per_lap: PerLapDrivingPoint[];
 }
 
 export type CarDataFetcher = (
