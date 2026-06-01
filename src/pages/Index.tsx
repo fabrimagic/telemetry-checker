@@ -12,6 +12,7 @@ import { TelemetryCharts, type DriverTelemetry, type TelemetryPoint } from "@/co
 import { TrackMap } from "@/components/f1/TrackMap";
 import { SectorMiniSectors } from "@/components/f1/SectorMiniSectors";
 import { DrivingAnalysis, computeDriverZones } from "@/components/f1/DrivingAnalysis";
+import { PerLapDrivingCharts } from "@/components/f1/PerLapDrivingCharts";
 import { TyreDegradationCard } from "@/components/f1/TyreDegradationCard";
 import { DashboardSummary } from "@/components/f1/DashboardSummary";
 import { calculateTyreDegradation } from "@/lib/tyreDegradation";
@@ -116,6 +117,7 @@ export default function Index() {
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
   const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
+  const [raceAvg, setRaceAvg] = useState<import("@/lib/raceDrivingAverages").RaceDrivingAverages | null>(null);
   const [loadingVre, setLoadingVre] = useState(false);
   const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
   const [vreScenario, setVreScenario] = useState<import("@/lib/scenarioContext").ScenarioId>("REAL_CONTEXT");
@@ -905,6 +907,11 @@ export default function Index() {
     };
   }, [singleDriverZones]);
 
+  const driverCumDev = useMemo(() => {
+    if (!isSingleDriverRaceLike || !singleDriverState || !cumDevResult) return null;
+    return cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null;
+  }, [isSingleDriverRaceLike, singleDriverState, cumDevResult]);
+
   const workspaceContent = (
     <>
       {error && (
@@ -1094,6 +1101,12 @@ export default function Index() {
                         lapSoftSensor={selectedLapSoftSensor}
                         zones={telemetryZones}
                       />
+                      {raceAvg && raceAvg.per_lap.length > 0 && (
+                        <PerLapDrivingCharts
+                          avg={raceAvg}
+                          driverCumulativeDeviation={driverCumDev}
+                        />
+                      )}
                     </section>
                     <aside className="space-y-4 min-w-0">
                       {mapDrivers.length > 0 && (
@@ -1128,7 +1141,7 @@ export default function Index() {
                         const driverCumDev = (isSingleDriverRaceLike && singleDriverState && cumDevResult)
                           ? cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null
                           : null;
-                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} driverCumulativeDeviation={driverCumDev} />;
+                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} onAvgChange={setRaceAvg} />;
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
                       {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
