@@ -9,9 +9,11 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
+  ReferenceArea,
   CartesianGrid,
 } from "recharts";
 import type { SoftSensorsLapState } from "@/lib/softSensors";
+import { ZONE_COLORS, groupDatesToIntervals, type ZoneInterval } from "@/lib/zoneIntervals";
 
 export interface DriverTelemetry {
   driverNumber: number;
@@ -36,6 +38,8 @@ interface Props {
   onCursorChange: (time: number | null) => void;
   onCursorClick: (time: number) => void;
   lapSoftSensor?: SoftSensorsLapState | null;
+  /** Single-driver only: dates (ISO) of driving-style episodes to overlay as bands. */
+  zones?: { superclipping: string[]; liftcoast: string[] } | null;
 }
 
 const GRID_STROKE = "hsl(220 14% 16%)";
@@ -130,7 +134,19 @@ function buildTooltipContent(lapSoftSensor: SoftSensorsLapState | null | undefin
   };
 }
 
-export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick, lapSoftSensor }: Props) {
+export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick, lapSoftSensor, zones }: Props) {
+  // Build zone bands only when there's a single driver in view (avoid color ambiguity).
+  const zoneIntervals: ZoneInterval[] = useMemo(() => {
+    if (!zones || drivers.length !== 1) return [];
+    const ref = drivers[0].data;
+    if (!ref.length) return [];
+    return [
+      ...groupDatesToIntervals(zones.superclipping ?? [], "superclipping", ref),
+      ...groupDatesToIntervals(zones.liftcoast ?? [], "liftcoast", ref),
+    ];
+  }, [zones, drivers]);
+  const hasZones = zoneIntervals.length > 0;
+
   const domain = useMemo(() => {
     let min = Infinity, max = -Infinity;
     for (const d of drivers) {
@@ -188,6 +204,18 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
     <ReferenceLine x={cursorTime} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
   ) : null;
 
+  const zoneAreas = zoneIntervals.map((iv, i) => (
+    <ReferenceArea
+      key={`zone-${i}`}
+      x1={iv.startTime}
+      x2={iv.endTime}
+      fill={ZONE_COLORS[iv.type]}
+      fillOpacity={0.14}
+      stroke="none"
+      ifOverflow="hidden"
+    />
+  ));
+
   const tooltipContent = buildTooltipContent(lapSoftSensor);
 
   if (!drivers.length || !drivers.some((d) => d.data.length > 0)) return null;
@@ -208,6 +236,7 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
           <XAxis {...commonXAxis} hide={!showXAxis} />
           <YAxis width={42} tick={AXIS_TICK} axisLine={false} tickLine={false} {...yProps} />
           <Tooltip content={tooltipContent} />
+          {zoneAreas}
           {refLine}
           {drivers.map((d) => (
             <Line
@@ -229,7 +258,20 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
 
   return (
     <div className="space-y-0">
+      {hasZones && (
+        <div className="flex flex-wrap gap-3 mb-2 px-1">
+          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: ZONE_COLORS.superclipping, opacity: 0.55 }} />
+            Superclipping
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: ZONE_COLORS.liftcoast, opacity: 0.55 }} />
+            Lift &amp; Coast
+          </span>
+        </div>
+      )}
       {renderLineChart("Speed (km/h)", speedData, "speed", 140)}
+
 
       {/* Throttle as area */}
       <ChartWrapper label="Throttle (%)">
@@ -239,6 +281,7 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
             <XAxis {...commonXAxis} hide />
             <YAxis width={42} domain={[0, 100]} tick={AXIS_TICK} axisLine={false} tickLine={false} />
             <Tooltip content={tooltipContent} />
+            {zoneAreas}
             {refLine}
             {drivers.map((d) => (
               <Area
@@ -264,6 +307,7 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
           <AreaChart data={brakeData} {...chartHandlers} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
             <XAxis {...commonXAxis} hide />
             <YAxis width={42} domain={[0, 100]} tick={AXIS_TICK} axisLine={false} tickLine={false} ticks={[0, 100]} />
+            {zoneAreas}
             {refLine}
             {drivers.map((d) => (
               <Area
