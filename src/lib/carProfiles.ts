@@ -69,14 +69,31 @@ export interface CarProfile {
    * otherwise null and the consumer should fall back to sector_strength.
    */
   corner_type_strength?: { slow: number; medium: number; fast: number } | null;
-  /** Aggregated 0..1 spatial coverage across the contributing GPs. */
-  corner_data_coverage?: number;
+  /**
+   * Aggregated 0..1 spatial coverage across the contributing GPs.
+   * Always populated when the analyzer produced any coverage measurement
+   * for this team, EVEN when coverage is below CORNER_COVERAGE_MIN
+   * (diagnostic value, preserved so the UI can show why the gate rejected
+   * the geometric branch). `null` only when coverage was not measurable at
+   * all (no analyzer injected, analyzer error, no /location data).
+   */
+  corner_data_coverage?: number | null;
   /**
    * Which method produced the cornering signal for this team:
    *  - "location_geometry": derived from GPS + circuit layout (granular)
    *  - "sector_fallback":   coverage too low / no data → use sector_strength
    */
   corner_source?: "location_geometry" | "sector_fallback";
+  /**
+   * Diagnostic summary of the GPS-coverage gate outcome for this team:
+   *  - "ok":              coverage measured and ≥ CORNER_COVERAGE_MIN
+   *  - "below_threshold": coverage measured but < CORNER_COVERAGE_MIN
+   *                       (fallback applies; value preserved on
+   *                       corner_data_coverage for diagnosis)
+   *  - "not_available":   coverage not measurable (no analyzer / no data /
+   *                       analyzer error) → corner_data_coverage is null
+   */
+  corner_coverage_status?: "ok" | "below_threshold" | "not_available";
 }
 
 /**
@@ -733,10 +750,12 @@ export async function computeCarProfiles(
     const covW = accCoverageW.get(team) ?? 0;
     const covS = accCoverageSum.get(team) ?? 0;
     const coverageAgg = covW > 0 ? covS / covW : 0;
+    const coverageMeasured = covW > 0;
 
     let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
     let cornerSource: CarProfile["corner_source"] = "sector_fallback";
-    if (covW > 0 && coverageAgg >= CORNER_COVERAGE_MIN) {
+    let coverageStatus: CarProfile["corner_coverage_status"] = "not_available";
+    if (coverageMeasured && coverageAgg >= CORNER_COVERAGE_MIN) {
       const slow = avgCorner("slow");
       const medium = avgCorner("medium");
       const fast = avgCorner("fast");
@@ -748,7 +767,14 @@ export async function computeCarProfiles(
           fast: fast ?? 0,
         };
         cornerSource = "location_geometry";
+        coverageStatus = "ok";
+      } else {
+        // Coverage was measured but no per-type value survived (degenerate
+        // analyzer output) → diagnostic-only fallback.
+        coverageStatus = "below_threshold";
       }
+    } else if (coverageMeasured) {
+      coverageStatus = "below_threshold";
     }
 
     profiles.push({
@@ -764,8 +790,11 @@ export async function computeCarProfiles(
       sample_laps: sampleLaps,
       confidence,
       corner_type_strength: cornerTypeStrength,
-      corner_data_coverage: covW > 0 ? coverageAgg : 0,
+      // Preserve real coverage value in every branch (even below threshold)
+      // so downstream consumers can diagnose; null only when not measurable.
+      corner_data_coverage: coverageMeasured ? coverageAgg : null,
       corner_source: cornerSource,
+      corner_coverage_status: coverageStatus,
     });
   }
 

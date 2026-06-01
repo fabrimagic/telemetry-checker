@@ -48,9 +48,23 @@ export interface TeamGpAffinity {
    * Surfaced so the UI/narrative can be transparent about provenance.
    */
   corner_source?: "location_geometry" | "sector_fallback";
-  /** Aggregated /location coverage when corner_source = "location_geometry". */
-  corner_coverage?: number;
+  /**
+   * Aggregated /location coverage as measured by the analyzer. ALWAYS
+   * propagated when the analyzer produced a measurement, including when
+   * the team fell back to sector_fallback because coverage was below the
+   * gate threshold (diagnostic-only). `null` when coverage could not be
+   * measured at all (no analyzer / no data / analyzer error). Does NOT
+   * affect the affinity score.
+   */
+  corner_coverage?: number | null;
+  /**
+   * Diagnostic gate outcome propagated verbatim from CarProfile:
+   * "ok" | "below_threshold" | "not_available". Surfaced so the UI can
+   * always show the user WHY the geometric branch was (or was not) used.
+   */
+  corner_coverage_status?: "ok" | "below_threshold" | "not_available";
 }
+
 
 export interface GpPrediction {
   ranked: TeamGpAffinity[];
@@ -237,8 +251,11 @@ export function predictGpAffinity(
       confidence: minConfidence(car.confidence, circuit.confidence),
       contributions: { top_speed: cTop, cornering: cCorner },
       corner_source: cornerSource,
+      // Diagnostic-only: propagate coverage in BOTH branches (incl. fallback)
+      // so the UI can always show the measured value. Does not affect score.
       corner_coverage:
-        cornerSource === "location_geometry" ? car.corner_data_coverage : undefined,
+        car.corner_data_coverage === undefined ? null : car.corner_data_coverage,
+      corner_coverage_status: car.corner_coverage_status ?? "not_available",
     };
   });
 

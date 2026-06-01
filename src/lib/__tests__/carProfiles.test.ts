@@ -535,6 +535,9 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     for (const p of profiles) {
       expect(p.corner_source).toBe("location_geometry");
       expect(p.corner_type_strength).not.toBeNull();
+      expect(p.corner_coverage_status).toBe("ok");
+      expect(typeof p.corner_data_coverage).toBe("number");
+      expect(p.corner_data_coverage!).toBeGreaterThanOrEqual(0.5);
     }
     const A = profiles.find((p) => p.team_name === "A")!;
     const B = profiles.find((p) => p.team_name === "B")!;
@@ -542,7 +545,7 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     expect(B.corner_type_strength!.medium).toBeCloseTo(1, 5);
   });
 
-  it("(b) low coverage → corner_type_strength=null, source=sector_fallback", async () => {
+  it("(b) low coverage → corner_type_strength=null, source=sector_fallback, BUT coverage value preserved (diagnostic)", async () => {
     setupOneGpWithQuali();
     const analyzeQualiCorners = vi.fn(async () => ({
       gpName: "Test", sessionKey: 2, segments: [],
@@ -556,10 +559,15 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     for (const p of profiles) {
       expect(p.corner_source).toBe("sector_fallback");
       expect(p.corner_type_strength).toBeNull();
+      // Diagnostic value preserved even though the gate rejected geometry.
+      expect(p.corner_coverage_status).toBe("below_threshold");
+      expect(typeof p.corner_data_coverage).toBe("number");
+      expect(p.corner_data_coverage!).toBeLessThan(0.5);
+      expect(p.corner_data_coverage!).toBeGreaterThan(0);
     }
   });
 
-  it("(c) analyzer throws → fallback, profile still valid", async () => {
+  it("(c) analyzer throws → fallback, coverage NOT measurable (null + not_available)", async () => {
     setupOneGpWithQuali();
     const analyzeQualiCorners = vi.fn(async () => { throw new Error("boom"); });
     const { profiles } = await computeCarProfiles({ now: NOW, analyzeQualiCorners });
@@ -567,16 +575,21 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
     for (const p of profiles) {
       expect(p.corner_source).toBe("sector_fallback");
       expect(p.corner_type_strength).toBeNull();
+      expect(p.corner_data_coverage).toBeNull();
+      expect(p.corner_coverage_status).toBe("not_available");
     }
   });
 
-  it("(d) no analyzer → corner dimension stays null (sector_fallback)", async () => {
+  it("(d) no analyzer → coverage not measurable (null + not_available)", async () => {
     setupOneGpWithQuali();
     const { profiles } = await computeCarProfiles({ now: NOW });
     for (const p of profiles) {
       expect(p.corner_source).toBe("sector_fallback");
       expect(p.corner_type_strength).toBeNull();
+      expect(p.corner_data_coverage).toBeNull();
+      expect(p.corner_coverage_status).toBe("not_available");
     }
   });
 });
+
 
