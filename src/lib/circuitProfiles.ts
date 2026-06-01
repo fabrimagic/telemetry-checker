@@ -184,6 +184,12 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 1.00, slow_corner_traction: 0.45, medium_corner: 0.25, fast_corner: 0.30,
     tyre_deg: 0.40, overtaking_difficulty: 0.20,
     confidence: "high", source: "historical",
+    // PILOTA: S1 dominato da velocità (Rettifilo chicane), S2 Lesmo medie/veloci, S3 Ascari/Parabolica veloci.
+    sector_corner_map: {
+      s1: { slow: 0.2, medium: 0.3, fast: 0.5 },
+      s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
+      s3: { slow: 0.2, medium: 0.3, fast: 0.5 },
+    },
   },
   "Gran Premio di Spagna": {
     // Madrid (Madring) — new circuit 2026, no representative history.
