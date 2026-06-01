@@ -2359,6 +2359,24 @@ export function computeVirtualRaceEngineer(
       confidenceFactors.push(`Risk scoring (${riskMode}): ${recScored.adjustment_reason}`);
     }
 
+    // Uncertainty band check: if the recommended strategy was promoted from an
+    // alternative whose pace delta vs actual is within the propagated
+    // degradation-slope band, flag it as "within margin" so the UI/narrative
+    // can warn the user. Pure-pace fields and ranking remain unchanged.
+    {
+      const matchedAlt = alternatives.find(a =>
+        a.pit_laps.length === recommendedStrategy.pit_windows.length &&
+        a.pit_laps.every((p, i) => p === recommendedStrategy.pit_windows[i]?.ideal_lap) &&
+        a.compounds.join(",") === recommendedStrategy.compounds.join(",")
+      );
+      if (matchedAlt && matchedAlt.indistinguishable_from_actual) {
+        confidenceFactors.push(
+          `Il vantaggio stimato (${matchedAlt.estimated_delta_vs_actual.toFixed(1)}s) rientra nel margine di incertezza del modello di degrado (±${(matchedAlt.delta_uncertainty_std ?? 0).toFixed(1)}s)`,
+        );
+      }
+    }
+
+
     // Soft sensor scoring narrative
     if (softSensorScoringGate.soft_sensor_scoring_enabled) {
       const anySSEffect = recSSScoringDelta !== 0 || altSSScoringDeltas.some(d => d !== 0);
