@@ -269,6 +269,25 @@ export function predictGpAffinity(
     );
   }
 
+  // Geometry-source transparency: when at least one team's cornering signal
+  // comes from /location + circuit GeoJSON (location_geometry), declare it
+  // honestly so the UI/narrative can surface the caveat about possible
+  // spatial-alignment imperfections.
+  const geomTeams = ranked.filter((t) => t.corner_source === "location_geometry");
+  if (geomTeams.length > 0) {
+    notes.push(
+      `Per ${geomTeams.length === 1 ? "un team" : `${geomTeams.length} team`} la tenuta in curva è ricostruita dalla geometria del tracciato e dalla posizione GPS delle vetture in qualifica (dimensione sperimentale): può contenere imprecisioni di allineamento.`,
+    );
+  }
+  const fallbackTeams = ranked.filter((t) => t.corner_source === "sector_fallback");
+  if (fallbackTeams.length > 0 && geomTeams.length > 0) {
+    notes.push(
+      `Per gli altri team la tenuta in curva è stimata dai tempi di settore (metodo aggregato, non per tipo di curva).`,
+    );
+  }
+
+
+
 
   return {
     ranked,
