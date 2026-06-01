@@ -16,20 +16,48 @@ const HIGH_TRAIT = 0.7;
 const DOMINANT_TOP_RATIO = 0.6; // contributions.top_speed / total ≥ this ⇒ "velocità di punta"
 const DOMINANT_CORNER_RATIO = 0.6;
 
+export interface RaceDiagnosticLite {
+  name: string;
+  date_end: string;
+  status: "used" | "no_data" | "fetch_failed";
+}
+
+export interface NarrativeDataContext {
+  totalPastRaces?: number;
+  racesConsidered?: number;
+  racesWithData?: number;
+  diagnostics?: RaceDiagnosticLite[];
+}
+
 function confidenceItalian(c: "high" | "medium" | "low"): string {
   return c === "high" ? "alta" : c === "medium" ? "media" : "bassa";
 }
 
-function joinTeamNames(names: string[]): string {
+function joinNames(names: string[]): string {
   if (names.length === 0) return "";
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} e ${names[1]}`;
   return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
 }
 
+/** Format a ratio in [0,1] as a readable Italian fraction phrase. */
+function ratioPhrase(r: number): string {
+  if (!Number.isFinite(r)) return "in parte";
+  if (r >= 0.78) return "in larghissima parte";
+  if (r >= 0.68) return "per circa tre quarti";
+  if (r >= 0.6) return "per circa due terzi";
+  if (r >= 0.52) return "per poco più della metà";
+  if (r >= 0.48) return "per circa metà";
+  if (r >= 0.4) return "per poco meno della metà";
+  if (r >= 0.32) return "per circa un terzo";
+  if (r >= 0.22) return "per circa un quarto";
+  return "in piccola parte";
+}
+
 export function buildGpPreviewNarrative(
   circuit: CircuitProfile,
   prediction: GpPrediction,
+  dataContext?: NarrativeDataContext,
 ): string[] {
   const sentences: string[] = [];
 
@@ -71,25 +99,40 @@ export function buildGpPreviewNarrative(
   // ----- Edge: nessun team -----
   if (prediction.ranked.length === 0) {
     sentences.push("Dati insufficienti per un'analisi dei team su questo circuito.");
+    // Even with no teams, surface the data-context paragraph if available so the
+    // user understands why.
+    appendDataContextParagraph(sentences, dataContext);
     return sentences;
   }
 
-  // ----- 2. TEAM FAVORITI E PERCHÉ -----
+  // ----- 2. COSA RAPPRESENTA IL PUNTEGGIO (didattica) -----
+  sentences.push(
+    "Il punteggio di affinità è un indice da 0 a 1 che stima quanto le caratteristiche misurate di ogni vettura — velocità di punta e tenuta in curva aggregata sui tre settori — si sposano con ciò che questo circuito richiede. Non è una previsione del risultato della gara, ma una lettura tecnica del match circuito-vettura sui dati raccolti finora.",
+  );
+
+  // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
+  {
+    const ranked = prediction.ranked;
+    const avgBand =
+      ranked.reduce((s, t) => s + t.uncertainty, 0) / Math.max(1, ranked.length);
+    const bandText = Number.isFinite(avgBand) ? `±${avgBand.toFixed(2)}` : "";
+    sentences.push(
+      `Ogni punteggio è accompagnato da una banda di incertezza${bandText ? ` (tipicamente ${bandText})` : ""} che riflette quanto i dati disponibili sono sufficienti a stimarlo: due team le cui bande si sovrappongono vanno considerati sostanzialmente equivalenti, perché la loro differenza rientra nell'errore di stima.`,
+    );
+  }
+
+  // ----- 3. TEAM FAVORITI E PERCHÉ (esteso) -----
   {
     const ranked = prediction.ranked;
     const leader = ranked[0];
 
-    // Find the indistinguishable group that contains the leader, if any.
     const leaderGroup = prediction.indistinguishable_groups.find((g) =>
       g.includes(leader.team_name),
     );
-
-    // The "top group" we present together: either the leader's indistinguishable
-    // group (if it includes the leader), otherwise just the leader alone.
     const topNames = leaderGroup ?? [leader.team_name];
     const topTeams = ranked.filter((t) => topNames.includes(t.team_name));
 
-    // Aggregate dominant dimension across the top teams (sum contributions).
+    // Aggregate dominant dimension across top teams.
     let sumTop = 0;
     let sumCorner = 0;
     for (const t of topTeams) {
@@ -98,27 +141,34 @@ export function buildGpPreviewNarrative(
     }
     const totalC = sumTop + sumCorner;
     const topRatio = totalC > 0 ? sumTop / totalC : 0.5;
+    const cornerRatio = 1 - topRatio;
 
     let because: string;
-    if (topRatio >= DOMINANT_TOP_RATIO) because = "soprattutto grazie alla velocità di punta";
-    else if (1 - topRatio >= DOMINANT_CORNER_RATIO)
-      because = "soprattutto grazie alla tenuta in curva";
-    else because = "grazie a un buon compromesso fra velocità di punta e curve";
+    if (topRatio >= DOMINANT_TOP_RATIO) {
+      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva`;
+    } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
+      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta`;
+    } else {
+      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva, senza una vera dimensione dominante";
+    }
 
     if (topTeams.length > 1) {
       sentences.push(
-        `Sui dati delle ultime gare, ${joinTeamNames(
+        `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} sembrano sostanzialmente equivalenti in cima alla classifica di affinità, ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di affinità: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
+      );
+      sentences.push(
+        "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} sembra il team più adatto a questo tracciato, ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} sembra il team più in linea con questo tracciato: il suo punteggio deriva ${because}.`,
       );
     }
   }
 
-  // ----- 3. CHI POTREBBE FATICARE -----
+  // ----- 4. CHI POTREBBE FATICARE (collegato al perché) -----
   {
     const ranked = prediction.ranked;
     if (ranked.length >= 3) {
@@ -126,23 +176,50 @@ export function buildGpPreviewNarrative(
       const leaderGroup = prediction.indistinguishable_groups.find((g) =>
         g.includes(ranked[0].team_name),
       );
-      // Only mention a back-marker if it is NOT in the leaders' equivalence group.
       if (!leaderGroup || !leaderGroup.includes(last.team_name)) {
+        const total =
+          last.contributions.top_speed + last.contributions.cornering;
+        const lastTopRatio = total > 0 ? last.contributions.top_speed / total : 0.5;
+        // Identify which trait the circuit rewards most to explain the mismatch.
+        const cornerMean =
+          (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
+        const circuitFavoursTop = circuit.top_speed >= cornerMean;
+        let why: string;
+        if (circuitFavoursTop && lastTopRatio < 0.5) {
+          why = "perché il suo punto di forza è più nella tenuta in curva che nella velocità di punta, ed è questa seconda dimensione che il circuito premia di più";
+        } else if (!circuitFavoursTop && lastTopRatio > 0.5) {
+          why = "perché il suo punto di forza è più nella velocità di punta che nella tenuta in curva, ed è quest'ultima che il circuito premia di più";
+        } else {
+          why = "perché su entrambe le dimensioni misurate appare più indietro rispetto agli altri team";
+        }
         sentences.push(
-          `${last.team_name} potrebbe invece trovarsi meno a suo agio su questo tipo di tracciato.`,
+          `${last.team_name} potrebbe invece trovarsi meno a suo agio su questo tipo di tracciato, ${why}.`,
         );
       }
     }
   }
 
-  // ----- 4. CAVEAT DI CONFIDENZA -----
+  // ----- 5. PARAGRAFO ESTESO SULLE GARE ESCLUSE -----
+  appendDataContextParagraph(sentences, dataContext);
+
+  // ----- 6. CAVEAT DI CONFIDENZA (richiamo breve, evita ripetizioni) -----
   {
-    const noteText = prediction.notes.find((n) => /Profili vettura basati/i.test(n));
     const confLabel = confidenceItalian(prediction.global_confidence);
-    if (noteText) {
-      sentences.push(`Confidenza ${confLabel}: ${noteText}`);
+    const hasExtendedDataParagraph =
+      !!dataContext &&
+      typeof dataContext.racesConsidered === "number" &&
+      typeof dataContext.racesWithData === "number" &&
+      dataContext.racesWithData < dataContext.racesConsidered;
+
+    if (hasExtendedDataParagraph) {
+      sentences.push(`Confidenza complessiva ${confLabel}, per i motivi appena esposti.`);
     } else {
-      sentences.push(`Confidenza ${confLabel} sull'analisi complessiva.`);
+      const noteText = prediction.notes.find((n) => /Profili vettura basati/i.test(n));
+      if (noteText) {
+        sentences.push(`Confidenza ${confLabel}: ${noteText}`);
+      } else {
+        sentences.push(`Confidenza ${confLabel} sull'analisi complessiva.`);
+      }
     }
 
     const overtakingNote = prediction.notes.find((n) => /sorpass/i.test(n));
@@ -154,4 +231,81 @@ export function buildGpPreviewNarrative(
   }
 
   return sentences;
+}
+
+/**
+ * Builds the extended "what races were excluded and why" paragraph and
+ * appends it to the sentences array. No-op when dataContext is missing or
+ * when racesWithData === racesConsidered (only a short reassurance sentence
+ * is added in that case).
+ */
+function appendDataContextParagraph(
+  sentences: string[],
+  dataContext?: NarrativeDataContext,
+): void {
+  if (!dataContext) return;
+  const considered = dataContext.racesConsidered;
+  const withData = dataContext.racesWithData;
+  const total = dataContext.totalPastRaces;
+  if (typeof considered !== "number" || typeof withData !== "number") return;
+
+  if (withData >= considered) {
+    if (typeof total === "number" && total > 0) {
+      sentences.push(
+        `L'analisi si basa sui dati telemetrici delle ultime ${considered} gare disputate finora nel 2026 (su ${total} totali), tutte con dati utilizzabili.`,
+      );
+    } else {
+      sentences.push(
+        `L'analisi si basa sui dati telemetrici delle ultime ${considered} gare, tutte con dati utilizzabili.`,
+      );
+    }
+    return;
+  }
+
+  // racesWithData < racesConsidered → extended explanation.
+  const diagnostics = dataContext.diagnostics ?? [];
+  const excluded = diagnostics.filter((d) => d.status !== "used");
+  const noData = excluded.filter((d) => d.status === "no_data").map((d) => d.name);
+  const fetchFailed = excluded
+    .filter((d) => d.status === "fetch_failed")
+    .map((d) => d.name);
+
+  // Frase 1: contesto generale.
+  if (typeof total === "number" && total > 0) {
+    sentences.push(
+      `Nel 2026 si sono finora disputate ${total} gare; per restare aderente all'evoluzione recente delle vetture, l'analisi considera solo le ultime ${considered}.`,
+    );
+  } else {
+    sentences.push(
+      `Per restare aderente all'evoluzione recente delle vetture, l'analisi considera solo le ultime ${considered} gare.`,
+    );
+  }
+
+  // Frase 2: di queste, quante con dati utili.
+  sentences.push(
+    `Di queste ${considered}, solo ${withData} hanno fornito dati telemetrici completi (velocità ai rilevamenti e tempi di settore validi).`,
+  );
+
+  // Frase 3: perché le altre sono state escluse, nominandole.
+  const reasonParts: string[] = [];
+  if (noData.length > 0) {
+    const list = joinNames(noData);
+    reasonParts.push(
+      `${list} ${noData.length === 1 ? "è stata esclusa" : "sono state escluse"} perché i dati dettagliati di telemetria e settore di OpenF1 per le gare più recenti possono arrivare con ritardo o risultare incompleti al momento dell'analisi`,
+    );
+  }
+  if (fetchFailed.length > 0) {
+    const list = joinNames(fetchFailed);
+    reasonParts.push(
+      `${list} ${fetchFailed.length === 1 ? "è stata esclusa" : "sono state escluse"} perché il recupero dei dati da OpenF1 non è andato a buon fine al momento dell'analisi`,
+    );
+  }
+  if (reasonParts.length > 0) {
+    sentences.push(reasonParts.join("; ") + ".");
+  }
+
+  // Frase 4: cosa significa per l'affidabilità.
+  sentences.push(
+    "Meno gare con dati utilizzabili significa stime più incerte: è questo il motivo della confidenza ridotta. Quando i dati delle gare mancanti saranno disponibili, vale la pena rileggere l'analisi.",
+  );
 }

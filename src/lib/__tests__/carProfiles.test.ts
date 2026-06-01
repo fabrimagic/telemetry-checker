@@ -203,4 +203,46 @@ describe("computeCarProfiles", () => {
     expect(res.profiles).toEqual([]);
     expect(res.races_used).toEqual([]);
   });
+
+  it("(g) diagnostics populated with used/no_data/fetch_failed; total_past_races vs races_considered coherent", async () => {
+    mockedSessions.mockResolvedValue([
+      { ...mkSession(1, "2026-03-01T15:00:00Z"), location: "Bahrain" },
+      { ...mkSession(2, "2026-04-01T15:00:00Z"), location: "Jeddah" },
+      { ...mkSession(3, "2026-05-01T15:00:00Z"), location: "Melbourne" },
+    ]);
+    mockedDrivers.mockImplementation(async (k: number) => {
+      if (k === 3) throw new Error("network");
+      return [mkDriver(1, "A"), mkDriver(2, "B")];
+    });
+    mockedLaps.mockImplementation(async (k: number) => {
+      if (k === 1) return [mkLap(1, { speed: 320 }), mkLap(2, { speed: 300 })];
+      if (k === 2) return []; // no usable laps → aggregateRace returns null
+      return [];
+    });
+
+    const res = await computeCarProfiles({ now: NOW, lastNRaces: 4 });
+    expect(res.total_past_races).toBe(3);
+    expect(res.races_considered).toBe(3);
+    expect(res.races_diagnostics).toHaveLength(3);
+    const byName = Object.fromEntries(res.races_diagnostics.map((d) => [d.name, d.status]));
+    expect(byName["Bahrain"]).toBe("used");
+    expect(byName["Jeddah"]).toBe("no_data");
+    expect(byName["Melbourne"]).toBe("fetch_failed");
+  });
+
+  it("(h) total_past_races counts ALL past races even when only last-N are considered", async () => {
+    mockedSessions.mockResolvedValue([
+      mkSession(1, "2026-02-01T15:00:00Z"),
+      mkSession(2, "2026-03-01T15:00:00Z"),
+      mkSession(3, "2026-04-01T15:00:00Z"),
+      mkSession(4, "2026-04-15T15:00:00Z"),
+      mkSession(5, "2026-05-01T15:00:00Z"),
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+    mockedLaps.mockResolvedValue([mkLap(1, { speed: 320 }), mkLap(2, { speed: 300 })]);
+    const res = await computeCarProfiles({ now: NOW, lastNRaces: 2 });
+    expect(res.total_past_races).toBe(5);
+    expect(res.races_considered).toBe(2);
+    expect(res.races_diagnostics).toHaveLength(2);
+  });
 });
