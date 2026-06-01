@@ -258,7 +258,20 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
 
   return (
     <div className="space-y-0">
+      {hasZones && (
+        <div className="flex flex-wrap gap-3 mb-2 px-1">
+          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: ZONE_COLORS.superclipping, opacity: 0.55 }} />
+            Superclipping
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: ZONE_COLORS.liftcoast, opacity: 0.55 }} />
+            Lift &amp; Coast
+          </span>
+        </div>
+      )}
       {renderLineChart("Speed (km/h)", speedData, "speed", 140)}
+
 
       {/* Throttle as area */}
       <ChartWrapper label="Throttle (%)">
