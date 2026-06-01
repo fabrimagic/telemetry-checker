@@ -153,6 +153,14 @@ export default function Index() {
       // Fetch session weather for lap classification (fire and forget)
       getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
       getRaceControl(key).then((rc) => setRaceControlMessages(rc)).catch(() => {});
+      // Resolve circuit location/country for the per-lap precipitation outlook
+      // card. Best-effort; failure simply leaves the card hidden.
+      setCircuitKey(null);
+      getSessionsByMeetingKey(mKey).then((sessions) => {
+        const match = sessions.find((s) => s.session_key === key);
+        const ck = match?.location ?? match?.country_name ?? null;
+        setCircuitKey(ck);
+      }).catch(() => {});
     } catch (e: any) {
       setError(e.message);
     } finally {
