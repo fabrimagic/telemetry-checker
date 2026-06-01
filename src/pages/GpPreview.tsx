@@ -266,9 +266,6 @@ export function GpPredictionResultView({
                         title="La tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del circuito e dalla posizione GPS in qualifica: lettura più granulare ma sperimentale, può contenere imprecisioni di allineamento."
                       >
                         Curve da geometria GPS
-                        {typeof t.corner_coverage === "number" && (
-                          <> · copertura {Math.round(t.corner_coverage * 100)}%</>
-                        )}
                       </span>
                     )}
                     {t.corner_source === "sector_fallback" && (
@@ -280,6 +277,17 @@ export function GpPredictionResultView({
                         Curve da settori (stima)
                       </span>
                     )}
+                    {/* Diagnostic-only: always show measured GPS coverage. */}
+                    <span
+                      className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/20 text-muted-foreground border-border/60"
+                      data-testid={`corner-coverage-${t.team_name}`}
+                      title="Indica quanto i dati GPS della qualifica coprono il tracciato per questo team. Sotto il 50% si usa la stima dai settori (valore solo diagnostico, non incide sul punteggio)."
+                    >
+                      {typeof t.corner_coverage === "number"
+                        ? <>Copertura dati posizione: {Math.round(t.corner_coverage * 100)}%</>
+                        : <>Copertura non disponibile</>}
+                    </span>
+
                     <span className="ml-auto opacity-70">
                       Confidenza team: {confidenceLabelIt(t.confidence)}
                     </span>
