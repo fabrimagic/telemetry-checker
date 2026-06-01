@@ -45,6 +45,11 @@ export interface CorrectedDegradationConfig {
   min_laps_corrected: number;
   outlier_threshold: number;
   max_plausible_slope: number;
+  /**
+   * Optional fuel load at the start of the race in kg. Used by the deterministic
+   * physical fuel correction. Defaults to FUEL_LOAD_KG_DEFAULT (~105 kg).
+   */
+  fuel_load_kg?: number;
 }
 
 export const DEFAULT_CORRECTED_CONFIG: CorrectedDegradationConfig = {
@@ -54,6 +59,47 @@ export const DEFAULT_CORRECTED_CONFIG: CorrectedDegradationConfig = {
   outlier_threshold: 0.07,
   max_plausible_slope: 0.30,
 };
+
+/* ──────────────────────────────────────────────────────────────────
+ * PHYSICAL FUEL CORRECTION (deterministic, telemetry-free)
+ * ──────────────────────────────────────────────────────────────────
+ * A modern F1 car starts with ~100-110 kg of fuel and consumes it roughly
+ * linearly along the race. The lap-time effect is approximately
+ * 0.030–0.035 s per kg of fuel on board. We model the cumulative
+ * "fuel advantage" at an absolute race lap as:
+ *
+ *   kgBurned(lap_abs) = FUEL_LOAD_KG × (lap_abs − 1) / max(1, totalRaceLaps − 1)
+ *   fuel_time_correction(lap_abs) = kgBurned × FUEL_EFFECT_S_PER_KG
+ *
+ * This is a PHYSICAL estimate, not the real fuel load (OpenF1 does not
+ * expose it). Its key property is that it is anchored to the ABSOLUTE race
+ * lap, so within a single stint it is NOT collinear with tyre_life
+ * (which resets at every pit stop). Subtracting this correction
+ * deterministically from lap times BEFORE the degradation regression
+ * disentangles the fuel burn-off from the tyre wear without relying on
+ * a regression that would otherwise be degenerate.
+ */
+export const FUEL_EFFECT_S_PER_KG = 0.033;
+export const FUEL_LOAD_KG_DEFAULT = 105;
+
+/**
+ * Seconds of "fuel advantage" accumulated at absolute race lap `lapNumberAbs`
+ * relative to lap 1. Monotonically non-decreasing, 0 at lap 1, ≈ full effect
+ * at the last lap. Used to neutralise the burn-off effect before regressing
+ * tyre degradation.
+ */
+export function computeFuelTimeCorrection(
+  lapNumberAbs: number,
+  totalRaceLaps: number,
+  fuelLoadKg: number = FUEL_LOAD_KG_DEFAULT,
+): number {
+  if (!Number.isFinite(lapNumberAbs) || !Number.isFinite(totalRaceLaps)) return 0;
+  if (lapNumberAbs <= 1 || totalRaceLaps <= 1) return 0;
+  const denom = Math.max(1, totalRaceLaps - 1);
+  const progress = Math.min(1, Math.max(0, (lapNumberAbs - 1) / denom));
+  const load = Number.isFinite(fuelLoadKg) && fuelLoadKg > 0 ? fuelLoadKg : FUEL_LOAD_KG_DEFAULT;
+  return load * progress * FUEL_EFFECT_S_PER_KG;
+}
 
 /** Compound-specific correction profiles */
 interface CorrectedCompoundProfile {
