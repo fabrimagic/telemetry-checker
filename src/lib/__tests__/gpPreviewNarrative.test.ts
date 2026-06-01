@@ -130,3 +130,116 @@ describe("predictGpAffinity — note on races considered vs withData", () => {
     expect(pred.notes.some((n) => /3 gare/.test(n))).toBe(true);
   });
 });
+
+describe("buildGpPreviewNarrative — extended data-context paragraph (Part B)", () => {
+  it("emits an extended paragraph naming excluded races when racesWithData < racesConsidered", () => {
+    const c = circuit();
+    const cars = [
+      car("A", 0.5, [0.5, 0.5, 0.5], "medium", 2),
+      car("B", 0.4, [0.4, 0.4, 0.4], "medium", 2),
+    ];
+    const pred = predictGpAffinity(c, cars, { racesConsidered: 4 });
+    const lines = buildGpPreviewNarrative(c, pred, {
+      totalPastRaces: 5,
+      racesConsidered: 4,
+      racesWithData: 2,
+      diagnostics: [
+        { name: "Bahrain", date_end: "2026-03-01", status: "used" },
+        { name: "Jeddah", date_end: "2026-04-01", status: "used" },
+        { name: "Melbourne", date_end: "2026-04-15", status: "no_data" },
+        { name: "Suzuka", date_end: "2026-05-01", status: "no_data" },
+      ],
+    });
+    const all = lines.join("\n");
+    expect(all).toMatch(/5 gare/);
+    expect(all).toMatch(/ultime 4/);
+    expect(all).toMatch(/solo 2/);
+    expect(all).toMatch(/Melbourne/);
+    expect(all).toMatch(/Suzuka/);
+    expect(all).toMatch(/OpenF1/);
+    expect(all).toMatch(/incertezza|incert/i);
+  });
+
+  it("emits only a short reassurance sentence when racesWithData === racesConsidered", () => {
+    const c = circuit();
+    const cars = [car("A", 0.5, [0.5, 0.5, 0.5], "high", 4)];
+    const pred = predictGpAffinity(c, cars, { racesConsidered: 4 });
+    const lines = buildGpPreviewNarrative(c, pred, {
+      totalPastRaces: 6,
+      racesConsidered: 4,
+      racesWithData: 4,
+      diagnostics: [],
+    });
+    const all = lines.join("\n");
+    expect(all).toMatch(/ultime 4 gare/);
+    expect(all).toMatch(/tutte con dati utilizzabili/);
+    // No "esclus*" prose
+    expect(all).not.toMatch(/esclus/i);
+  });
+
+  it("no dataContext ⇒ no crash, no extended paragraph", () => {
+    const c = circuit();
+    const cars = [car("A", 0.5, [0.5, 0.5, 0.5], "medium", 2)];
+    const pred = predictGpAffinity(c, cars);
+    const lines = buildGpPreviewNarrative(c, pred);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.join(" ")).not.toMatch(/esclus/i);
+  });
+});
+
+describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", () => {
+  it("includes the didactic score sentence and the uncertainty-band explanation", () => {
+    const c = circuit();
+    const cars = [car("A", 0.6, [0.5, 0.5, 0.5]), car("B", 0.3, [0.4, 0.4, 0.4])];
+    const pred = predictGpAffinity(c, cars);
+    const lines = buildGpPreviewNarrative(c, pred);
+    const all = lines.join(" ");
+    expect(all).toMatch(/indice da 0 a 1/i);
+    expect(all).toMatch(/banda di incertezza/i);
+    expect(all).toMatch(/sovrappongono/i);
+  });
+
+  it("leader with top-speed-dominant contributions: prose says the score comes mostly from velocità di punta", () => {
+    const c = circuit({
+      top_speed: 1.0,
+      slow_corner_traction: 0.1,
+      medium_corner: 0.1,
+      fast_corner: 0.1,
+    });
+    const cars = [
+      car("Fast", 0.95, [0.3, 0.3, 0.3]),
+      car("Slow", 0.2, [0.5, 0.5, 0.5]),
+    ];
+    const pred = predictGpAffinity(c, cars);
+    const lines = buildGpPreviewNarrative(c, pred);
+    const all = lines.join(" ");
+    expect(all).toMatch(/Fast/);
+    // The leader's top-speed contribution should dominate.
+    expect(all).toMatch(/grazie alla velocità di punta/i);
+    // One of the fraction phrases should appear.
+    expect(all).toMatch(/(tre quarti|due terzi|larghissima parte)/i);
+  });
+
+  it("indistinguishable leaders: no sole favorite, both teams cited together", () => {
+    const c = circuit({ confidence: "high" });
+    const cars = [
+      car("A", 0.50, [0.50, 0.50, 0.50], "low"),
+      car("B", 0.52, [0.52, 0.52, 0.52], "low"),
+      car("C", 0.0, [0.0, 0.0, 0.0], "high"),
+    ];
+    const pred = predictGpAffinity(c, cars);
+    const lines = buildGpPreviewNarrative(c, pred);
+    const all = lines.join(" ");
+    expect(all).toMatch(/equivalent/i);
+    expect(all).toMatch(/\bA\b/);
+    expect(all).toMatch(/\bB\b/);
+    expect(all).toMatch(/arbitrario/i);
+  });
+
+  it("edge: empty ranking + missing dataContext ⇒ no crash", () => {
+    const c = circuit();
+    const pred = predictGpAffinity(c, []);
+    expect(() => buildGpPreviewNarrative(c, pred)).not.toThrow();
+  });
+});
+
