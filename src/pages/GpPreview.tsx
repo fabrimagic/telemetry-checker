@@ -391,18 +391,27 @@ export default function GpPreview() {
         signal: ctrl.signal,
         onProgress: (done, total) => setProgress({ done, total }),
         analyzeQualiCorners: async (qualiSession: SessionInfo, driverNumbers: number[]) => {
-          // Best-effort mapping: the OpenF1 session metadata doesn't carry
-          // our Italian gpName, but the upcoming GP usually shares the
-          // circuit name we already know. We pass the next session's gpName
-          // for the GeoJSON lookup; if the historical GP is on a different
-          // circuit, fetchCircuitOutline returns null and the analyzer
-          // gracefully degrades to a "no_circuit_layout" no-op (which then
-          // becomes a sector_fallback in carProfiles).
-          const gpName =
-            (qualiSession as { location?: string; country_name?: string }).location ??
-            (qualiSession as { country_name?: string }).country_name ??
-            circuit?.gpName ??
-            "";
+          // BUG-FIX: previously this passed qualiSession.location /
+          // country_name (e.g. "Monaco", "Suzuka") directly as gpName, but
+          // GP_TO_CIRCUIT_ID is keyed on the Italian calendar gpName
+          // ("Gran Premio di Monaco", ...). The keys NEVER matched, so
+          // fetchCircuitOutline always returned null and the geometric
+          // corner analysis silently no-opped on every historical race.
+          //
+          // We CAN'T just pass circuit.gpName (the upcoming GP) either,
+          // because the historical qualifying being analyzed is from a
+          // DIFFERENT circuit — using the next GP's layout would mis-align
+          // GPS points against a track the cars never drove.
+          //
+          // Correct resolution: normalize OpenF1 location/country_name into
+          // the calendar gpName via the explicit lookup table in
+          // circuitGeometry. If the historical race is on a circuit not in
+          // GP_TO_CIRCUIT_ID, the resolver returns null and we degrade to
+          // sector_fallback (real degradation, no fake layout).
+          const loc = (qualiSession as { location?: string }).location;
+          const country = (qualiSession as { country_name?: string }).country_name;
+          const gpName = resolveCalendarGpName(loc, country);
+          if (!gpName) return null;
           const dateStart = qualiSession.date_start ?? qualiSession.date_end ?? "";
           const dateEnd = qualiSession.date_end ?? qualiSession.date_start ?? "";
           if (!dateStart || !dateEnd) return null;
