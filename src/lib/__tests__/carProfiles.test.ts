@@ -216,14 +216,10 @@ describe("computeCarProfiles", () => {
     });
     mockedLaps.mockImplementation(async (k: number) => {
       if (k === 1) return [mkLap(1, { speed: 320 }), mkLap(2, { speed: 300 })];
-      if (k === 2) {
-        return [
-          mkLap(1, { speed: null, s1: null, s2: null, s3: null }),
-          mkLap(2, { speed: null, s1: null, s2: null, s3: null }),
-        ];
-      }
+      if (k === 2) return []; // no usable laps → aggregateRace returns null
       return [];
     });
+
     const res = await computeCarProfiles({ now: NOW, lastNRaces: 4 });
     expect(res.total_past_races).toBe(3);
     expect(res.races_considered).toBe(3);
