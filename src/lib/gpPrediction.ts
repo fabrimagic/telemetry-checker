@@ -95,6 +95,27 @@ function mean(xs: number[]): number {
   return s / xs.length;
 }
 
+/**
+ * Weighted quadratic mean: Σ(wᵢ²) / Σ(wᵢ). Emphasizes the largest weights
+ * (dominant corner-type character) without collapsing to max(). Returns 0
+ * if the sum of weights is 0 (avoids NaN; downstream handles the fallback).
+ */
+function weightedQuadratic(weights: number[]): number {
+  let sum = 0;
+  let sumSq = 0;
+  for (const w of weights) {
+    sum += w;
+    sumSq += w * w;
+  }
+  if (sum <= 0) return 0;
+  return sumSq / sum;
+}
+  if (xs.length === 0) return 0;
+  let s = 0;
+  for (const x of xs) s += x;
+  return s / xs.length;
+}
+
 function downgrade(level: ConfidenceLevel): ConfidenceLevel {
   if (level === "high") return "medium";
   if (level === "medium") return "low";
