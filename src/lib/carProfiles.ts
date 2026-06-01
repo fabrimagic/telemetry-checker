@@ -265,7 +265,6 @@ function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
 export async function computeCarProfiles(
   opts: ComputeCarProfilesOptions = {},
 ): Promise<ComputeCarProfilesResult> {
-  const lastN = opts.lastNRaces ?? DEFAULT_LAST_N;
   const now = opts.now ?? new Date();
   const signal = opts.signal;
 
