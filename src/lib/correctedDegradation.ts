@@ -45,6 +45,11 @@ export interface CorrectedDegradationConfig {
   min_laps_corrected: number;
   outlier_threshold: number;
   max_plausible_slope: number;
+  /**
+   * Optional fuel load at the start of the race in kg. Used by the deterministic
+   * physical fuel correction. Defaults to FUEL_LOAD_KG_DEFAULT (~105 kg).
+   */
+  fuel_load_kg?: number;
 }
 
 export const DEFAULT_CORRECTED_CONFIG: CorrectedDegradationConfig = {
@@ -54,6 +59,47 @@ export const DEFAULT_CORRECTED_CONFIG: CorrectedDegradationConfig = {
   outlier_threshold: 0.07,
   max_plausible_slope: 0.30,
 };
+
+/* ──────────────────────────────────────────────────────────────────
+ * PHYSICAL FUEL CORRECTION (deterministic, telemetry-free)
+ * ──────────────────────────────────────────────────────────────────
+ * A modern F1 car starts with ~100-110 kg of fuel and consumes it roughly
+ * linearly along the race. The lap-time effect is approximately
+ * 0.030–0.035 s per kg of fuel on board. We model the cumulative
+ * "fuel advantage" at an absolute race lap as:
+ *
+ *   kgBurned(lap_abs) = FUEL_LOAD_KG × (lap_abs − 1) / max(1, totalRaceLaps − 1)
+ *   fuel_time_correction(lap_abs) = kgBurned × FUEL_EFFECT_S_PER_KG
+ *
+ * This is a PHYSICAL estimate, not the real fuel load (OpenF1 does not
+ * expose it). Its key property is that it is anchored to the ABSOLUTE race
+ * lap, so within a single stint it is NOT collinear with tyre_life
+ * (which resets at every pit stop). Subtracting this correction
+ * deterministically from lap times BEFORE the degradation regression
+ * disentangles the fuel burn-off from the tyre wear without relying on
+ * a regression that would otherwise be degenerate.
+ */
+export const FUEL_EFFECT_S_PER_KG = 0.033;
+export const FUEL_LOAD_KG_DEFAULT = 105;
+
+/**
+ * Seconds of "fuel advantage" accumulated at absolute race lap `lapNumberAbs`
+ * relative to lap 1. Monotonically non-decreasing, 0 at lap 1, ≈ full effect
+ * at the last lap. Used to neutralise the burn-off effect before regressing
+ * tyre degradation.
+ */
+export function computeFuelTimeCorrection(
+  lapNumberAbs: number,
+  totalRaceLaps: number,
+  fuelLoadKg: number = FUEL_LOAD_KG_DEFAULT,
+): number {
+  if (!Number.isFinite(lapNumberAbs) || !Number.isFinite(totalRaceLaps)) return 0;
+  if (lapNumberAbs <= 1 || totalRaceLaps <= 1) return 0;
+  const denom = Math.max(1, totalRaceLaps - 1);
+  const progress = Math.min(1, Math.max(0, (lapNumberAbs - 1) / denom));
+  const load = Number.isFinite(fuelLoadKg) && fuelLoadKg > 0 ? fuelLoadKg : FUEL_LOAD_KG_DEFAULT;
+  return load * progress * FUEL_EFFECT_S_PER_KG;
+}
 
 /** Compound-specific correction profiles */
 interface CorrectedCompoundProfile {
@@ -100,7 +146,7 @@ export interface LapWeatherData {
 }
 
 export interface CorrectedDegradationResult extends DegradationResult {
-  model_type: "corrected_two_stage" | "corrected_fuel_only" | "simple_fallback";
+  model_type: "corrected_two_stage" | "corrected_fuel_only" | "corrected_physical_fuel" | "simple_fallback";
   slope_raw: number;
   slope_corrected: number;
   fuel_proxy_type: string;
@@ -520,6 +566,107 @@ function twoStageDegradation(
 }
 
 /* ══════════════════════════════════════════════════════════════════
+ * PHYSICAL FUEL DEGRADATION
+ * ──────────────────────────────────────────────────────────────────
+ * Deterministic alternative to the multivariate fuel-proxy regression.
+ * Subtracts the physical fuel burn-off from lap times BEFORE regressing
+ * tyre degradation. Because the burn-off is anchored to the ABSOLUTE
+ * race lap (not stint tyre_life), it is not collinear with tyre wear
+ * within a single stint, and the residual slope is a clean estimate
+ * of degradation.
+ * ══════════════════════════════════════════════════════════════════ */
+function physicalFuelDegradation(
+  tyreLifes: number[],
+  lapNumbersAbs: number[],
+  trackTemps: number[] | null,
+  airTemps: number[] | null,
+  lapTimes: number[],
+  totalRaceLaps: number,
+  fuelLoadKg: number,
+): {
+  slope_corrected: number;
+  slope_corrected_std_error: number | null;
+  r_squared_stage_a: number | null;
+  r_squared_stage_b: number;
+  rmse_stage_b: number;
+  model_type: CorrectedDegradationResult["model_type"];
+  coefficients: CorrectedDegradationResult["coefficients"];
+  weather_used: boolean;
+  conditionWarning: boolean;
+} | null {
+  const n = lapTimes.length;
+  if (n < 3) return null;
+
+  // Subtract burn-off: add the fuel advantage back so all laps are at
+  // full-load equivalent. A lap at lap_abs=30 was ~1s faster than at lap_abs=1
+  // due to lighter fuel; we add that ~1s back to bring it onto the same scale.
+  const fuelCorrections = lapNumbersAbs.map(la =>
+    computeFuelTimeCorrection(la, totalRaceLaps, fuelLoadKg),
+  );
+  const lapTimesFuelCorrected = lapTimes.map((t, i) => t + fuelCorrections[i]);
+
+  // Per-lap fuel slope (s/lap) — stored in coefficients.fuel_proxy for
+  // interpretability. Negative because cars get faster as fuel burns off.
+  const perLapFuelEffect =
+    -FUEL_EFFECT_S_PER_KG * fuelLoadKg / Math.max(1, totalRaceLaps - 1);
+
+  // Optional Stage A: regress fuel-corrected lap times on temperatures
+  // (if enough weather variance). The residuals then go to Stage B.
+  let stageARes: { coefficients: number[]; rSquared: number; residuals: number[]; conditionWarning: boolean } | null = null;
+  let weatherUsed = false;
+  let trackScale = 1, airScale = 1, trackMean = 0, airMean = 0;
+  let conditionWarning = false;
+
+  if (trackTemps && airTemps && trackTemps.length === n && airTemps.length === n && n > 5) {
+    trackMean = meanVal(trackTemps);
+    airMean = meanVal(airTemps);
+    const tStd = stdDev(trackTemps);
+    const aStd = stdDev(airTemps);
+    if (tStd > 0.3 || aStd > 0.3) {
+      trackScale = tStd > 0.1 ? tStd : 1;
+      airScale = aStd > 0.1 ? aStd : 1;
+      const trackScaled = trackTemps.map(t => (t - trackMean) / trackScale);
+      const airScaled = airTemps.map(t => (t - airMean) / airScale);
+      const X = trackScaled.map((t, i) => [t, airScaled[i]]);
+      stageARes = multivariateOLS(X, lapTimesFuelCorrected);
+      if (stageARes) {
+        weatherUsed = true;
+        conditionWarning = stageARes.conditionWarning;
+      }
+    }
+  }
+
+  // Stage B: regress on tyre_life either the residuals (if Stage A ran)
+  // or the fuel-corrected times directly.
+  const yForStageB = stageARes ? stageARes.residuals : lapTimesFuelCorrected;
+  const stageBResult = simpleLinearRegression(tyreLifes, yForStageB);
+  if (!stageBResult) return null;
+
+  const stageAIntercept = stageARes ? stageARes.coefficients[0] : meanVal(lapTimesFuelCorrected);
+
+  const coefficients: CorrectedDegradationResult["coefficients"] = {
+    intercept: stageBResult.intercept + (stageARes ? stageAIntercept : 0),
+    tyre_life: stageBResult.slope,
+    fuel_proxy: perLapFuelEffect,
+    track_temp: weatherUsed && stageARes ? stageARes.coefficients[1] / trackScale : null,
+    air_temp: weatherUsed && stageARes ? stageARes.coefficients[2] / airScale : null,
+  };
+
+  return {
+    slope_corrected: stageBResult.slope,
+    slope_corrected_std_error: stageBResult.slopeStdError,
+    r_squared_stage_a: stageARes ? stageARes.rSquared : null,
+    r_squared_stage_b: stageBResult.rSquared,
+    rmse_stage_b: stageBResult.rmse,
+    model_type: "corrected_physical_fuel",
+    coefficients,
+    weather_used: weatherUsed,
+    conditionWarning,
+  };
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
  * CORRECTION QUALITY ASSESSMENT
  * ══════════════════════════════════════════════════════════════════ */
 
@@ -692,6 +839,10 @@ export function calculateCorrectedTyreDegradation(
     // (used by twoStageDegradation, which requires equal-length inputs).
     const tyreLifes: number[] = [];
     const lapTimes: number[] = [];
+    const lapNumbersAbs: number[] = [];
+    const trackTempsAll: number[] = [];
+    const airTempsAll: number[] = [];
+    let weatherCompleteAll = true;
     const points: { tyreLife: number; lapTime: number }[] = [];
 
     const tyreLifes_mv: number[] = [];
@@ -705,10 +856,18 @@ export function calculateCorrectedTyreDegradation(
       const tyreLife = (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start);
       tyreLifes.push(tyreLife);
       lapTimes.push(l.lap_duration!);
+      lapNumbersAbs.push(l.lap_number);
       points.push({ tyreLife, lapTime: l.lap_duration! });
 
       const fuelProxy = buildFuelProxy(l, totalSessionLaps, config.fuel_proxy_type, context);
       const wData = lapWeather.get(l.lap_number);
+
+      if (wData?.track_temperature != null && wData?.air_temperature != null) {
+        trackTempsAll.push(wData.track_temperature);
+        airTempsAll.push(wData.air_temperature);
+      } else {
+        weatherCompleteAll = false;
+      }
 
       if (fuelProxy !== null) {
         tyreLifes_mv.push(tyreLife);
@@ -757,7 +916,19 @@ export function calculateCorrectedTyreDegradation(
 
     const hasFuelVariance = fuelProxyQuality !== "LOW";
 
-    if (hasFuelVariance && lapTimes_mv.length >= config.min_laps_corrected) {
+    // The legacy proxy-regression path is only used when an ALTERNATIVE,
+    // non-collinear fuel proxy is available with HIGH quality (throttle_integral
+    // from telemetry, or st_speed). The default "laps_remaining" / "lap_number"
+    // proxies are degenerate inside a stint (collinear with tyre_life), so we
+    // route them through the deterministic physical fuel correction instead.
+    const useAltProxyRegression =
+      hasFuelVariance &&
+      (config.fuel_proxy_type === "throttle_integral" || config.fuel_proxy_type === "st_speed") &&
+      fuelProxyQuality === "HIGH";
+
+    let modelResolved = false;
+
+    if (useAltProxyRegression && lapTimes_mv.length >= config.min_laps_corrected) {
       const twoStage = twoStageDegradation(
         tyreLifes_mv, fuelProxies_mv,
         weatherComplete ? trackTemps_mv : null,
@@ -775,8 +946,9 @@ export function calculateCorrectedTyreDegradation(
         coefficients = twoStage.coefficients;
         conditionWarning = twoStage.conditionWarning;
         correctedRmse = twoStage.rmse_stage_b;
+        modelResolved = true;
       }
-    } else if (hasFuelVariance && lapTimes_mv.length >= config.min_laps + 1) {
+    } else if (useAltProxyRegression && lapTimes_mv.length >= config.min_laps + 1) {
       const twoStage = twoStageDegradation(
         tyreLifes_mv, fuelProxies_mv, null, null, lapTimes_mv,
       );
@@ -790,6 +962,34 @@ export function calculateCorrectedTyreDegradation(
         coefficients = twoStage.coefficients;
         conditionWarning = twoStage.conditionWarning;
         correctedRmse = twoStage.rmse_stage_b;
+        modelResolved = true;
+      }
+    }
+
+    // Default robust path: deterministic physical fuel correction.
+    // Used whenever the alt proxy is unavailable / low quality, or its
+    // regression failed the plausibility gate.
+    if (!modelResolved && tyreLifes.length >= config.min_laps + 1) {
+      const physical = physicalFuelDegradation(
+        tyreLifes,
+        lapNumbersAbs,
+        weatherCompleteAll ? trackTempsAll : null,
+        weatherCompleteAll ? airTempsAll : null,
+        lapTimes,
+        totalSessionLaps,
+        config.fuel_load_kg ?? FUEL_LOAD_KG_DEFAULT,
+      );
+
+      if (physical && Math.abs(physical.slope_corrected) <= config.max_plausible_slope) {
+        modelType = physical.model_type;
+        slopeCorrected = physical.slope_corrected;
+        slopeCorrectedStdError = physical.slope_corrected_std_error;
+        rSquaredCorrected = physical.r_squared_stage_b;
+        rSquaredStageA = physical.r_squared_stage_a;
+        weatherCorrectionUsed = physical.weather_used;
+        coefficients = physical.coefficients;
+        conditionWarning = physical.conditionWarning;
+        correctedRmse = physical.rmse_stage_b;
       }
     }
 
