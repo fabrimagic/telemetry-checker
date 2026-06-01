@@ -124,7 +124,7 @@ describe("classifyCircuitCorners", () => {
     expect(segs.length).toBeGreaterThanOrEqual(1);
     expect(segs[0].type).toBe("fast");
     expect(segs[0].curvature).toBeGreaterThan(CORNER_CURVATURE_STRAIGHT_MAX);
-    expect(segs[0].curvature).toBeLessThan(CORNER_CURVATURE_MEDIUM);
+    expect(segs[0].curvature).toBeLessThan(1 / 180);
   });
 
   it("classifies an R≈800 m arc as straight (below the 600 m threshold)", () => {
