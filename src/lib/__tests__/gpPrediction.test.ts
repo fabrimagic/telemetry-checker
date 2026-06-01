@@ -133,6 +133,16 @@ describe("gpPrediction", () => {
     expect(group).not.toContain("C");
   });
 
+  it("empty cars array returns safe output without throwing", () => {
+    const out = predictGpAffinity(circuit(), []);
+    expect(out.ranked).toEqual([]);
+    expect(out.global_confidence).toBe("low");
+    expect(out.indistinguishable_groups).toEqual([]);
+    expect(out.notes.length).toBeGreaterThan(0);
+  });
+
+
+
   it("uses corner_type_strength weighted by circuit per-corner weights when present", () => {
     const c = circuit({
       top_speed: 0, slow_corner_traction: 1.0, medium_corner: 0, fast_corner: 0,
