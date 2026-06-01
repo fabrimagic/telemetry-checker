@@ -102,6 +102,14 @@ export interface CarProfile {
    *                       analyzer error) → corner_data_coverage is null
    */
   corner_coverage_status?: "ok" | "below_threshold" | "not_available";
+  /**
+   * Diagnostic-only: aggregated Procrustes residual (normalised RMS) of
+   * the GPS↔layout shape alignment. Lower is better; values around 1 mean
+   * the alignment failed to lock. `null` when not measured (no analyzer /
+   * no GPS data / degenerate-bbox-fallback for every contributing GP).
+   * Does NOT affect the gate or the affinity score.
+   */
+  corner_alignment_error?: number | null;
 }
 
 /**
