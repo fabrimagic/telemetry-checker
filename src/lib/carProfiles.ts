@@ -45,10 +45,28 @@ export interface CarProfile {
   confidence: "high" | "medium" | "low";
 }
 
+export type RaceDiagnosticStatus = "used" | "no_data" | "fetch_failed";
+
+export interface RaceDiagnostic {
+  name: string;
+  date_end: string;
+  status: RaceDiagnosticStatus;
+}
+
 export interface ComputeCarProfilesResult {
   profiles: CarProfile[];
   races_used: SessionInfo[];
   aborted: boolean;
+  /** Diagnostics for each of the last-N selected races (used | no_data | fetch_failed). */
+  races_diagnostics: RaceDiagnostic[];
+  /** Number of races among the last-N effectively iterated (== selected.length, minus aborted tail). */
+  races_considered: number;
+  /** Total number of past 2026 races known BEFORE the slice to last-N. */
+  total_past_races: number;
+}
+
+function sessionDisplayName(s: SessionInfo): string {
+  return s.location ?? s.country_name ?? s.session_name ?? `Session ${s.session_key}`;
 }
 
 export interface ComputeCarProfilesOptions {
