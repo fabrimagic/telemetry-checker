@@ -112,7 +112,9 @@ function medianConfidence(cars: CarProfile[]): ConfidenceLevel {
 export function predictGpAffinity(
   circuit: CircuitProfile,
   cars: CarProfile[],
+  meta?: GpPredictionMeta,
 ): GpPrediction {
+
   const notes: string[] = [];
 
   // Aggregated corner weight (simple mean of the three corner-type weights).
