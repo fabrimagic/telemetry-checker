@@ -224,10 +224,9 @@ export function classifyCircuitCorners(outline: [number, number][]): CornerSegme
 }
 
 // ---------------------------------------------------------------------------
-// Spatial alignment GeoJSON <-> LocationData
+// Procrustes shape alignment (PCA initial + ICP refinement)
 // ---------------------------------------------------------------------------
 
-interface NormalizedPoint { x: number; y: number; }
 
 // ---------------------------------------------------------------------------
 // Procrustes shape alignment (PCA initial + ICP refinement)
