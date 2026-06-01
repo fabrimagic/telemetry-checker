@@ -1101,6 +1101,12 @@ export default function Index() {
                         lapSoftSensor={selectedLapSoftSensor}
                         zones={telemetryZones}
                       />
+                      {raceAvg && raceAvg.per_lap.length > 0 && (
+                        <PerLapDrivingCharts
+                          avg={raceAvg}
+                          driverCumulativeDeviation={driverCumDev}
+                        />
+                      )}
                     </section>
                     <aside className="space-y-4 min-w-0">
                       {mapDrivers.length > 0 && (
