@@ -218,6 +218,75 @@ describe("aggregateDriverCornerSpeeds", () => {
     const res = aggregateDriverCornerSpeeds({ driver_number: 9, locations: [], carData: [], segments, outline });
     expect(res.partial).toBe(true);
     expect(res.slow_corner_speed).toBeNull();
+    expect(res.corner_coverage).toBeNull();
+  });
+
+  // -- Diagnostic corner_coverage metric -----------------------------------
+  function locOnVertex(idx: number, t: number): LocationData {
+    const [lon, lat] = outline[idx];
+    return { date: new Date(t).toISOString(), x: -lon, y: lat, z: 0, driver_number: 1, session_key: 1 };
+  }
+  const cornerVertexIndices: number[] = [];
+  for (const s of segments) {
+    for (let v = s.start_idx; v <= s.end_idx; v++) cornerVertexIndices.push(v);
+  }
+  const straightVertexIndices: number[] = [];
+  for (let v = 0; v < outline.length; v++) {
+    if (!cornerVertexIndices.includes(v)) straightVertexIndices.push(v);
+  }
+
+  it("(a) corner_coverage > global coverage when locations target corner vertices", () => {
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    // Cover every corner vertex + an anchor on a straight vertex (bbox).
+    const locations: LocationData[] = [
+      locOnVertex(straightVertexIndices[0], t0),
+      ...cornerVertexIndices.map((v, i) => locOnVertex(v, t0 + (i + 1) * 100)),
+    ];
+    const carData: CarData[] = locations.map((l, i) => ({
+      date: l.date, speed: 100 + i, throttle: 50, brake: 0, n_gear: 4, rpm: 10000, drs: 0, driver_number: 1, session_key: 1,
+    }));
+    const res = aggregateDriverCornerSpeeds({ driver_number: 1, locations, carData, segments, outline });
+    expect(res.corner_coverage).not.toBeNull();
+    expect(res.corner_coverage!).toBeGreaterThan(res.coverage);
+    expect(res.corner_coverage!).toBeGreaterThan(0.8);
+  });
+
+  it("(b) corner_coverage < global coverage when locations target straight vertices", () => {
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    const locations: LocationData[] = straightVertexIndices.map((v, i) => locOnVertex(v, t0 + i * 100));
+    const carData: CarData[] = locations.map((l, i) => ({
+      date: l.date, speed: 200 + i, throttle: 100, brake: 0, n_gear: 7, rpm: 11000, drs: 12, driver_number: 1, session_key: 1,
+    }));
+    const res = aggregateDriverCornerSpeeds({ driver_number: 1, locations, carData, segments, outline });
+    expect(res.corner_coverage).not.toBeNull();
+    expect(res.corner_coverage!).toBeLessThan(res.coverage);
+  });
+
+  it("(c) corner_coverage is null when there are no corner segments", () => {
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    const locations: LocationData[] = [
+      locOnVertex(0, t0),
+      locOnVertex(1, t0 + 100),
+    ];
+    const carData: CarData[] = locations.map((l) => ({
+      date: l.date, speed: 250, throttle: 100, brake: 0, n_gear: 8, rpm: 12000, drs: 12, driver_number: 1, session_key: 1,
+    }));
+    const res = aggregateDriverCornerSpeeds({
+      driver_number: 1, locations, carData, segments: [], outline,
+    });
+    expect(res.corner_coverage).toBeNull();
+  });
+
+  it("(d) global coverage formula is unchanged (touched / outline.length)", () => {
+    const t0 = new Date("2026-01-01T12:00:00Z").getTime();
+    const pickedIdx = [0, 5, 10, 30, 35];
+    const locations: LocationData[] = pickedIdx.map((v, i) => locOnVertex(v, t0 + i * 100));
+    const carData: CarData[] = locations.map((l) => ({
+      date: l.date, speed: 150, throttle: 50, brake: 0, n_gear: 4, rpm: 10000, drs: 0, driver_number: 1, session_key: 1,
+    }));
+    const res = aggregateDriverCornerSpeeds({ driver_number: 1, locations, carData, segments, outline });
+    // 5 distinct vertices touched → 5/outline.length.
+    expect(res.coverage).toBeCloseTo(pickedIdx.length / outline.length, 6);
   });
 });
 
