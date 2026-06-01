@@ -364,6 +364,80 @@ export function sortAlternativesByPositionAwareScore<
 }
 
 
+/**
+ * Systematic (non-statistical) component of the uncertainty on the tyre
+ * degradation slope, in s/lap. Captures the track-evolution effect (the
+ * rubbering-in that makes the surface faster as the race progresses): the
+ * model does NOT correct for it because the per-circuit coefficient is
+ * unknown, so we declare the resulting bias as an additional uncertainty
+ * (added in quadrature to the regression slopeStdError). The true tyre
+ * degradation is in general ≥ the estimated one — this constant gives an
+ * indicative ±5 ms/lap envelope.
+ */
+export const TRACK_EVOLUTION_SLOPE_UNCERTAINTY = 0.005; // s/lap
+
+/**
+ * k-factor used to flag an alternative as statistically indistinguishable
+ * from the actual strategy: |Δt| < K × delta_uncertainty_std. K = 1.0 ≈ 1σ
+ * (≈ 68% confidence the difference is real). Raise to ~2.0 for a stricter
+ * 95% test. The flag is informative only — it does not change the ranking.
+ */
+export const DELTA_SIGNIFICANCE_K = 1.0;
+
+export interface StintBoundForUncertainty {
+  start: number;
+  end: number;
+  compound: string;
+}
+
+/**
+ * Analytically propagate the per-compound slope uncertainty through a full
+ * strategy and return the standard deviation of the total stint time.
+ *
+ * For a stint of length T laps, lap time = slope × tyreLife + intercept, so
+ *   stintTime  = Σ_{k=0..T-1} (slope × k + intercept)
+ *   ∂stintTime/∂slope = Σ_{k=0..T-1} k = T(T−1)/2
+ *   var(stintTime)    = (T(T−1)/2)² × σ_effective²
+ * where σ_effective² = slopeStdError² + TRACK_EVOLUTION_SLOPE_UNCERTAINTY².
+ *
+ * Stint variances are summed under the assumption of independence across
+ * stints (and across strategies, when propagating the delta uncertainty as
+ * √(var_alt + var_actual)). This is a documented approximation: residual
+ * correlation can exist (shared track conditions, shared regression noise),
+ * but the band is meant as an indicative ± envelope, not a strict CI.
+ *
+ * When slopeStdError is null for a compound we still contribute the
+ * track-evolution term and signal reduced reliability via `missingStdError`.
+ */
+export function computeStrategyDeltaUncertainty(
+  stintBounds: StintBoundForUncertainty[],
+  compoundModels: Map<string, { slopeStdError: number | null }>,
+): { stdDev: number; missingStdError: boolean } {
+  let variance = 0;
+  let missing = false;
+  const sysSq = TRACK_EVOLUTION_SLOPE_UNCERTAINTY * TRACK_EVOLUTION_SLOPE_UNCERTAINTY;
+  for (const sb of stintBounds) {
+    const T = Math.max(0, sb.end - sb.start + 1);
+    if (T <= 1) continue;
+    const sensitivity = (T * (T - 1)) / 2; // = Σ tyre_life over the stint
+    const m = compoundModels.get(sb.compound);
+    const stat = m?.slopeStdError;
+    let statSq = 0;
+    if (stat != null && Number.isFinite(stat) && stat > 0) {
+      statSq = stat * stat;
+    } else {
+      missing = true;
+    }
+    const sigmaSq = statSq + sysSq;
+    variance += sensitivity * sensitivity * sigmaSq;
+  }
+  return { stdDev: Math.sqrt(variance), missingStdError: missing };
+}
+
+
+
+
+
 
 export function computeVirtualRaceEngineer(
   driverNumber: number,
