@@ -28,7 +28,7 @@ describe("SoftSensorsLapCard", () => {
     expect(screen.getByText("In finestra")).toBeTruthy();
     expect(screen.getByText("Moderato")).toBeTruthy();
     expect(screen.getByText("Stabile")).toBeTruthy();
-    expect(screen.getByText("nota di test")).toBeTruthy();
+    expect(screen.getByText(/nota di test/)).toBeTruthy();
   });
 
   it("renders em-dash for UNKNOWN sensors without inventing values", () => {
