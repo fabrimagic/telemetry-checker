@@ -94,7 +94,7 @@ export interface PerDriverCornerSpeeds {
    * the gate or score; surfaced so the UI can show whether the shape
    * alignment succeeded.
    */
-  alignment_error: number | null;
+  alignment_error?: number | null;
   /** True when /location or /car_data returned empty or fetch failed. */
   partial: boolean;
   notes: string[];
