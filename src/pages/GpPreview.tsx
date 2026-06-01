@@ -94,9 +94,16 @@ function CircuitProfileCard({ circuit }: { circuit: CircuitProfile }) {
 export function GpPredictionResultView({
   circuit,
   prediction,
+  dataContext,
 }: {
   circuit: CircuitProfile;
   prediction: GpPrediction;
+  dataContext?: {
+    totalPastRaces?: number;
+    racesConsidered?: number;
+    racesWithData?: number;
+    diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
+  };
 }) {
   const ranked = prediction.ranked;
   const groupOf = useMemo(() => {
@@ -108,9 +115,10 @@ export function GpPredictionResultView({
   }, [prediction.indistinguishable_groups]);
 
   const narrative = useMemo(
-    () => buildGpPreviewNarrative(circuit, prediction),
-    [circuit, prediction],
+    () => buildGpPreviewNarrative(circuit, prediction, dataContext),
+    [circuit, prediction, dataContext],
   );
+
 
   return (
     <div className="space-y-6">
