@@ -839,6 +839,10 @@ export function calculateCorrectedTyreDegradation(
     // (used by twoStageDegradation, which requires equal-length inputs).
     const tyreLifes: number[] = [];
     const lapTimes: number[] = [];
+    const lapNumbersAbs: number[] = [];
+    const trackTempsAll: number[] = [];
+    const airTempsAll: number[] = [];
+    let weatherCompleteAll = true;
     const points: { tyreLife: number; lapTime: number }[] = [];
 
     const tyreLifes_mv: number[] = [];
@@ -852,10 +856,18 @@ export function calculateCorrectedTyreDegradation(
       const tyreLife = (stint.tyre_age_at_start ?? 0) + (l.lap_number - stint.lap_start);
       tyreLifes.push(tyreLife);
       lapTimes.push(l.lap_duration!);
+      lapNumbersAbs.push(l.lap_number);
       points.push({ tyreLife, lapTime: l.lap_duration! });
 
       const fuelProxy = buildFuelProxy(l, totalSessionLaps, config.fuel_proxy_type, context);
       const wData = lapWeather.get(l.lap_number);
+
+      if (wData?.track_temperature != null && wData?.air_temperature != null) {
+        trackTempsAll.push(wData.track_temperature);
+        airTempsAll.push(wData.air_temperature);
+      } else {
+        weatherCompleteAll = false;
+      }
 
       if (fuelProxy !== null) {
         tyreLifes_mv.push(tyreLife);
