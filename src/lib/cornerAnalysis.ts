@@ -300,6 +300,7 @@ export function aggregateDriverCornerSpeeds(params: {
     fast_corner_speed: null,
     sample_counts: { slow: 0, medium: 0, fast: 0, straight: 0 },
     coverage: 0,
+    corner_coverage: null,
     partial: true,
     notes,
   };
