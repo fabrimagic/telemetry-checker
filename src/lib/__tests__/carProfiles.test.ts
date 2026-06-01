@@ -2,13 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../openf1", () => ({
   getRaceSessionsByYear: vi.fn(),
+  getQualifyingSessionsByYear: vi.fn(),
   getAllLaps: vi.fn(),
   getDrivers: vi.fn(),
 }));
 
-import { computeCarProfiles, RECENCY_HALFLIFE_RACES } from "../carProfiles";
+import {
+  computeCarProfiles,
+  RECENCY_HALFLIFE_RACES,
+  TOP_SPEED_QUALI_WEIGHT,
+  TOP_SPEED_RACE_WEIGHT,
+  CORNER_QUALI_WEIGHT,
+  CORNER_RACE_WEIGHT,
+} from "../carProfiles";
 import {
   getRaceSessionsByYear,
+  getQualifyingSessionsByYear,
   getAllLaps,
   getDrivers,
   type Driver,
@@ -17,6 +26,7 @@ import {
 } from "../openf1";
 
 const mockedSessions = getRaceSessionsByYear as unknown as ReturnType<typeof vi.fn>;
+const mockedQuali = getQualifyingSessionsByYear as unknown as ReturnType<typeof vi.fn>;
 const mockedLaps = getAllLaps as unknown as ReturnType<typeof vi.fn>;
 const mockedDrivers = getDrivers as unknown as ReturnType<typeof vi.fn>;
 
