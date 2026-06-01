@@ -363,3 +363,53 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     expect(buildPerTeamExplanations(circ, pred)).toEqual([]);
   });
 });
+
+describe("buildGpPreviewNarrative — qualifying-source transparency", () => {
+  it("didactic block states top speed reflects primarily the qualifying potential", () => {
+    const c = circuit();
+    const cars = [car("A", 0.6, [0.5, 0.5, 0.5]), car("B", 0.3, [0.4, 0.4, 0.4])];
+    const pred = predictGpAffinity(c, cars);
+    const lines = buildGpPreviewNarrative(c, pred);
+    const all = lines.join(" ");
+    expect(all).toMatch(/potenziale espresso in qualifica/i);
+    expect(all).toMatch(/in gara la velocità di punta è invece compressa/i);
+  });
+
+  it("flags GPs whose qualifying session was missing among used races", () => {
+    const c = circuit();
+    const cars = [car("A", 0.5, [0.5, 0.5, 0.5], "medium", 3)];
+    const pred = predictGpAffinity(c, cars, { racesConsidered: 3 });
+    const lines = buildGpPreviewNarrative(c, pred, {
+      totalPastRaces: 3,
+      racesConsidered: 3,
+      racesWithData: 3,
+      diagnostics: [
+        { name: "Bahrain", date_end: "2026-03-01", status: "used", sources: { quali: true, race: true } },
+        { name: "Jeddah", date_end: "2026-04-01", status: "used", sources: { quali: false, race: true } },
+        { name: "Melbourne", date_end: "2026-04-15", status: "used", sources: { quali: false, race: true } },
+      ],
+    });
+    const all = lines.join("\n");
+    expect(all).toMatch(/non era disponibile la sessione di qualifica/i);
+    expect(all).toMatch(/Jeddah/);
+    expect(all).toMatch(/Melbourne/);
+  });
+
+  it("does NOT flag quali-missing when all used GPs had quali", () => {
+    const c = circuit();
+    const cars = [car("A", 0.5, [0.5, 0.5, 0.5], "high", 3)];
+    const pred = predictGpAffinity(c, cars, { racesConsidered: 3 });
+    const lines = buildGpPreviewNarrative(c, pred, {
+      totalPastRaces: 3,
+      racesConsidered: 3,
+      racesWithData: 3,
+      diagnostics: [
+        { name: "Bahrain", date_end: "2026-03-01", status: "used", sources: { quali: true, race: true } },
+        { name: "Jeddah", date_end: "2026-04-01", status: "used", sources: { quali: true, race: true } },
+        { name: "Melbourne", date_end: "2026-04-15", status: "used", sources: { quali: true, race: true } },
+      ],
+    });
+    const all = lines.join("\n");
+    expect(all).not.toMatch(/non era disponibile la sessione di qualifica/i);
+  });
+});
