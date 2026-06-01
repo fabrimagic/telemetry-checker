@@ -38,6 +38,8 @@ interface Props {
   onCursorChange: (time: number | null) => void;
   onCursorClick: (time: number) => void;
   lapSoftSensor?: SoftSensorsLapState | null;
+  /** Single-driver only: dates (ISO) of driving-style episodes to overlay as bands. */
+  zones?: { superclipping: string[]; liftcoast: string[] } | null;
 }
 
 const GRID_STROKE = "hsl(220 14% 16%)";
