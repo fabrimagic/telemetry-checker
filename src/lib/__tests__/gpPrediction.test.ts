@@ -182,6 +182,10 @@ describe("gpPrediction", () => {
       corner_source: "location_geometry",
     };
     const out = predictGpAffinity(c, [geomCar, car("S", 0.5, [0.5, 0.5, 0.5], "high")]);
+    expect(out.notes.some((n) => /geometria del tracciato/i.test(n))).toBe(true);
+  });
+
+
 
   // ---- Weighted-quadratic cornerWeight aggregation ----
   // For a circuit with a single dominant corner type, the weighted quadratic
