@@ -884,6 +884,25 @@ export default function Index() {
     ? (vreResult?.soft_sensors_timeline?.by_lap.find(s => s.lap_number === singleDriverState.selectedLap) ?? null)
     : null;
 
+  // Driving-style zones for visual overlay on TrackMap + TelemetryCharts.
+  // Single-driver Race/Sprint only, to avoid color ambiguity in multi-driver views.
+  const singleDriverZones = useMemo(() => {
+    if (!isSingleDriverRaceLike || !singleDriverState || singleDriverState.carData.length === 0) return null;
+    return computeDriverZones(
+      singleDriverState.carData,
+      singleDriverState.driver.driver_number,
+      getColor(singleDriverState.driver.driver_number)
+    );
+  }, [isSingleDriverRaceLike, singleDriverState]);
+
+  const telemetryZones = useMemo(() => {
+    if (!singleDriverZones) return null;
+    return {
+      superclipping: singleDriverZones.zones.filter((z) => z.type === "superclipping").map((z) => z.date),
+      liftcoast: singleDriverZones.zones.filter((z) => z.type === "liftcoast").map((z) => z.date),
+    };
+  }, [singleDriverZones]);
+
   const workspaceContent = (
     <>
       {error && (
