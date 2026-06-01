@@ -444,10 +444,22 @@ export async function computeCarProfiles(
   for (const team of teams) {
     const sampleRaces = racesByTeam.get(team) ?? 0;
     const sampleLaps = lapsByTeam.get(team) ?? 0;
-    // confidence thresholds (cautious; 2026 has few races and new regs).
+    // Kish effective sample size from the recency weights of the races
+    // this team actually contributed to: (Σ w)² / Σ(w²). Equals the count
+    // with uniform weights; decreases when a few races dominate.
+    const ws = weightsByTeam.get(team) ?? [];
+    let effective = 0;
+    if (ws.length > 0) {
+      const sumW = ws.reduce((s, x) => s + x, 0);
+      const sumW2 = ws.reduce((s, x) => s + x * x, 0);
+      effective = sumW2 > 0 ? (sumW * sumW) / sumW2 : 0;
+    }
+    // Confidence thresholds (cautious; 2026 has few races and new regs).
+    // Driven by the EFFECTIVE sample so that including many low-weight old
+    // races does NOT inflate confidence.
     let confidence: CarProfile["confidence"];
-    if (sampleRaces < 2 || sampleLaps < 20) confidence = "low";
-    else if (sampleRaces < 4 || sampleLaps < 60) confidence = "medium";
+    if (effective < 2 || sampleLaps < 20) confidence = "low";
+    else if (effective < 6 || sampleLaps < 60) confidence = "medium";
     else confidence = "high";
 
     profiles.push({
@@ -459,6 +471,7 @@ export async function computeCarProfiles(
         s3: normS3.get(team) ?? 0,
       },
       sample_races: sampleRaces,
+      effective_sample_races: effective,
       sample_laps: sampleLaps,
       confidence,
     });
