@@ -28,6 +28,7 @@ const App = () => (
           <Route path="/compare" element={<Compare />} />
           <Route path="/pre-race" element={<PreRace />} />
           <Route path="/campionato" element={<Championship />} />
+          <Route path="/anteprima-gp" element={<GpPreview />} />
           <Route
             path="/internal-pitwall-live-x7k2m9"
             element={
