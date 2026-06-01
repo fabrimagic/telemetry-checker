@@ -259,6 +259,27 @@ export function GpPredictionResultView({
                           ? "curve"
                           : "equilibrato"}
                     </span>
+                    {t.corner_source === "location_geometry" && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-sky-500/10 text-sky-300 border-sky-500/40"
+                        data-testid={`corner-source-${t.team_name}`}
+                        title="La tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del circuito e dalla posizione GPS in qualifica: lettura più granulare ma sperimentale, può contenere imprecisioni di allineamento."
+                      >
+                        Curve da geometria GPS
+                        {typeof t.corner_coverage === "number" && (
+                          <> · copertura {Math.round(t.corner_coverage * 100)}%</>
+                        )}
+                      </span>
+                    )}
+                    {t.corner_source === "sector_fallback" && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/40 text-muted-foreground border-border"
+                        data-testid={`corner-source-${t.team_name}`}
+                        title="La tenuta in curva è stimata dai tempi di settore aggregati (metodo robusto ma meno granulare: non distingue fra curve lente, medie e veloci)."
+                      >
+                        Curve da settori (stima)
+                      </span>
+                    )}
                     <span className="ml-auto opacity-70">
                       Confidenza team: {confidenceLabelIt(t.confidence)}
                     </span>
