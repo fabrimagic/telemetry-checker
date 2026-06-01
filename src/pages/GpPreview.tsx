@@ -15,7 +15,11 @@ import {
   type CarProfile,
 } from "@/lib/carProfiles";
 import { predictGpAffinity, type GpPrediction } from "@/lib/gpPrediction";
-import { buildGpPreviewNarrative } from "@/lib/gpPreviewNarrative";
+import {
+  buildGpPreviewNarrative,
+  buildPerTeamExplanations,
+  strengthLabel,
+} from "@/lib/gpPreviewNarrative";
 
 
 // ----- Helpers -----
