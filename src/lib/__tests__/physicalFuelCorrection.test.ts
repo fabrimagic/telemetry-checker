@@ -92,6 +92,7 @@ function buildSyntheticStint(
   const stint: StintData = {
     driver_number: 1,
     session_key: 1,
+    meeting_key: 1,
     stint_number: 1,
     compound: "MEDIUM",
     lap_start: stintStart,
