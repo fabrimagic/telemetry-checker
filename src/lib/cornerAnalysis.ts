@@ -388,6 +388,7 @@ export function aggregateDriverCornerSpeeds(params: {
     fast_corner_speed: minSpeed.fast,
     sample_counts: counts,
     coverage,
+    corner_coverage,
     partial: coverage < 0.5 || counts.slow + counts.medium + counts.fast === 0,
     notes,
   };
