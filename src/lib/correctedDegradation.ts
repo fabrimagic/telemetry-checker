@@ -566,6 +566,107 @@ function twoStageDegradation(
 }
 
 /* ══════════════════════════════════════════════════════════════════
+ * PHYSICAL FUEL DEGRADATION
+ * ──────────────────────────────────────────────────────────────────
+ * Deterministic alternative to the multivariate fuel-proxy regression.
+ * Subtracts the physical fuel burn-off from lap times BEFORE regressing
+ * tyre degradation. Because the burn-off is anchored to the ABSOLUTE
+ * race lap (not stint tyre_life), it is not collinear with tyre wear
+ * within a single stint, and the residual slope is a clean estimate
+ * of degradation.
+ * ══════════════════════════════════════════════════════════════════ */
+function physicalFuelDegradation(
+  tyreLifes: number[],
+  lapNumbersAbs: number[],
+  trackTemps: number[] | null,
+  airTemps: number[] | null,
+  lapTimes: number[],
+  totalRaceLaps: number,
+  fuelLoadKg: number,
+): {
+  slope_corrected: number;
+  slope_corrected_std_error: number | null;
+  r_squared_stage_a: number | null;
+  r_squared_stage_b: number;
+  rmse_stage_b: number;
+  model_type: CorrectedDegradationResult["model_type"];
+  coefficients: CorrectedDegradationResult["coefficients"];
+  weather_used: boolean;
+  conditionWarning: boolean;
+} | null {
+  const n = lapTimes.length;
+  if (n < 3) return null;
+
+  // Subtract burn-off: add the fuel advantage back so all laps are at
+  // full-load equivalent. A lap at lap_abs=30 was ~1s faster than at lap_abs=1
+  // due to lighter fuel; we add that ~1s back to bring it onto the same scale.
+  const fuelCorrections = lapNumbersAbs.map(la =>
+    computeFuelTimeCorrection(la, totalRaceLaps, fuelLoadKg),
+  );
+  const lapTimesFuelCorrected = lapTimes.map((t, i) => t + fuelCorrections[i]);
+
+  // Per-lap fuel slope (s/lap) — stored in coefficients.fuel_proxy for
+  // interpretability. Negative because cars get faster as fuel burns off.
+  const perLapFuelEffect =
+    -FUEL_EFFECT_S_PER_KG * fuelLoadKg / Math.max(1, totalRaceLaps - 1);
+
+  // Optional Stage A: regress fuel-corrected lap times on temperatures
+  // (if enough weather variance). The residuals then go to Stage B.
+  let stageARes: { coefficients: number[]; rSquared: number; residuals: number[]; conditionWarning: boolean } | null = null;
+  let weatherUsed = false;
+  let trackScale = 1, airScale = 1, trackMean = 0, airMean = 0;
+  let conditionWarning = false;
+
+  if (trackTemps && airTemps && trackTemps.length === n && airTemps.length === n && n > 5) {
+    trackMean = meanVal(trackTemps);
+    airMean = meanVal(airTemps);
+    const tStd = stdDev(trackTemps);
+    const aStd = stdDev(airTemps);
+    if (tStd > 0.3 || aStd > 0.3) {
+      trackScale = tStd > 0.1 ? tStd : 1;
+      airScale = aStd > 0.1 ? aStd : 1;
+      const trackScaled = trackTemps.map(t => (t - trackMean) / trackScale);
+      const airScaled = airTemps.map(t => (t - airMean) / airScale);
+      const X = trackScaled.map((t, i) => [t, airScaled[i]]);
+      stageARes = multivariateOLS(X, lapTimesFuelCorrected);
+      if (stageARes) {
+        weatherUsed = true;
+        conditionWarning = stageARes.conditionWarning;
+      }
+    }
+  }
+
+  // Stage B: regress on tyre_life either the residuals (if Stage A ran)
+  // or the fuel-corrected times directly.
+  const yForStageB = stageARes ? stageARes.residuals : lapTimesFuelCorrected;
+  const stageBResult = simpleLinearRegression(tyreLifes, yForStageB);
+  if (!stageBResult) return null;
+
+  const stageAIntercept = stageARes ? stageARes.coefficients[0] : meanVal(lapTimesFuelCorrected);
+
+  const coefficients: CorrectedDegradationResult["coefficients"] = {
+    intercept: stageBResult.intercept + (stageARes ? stageAIntercept : 0),
+    tyre_life: stageBResult.slope,
+    fuel_proxy: perLapFuelEffect,
+    track_temp: weatherUsed && stageARes ? stageARes.coefficients[1] / trackScale : null,
+    air_temp: weatherUsed && stageARes ? stageARes.coefficients[2] / airScale : null,
+  };
+
+  return {
+    slope_corrected: stageBResult.slope,
+    slope_corrected_std_error: stageBResult.slopeStdError,
+    r_squared_stage_a: stageARes ? stageARes.rSquared : null,
+    r_squared_stage_b: stageBResult.rSquared,
+    rmse_stage_b: stageBResult.rmse,
+    model_type: "corrected_physical_fuel",
+    coefficients,
+    weather_used: weatherUsed,
+    conditionWarning,
+  };
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
  * CORRECTION QUALITY ASSESSMENT
  * ══════════════════════════════════════════════════════════════════ */
 
