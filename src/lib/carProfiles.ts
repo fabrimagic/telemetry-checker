@@ -791,6 +791,10 @@ export async function computeCarProfiles(
     const ccW = accCornerCovW.get(team) ?? 0;
     const ccS = accCornerCovSum.get(team) ?? 0;
     const cornerCoverageCurve = ccW > 0 ? ccS / ccW : null;
+    // Diagnostic-only: aggregate Procrustes alignment error.
+    const aeW = accAlignErrW.get(team) ?? 0;
+    const aeS = accAlignErrSum.get(team) ?? 0;
+    const cornerAlignmentError = aeW > 0 ? aeS / aeW : null;
 
     let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
     let cornerSource: CarProfile["corner_source"] = "sector_fallback";
