@@ -280,6 +280,12 @@ export default function GpPreview() {
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<CarProfile[] | null>(null);
   const [racesConsidered, setRacesConsidered] = useState<number>(0);
+  const [dataContext, setDataContext] = useState<{
+    totalPastRaces?: number;
+    racesConsidered?: number;
+    racesWithData?: number;
+    diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
+  } | undefined>(undefined);
   const [aborted, setAborted] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -297,6 +303,7 @@ export default function GpPreview() {
     setAborted(false);
     setProfiles(null);
     setRacesConsidered(0);
+    setDataContext(undefined);
     setProgress({ done: 0, total: 0 });
     try {
       const res = await computeCarProfiles({
@@ -306,6 +313,13 @@ export default function GpPreview() {
       setProfiles(res.profiles);
       setRacesConsidered(res.races_used.length);
       setAborted(res.aborted);
+      const racesWithData = res.profiles.reduce((m, p) => Math.max(m, p.sample_races), 0);
+      setDataContext({
+        totalPastRaces: res.total_past_races,
+        racesConsidered: res.races_considered,
+        racesWithData,
+        diagnostics: res.races_diagnostics,
+      });
 
     } catch (e: any) {
       setError(e?.message ?? "Errore durante il calcolo dei profili vettura");
@@ -314,6 +328,7 @@ export default function GpPreview() {
       abortRef.current = null;
     }
   }, [circuit]);
+
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort();
