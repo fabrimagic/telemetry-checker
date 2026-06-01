@@ -907,6 +907,11 @@ export default function Index() {
     };
   }, [singleDriverZones]);
 
+  const driverCumDev = useMemo(() => {
+    if (!isSingleDriverRaceLike || !singleDriverState || !cumDevResult) return null;
+    return cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null;
+  }, [isSingleDriverRaceLike, singleDriverState, cumDevResult]);
+
   const workspaceContent = (
     <>
       {error && (
