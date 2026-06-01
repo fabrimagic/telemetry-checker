@@ -40,8 +40,15 @@ import { getCarData, getLocation, type CarData, type LocationData } from "./open
 // of radius R has κ = 1/R. Defaults are chosen so a typical F1 circuit
 // yields a sensible split (Monaco mostly slow, Monza mostly fast/straight).
 // ---------------------------------------------------------------------------
-/** Below this curvature the point is treated as a straight (R > ~400 m). */
-export const CORNER_CURVATURE_STRAIGHT_MAX = 1 / 400;
+/**
+ * Below this curvature the point is treated as a straight (R > ~600 m).
+ *
+ * Calibration note: raised to 1/600 so that real-world fast corners with
+ * radius around 440 m (e.g. Copse at Silverstone) are classified as "fast"
+ * rather than "straight". This is a heuristic based on the published track
+ * geometry, not the racing line; expect a margin of error.
+ */
+export const CORNER_CURVATURE_STRAIGHT_MAX = 1 / 600;
 /** At or above this curvature the corner is "slow" (R ≤ ~70 m). */
 export const CORNER_CURVATURE_SLOW = 1 / 70;
 /** At or above this curvature (but below SLOW) the corner is "medium". */

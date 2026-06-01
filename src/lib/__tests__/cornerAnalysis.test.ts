@@ -7,6 +7,7 @@ import {
   analyzeCornersForSession,
   summarizeAnalysis,
   CORNER_CURVATURE_SLOW,
+  CORNER_CURVATURE_STRAIGHT_MAX,
 } from "../cornerAnalysis";
 import type { CarData, LocationData } from "../openf1";
 
@@ -35,6 +36,16 @@ function metersToDeg(m: number): number {
 }
 
 /** Build outline: straight east (long), then tight U-turn, then a wide curve back. */
+/** Build a circular arc of given radius (m) with N points over angleSweep (rad). */
+function buildArcOutline(R: number, N: number, angleSweep: number): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= N; i++) {
+    const ang = (i / N) * angleSweep;
+    pts.push([metersToDeg(R * Math.cos(ang)), metersToDeg(R * Math.sin(ang))]);
+  }
+  return pts;
+}
+
 function buildSyntheticOutline(): [number, number][] {
   const pts: [number, number][] = [];
   // 1) Long straight: 30 points, 20 m apart, due east.
@@ -105,6 +116,42 @@ describe("classifyCircuitCorners", () => {
     expect(segs.length).toBeGreaterThanOrEqual(1);
     expect(segs[0].curvature).toBeLessThan(CORNER_CURVATURE_SLOW);
     expect(["fast", "medium"]).toContain(segs[0].type);
+  });
+
+  it("classifies an R≈440 m arc as fast (was straight at the old 400 m ceiling)", () => {
+    const outline = buildArcOutline(440, 60, Math.PI);
+    const segs = classifyCircuitCorners(outline);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    expect(segs[0].type).toBe("fast");
+    expect(segs[0].curvature).toBeGreaterThan(CORNER_CURVATURE_STRAIGHT_MAX);
+    expect(segs[0].curvature).toBeLessThan(1 / 180);
+  });
+
+  it("classifies an R≈800 m arc as straight (below the 600 m threshold)", () => {
+    const outline = buildArcOutline(800, 60, Math.PI);
+    const segs = classifyCircuitCorners(outline);
+    expect(segs.length).toBe(0);
+  });
+
+  it("classifies an R≈300 m arc as fast", () => {
+    const outline = buildArcOutline(300, 40, Math.PI / 2);
+    const segs = classifyCircuitCorners(outline);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    expect(segs[0].type).toBe("fast");
+  });
+
+  it("classifies an R≈120 m arc as medium", () => {
+    const outline = buildArcOutline(120, 40, Math.PI / 2);
+    const segs = classifyCircuitCorners(outline);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    expect(segs[0].type).toBe("medium");
+  });
+
+  it("classifies an R≈25 m arc as slow", () => {
+    const outline = buildArcOutline(25, 40, Math.PI);
+    const segs = classifyCircuitCorners(outline);
+    expect(segs.length).toBeGreaterThanOrEqual(1);
+    expect(segs[0].type).toBe("slow");
   });
 });
 
