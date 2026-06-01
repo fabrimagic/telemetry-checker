@@ -294,6 +294,7 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
           <AreaChart data={brakeData} {...chartHandlers} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
             <XAxis {...commonXAxis} hide />
             <YAxis width={42} domain={[0, 100]} tick={AXIS_TICK} axisLine={false} tickLine={false} ticks={[0, 100]} />
+            {zoneAreas}
             {refLine}
             {drivers.map((d) => (
               <Area
