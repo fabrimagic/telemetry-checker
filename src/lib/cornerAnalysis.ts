@@ -229,51 +229,308 @@ export function classifyCircuitCorners(outline: [number, number][]): CornerSegme
 
 interface NormalizedPoint { x: number; y: number; }
 
-function normalizeBox(points: NormalizedPoint[]): NormalizedPoint[] {
-  if (points.length === 0) return [];
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  const range = Math.max(maxX - minX, maxY - minY) || 1;
-  return points.map((p) => ({ x: (p.x - cx) / range, y: (p.y - cy) / range }));
+// ---------------------------------------------------------------------------
+// Procrustes shape alignment (PCA initial + ICP refinement)
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of a similarity-transform alignment: the source points expressed
+ * in the target frame, plus a normalised residual error (RMS of nearest-
+ * neighbour distances divided by the target's RMS spread). Residual is
+ * `null` when not computable (degenerate inputs or bbox-only fallback).
+ */
+export interface ShapeAlignment {
+  transformed: { x: number; y: number }[];
+  residual: number | null;
+}
+
+// 2x2 helpers (closed-form; no external deps).
+type M2 = [[number, number], [number, number]];
+const mul2 = (A: M2, B: M2): M2 => [
+  [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+  [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+];
+const transpose2 = (A: M2): M2 => [
+  [A[0][0], A[1][0]],
+  [A[0][1], A[1][1]],
+];
+
+/** Eigendecomposition of a symmetric 2x2 matrix (e1 ≥ e2). */
+function eig2sym(M: M2): { e1: number; e2: number; v1: [number, number]; v2: [number, number] } {
+  const a = M[0][0], b = M[0][1], c = M[1][1];
+  const tr = a + c;
+  const det = a * c - b * b;
+  const disc = Math.max(0, (tr * tr) / 4 - det);
+  const sq = Math.sqrt(disc);
+  const e1 = tr / 2 + sq;
+  const e2 = tr / 2 - sq;
+  let v1: [number, number];
+  if (Math.abs(b) > 1e-14) v1 = [e1 - c, b];
+  else v1 = a >= c ? [1, 0] : [0, 1];
+  const n = Math.hypot(v1[0], v1[1]);
+  if (n > 0) v1 = [v1[0] / n, v1[1] / n];
+  const v2: [number, number] = [-v1[1], v1[0]];
+  return { e1, e2, v1, v2 };
+}
+
+function centroid(pts: { x: number; y: number }[]): { x: number; y: number } {
+  let sx = 0, sy = 0;
+  for (const p of pts) { sx += p.x; sy += p.y; }
+  return { x: sx / pts.length, y: sy / pts.length };
+}
+
+function covar2(centered: { x: number; y: number }[]): M2 {
+  let xx = 0, xy = 0, yy = 0;
+  for (const p of centered) { xx += p.x * p.x; xy += p.x * p.y; yy += p.y * p.y; }
+  return [[xx, xy], [xy, yy]];
+}
+
+function meanSqNearest(
+  src: { x: number; y: number }[],
+  tgt: { x: number; y: number }[],
+): number {
+  if (src.length === 0 || tgt.length === 0) return Infinity;
+  let s = 0;
+  for (const p of src) {
+    let best = Infinity;
+    for (const q of tgt) {
+      const dx = p.x - q.x, dy = p.y - q.y;
+      const d = dx * dx + dy * dy;
+      if (d < best) best = d;
+    }
+    s += best;
+  }
+  return s / src.length;
+}
+
+/**
+ * One ICP refinement step: pair each source point with its nearest target,
+ * then compute the optimal similarity transform (allowing reflection) over
+ * the pairs via SVD-free closed-form Procrustes on 2x2.
+ *
+ * Returns the newly-transformed source, or null if degenerate.
+ */
+function procrustesStep(
+  src: { x: number; y: number }[],
+  tgt: { x: number; y: number }[],
+): { x: number; y: number }[] | null {
+  // Nearest-neighbour pairing.
+  const pairs: { s: { x: number; y: number }; t: { x: number; y: number } }[] = [];
+  for (const p of src) {
+    let best = Infinity;
+    let bq: { x: number; y: number } = tgt[0];
+    for (const q of tgt) {
+      const dx = p.x - q.x, dy = p.y - q.y;
+      const d = dx * dx + dy * dy;
+      if (d < best) { best = d; bq = q; }
+    }
+    pairs.push({ s: p, t: bq });
+  }
+  const cs = centroid(pairs.map((x) => x.s));
+  const ct = centroid(pairs.map((x) => x.t));
+  // H = Σ (s_i - cs)(t_i - ct)^T  (2x2)
+  let h00 = 0, h01 = 0, h10 = 0, h11 = 0;
+  let normS = 0;
+  for (const { s, t } of pairs) {
+    const sx = s.x - cs.x, sy = s.y - cs.y;
+    const tx = t.x - ct.x, ty = t.y - ct.y;
+    h00 += sx * tx; h01 += sx * ty;
+    h10 += sy * tx; h11 += sy * ty;
+    normS += sx * sx + sy * sy;
+  }
+  if (normS <= 1e-20) return null;
+  // 2x2 SVD via H^T H eigendecomp.
+  const H: M2 = [[h00, h01], [h10, h11]];
+  const Ht: M2 = transpose2(H);
+  const HtH: M2 = mul2(Ht, H);
+  const eig = eig2sym(HtH);
+  const s1 = Math.sqrt(Math.max(0, eig.e1));
+  const s2 = Math.sqrt(Math.max(0, eig.e2));
+  // V columns = eigenvectors of HtH.
+  const V: M2 = [[eig.v1[0], eig.v2[0]], [eig.v1[1], eig.v2[1]]];
+  // U columns = H * v_i / s_i.
+  const u1 = s1 > 1e-12
+    ? [(H[0][0] * eig.v1[0] + H[0][1] * eig.v1[1]) / s1, (H[1][0] * eig.v1[0] + H[1][1] * eig.v1[1]) / s1] as [number, number]
+    : [1, 0] as [number, number];
+  const u2 = s2 > 1e-12
+    ? [(H[0][0] * eig.v2[0] + H[0][1] * eig.v2[1]) / s2, (H[1][0] * eig.v2[0] + H[1][1] * eig.v2[1]) / s2] as [number, number]
+    : [-u1[1], u1[0]] as [number, number];
+  const U: M2 = [[u1[0], u2[0]], [u1[1], u2[1]]];
+  // Procrustes (with reflection allowed): R = V * U^T.
+  const R: M2 = mul2(V, transpose2(U));
+  const scale = (s1 + s2) / normS;
+  return src.map((p) => {
+    const x = p.x - cs.x, y = p.y - cs.y;
+    return {
+      x: scale * (R[0][0] * x + R[0][1] * y) + ct.x,
+      y: scale * (R[1][0] * x + R[1][1] * y) + ct.y,
+    };
+  });
+}
+
+/**
+ * Estimate the optimal similarity transform (rotation + reflection + uniform
+ * scale + translation) that maps `source` onto `target`. The two point sets
+ * do NOT need point-to-point correspondence: a PCA-based initial guess
+ * (with all 4 axis-sign combinations to cover reflection) is refined by a
+ * few ICP iterations.
+ *
+ * Returns transformed source points in the target frame plus a
+ * residual error normalised by the target's RMS spread (smaller = better
+ * alignment; values around 1 mean the shapes don't match).
+ *
+ * Falls back to bbox normalisation when the source is degenerate
+ * (<3 points or near-zero secondary variance) — residual=null in that case.
+ *
+ * Complexity: O(N*M) per ICP iteration (nearest-neighbour snap). Kept to
+ * a few iterations for the PoC.
+ */
+export function alignShapes(
+  source: { x: number; y: number }[],
+  target: { x: number; y: number }[],
+): ShapeAlignment {
+  if (source.length === 0 || target.length === 0) {
+    return { transformed: [...source], residual: null };
+  }
+  // Degenerate-input fallback: bbox normalisation (no shape alignment).
+  if (source.length < 3 || target.length < 3) {
+    return { transformed: bboxFallback(source, target), residual: null };
+  }
+  const cs = centroid(source);
+  const ct = centroid(target);
+  const sCent = source.map((p) => ({ x: p.x - cs.x, y: p.y - cs.y }));
+  const tCent = target.map((p) => ({ x: p.x - ct.x, y: p.y - ct.y }));
+  const Cs = covar2(sCent);
+  const Ct = covar2(tCent);
+  const eigS = eig2sym(Cs);
+  const eigT = eig2sym(Ct);
+  const trS = Cs[0][0] + Cs[1][1];
+  const trT = Ct[0][0] + Ct[1][1];
+  if (trS <= 1e-20 || trT <= 1e-20) {
+    return { transformed: bboxFallback(source, target), residual: null };
+  }
+  // Degenerate-shape fallback: secondary variance is tiny (collinear data).
+  if (eigS.e2 / Math.max(eigS.e1, 1e-20) < 1e-6) {
+    return { transformed: bboxFallback(source, target), residual: null };
+  }
+  const scale = Math.sqrt(trT / trS);
+  const Vs: M2 = [[eigS.v1[0], eigS.v2[0]], [eigS.v1[1], eigS.v2[1]]];
+  const Vt: M2 = [[eigT.v1[0], eigT.v2[0]], [eigT.v1[1], eigT.v2[1]]];
+
+  // PCA gives eigenvectors with sign ambiguity. Try all 4 sign
+  // combinations on D and keep the one with lowest residual: this is
+  // what covers the reflection (mirror) case the legacy code handled
+  // with a hard `-l.x` flip.
+  let bestErr = Infinity;
+  let bestT: { x: number; y: number }[] = source;
+  for (const sa of [1, -1]) {
+    for (const sb of [1, -1]) {
+      const VtD: M2 = [
+        [Vt[0][0] * sa, Vt[0][1] * sb],
+        [Vt[1][0] * sa, Vt[1][1] * sb],
+      ];
+      const R: M2 = mul2(VtD, transpose2(Vs));
+      const tr = sCent.map((p) => ({
+        x: scale * (R[0][0] * p.x + R[0][1] * p.y) + ct.x,
+        y: scale * (R[1][0] * p.x + R[1][1] * p.y) + ct.y,
+      }));
+      const err = meanSqNearest(tr, target);
+      if (err < bestErr) { bestErr = err; bestT = tr; }
+    }
+  }
+
+  // ICP refinement. Few iterations, exit on stall.
+  const MAX_ICP = 10;
+  let cur = bestT;
+  let curErr = bestErr;
+  for (let k = 0; k < MAX_ICP; k++) {
+    const next = procrustesStep(cur, target);
+    if (!next) break;
+    const nextErr = meanSqNearest(next, target);
+    if (nextErr >= curErr - 1e-12) break;
+    cur = next;
+    curErr = nextErr;
+  }
+
+  // Residual normalised by target RMS spread = sqrt(trT / target.length).
+  const targetRms = Math.sqrt(trT / target.length);
+  const residual = targetRms > 0 ? Math.sqrt(curErr) / targetRms : null;
+  return { transformed: cur, residual };
+}
+
+/**
+ * Legacy bbox normalisation, kept as a fallback for degenerate inputs.
+ * Both spaces are centred + scaled by their bounding-box max range, and
+ * the source's X axis is mirrored (OpenF1 convention: TrackMap renders
+ * with scale(-1,1)). Used only when alignShapes cannot run.
+ */
+function bboxFallback(
+  source: { x: number; y: number }[],
+  target: { x: number; y: number }[],
+): { x: number; y: number }[] {
+  if (source.length === 0 || target.length === 0) return [...source];
+  const norm = (pts: { x: number; y: number }[]) => {
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const range = Math.max(maxX - minX, maxY - minY) || 1;
+    return { cx, cy, range };
+  };
+  const ns = norm(source.map((l) => ({ x: -l.x, y: l.y })));
+  const nt = norm(target);
+  return source.map((l) => ({
+    x: ((-l.x - ns.cx) / ns.range) * nt.range + nt.cx,
+    y: ((l.y - ns.cy) / ns.range) * nt.range + nt.cy,
+  }));
 }
 
 /**
  * For each LocationData point, return the index of the closest outline
- * vertex (or -1 when no outline). Both spaces are normalized to the unit
- * box around their respective bounding-box centers. OpenF1 LocationData
- * X is mirrored (TrackMap renders with scale(-1,1)); we mirror here too.
+ * vertex (or -1 when no outline). Uses Procrustes shape alignment
+ * (rotation + reflection + scale + translation) to map the GPS frame
+ * into the GeoJSON-meters frame BEFORE snapping to the nearest vertex.
+ * Falls back to bbox normalisation for degenerate inputs.
  *
- * APPROXIMATE alignment: rotation between the two frames is not estimated,
- * so heavily rotated layouts may snap to wrong neighbours on shared
- * straights. Acceptable for a PoC; flagged in the JSDoc and surfaced via
- * `coverage` so the caller can judge.
+ * The legacy hard `-l.x` mirror is gone: reflection is now estimated
+ * from the data (one of the 4 PCA sign combinations covers it).
  */
 export function mapLocationsToOutlineIndices(
   locations: { x: number; y: number }[],
   outlineMeters: { x: number; y: number }[],
 ): number[] {
-  if (outlineMeters.length === 0 || locations.length === 0) return [];
-  const normOutline = normalizeBox(outlineMeters);
-  const normLocs = normalizeBox(locations.map((l) => ({ x: -l.x, y: l.y })));
-  const result: number[] = new Array(normLocs.length);
-  for (let i = 0; i < normLocs.length; i++) {
+  return mapLocationsToOutlineIndicesWithError(locations, outlineMeters).indices;
+}
+
+/**
+ * Same as `mapLocationsToOutlineIndices` but also returns the normalised
+ * residual of the shape alignment (smaller = better; `null` for bbox
+ * fallback). Surfaced so callers can propagate the diagnostic.
+ */
+export function mapLocationsToOutlineIndicesWithError(
+  locations: { x: number; y: number }[],
+  outlineMeters: { x: number; y: number }[],
+): { indices: number[]; alignment_error: number | null } {
+  if (outlineMeters.length === 0 || locations.length === 0) {
+    return { indices: [], alignment_error: null };
+  }
+  const aligned = alignShapes(locations, outlineMeters);
+  const result: number[] = new Array(aligned.transformed.length);
+  for (let i = 0; i < aligned.transformed.length; i++) {
     let best = 0;
     let bestD = Infinity;
-    const lx = normLocs[i].x, ly = normLocs[i].y;
-    for (let j = 0; j < normOutline.length; j++) {
-      const dx = normOutline[j].x - lx;
-      const dy = normOutline[j].y - ly;
+    const lx = aligned.transformed[i].x, ly = aligned.transformed[i].y;
+    for (let j = 0; j < outlineMeters.length; j++) {
+      const dx = outlineMeters[j].x - lx;
+      const dy = outlineMeters[j].y - ly;
       const d = dx * dx + dy * dy;
       if (d < bestD) { bestD = d; best = j; }
     }
     result[i] = best;
   }
-  return result;
+  return { indices: result, alignment_error: aligned.residual };
 }
+
 
 // ---------------------------------------------------------------------------
 // Telemetry alignment + aggregation
