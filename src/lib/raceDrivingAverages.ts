@@ -13,6 +13,10 @@ export interface DrivingZoneStats {
   liftcoast: { count: number; duration: number; dates: string[] };
 }
 
+// Throttle threshold for superclipping: episode starts only when throttle is
+// STRICTLY above 95% (i.e. "oltre il 95%").
+const THROTTLE_SUPERCLIP_MIN = 95;
+
 export function computeZones(carData: CarData[]): DrivingZoneStats {
   let superclipCount = 0;
   let superclipMs = 0;
@@ -23,23 +27,41 @@ export function computeZones(carData: CarData[]): DrivingZoneStats {
   const liftcoastDates: string[] = [];
 
   let inLiftCoast = false;
+  let inSuperclip = false;
 
   for (let i = 1; i < carData.length; i++) {
     const prev = carData[i - 1];
     const curr = carData[i];
     const dt = new Date(curr.date).getTime() - new Date(prev.date).getTime();
+    const safeDt = Number.isFinite(dt) && dt > 0 ? dt : 0;
 
-    // Superclipping: throttle 100% but speed decreasing
-    if (curr.throttle >= 100 && curr.speed < prev.speed && prev.speed > 0) {
-      superclipMs += dt;
-      superclipDates.push(curr.date);
-      if (i === 1 || !(carData[i - 1].throttle >= 100 && prev.speed < carData[i - 2]?.speed)) {
+    // ---- Superclipping (stateful, episodic) ----
+    // Start: throttle > 95% AND speed decreasing. End: brake pressed OR speed rising again.
+    // Note: during an active episode the throttle is NOT required to stay > 95 — the
+    // definition explicitly anchors the end to brake-on or speed-rising, not to a
+    // momentary throttle dip. Only brake-on or speed-rising terminates the episode.
+    if (!inSuperclip) {
+      if (curr.throttle > THROTTLE_SUPERCLIP_MIN && curr.speed < prev.speed && prev.speed > 0) {
+        inSuperclip = true;
         superclipCount++;
+        superclipMs += safeDt;
+        superclipDates.push(curr.date);
+      }
+    } else {
+      const endsByBrake = (curr.brake ?? 0) > 0;
+      const endsBySpeedUp = curr.speed > prev.speed;
+      if (endsByBrake || endsBySpeedUp) {
+        // Episode ends; the terminating sample is NOT accumulated.
+        inSuperclip = false;
+      } else {
+        superclipMs += safeDt;
+        superclipDates.push(curr.date);
       }
     }
 
-    // Lift & Coast: starts when going from (throttle>90, brake=0) to (throttle=0, brake=0)
-    // ends when throttle OR brake are pressed
+    // ---- Lift & Coast (unchanged) ----
+    // Starts when going from (throttle>90, brake=0) to (throttle=0, brake=0);
+    // ends when throttle OR brake are pressed.
     if (!inLiftCoast) {
       const prevHighThrottle = prev.throttle > 90 && prev.brake === 0;
       const currCoasting = curr.throttle === 0 && curr.brake === 0;
@@ -64,6 +86,7 @@ export function computeZones(carData: CarData[]): DrivingZoneStats {
     liftcoast: { count: liftcoastCount, duration: liftcoastMs / 1000, dates: liftcoastDates },
   };
 }
+
 
 // ───────────────────────── Race average aggregation ─────────────────────────
 
