@@ -360,6 +360,32 @@ export default function GpPreview() {
       const res = await computeCarProfiles({
         signal: ctrl.signal,
         onProgress: (done, total) => setProgress({ done, total }),
+        analyzeQualiCorners: async (qualiSession: SessionInfo, driverNumbers: number[]) => {
+          // Best-effort mapping: the OpenF1 session metadata doesn't carry
+          // our Italian gpName, but the upcoming GP usually shares the
+          // circuit name we already know. We pass the next session's gpName
+          // for the GeoJSON lookup; if the historical GP is on a different
+          // circuit, fetchCircuitOutline returns null and the analyzer
+          // gracefully degrades to a "no_circuit_layout" no-op (which then
+          // becomes a sector_fallback in carProfiles).
+          const gpName =
+            (qualiSession as { location?: string; country_name?: string }).location ??
+            (qualiSession as { country_name?: string }).country_name ??
+            circuit?.gpName ??
+            "";
+          const dateStart = qualiSession.date_start ?? qualiSession.date_end ?? "";
+          const dateEnd = qualiSession.date_end ?? qualiSession.date_start ?? "";
+          if (!dateStart || !dateEnd) return null;
+          try {
+            return await analyzeCornersForSession(gpName, qualiSession.session_key, driverNumbers, {
+              signal: ctrl.signal,
+              dateStart,
+              dateEnd,
+            });
+          } catch {
+            return null;
+          }
+        },
       });
       setProfiles(res.profiles);
       setRacesConsidered(res.races_used.length);
