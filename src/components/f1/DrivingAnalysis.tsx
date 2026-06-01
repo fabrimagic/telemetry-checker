@@ -7,7 +7,7 @@ import {
   type CarDataFetcher,
   type RaceDrivingAverages,
 } from "@/lib/raceDrivingAverages";
-import type { LapDeviation } from "@/lib/cumulativeDeviation";
+
 import { ZONE_COLORS } from "@/lib/zoneIntervals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
