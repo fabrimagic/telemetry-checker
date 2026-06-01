@@ -19,6 +19,7 @@ import { calculateCorrectedTyreDegradation } from "@/lib/correctedDegradation";
 import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
+import { SoftSensorsLapCard } from "@/components/f1/SoftSensorsLapCard";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
@@ -853,6 +854,10 @@ export default function Index() {
   // ───────── Contenuto centrale ─────────
   const singleDriverState = selectedDriverNumbers.length === 1 ? driverStates.get(selectedDriverNumbers[0]) : null;
   const isRaceOrSprint = sessionType === "Race" || sessionType === "Sprint";
+  const isSingleDriverRaceLike = selectedDriverNumbers.length === 1 && isRaceOrSprint;
+  const selectedLapSoftSensor = (isSingleDriverRaceLike && singleDriverState?.selectedLap != null)
+    ? (vreResult?.soft_sensors_timeline?.by_lap.find(s => s.lap_number === singleDriverState.selectedLap) ?? null)
+    : null;
 
   const workspaceContent = (
     <>
@@ -1040,6 +1045,7 @@ export default function Index() {
                         cursorTime={cursorTime}
                         onCursorChange={setCursorTime}
                         onCursorClick={setClickedTime}
+                        lapSoftSensor={selectedLapSoftSensor}
                       />
                     </section>
                     <aside className="space-y-4 min-w-0">
@@ -1059,6 +1065,7 @@ export default function Index() {
                         return <DrivingAnalysis drivers={analysisDrivers} />;
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
+                      {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
                       {(() => {
                         const driversForMiniSectors = [...driverStates.values()]
                           .filter((s) => s.selectedLap != null)
