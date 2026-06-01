@@ -110,11 +110,6 @@ function weightedQuadratic(weights: number[]): number {
   if (sum <= 0) return 0;
   return sumSq / sum;
 }
-  if (xs.length === 0) return 0;
-  let s = 0;
-  for (const x of xs) s += x;
-  return s / xs.length;
-}
 
 function downgrade(level: ConfidenceLevel): ConfidenceLevel {
   if (level === "high") return "medium";
