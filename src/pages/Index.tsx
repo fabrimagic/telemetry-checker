@@ -114,6 +114,7 @@ export default function Index() {
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
+  const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
   const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
   const [loadingVre, setLoadingVre] = useState(false);
   const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
@@ -322,6 +323,7 @@ export default function Index() {
                 cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
               }
             } catch { /* optional */ }
+            setCumDevResult(cumDevForVre);
 
             // diaryForVre captured from diary build above
 
@@ -403,7 +405,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
+    setVreResult(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
   }, []);
 
   // Select lap for a driver
@@ -518,7 +520,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
+    setVreResult(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -1123,7 +1125,10 @@ export default function Index() {
                               enabled: true,
                             }
                           : null;
-                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} />;
+                        const driverCumDev = (isSingleDriverRaceLike && singleDriverState && cumDevResult)
+                          ? cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null
+                          : null;
+                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} driverCumulativeDeviation={driverCumDev} />;
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
                       {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}

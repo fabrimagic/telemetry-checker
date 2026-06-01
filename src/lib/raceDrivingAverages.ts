@@ -90,6 +90,14 @@ export function computeZones(carData: CarData[]): DrivingZoneStats {
 
 // ───────────────────────── Race average aggregation ─────────────────────────
 
+export interface PerLapDrivingPoint {
+  lap_number: number;
+  superclip_duration: number;
+  superclip_count: number;
+  liftcoast_duration: number;
+  liftcoast_count: number;
+}
+
 export interface RaceDrivingAverages {
   laps_used: number;
   laps_total_comparable: number;
@@ -103,6 +111,8 @@ export interface RaceDrivingAverages {
   low_sample: boolean;
   /** True when computation was aborted before completing all comparable laps. */
   aborted: boolean;
+  /** Per-lap driving series for successfully downloaded comparable laps, ordered by lap_number. */
+  per_lap: PerLapDrivingPoint[];
 }
 
 export type CarDataFetcher = (
@@ -173,6 +183,7 @@ export async function computeRaceDrivingAverages(
   const superclipCounts: number[] = [];
   const liftcoastDurations: number[] = [];
   const liftcoastCounts: number[] = [];
+  const perLap: PerLapDrivingPoint[] = [];
 
   let aborted = false;
 
@@ -195,6 +206,13 @@ export async function computeRaceDrivingAverages(
         superclipCounts.push(z.superclipping.count);
         liftcoastDurations.push(z.liftcoast.duration);
         liftcoastCounts.push(z.liftcoast.count);
+        perLap.push({
+          lap_number: lap.lap_number,
+          superclip_duration: z.superclipping.duration,
+          superclip_count: z.superclipping.count,
+          liftcoast_duration: z.liftcoast.duration,
+          liftcoast_count: z.liftcoast.count,
+        });
       }
     } catch {
       // skip failed lap, keep going
@@ -213,6 +231,8 @@ export async function computeRaceDrivingAverages(
     return Math.sqrt(v);
   };
 
+  perLap.sort((a, b) => a.lap_number - b.lap_number);
+
   return {
     laps_used: used,
     laps_total_comparable: total,
@@ -224,5 +244,6 @@ export async function computeRaceDrivingAverages(
     liftcoast_std_duration: std(liftcoastDurations),
     low_sample: used < MIN_SAMPLE_FOR_RELIABLE_AVG,
     aborted,
+    per_lap: perLap,
   };
 }

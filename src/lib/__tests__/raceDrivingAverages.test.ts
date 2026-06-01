@@ -116,6 +116,26 @@ describe("computeRaceDrivingAverages", () => {
     expect(res.aborted).toBe(false);
   });
 
+  it("populates per_lap with one ordered entry per successful lap, skipping failures", async () => {
+    const laps: Lap[] = [makeLap(3), makeLap(1), makeLap(2), makeLap(4)];
+    let call = 0;
+    const fetcher: getCarDataMock = async (_s, _d, start) => {
+      call++;
+      if (call === 2) throw new Error("boom"); // 2nd comparable lap fails
+      return syntheticLapData(start);
+    };
+    const res = await computeRaceDrivingAverages(1, 1, laps, new Map(), fetcher);
+    expect(res.per_lap.length).toBe(3);
+    // Sorted by lap_number
+    expect(res.per_lap.map((p) => p.lap_number)).toEqual([...res.per_lap.map((p) => p.lap_number)].sort((a, b) => a - b));
+    // Aggregate count matches succeeded laps
+    expect(res.per_lap.length).toBe(res.laps_used);
+    for (const p of res.per_lap) {
+      expect(p.liftcoast_duration).toBeGreaterThan(0);
+      expect(p.superclip_count).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it("honours AbortSignal and returns partial results with aborted=true", async () => {
     const laps: Lap[] = Array.from({ length: 6 }, (_, i) => makeLap(i + 1));
     const ctrl = new AbortController();

@@ -333,13 +333,51 @@ export default function Documentation() {
 
         <DocSection id="driving-analysis" title="Analisi di Guida" icon={<Activity className="h-4 w-4" />}>
           <p>
-            Identifica e quantifica due comportamenti di guida significativi:
+            Identifica e quantifica due comportamenti di guida significativi, calcolati dalla telemetria del giro selezionato:
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-foreground">Superclipping</strong> — si verifica quando la velocità della vettura cala mentre l'acceleratore è premuto al 100% e il freno è allo 0%.</li>
-            <li><strong className="text-foreground">Lift &amp; Coast</strong> — si verifica quando il pilota passa da acceleratore superiore al 90% e freno a 0% ad acceleratore a 0% e freno a 0%; termina non appena uno dei due pedali viene premuto, anche solo leggermente.</li>
+            <li>
+              <strong className="text-foreground">Superclipping</strong> — un <em>episodio</em> inizia quando la velocità
+              della vettura diminuisce nonostante l'acceleratore sia oltre il 95%, e dura fino a quando il pilota tocca
+              il freno oppure la velocità torna a salire. Durante un episodio l'acceleratore può anche scendere
+              temporaneamente sotto la soglia senza interromperlo: a chiudere l'episodio sono solo la frenata o la
+              ripresa di velocità. Nel <strong className="text-foreground">regolamento F1 2026</strong>, con la maggiore
+              componente elettrica della power unit e una gestione più complessa del dispiegamento dell'ERS, il
+              <em> clipping</em> — l'esaurimento dell'erogazione elettrica a fine rettilineo — diventa un fenomeno più
+              frequente e rilevante da osservare giro per giro.
+            </li>
+            <li>
+              <strong className="text-foreground">Lift &amp; Coast</strong> — si verifica quando il pilota passa da
+              acceleratore superiore al 90% e freno a 0% ad acceleratore a 0% e freno a 0%; termina non appena uno dei
+              due pedali viene premuto, anche solo leggermente. È una tecnica di <em>gestione</em>: risparmio
+              carburante, raffreddamento freni, controllo della temperatura gomme. Nel <strong className="text-foreground">2026</strong>{" "}
+              la rilevanza cresce ulteriormente perché la gestione dell'energia (recupero e dispiegamento elettrico)
+              rende il lift &amp; coast uno strumento abituale di pianificazione del giro.
+            </li>
           </ul>
-          <p>Per ogni zona vengono mostrati il numero di curve coinvolte e l'intensità relativa.</p>
+          <p>Per ogni zona vengono mostrati il numero di episodi e la durata totale nel giro selezionato.</p>
+          <p className="mt-2">
+            Nelle sessioni di Gara e Sprint, con la vista pilota-singolo, il pulsante{" "}
+            <strong className="text-foreground">Confronta con media gara</strong> scarica la telemetria di tutti i giri
+            comparabili (verdi, esclusi pit-out e pit-in) e mostra due grafici timeline allineati sull'asse dei giri:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Superclipping &amp; Lift &amp; Coast per giro</strong> — barre con la
+              durata (in secondi) dei due fenomeni per ciascun giro comparabile.
+            </li>
+            <li>
+              <strong className="text-foreground">Deviazione cumulativa</strong> — il distacco cumulato del pilota
+              rispetto al ritmo del vincitore, giro per giro.
+            </li>
+          </ul>
+          <p className="mt-2">
+            I due grafici condividono lo stesso asse dei giri proprio per facilitare la lettura di{" "}
+            <em>coincidenze</em> temporali. Tuttavia <strong className="text-foreground">correlazione non implica
+            causalità</strong>: un picco di lift &amp; coast o superclipping in concomitanza con un aumento del distacco
+            può dipendere da traffico, neutralizzazioni, scelte di gestione o strategia. Il confronto è uno spunto di
+            esplorazione, non una prova.
+          </p>
         </DocSection>
 
         <DocSection id="weather-card" title="Meteo" icon={<Cloud className="h-4 w-4" />}>
