@@ -384,6 +384,9 @@ export async function computeCarProfiles(
         ]);
         for (const t of teamsInRace) {
           racesByTeam.set(t, (racesByTeam.get(t) ?? 0) + 1);
+          const arr = weightsByTeam.get(t) ?? [];
+          arr.push(w);
+          weightsByTeam.set(t, arr);
         }
         for (const [t, n] of agg.lapsByTeam.entries()) {
           lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
