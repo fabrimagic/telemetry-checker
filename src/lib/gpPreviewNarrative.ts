@@ -20,6 +20,8 @@ export interface RaceDiagnosticLite {
   name: string;
   date_end: string;
   status: "used" | "no_data" | "fetch_failed";
+  /** Which sessions contributed to this GP. Optional for back-compat. */
+  sources?: { quali: boolean; race: boolean };
 }
 
 export interface NarrativeDataContext {
