@@ -111,6 +111,9 @@ export function buildGpPreviewNarrative(
   sentences.push(
     "Il punteggio di affinità è un indice da 0 a 1 che stima quanto le caratteristiche misurate di ogni vettura — velocità di punta e tenuta in curva aggregata sui tre settori — si sposano con ciò che questo circuito richiede. Non è una previsione del risultato della gara, ma una lettura tecnica del match circuito-vettura sui dati raccolti finora.",
   );
+  sentences.push(
+    "La velocità di punta riflette soprattutto il potenziale espresso in qualifica, quando le vetture spingono al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova; in gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
+  );
 
   // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
   {
