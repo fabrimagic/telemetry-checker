@@ -25,6 +25,26 @@
 
 import { getNextSession } from "./f1Calendar2026";
 
+export interface CornerTypeWeights {
+  slow: number;
+  medium: number;
+  fast: number;
+}
+
+/**
+ * STIMA del carattere di ciascun settore in termini di tipi di curva.
+ * Additiva/opzionale: se assente, il modello usa il comportamento attuale
+ * (media piatta dei sector_strength). I valori 0..1 indicano quanto il
+ * settore è rappresentativo di un tipo di curva (idealmente Σ≈1 per
+ * settore, non vincolante). NON è una misura pura: un settore è una
+ * miscela (es. S2 Monaco contiene tornante lento + tunnel veloce).
+ */
+export interface SectorCornerMap {
+  s1: CornerTypeWeights;
+  s2: CornerTypeWeights;
+  s3: CornerTypeWeights;
+}
+
 export interface CircuitProfile {
   /** Must match exactly an F1_CALENDAR_2026 gpName. */
   gpName: string;
@@ -54,6 +74,12 @@ export interface CircuitProfile {
    * finché il GP non entra nel calendario. Assenza = false (retrocompatibile).
    */
   dormant?: boolean;
+  /**
+   * STIMA opzionale del carattere dei settori (matrice settore→tipo di
+   * curva). Quando presente abilita il ramo "sector_typed" in
+   * gpPrediction. Assente → ramo legacy sector_fallback (media piatta).
+   */
+  sector_corner_map?: SectorCornerMap;
 }
 
 export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
