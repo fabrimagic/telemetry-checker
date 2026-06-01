@@ -123,6 +123,16 @@ export function GpPredictionResultView({
     [circuit, prediction, dataContext],
   );
 
+  const perTeam = useMemo(
+    () => buildPerTeamExplanations(circuit, prediction),
+    [circuit, prediction],
+  );
+  const perTeamMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of perTeam) m.set(e.team_name, e.text);
+    return m;
+  }, [perTeam]);
+
 
   return (
     <div className="space-y-6">
