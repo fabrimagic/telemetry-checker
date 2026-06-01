@@ -236,6 +236,7 @@ export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorC
           <XAxis {...commonXAxis} hide={!showXAxis} />
           <YAxis width={42} tick={AXIS_TICK} axisLine={false} tickLine={false} {...yProps} />
           <Tooltip content={tooltipContent} />
+          {zoneAreas}
           {refLine}
           {drivers.map((d) => (
             <Line
