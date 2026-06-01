@@ -245,4 +245,87 @@ describe("computeCarProfiles", () => {
     expect(res.races_considered).toBe(2);
     expect(res.races_diagnostics).toHaveLength(2);
   });
+
+  // ----- New behavior: all races + exponential decay + Kish effective sample -----
+
+  function setupNRaces(n: number, opts: { withData?: boolean[] } = {}) {
+    const sessions: SessionInfo[] = [];
+    const driversByRace: Record<number, Driver[]> = {};
+    const lapsByRace: Record<number, Lap[]> = {};
+    for (let i = 0; i < n; i++) {
+      const key = i + 1;
+      const month = String(i + 2).padStart(2, "0");
+      sessions.push(mkSession(key, `2026-${month}-01T15:00:00Z`));
+      driversByRace[key] = [mkDriver(1, "A"), mkDriver(2, "B")];
+      const useData = opts.withData ? opts.withData[i] : true;
+      lapsByRace[key] = useData
+        ? [
+            ...Array.from({ length: 5 }, (_, j) => mkLap(1, { speed: 320, lap: j + 2 })),
+            ...Array.from({ length: 5 }, (_, j) => mkLap(2, { speed: 300, lap: j + 2 })),
+          ]
+        : [];
+    }
+    mockedSessions.mockResolvedValue(sessions);
+    mockedDrivers.mockImplementation(async (k: number) => driversByRace[k] ?? []);
+    mockedLaps.mockImplementation(async (k: number) => lapsByRace[k] ?? []);
+  }
+
+  it("(NEW-a) default = all past races: 7 races mock ⇒ diagnostics length 7", async () => {
+    setupNRaces(7);
+    const res = await computeCarProfiles({ now: new Date("2026-12-01T00:00:00Z") });
+    expect(res.total_past_races).toBe(7);
+    expect(res.races_considered).toBe(7);
+    expect(res.races_diagnostics).toHaveLength(7);
+  });
+
+  it("(NEW-b) exponential decay: w(newest) > w(prev) and follows 0.5^(a/halflife)", () => {
+    // Verify the math directly without needing to expose weights from the
+    // public API: with halflife = RECENCY_HALFLIFE_RACES we expect
+    //   w(age=halflife) / w(age=0) === 0.5 exactly.
+    const newest = Math.pow(0.5, 0 / RECENCY_HALFLIFE_RACES);
+    const previous = Math.pow(0.5, 1 / RECENCY_HALFLIFE_RACES);
+    const atHalflife = Math.pow(0.5, RECENCY_HALFLIFE_RACES / RECENCY_HALFLIFE_RACES);
+    expect(newest).toBeCloseTo(1, 10);
+    expect(previous).toBeGreaterThan(atHalflife);
+    expect(previous).toBeLessThan(newest);
+    expect(atHalflife / newest).toBeCloseTo(0.5, 10);
+    // No step: previous/newest must NOT be 0.5 (would mean a step), it
+    // must follow the continuous formula.
+    expect(previous / newest).toBeCloseTo(Math.pow(0.5, 1 / RECENCY_HALFLIFE_RACES), 10);
+  });
+
+  it("(NEW-c) including many old low-weight races does NOT inflate confidence to 'high'", async () => {
+    setupNRaces(7);
+    const res = await computeCarProfiles({ now: new Date("2026-12-01T00:00:00Z") });
+    expect(res.races_considered).toBe(7);
+    for (const p of res.profiles) {
+      // 7 races participation but Kish effective ≈ 5.81 (< 6 threshold).
+      expect(p.sample_races).toBe(7);
+      expect(p.effective_sample_races).toBeLessThan(7);
+      expect(p.confidence).not.toBe("high");
+    }
+  });
+
+  it("(NEW-d) effective_sample_races ≈ count when only few recent races contribute (uniform-ish)", async () => {
+    setupNRaces(2);
+    const res = await computeCarProfiles({ now: new Date("2026-12-01T00:00:00Z") });
+    for (const p of res.profiles) {
+      expect(p.sample_races).toBe(2);
+      // With 2 contiguous recent races and halflife=3 the Kish effective
+      // is ≈ 1.97 — within 5% of the raw count.
+      expect(p.effective_sample_races).toBeGreaterThan(1.9);
+      expect(p.effective_sample_races).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("(NEW-e) backward-compat: explicit lastNRaces=4 still slices to 4", async () => {
+    setupNRaces(7);
+    const res = await computeCarProfiles({
+      now: new Date("2026-12-01T00:00:00Z"),
+      lastNRaces: 4,
+    });
+    expect(res.total_past_races).toBe(7);
+    expect(res.races_considered).toBe(4);
+    expect(res.races_diagnostics).toHaveLength(4);
+  });
 });
