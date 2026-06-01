@@ -1090,11 +1090,18 @@ export default function Index() {
                         onCursorChange={setCursorTime}
                         onCursorClick={setClickedTime}
                         lapSoftSensor={selectedLapSoftSensor}
+                        zones={telemetryZones}
                       />
                     </section>
                     <aside className="space-y-4 min-w-0">
                       {mapDrivers.length > 0 && (
-                        <TrackMap drivers={mapDrivers} activeDate={activeDate} activeInfo={activeInfo} onClearPin={() => setClickedTime(null)} />
+                        <TrackMap
+                          drivers={mapDrivers}
+                          activeDate={activeDate}
+                          driverZones={singleDriverZones ? [singleDriverZones] : undefined}
+                          activeInfo={activeInfo}
+                          onClearPin={() => setClickedTime(null)}
+                        />
                       )}
                       {(() => {
                         const analysisDrivers = [...driverStates.values()]
