@@ -319,6 +319,22 @@ export function aggregateDriverCornerSpeeds(params: {
   for (const v of locIdxToOutlineIdx) touched.add(v);
   const coverage = outline.length > 0 ? touched.size / outline.length : 0;
 
+  // Corner-only coverage: fraction of CORNER vertices (slow/medium/fast)
+  // touched. Straights excluded. `null` when no corner vertices exist.
+  let cornerVerticesTotal = 0;
+  let cornerVerticesTouched = 0;
+  for (let v = 0; v < outline.length; v++) {
+    const segIdx = idxToSeg[v];
+    if (segIdx < 0) continue;
+    const segType = segments[segIdx]?.type;
+    if (segType !== "slow" && segType !== "medium" && segType !== "fast") continue;
+    cornerVerticesTotal++;
+    if (touched.has(v)) cornerVerticesTouched++;
+  }
+  const corner_coverage = cornerVerticesTotal > 0
+    ? cornerVerticesTouched / cornerVerticesTotal
+    : null;
+
   // Sort locations by timestamp once for binary search.
   const locTimes = locations
     .map((l, idx) => ({ t: new Date(l.date).getTime(), idx }))
