@@ -264,6 +264,7 @@ function appendDataContextParagraph(
       sentences.push(
         `Nel 2026 si sono finora disputate ${total} gare; l'analisi le considera tutte, dando un peso maggiore alle più recenti per riflettere gli aggiornamenti tecnici delle vetture. Tutte le gare hanno fornito dati utilizzabili.`,
       );
+      appendExclusionDetail(sentences, dataContext.diagnostics ?? []);
       return;
     }
     sentences.push(
@@ -290,6 +291,7 @@ function appendDataContextParagraph(
         `L'analisi si basa sui dati telemetrici delle ultime ${considered} gare, tutte con dati utilizzabili.`,
       );
     }
+    appendExclusionDetail(sentences, dataContext.diagnostics ?? []);
     return;
   }
 
