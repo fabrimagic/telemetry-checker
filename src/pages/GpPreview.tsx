@@ -437,7 +437,7 @@ export default function GpPreview() {
             </Card>
 
             {prediction && profiles && profiles.length > 0 && (
-              <GpPredictionResultView circuit={circuit} prediction={prediction} />
+              <GpPredictionResultView circuit={circuit} prediction={prediction} dataContext={dataContext} />
             )}
           </>
         )}
