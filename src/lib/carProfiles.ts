@@ -768,6 +768,10 @@ export async function computeCarProfiles(
     const covS = accCoverageSum.get(team) ?? 0;
     const coverageAgg = covW > 0 ? covS / covW : 0;
     const coverageMeasured = covW > 0;
+    // Diagnostic-only: aggregate corner-vertices coverage.
+    const ccW = accCornerCovW.get(team) ?? 0;
+    const ccS = accCornerCovSum.get(team) ?? 0;
+    const cornerCoverageCurve = ccW > 0 ? ccS / ccW : null;
 
     let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
     let cornerSource: CarProfile["corner_source"] = "sector_fallback";
