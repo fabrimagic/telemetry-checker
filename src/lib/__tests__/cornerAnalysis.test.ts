@@ -36,6 +36,16 @@ function metersToDeg(m: number): number {
 }
 
 /** Build outline: straight east (long), then tight U-turn, then a wide curve back. */
+/** Build a circular arc of given radius (m) with N points over angleSweep (rad). */
+function buildArcOutline(R: number, N: number, angleSweep: number): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= N; i++) {
+    const ang = (i / N) * angleSweep;
+    pts.push([metersToDeg(R * Math.cos(ang)), metersToDeg(R * Math.sin(ang))]);
+  }
+  return pts;
+}
+
 function buildSyntheticOutline(): [number, number][] {
   const pts: [number, number][] = [];
   // 1) Long straight: 30 points, 20 m apart, due east.
