@@ -272,6 +272,8 @@ export function predictGpAffinity(
       corner_coverage_curve:
         car.corner_coverage_curve === undefined ? null : car.corner_coverage_curve,
       corner_coverage_status: car.corner_coverage_status ?? "not_available",
+      corner_alignment_error:
+        car.corner_alignment_error === undefined ? null : car.corner_alignment_error,
     };
   });
 
