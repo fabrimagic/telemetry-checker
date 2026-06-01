@@ -1087,7 +1087,17 @@ export default function Index() {
                             carData: s.carData,
                           }));
                         if (!analysisDrivers.length) return null;
-                        return <DrivingAnalysis drivers={analysisDrivers} />;
+                        const raceAvgCtx = (isSingleDriverRaceLike && singleDriverState && sessionKey)
+                          ? {
+                              sessionKey,
+                              driverNumber: singleDriverState.driver.driver_number,
+                              laps: singleDriverState.laps,
+                              trackStatusMap: classifyLapsTrackStatus(singleDriverState.laps, raceControlMessages),
+                              fetchCarData: getCarData,
+                              enabled: true,
+                            }
+                          : null;
+                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} />;
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
                       {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
