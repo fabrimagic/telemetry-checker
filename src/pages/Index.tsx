@@ -1125,7 +1125,10 @@ export default function Index() {
                               enabled: true,
                             }
                           : null;
-                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} />;
+                        const driverCumDev = (isSingleDriverRaceLike && singleDriverState && cumDevResult)
+                          ? cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null
+                          : null;
+                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} driverCumulativeDeviation={driverCumDev} />;
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
                       {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
