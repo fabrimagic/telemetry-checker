@@ -509,6 +509,8 @@ export default function Index() {
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setWeatherData(null);
+    setLapPrecip(null);
+    setCircuitKey(null);
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setStintsData([]);
@@ -1089,6 +1091,7 @@ export default function Index() {
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
                       {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
+                      {lapPrecip && <LapPrecipOutlookCard outlook={lapPrecip} />}
                       {(() => {
                         const driversForMiniSectors = [...driverStates.values()]
                           .filter((s) => s.selectedLap != null)
