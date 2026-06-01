@@ -117,6 +117,7 @@ export default function Index() {
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
   const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
+  const [raceAvg, setRaceAvg] = useState<import("@/lib/raceDrivingAverages").RaceDrivingAverages | null>(null);
   const [loadingVre, setLoadingVre] = useState(false);
   const [vreRiskMode, setVreRiskMode] = useState<RiskMode>("BALANCED");
   const [vreScenario, setVreScenario] = useState<import("@/lib/scenarioContext").ScenarioId>("REAL_CONTEXT");
