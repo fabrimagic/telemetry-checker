@@ -146,7 +146,7 @@ export interface LapWeatherData {
 }
 
 export interface CorrectedDegradationResult extends DegradationResult {
-  model_type: "corrected_two_stage" | "corrected_fuel_only" | "simple_fallback";
+  model_type: "corrected_two_stage" | "corrected_fuel_only" | "corrected_physical_fuel" | "simple_fallback";
   slope_raw: number;
   slope_corrected: number;
   fuel_proxy_type: string;
