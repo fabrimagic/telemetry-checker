@@ -659,6 +659,7 @@ export async function computeCarProfiles(
             };
             const coverageByTeam = new Map<string, number>();
             const cornerCoverageByTeam = new Map<string, number>();
+            const alignErrByTeam = new Map<string, number>();
             for (const pd of analysis.per_driver) {
               const team = driverToTeam.get(pd.driver_number);
               if (!team) continue;
@@ -667,6 +668,9 @@ export async function computeCarProfiles(
               if (pd.fast_corner_speed != null) rawByType.fast.set(team, pd.fast_corner_speed);
               coverageByTeam.set(team, pd.coverage);
               if (pd.corner_coverage != null) cornerCoverageByTeam.set(team, pd.corner_coverage);
+              if (pd.alignment_error != null && Number.isFinite(pd.alignment_error)) {
+                alignErrByTeam.set(team, pd.alignment_error);
+              }
             }
             // Normalize per type within this GP (higher speed = stronger).
             const normSlow = normalizeHigherIsBetter(rawByType.slow);
@@ -692,6 +696,10 @@ export async function computeCarProfiles(
             for (const [team, cov] of cornerCoverageByTeam.entries()) {
               accCornerCovSum.set(team, (accCornerCovSum.get(team) ?? 0) + cov * w);
               accCornerCovW.set(team, (accCornerCovW.get(team) ?? 0) + w);
+            }
+            for (const [team, err] of alignErrByTeam.entries()) {
+              accAlignErrSum.set(team, (accAlignErrSum.get(team) ?? 0) + err * w);
+              accAlignErrW.set(team, (accAlignErrW.get(team) ?? 0) + w);
             }
           }
         }
