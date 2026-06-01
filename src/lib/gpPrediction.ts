@@ -262,6 +262,8 @@ export function predictGpAffinity(
       // so the UI can always show the measured value. Does not affect score.
       corner_coverage:
         car.corner_data_coverage === undefined ? null : car.corner_data_coverage,
+      corner_coverage_curve:
+        car.corner_coverage_curve === undefined ? null : car.corner_coverage_curve,
       corner_coverage_status: car.corner_coverage_status ?? "not_available",
     };
   });
