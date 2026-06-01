@@ -439,7 +439,18 @@ export function buildPerTeamExplanations(
       equivClause = ` Il suo punteggio è troppo vicino a quello di ${joinNames(others)} per distinguerli con certezza con i dati attuali: vanno considerati alla pari.`;
     }
 
-    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}`;
+    let sourceClause = "";
+    if (t.corner_source === "location_geometry") {
+      const covPct =
+        typeof t.corner_coverage === "number"
+          ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
+          : "";
+      sourceClause = ` La tenuta in curva di questo team è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}: lettura più granulare ma con possibili imprecisioni di allineamento.`;
+    } else if (t.corner_source === "sector_fallback") {
+      sourceClause = ` La tenuta in curva di questo team è stimata dai tempi di settore aggregati (non disponibile la ricostruzione per tipo di curva).`;
+    }
+
+    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}${sourceClause}`;
     return { team_name: t.team_name, text };
   });
 }
