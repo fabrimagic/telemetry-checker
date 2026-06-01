@@ -20,6 +20,8 @@ import { detectLongRuns, longRunToStintsAndLaps } from "@/lib/longRunDetector";
 import { classifyLapsWeather, type WeatherCondition } from "@/lib/weatherClassification";
 import { WeatherCard } from "@/components/f1/WeatherCard";
 import { SoftSensorsLapCard } from "@/components/f1/SoftSensorsLapCard";
+import { LapPrecipOutlookCard } from "@/components/f1/LapPrecipOutlookCard";
+import { fetchLapPrecipOutlook, type LapPrecipOutlook } from "@/lib/precipForecast";
 import { OvertakesCard } from "@/components/f1/OvertakesCard";
 import { StintsCard } from "@/components/f1/StintsCard";
 import { PitStopsCard } from "@/components/f1/PitStopsCard";
@@ -99,6 +101,9 @@ export default function Index() {
   const [loadingLaps, setLoadingLaps] = useState<Set<number>>(new Set());
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  // Purely informative; never feeds any computation.
+  const [lapPrecip, setLapPrecip] = useState<LapPrecipOutlook | null>(null);
+  const [circuitKey, setCircuitKey] = useState<string | null>(null);
   const [overtakesData, setOvertakesData] = useState<OvertakeData[]>([]);
   const [overtakesReceivedData, setOvertakesReceivedData] = useState<OvertakeData[]>([]);
   const [stintsData, setStintsData] = useState<StintData[]>([]);
@@ -148,6 +153,14 @@ export default function Index() {
       // Fetch session weather for lap classification (fire and forget)
       getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
       getRaceControl(key).then((rc) => setRaceControlMessages(rc)).catch(() => {});
+      // Resolve circuit location/country for the per-lap precipitation outlook
+      // card. Best-effort; failure simply leaves the card hidden.
+      setCircuitKey(null);
+      getSessionsByMeetingKey(mKey).then((sessions) => {
+        const match = sessions.find((s) => s.session_key === key);
+        const ck = match?.location ?? match?.country_name ?? null;
+        setCircuitKey(ck);
+      }).catch(() => {});
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -463,6 +476,16 @@ export default function Index() {
         } catch { /* optional */ }
       }
 
+      // Per-lap precipitation outlook — purely informative card.
+      // Race/Sprint single-driver only. NEVER used in any calculation.
+      setLapPrecip(null);
+      const isRaceOrSprintLocal = sessionType === "Race" || sessionType === "Sprint";
+      if (selectedDriverNumbers.length === 1 && isRaceOrSprintLocal && weatherStart && circuitKey) {
+        fetchLapPrecipOutlook(circuitKey, weatherStart)
+          .then((o) => setLapPrecip(o))
+          .catch(() => setLapPrecip(null));
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
@@ -476,7 +499,7 @@ export default function Index() {
     } finally {
       setLoadingTelemetry(false);
     }
-  }, [sessionKey, driverStates, selectedDriverNumbers, sessionType]);
+  }, [sessionKey, driverStates, selectedDriverNumbers, sessionType, circuitKey]);
 
   const handleReset = useCallback(() => {
     setAnalysisMode(null);
@@ -486,6 +509,8 @@ export default function Index() {
     setSelectedDriverNumbers([]);
     setDriverStates(new Map());
     setWeatherData(null);
+    setLapPrecip(null);
+    setCircuitKey(null);
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setStintsData([]);
@@ -1066,6 +1091,7 @@ export default function Index() {
                       })()}
                       {weatherData && <WeatherCard weather={weatherData} />}
                       {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
+                      {lapPrecip && <LapPrecipOutlookCard outlook={lapPrecip} />}
                       {(() => {
                         const driversForMiniSectors = [...driverStates.values()]
                           .filter((s) => s.selectedLap != null)
