@@ -83,7 +83,54 @@ function mergeData(drivers: DriverTelemetry[], field: string) {
   return Array.from(map.values()).sort((a, b) => a.time - b.time);
 }
 
-export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick }: Props) {
+const THERMAL_IT: Record<string, string> = {
+  COLD: "Fredde", WARMING_UP: "In riscaldamento", IN_WINDOW: "In finestra",
+  HOT: "Calde", OVERHEATED: "Surriscaldate", UNKNOWN: "n/d",
+};
+const STRESS_IT: Record<string, string> = {
+  LOW: "Basso", MODERATE: "Moderato", HIGH: "Alto", CRITICAL: "Critico", UNKNOWN: "n/d",
+};
+const GRIP_IT: Record<string, string> = {
+  LOW_GRIP: "Grip basso", IMPROVING: "In miglioramento", STABLE: "Stabile",
+  FALLING: "In calo", MIXED: "Misto", UNKNOWN: "n/d",
+};
+
+function SoftSensorTooltipBlock({ state }: { state: SoftSensorsLapState }) {
+  return (
+    <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid hsl(220 14% 18%)" }}>
+      <div style={{ color: "hsl(215 12% 55%)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+        Soft sensor (valore per-giro)
+      </div>
+      <div style={{ fontSize: 10, lineHeight: 1.4 }}>
+        <div>Termica: <strong>{THERMAL_IT[state.tyre_thermal.label] ?? state.tyre_thermal.label}</strong></div>
+        <div>Stress: <strong>{STRESS_IT[state.tyre_stress.label] ?? state.tyre_stress.label}</strong></div>
+        <div>Grip: <strong>{GRIP_IT[state.track_grip.label] ?? state.track_grip.label}</strong></div>
+      </div>
+    </div>
+  );
+}
+
+function buildTooltipContent(lapSoftSensor: SoftSensorsLapState | null | undefined) {
+  return (props: any) => {
+    const { active, payload, label } = props;
+    if (!active || !payload || !payload.length) return null;
+    return (
+      <div style={{ ...TOOLTIP_STYLE.contentStyle, padding: "8px 10px" }}>
+        <div style={{ color: "hsl(215 12% 55%)", fontSize: 10, marginBottom: 4 }}>
+          {formatTimeAxis(label)}
+        </div>
+        {payload.map((p: any, i: number) => (
+          <div key={i} style={{ color: p.color, fontSize: 11, lineHeight: 1.4 }}>
+            {p.name}: <strong>{typeof p.value === "number" ? p.value.toFixed(p.value < 10 ? 1 : 0) : p.value}</strong>
+          </div>
+        ))}
+        {lapSoftSensor && <SoftSensorTooltipBlock state={lapSoftSensor} />}
+      </div>
+    );
+  };
+}
+
+export function TelemetryCharts({ drivers, cursorTime, onCursorChange, onCursorClick, lapSoftSensor }: Props) {
   const domain = useMemo(() => {
     let min = Infinity, max = -Infinity;
     for (const d of drivers) {
