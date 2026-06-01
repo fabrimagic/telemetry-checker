@@ -48,9 +48,21 @@ export interface TeamGpAffinity {
    * Surfaced so the UI/narrative can be transparent about provenance.
    */
   corner_source?: "location_geometry" | "sector_fallback";
-  /** Aggregated /location coverage when corner_source = "location_geometry". */
-  corner_coverage?: number;
-}
+  /**
+   * Aggregated /location coverage as measured by the analyzer. ALWAYS
+   * propagated when the analyzer produced a measurement, including when
+   * the team fell back to sector_fallback because coverage was below the
+   * gate threshold (diagnostic-only). `null` when coverage could not be
+   * measured at all (no analyzer / no data / analyzer error). Does NOT
+   * affect the affinity score.
+   */
+  corner_coverage?: number | null;
+  /**
+   * Diagnostic gate outcome propagated verbatim from CarProfile:
+   * "ok" | "below_threshold" | "not_available". Surfaced so the UI can
+   * always show the user WHY the geometric branch was (or was not) used.
+   */
+  corner_coverage_status?: "ok" | "below_threshold" | "not_available";
 
 export interface GpPrediction {
   ranked: TeamGpAffinity[];
