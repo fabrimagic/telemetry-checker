@@ -140,4 +140,49 @@ describe("gpPrediction", () => {
     expect(out.indistinguishable_groups).toEqual([]);
     expect(out.notes.length).toBeGreaterThan(0);
   });
+
+
+
+  it("uses corner_type_strength weighted by circuit per-corner weights when present", () => {
+    const c = circuit({
+      top_speed: 0, slow_corner_traction: 1.0, medium_corner: 0, fast_corner: 0,
+    });
+    const slowSpecialist: CarProfile = {
+      ...car("Slow", 0.5, [0.5, 0.5, 0.5], "high"),
+      corner_type_strength: { slow: 1.0, medium: 0.0, fast: 0.0 },
+      corner_data_coverage: 0.8,
+      corner_source: "location_geometry",
+    };
+    const fastSpecialist: CarProfile = {
+      ...car("Fast", 0.5, [0.5, 0.5, 0.5], "high"),
+      corner_type_strength: { slow: 0.0, medium: 0.0, fast: 1.0 },
+      corner_data_coverage: 0.8,
+      corner_source: "location_geometry",
+    };
+    const out = predictGpAffinity(c, [slowSpecialist, fastSpecialist]);
+    expect(out.ranked[0].team_name).toBe("Slow");
+    expect(out.ranked[0].corner_source).toBe("location_geometry");
+    expect(out.ranked[0].corner_coverage).toBeCloseTo(0.8, 5);
+  });
+
+  it("falls back to sector_strength when corner_type_strength is null", () => {
+    const c = circuit({ top_speed: 0, slow_corner_traction: 1, medium_corner: 0, fast_corner: 0 });
+    const out = predictGpAffinity(c, [
+      car("X", 0.5, [0.8, 0.8, 0.8], "high"),
+    ]);
+    expect(out.ranked[0].corner_source).toBe("sector_fallback");
+  });
+
+  it("emits a geometry-source note when at least one team uses location_geometry", () => {
+    const c = circuit();
+    const geomCar: CarProfile = {
+      ...car("G", 0.5, [0.5, 0.5, 0.5], "high"),
+      corner_type_strength: { slow: 0.7, medium: 0.7, fast: 0.7 },
+      corner_data_coverage: 0.7,
+      corner_source: "location_geometry",
+    };
+    const out = predictGpAffinity(c, [geomCar, car("S", 0.5, [0.5, 0.5, 0.5], "high")]);
+    expect(out.notes.some((n) => /geometria del tracciato/i.test(n))).toBe(true);
+  });
 });
+

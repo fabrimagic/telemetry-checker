@@ -40,6 +40,16 @@ export interface TeamGpAffinity {
   confidence: ConfidenceLevel;
   /** How much each dimension contributed to the final score. */
   contributions: { top_speed: number; cornering: number };
+  /**
+   * Which method produced the cornering signal for this team:
+   *  - "location_geometry": granular slow/medium/fast strength matched
+   *                         against the circuit's per-corner-type weights;
+   *  - "sector_fallback":   aggregated sector_strength (the legacy path).
+   * Surfaced so the UI/narrative can be transparent about provenance.
+   */
+  corner_source?: "location_geometry" | "sector_fallback";
+  /** Aggregated /location coverage when corner_source = "location_geometry". */
+  corner_coverage?: number;
 }
 
 export interface GpPrediction {
@@ -149,9 +159,45 @@ export function predictGpAffinity(
 
   const ranked: TeamGpAffinity[] = cars.map((car) => {
     const topIdx = clamp01(car.top_speed_index);
-    const cornerIdx = clamp01(
-      mean([car.sector_strength.s1, car.sector_strength.s2, car.sector_strength.s3]),
-    );
+
+    // HYBRID cornering signal:
+    //  - If the car has a per-corner-type strength (location_geometry path),
+    //    weight slow/medium/fast by the circuit's slow/medium/fast weights.
+    //    This is the FIRST place where slow_corner_traction/medium_corner/
+    //    fast_corner enter the score (previously descriptive only).
+    //  - Otherwise fall back to the legacy sector-mean estimate, which does
+    //    NOT depend on spatial alignment.
+    let cornerIdx: number;
+    let cornerSource: "location_geometry" | "sector_fallback";
+    if (car.corner_type_strength) {
+      const wS = circuit.slow_corner_traction;
+      const wM = circuit.medium_corner;
+      const wF = circuit.fast_corner;
+      const sumW = wS + wM + wF;
+      if (sumW > 0) {
+        cornerIdx = clamp01(
+          (wS * car.corner_type_strength.slow +
+            wM * car.corner_type_strength.medium +
+            wF * car.corner_type_strength.fast) /
+            sumW,
+        );
+      } else {
+        cornerIdx = clamp01(
+          mean([
+            car.corner_type_strength.slow,
+            car.corner_type_strength.medium,
+            car.corner_type_strength.fast,
+          ]),
+        );
+      }
+      cornerSource = "location_geometry";
+    } else {
+      cornerIdx = clamp01(
+        mean([car.sector_strength.s1, car.sector_strength.s2, car.sector_strength.s3]),
+      );
+      cornerSource = "sector_fallback";
+    }
+
     const cTop = wTop * topIdx;
     const cCorner = wCorner * cornerIdx;
     const score = clamp01(cTop + cCorner);
@@ -167,6 +213,9 @@ export function predictGpAffinity(
       uncertainty,
       confidence: minConfidence(car.confidence, circuit.confidence),
       contributions: { top_speed: cTop, cornering: cCorner },
+      corner_source: cornerSource,
+      corner_coverage:
+        cornerSource === "location_geometry" ? car.corner_data_coverage : undefined,
     };
   });
 
@@ -219,6 +268,25 @@ export function predictGpAffinity(
       `Profili vettura basati sui dati disponibili di ${n} gare (regolamento 2026 ancora recente).`,
     );
   }
+
+  // Geometry-source transparency: when at least one team's cornering signal
+  // comes from /location + circuit GeoJSON (location_geometry), declare it
+  // honestly so the UI/narrative can surface the caveat about possible
+  // spatial-alignment imperfections.
+  const geomTeams = ranked.filter((t) => t.corner_source === "location_geometry");
+  if (geomTeams.length > 0) {
+    notes.push(
+      `Per ${geomTeams.length === 1 ? "un team" : `${geomTeams.length} team`} la tenuta in curva è ricostruita dalla geometria del tracciato e dalla posizione GPS delle vetture in qualifica (dimensione sperimentale): può contenere imprecisioni di allineamento.`,
+    );
+  }
+  const fallbackTeams = ranked.filter((t) => t.corner_source === "sector_fallback");
+  if (fallbackTeams.length > 0 && geomTeams.length > 0) {
+    notes.push(
+      `Per gli altri team la tenuta in curva è stimata dai tempi di settore (metodo aggregato, non per tipo di curva).`,
+    );
+  }
+
+
 
 
   return {

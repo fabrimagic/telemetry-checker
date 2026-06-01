@@ -504,3 +504,79 @@ describe("computeCarProfiles — qualifying + race combination", () => {
     expect(CORNER_RACE_WEIGHT).toBe(0.5);
   });
 });
+
+describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
+  const NOW = new Date("2026-12-01T00:00:00Z");
+
+  function setupOneGpWithQuali() {
+    const race: SessionInfo = { session_key: 1, session_type: "Race", session_name: "Race", meeting_key: 10, date_start: "2026-04-01T15:00:00Z", date_end: "2026-04-01T15:00:00Z" };
+    const quali: SessionInfo = { session_key: 2, session_type: "Qualifying", session_name: "Qualifying", meeting_key: 10, date_start: "2026-03-31T15:00:00Z", date_end: "2026-03-31T15:00:00Z" };
+    mockedSessions.mockResolvedValue([race]);
+    mockedQuali.mockResolvedValue([quali]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+    mockedLaps.mockResolvedValue([
+      mkLap(1, { speed: 320 }),
+      mkLap(2, { speed: 300 }),
+    ]);
+  }
+
+  it("(a) high-coverage analysis → corner_type_strength populated, source=location_geometry", async () => {
+    setupOneGpWithQuali();
+    const analyzeQualiCorners = vi.fn(async () => ({
+      gpName: "Test", sessionKey: 2, segments: [],
+      per_driver: [
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.8, partial: false, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.75, partial: false, notes: [] },
+      ],
+      notes: [], aborted: false,
+    }));
+    const { profiles } = await computeCarProfiles({ now: NOW, analyzeQualiCorners });
+    expect(analyzeQualiCorners).toHaveBeenCalled();
+    for (const p of profiles) {
+      expect(p.corner_source).toBe("location_geometry");
+      expect(p.corner_type_strength).not.toBeNull();
+    }
+    const A = profiles.find((p) => p.team_name === "A")!;
+    const B = profiles.find((p) => p.team_name === "B")!;
+    expect(A.corner_type_strength!.slow).toBeCloseTo(1, 5);
+    expect(B.corner_type_strength!.medium).toBeCloseTo(1, 5);
+  });
+
+  it("(b) low coverage → corner_type_strength=null, source=sector_fallback", async () => {
+    setupOneGpWithQuali();
+    const analyzeQualiCorners = vi.fn(async () => ({
+      gpName: "Test", sessionKey: 2, segments: [],
+      per_driver: [
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.2, partial: true, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 5, medium: 5, fast: 5, straight: 10 }, coverage: 0.1, partial: true, notes: [] },
+      ],
+      notes: [], aborted: false,
+    }));
+    const { profiles } = await computeCarProfiles({ now: NOW, analyzeQualiCorners });
+    for (const p of profiles) {
+      expect(p.corner_source).toBe("sector_fallback");
+      expect(p.corner_type_strength).toBeNull();
+    }
+  });
+
+  it("(c) analyzer throws → fallback, profile still valid", async () => {
+    setupOneGpWithQuali();
+    const analyzeQualiCorners = vi.fn(async () => { throw new Error("boom"); });
+    const { profiles } = await computeCarProfiles({ now: NOW, analyzeQualiCorners });
+    expect(profiles.length).toBe(2);
+    for (const p of profiles) {
+      expect(p.corner_source).toBe("sector_fallback");
+      expect(p.corner_type_strength).toBeNull();
+    }
+  });
+
+  it("(d) no analyzer → corner dimension stays null (sector_fallback)", async () => {
+    setupOneGpWithQuali();
+    const { profiles } = await computeCarProfiles({ now: NOW });
+    for (const p of profiles) {
+      expect(p.corner_source).toBe("sector_fallback");
+      expect(p.corner_type_strength).toBeNull();
+    }
+  });
+});
+

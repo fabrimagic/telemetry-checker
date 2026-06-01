@@ -36,6 +36,7 @@ import {
   type Lap,
   type SessionInfo,
 } from "./openf1";
+import type { SessionCornerAnalysis } from "./cornerAnalysis";
 
 export interface CarProfile {
   team_name: string;
@@ -61,7 +62,30 @@ export interface CarProfile {
   effective_sample_races: number;
   sample_laps: number;
   confidence: "high" | "medium" | "low";
+  /**
+   * EXPERIMENTAL — per-corner-type strength (0..1, 1 = best in field) built
+   * from QUALIFYING /location + /car_data via cornerAnalysis. Populated
+   * only when the aggregated spatial coverage is ≥ CORNER_COVERAGE_MIN;
+   * otherwise null and the consumer should fall back to sector_strength.
+   */
+  corner_type_strength?: { slow: number; medium: number; fast: number } | null;
+  /** Aggregated 0..1 spatial coverage across the contributing GPs. */
+  corner_data_coverage?: number;
+  /**
+   * Which method produced the cornering signal for this team:
+   *  - "location_geometry": derived from GPS + circuit layout (granular)
+   *  - "sector_fallback":   coverage too low / no data → use sector_strength
+   */
+  corner_source?: "location_geometry" | "sector_fallback";
 }
+
+/**
+ * Minimum aggregated /location coverage for a team to be considered
+ * trustworthy on the per-corner-type dimension. Below this threshold the
+ * spatial alignment is too thin to be meaningful and we fall back to the
+ * sector-strength estimate, which doesn't depend on GPS alignment.
+ */
+export const CORNER_COVERAGE_MIN = 0.5;
 
 export type RaceDiagnosticStatus = "used" | "no_data" | "fetch_failed";
 
@@ -105,6 +129,21 @@ export interface ComputeCarProfilesOptions {
   onProgress?: (done: number, total: number) => void;
   /** Override "now" for testing. */
   now?: Date;
+  /**
+   * Optional injected analyzer for the per-GP corner-type dimension.
+   * Receives the QUALIFYING session and the list of driver_numbers to
+   * sample (one representative per team to bound /location load), and
+   * must return a SessionCornerAnalysis or null. When omitted the corner
+   * dimension is skipped — profiles are still computed, just without
+   * corner_type_strength (consumers fall back to sector_strength).
+   *
+   * Heavy: /location is one request per driver. Errors are absorbed
+   * (treated as no data → sector_fallback).
+   */
+  analyzeQualiCorners?: (
+    qualiSession: SessionInfo,
+    driverNumbers: number[],
+  ) => Promise<SessionCornerAnalysis | null>;
 }
 
 /**
@@ -429,6 +468,19 @@ export async function computeCarProfiles(
     s2: new Map<string, number>(),
     s3: new Map<string, number>(),
   };
+  // Per-corner-type accumulators (location_geometry dimension, optional).
+  const accCornerSum = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
+  const accCornerW = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
+  const accCoverageSum = new Map<string, number>();
+  const accCoverageW = new Map<string, number>();
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
   // For each team, collect the weights of the races it contributed to —
@@ -533,6 +585,76 @@ export async function computeCarProfiles(
       status = "fetch_failed";
     }
 
+    // ----- EXPERIMENTAL: per-corner-type strength from quali /location -----
+    // Heavy: one /location + /car_data per representative driver. Runs only
+    // when the caller injected an analyzer AND a Quali session exists for
+    // this GP. All failures are absorbed (treated as "no data" → eventually
+    // the team falls back to sector_strength). Recency weight `w` is the
+    // same one used by all other dimensions, so the recency model stays
+    // consistent across signals.
+    if (status === "used" && qualiSession && opts.analyzeQualiCorners) {
+      try {
+        const qDrivers = await getDrivers(qualiSession.session_key);
+        // One representative per team — lowest driver_number for
+        // determinism — to bound /location calls.
+        const repByTeam = new Map<string, number>();
+        for (const d of qDrivers) {
+          if (!d.team_name) continue;
+          const cur = repByTeam.get(d.team_name);
+          if (cur == null || d.driver_number < cur) {
+            repByTeam.set(d.team_name, d.driver_number);
+          }
+        }
+        const driverToTeam = new Map<number, string>();
+        for (const [team, num] of repByTeam.entries()) driverToTeam.set(num, team);
+        const driverNumbers = [...repByTeam.values()];
+        if (driverNumbers.length > 0) {
+          const analysis = await opts.analyzeQualiCorners(qualiSession, driverNumbers);
+          if (analysis && analysis.per_driver.length > 0) {
+            // Per-GP per-team RAW speeds (km/h) per corner type, plus the
+            // representative driver's coverage.
+            const rawByType: Record<"slow" | "medium" | "fast", Map<string, number>> = {
+              slow: new Map(),
+              medium: new Map(),
+              fast: new Map(),
+            };
+            const coverageByTeam = new Map<string, number>();
+            for (const pd of analysis.per_driver) {
+              const team = driverToTeam.get(pd.driver_number);
+              if (!team) continue;
+              if (pd.slow_corner_speed != null) rawByType.slow.set(team, pd.slow_corner_speed);
+              if (pd.medium_corner_speed != null) rawByType.medium.set(team, pd.medium_corner_speed);
+              if (pd.fast_corner_speed != null) rawByType.fast.set(team, pd.fast_corner_speed);
+              coverageByTeam.set(team, pd.coverage);
+            }
+            // Normalize per type within this GP (higher speed = stronger).
+            const normSlow = normalizeHigherIsBetter(rawByType.slow);
+            const normMed = normalizeHigherIsBetter(rawByType.medium);
+            const normFast = normalizeHigherIsBetter(rawByType.fast);
+            function pushNorm(
+              norm: Map<string, number>,
+              sumMap: Map<string, number>,
+              wMap: Map<string, number>,
+            ) {
+              for (const [team, v] of norm.entries()) {
+                sumMap.set(team, (sumMap.get(team) ?? 0) + v * w);
+                wMap.set(team, (wMap.get(team) ?? 0) + w);
+              }
+            }
+            pushNorm(normSlow, accCornerSum.slow, accCornerW.slow);
+            pushNorm(normMed, accCornerSum.medium, accCornerW.medium);
+            pushNorm(normFast, accCornerSum.fast, accCornerW.fast);
+            for (const [team, cov] of coverageByTeam.entries()) {
+              accCoverageSum.set(team, (accCoverageSum.get(team) ?? 0) + cov * w);
+              accCoverageW.set(team, (accCoverageW.get(team) ?? 0) + w);
+            }
+          }
+        }
+      } catch {
+        // Swallow: the corner dimension is optional. Sector fallback covers it.
+      }
+    }
+
     diagnostics.push({
       name: sessionDisplayName(session),
       date_end: session.date_end ?? "",
@@ -601,6 +723,34 @@ export async function computeCarProfiles(
     else if (effective < 6 || sampleLaps < 60) confidence = "medium";
     else confidence = "high";
 
+    // ----- Per-corner-type strength (gated by coverage) -----
+    function avgCorner(type: "slow" | "medium" | "fast"): number | null {
+      const s = accCornerSum[type].get(team);
+      const wt = accCornerW[type].get(team);
+      if (s == null || !wt || wt <= 0) return null;
+      return s / wt;
+    }
+    const covW = accCoverageW.get(team) ?? 0;
+    const covS = accCoverageSum.get(team) ?? 0;
+    const coverageAgg = covW > 0 ? covS / covW : 0;
+
+    let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
+    let cornerSource: CarProfile["corner_source"] = "sector_fallback";
+    if (covW > 0 && coverageAgg >= CORNER_COVERAGE_MIN) {
+      const slow = avgCorner("slow");
+      const medium = avgCorner("medium");
+      const fast = avgCorner("fast");
+      // Require at least one type to be present; missing types default to 0.
+      if (slow != null || medium != null || fast != null) {
+        cornerTypeStrength = {
+          slow: slow ?? 0,
+          medium: medium ?? 0,
+          fast: fast ?? 0,
+        };
+        cornerSource = "location_geometry";
+      }
+    }
+
     profiles.push({
       team_name: team,
       top_speed_index: normTop.get(team) ?? 0,
@@ -613,6 +763,9 @@ export async function computeCarProfiles(
       effective_sample_races: effective,
       sample_laps: sampleLaps,
       confidence,
+      corner_type_strength: cornerTypeStrength,
+      corner_data_coverage: covW > 0 ? coverageAgg : 0,
+      corner_source: cornerSource,
     });
   }
 

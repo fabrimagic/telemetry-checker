@@ -204,6 +204,23 @@ export function buildGpPreviewNarrative(
     }
   }
 
+  // ----- 4b. ORIGINE DELLA DIMENSIONE "TIPO DI CURVA" -----
+  {
+    const ranked = prediction.ranked;
+    const geom = ranked.filter((t) => t.corner_source === "location_geometry");
+    const fallback = ranked.filter((t) => t.corner_source === "sector_fallback");
+    if (geom.length > 0) {
+      sentences.push(
+        `Per ${geom.length === 1 ? "un team" : `${geom.length} team`} (${joinNames(geom.map((t) => t.team_name))}) la valutazione per tipo di curva — lente, medie e veloci — è ricostruita incrociando la geometria del circuito con la posizione GPS delle vetture in qualifica. È una lettura più granulare, ma sperimentale: l'allineamento spaziale può contenere imprecisioni, quindi va interpretata con prudenza.`,
+      );
+      if (fallback.length > 0) {
+        sentences.push(
+          `Per ${fallback.length === 1 ? "il team rimanente" : `i ${fallback.length} team rimanenti`} (${joinNames(fallback.map((t) => t.team_name))}) la copertura dei dati GPS non era sufficiente: la tenuta in curva viene quindi stimata dai tempi di settore aggregati, un metodo robusto ma meno granulare (non distingue fra curve lente, medie e veloci).`,
+        );
+      }
+    }
+  }
+
   // ----- 5. PARAGRAFO ESTESO SULLE GARE ESCLUSE -----
   appendDataContextParagraph(sentences, dataContext);
 
@@ -439,7 +456,18 @@ export function buildPerTeamExplanations(
       equivClause = ` Il suo punteggio è troppo vicino a quello di ${joinNames(others)} per distinguerli con certezza con i dati attuali: vanno considerati alla pari.`;
     }
 
-    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}`;
+    let sourceClause = "";
+    if (t.corner_source === "location_geometry") {
+      const covPct =
+        typeof t.corner_coverage === "number"
+          ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
+          : "";
+      sourceClause = ` La tenuta in curva di questo team è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}: lettura più granulare ma con possibili imprecisioni di allineamento.`;
+    } else if (t.corner_source === "sector_fallback") {
+      sourceClause = ` La tenuta in curva di questo team è stimata dai tempi di settore aggregati (non disponibile la ricostruzione per tipo di curva).`;
+    }
+
+    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}${sourceClause}`;
     return { team_name: t.team_name, text };
   });
 }
