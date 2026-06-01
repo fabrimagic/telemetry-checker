@@ -854,6 +854,10 @@ export default function Index() {
   // ───────── Contenuto centrale ─────────
   const singleDriverState = selectedDriverNumbers.length === 1 ? driverStates.get(selectedDriverNumbers[0]) : null;
   const isRaceOrSprint = sessionType === "Race" || sessionType === "Sprint";
+  const isSingleDriverRaceLike = selectedDriverNumbers.length === 1 && isRaceOrSprint;
+  const selectedLapSoftSensor = (isSingleDriverRaceLike && singleDriverState?.selectedLap != null)
+    ? (vreResult?.soft_sensors_timeline?.by_lap.find(s => s.lap_number === singleDriverState.selectedLap) ?? null)
+    : null;
 
   const workspaceContent = (
     <>
