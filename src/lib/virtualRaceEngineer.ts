@@ -155,6 +155,22 @@ export interface AlternativeStrategy {
    * deltas (unchanged) and are still consumed by UI/tests.
    */
   ranking_time_estimate?: number;
+  /**
+   * Standard deviation (±, seconds) on `estimated_delta_vs_actual` obtained by
+   * analytical propagation of per-compound slope uncertainties through the
+   * stint sum. Includes both the statistical slopeStdError and the systematic
+   * TRACK_EVOLUTION_SLOPE_UNCERTAINTY term. Independence between stints and
+   * between strategies is assumed (approximation, documented).
+   */
+  delta_uncertainty_std?: number;
+  /**
+   * True when |estimated_delta_vs_actual| < DELTA_SIGNIFICANCE_K *
+   * delta_uncertainty_std — i.e. the pace delta vs the actual strategy is
+   * within the propagated uncertainty band of the degradation model. UI and
+   * narrative can use this to mark the comparison as "within margin".
+   * Informative only — does NOT change the sort order.
+   */
+  indistinguishable_from_actual?: boolean;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
