@@ -9,9 +9,11 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
+  ReferenceArea,
   CartesianGrid,
 } from "recharts";
 import type { SoftSensorsLapState } from "@/lib/softSensors";
+import { ZONE_COLORS, groupDatesToIntervals, type ZoneInterval } from "@/lib/zoneIntervals";
 
 export interface DriverTelemetry {
   driverNumber: number;
