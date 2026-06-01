@@ -243,7 +243,14 @@ export async function computeCarProfiles(
   try {
     sessions = await getRaceSessionsByYear(2026);
   } catch {
-    return { profiles: [], races_used: [], aborted: false };
+    return {
+      profiles: [],
+      races_used: [],
+      aborted: false,
+      races_diagnostics: [],
+      races_considered: 0,
+      total_past_races: 0,
+    };
   }
 
   const past = sessions
@@ -254,11 +261,19 @@ export async function computeCarProfiles(
     })
     .sort((a, b) => new Date(a.date_end!).getTime() - new Date(b.date_end!).getTime());
 
+  const totalPastRaces = past.length;
   const selected = past.slice(-lastN); // oldest → newest among the N
   const total = selected.length;
 
   if (total === 0) {
-    return { profiles: [], races_used: [], aborted: false };
+    return {
+      profiles: [],
+      races_used: [],
+      aborted: false,
+      races_diagnostics: [],
+      races_considered: 0,
+      total_past_races: totalPastRaces,
+    };
   }
 
   // weight: linear, most-recent has highest weight.
@@ -282,7 +297,9 @@ export async function computeCarProfiles(
   const lapsByTeam = new Map<string, number>();
 
   const racesUsed: SessionInfo[] = [];
+  const diagnostics: RaceDiagnostic[] = [];
   let aborted = false;
+  let racesConsidered = 0;
   let done = 0;
 
   for (let i = 0; i < selected.length; i++) {
@@ -292,6 +309,8 @@ export async function computeCarProfiles(
     }
     const session = selected[i];
     const w = weights[i];
+    racesConsidered++;
+    let status: RaceDiagnosticStatus = "no_data";
     try {
       const [laps, drivers] = [
         await getAllLaps(session.session_key),
@@ -299,6 +318,7 @@ export async function computeCarProfiles(
       ];
       const agg = aggregateRace(laps, drivers);
       if (agg) {
+        status = "used";
         racesUsed.push(session);
 
         function add(
@@ -330,8 +350,13 @@ export async function computeCarProfiles(
         }
       }
     } catch {
-      // skip race on fetch failure
+      status = "fetch_failed";
     }
+    diagnostics.push({
+      name: sessionDisplayName(session),
+      date_end: session.date_end ?? "",
+      status,
+    });
     done++;
     opts.onProgress?.(done, total);
   }
@@ -398,5 +423,13 @@ export async function computeCarProfiles(
 
   profiles.sort((a, b) => a.team_name.localeCompare(b.team_name));
 
-  return { profiles, races_used: racesUsed, aborted };
+  return {
+    profiles,
+    races_used: racesUsed,
+    aborted,
+    races_diagnostics: diagnostics,
+    races_considered: racesConsidered,
+    total_past_races: totalPastRaces,
+  };
 }
+
