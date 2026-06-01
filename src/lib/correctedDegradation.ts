@@ -916,7 +916,19 @@ export function calculateCorrectedTyreDegradation(
 
     const hasFuelVariance = fuelProxyQuality !== "LOW";
 
-    if (hasFuelVariance && lapTimes_mv.length >= config.min_laps_corrected) {
+    // The legacy proxy-regression path is only used when an ALTERNATIVE,
+    // non-collinear fuel proxy is available with HIGH quality (throttle_integral
+    // from telemetry, or st_speed). The default "laps_remaining" / "lap_number"
+    // proxies are degenerate inside a stint (collinear with tyre_life), so we
+    // route them through the deterministic physical fuel correction instead.
+    const useAltProxyRegression =
+      hasFuelVariance &&
+      (config.fuel_proxy_type === "throttle_integral" || config.fuel_proxy_type === "st_speed") &&
+      fuelProxyQuality === "HIGH";
+
+    let modelResolved = false;
+
+    if (useAltProxyRegression && lapTimes_mv.length >= config.min_laps_corrected) {
       const twoStage = twoStageDegradation(
         tyreLifes_mv, fuelProxies_mv,
         weatherComplete ? trackTemps_mv : null,
@@ -934,8 +946,9 @@ export function calculateCorrectedTyreDegradation(
         coefficients = twoStage.coefficients;
         conditionWarning = twoStage.conditionWarning;
         correctedRmse = twoStage.rmse_stage_b;
+        modelResolved = true;
       }
-    } else if (hasFuelVariance && lapTimes_mv.length >= config.min_laps + 1) {
+    } else if (useAltProxyRegression && lapTimes_mv.length >= config.min_laps + 1) {
       const twoStage = twoStageDegradation(
         tyreLifes_mv, fuelProxies_mv, null, null, lapTimes_mv,
       );
@@ -949,6 +962,34 @@ export function calculateCorrectedTyreDegradation(
         coefficients = twoStage.coefficients;
         conditionWarning = twoStage.conditionWarning;
         correctedRmse = twoStage.rmse_stage_b;
+        modelResolved = true;
+      }
+    }
+
+    // Default robust path: deterministic physical fuel correction.
+    // Used whenever the alt proxy is unavailable / low quality, or its
+    // regression failed the plausibility gate.
+    if (!modelResolved && tyreLifes.length >= config.min_laps + 1) {
+      const physical = physicalFuelDegradation(
+        tyreLifes,
+        lapNumbersAbs,
+        weatherCompleteAll ? trackTempsAll : null,
+        weatherCompleteAll ? airTempsAll : null,
+        lapTimes,
+        totalSessionLaps,
+        config.fuel_load_kg ?? FUEL_LOAD_KG_DEFAULT,
+      );
+
+      if (physical && Math.abs(physical.slope_corrected) <= config.max_plausible_slope) {
+        modelType = physical.model_type;
+        slopeCorrected = physical.slope_corrected;
+        slopeCorrectedStdError = physical.slope_corrected_std_error;
+        rSquaredCorrected = physical.r_squared_stage_b;
+        rSquaredStageA = physical.r_squared_stage_a;
+        weatherCorrectionUsed = physical.weather_used;
+        coefficients = physical.coefficients;
+        conditionWarning = physical.conditionWarning;
+        correctedRmse = physical.rmse_stage_b;
       }
     }
 
