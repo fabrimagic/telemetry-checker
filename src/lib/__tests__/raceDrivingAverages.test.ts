@@ -76,7 +76,7 @@ describe("computeRaceDrivingAverages", () => {
   it("aggregates over comparable laps only and calls onProgress", async () => {
     const laps: Lap[] = [
       makeLap(1),
-      makeLap(2, { is_pit_out_lap: true }),
+      makeLap(2),
       makeLap(3),
       makeLap(4),
     ];
@@ -89,12 +89,12 @@ describe("computeRaceDrivingAverages", () => {
       onProgress,
     });
 
-    // Laps 1, 3, 4 are comparable (3 laps).
-    expect(res.laps_total_comparable).toBe(3);
-    expect(res.laps_used).toBe(3);
-    expect(fetcher).toHaveBeenCalledTimes(3);
-    expect(onProgress).toHaveBeenCalledTimes(3);
-    expect(onProgress).toHaveBeenLastCalledWith(3, 3);
+    // All 4 laps are comparable (no pit-out, no track-status entries).
+    expect(res.laps_total_comparable).toBe(4);
+    expect(res.laps_used).toBe(4);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(onProgress).toHaveBeenCalledTimes(4);
+    expect(onProgress).toHaveBeenLastCalledWith(4, 4);
     expect(res.low_sample).toBe(false);
     expect(res.aborted).toBe(false);
     expect(res.superclip_avg_duration).toBeGreaterThan(0);
