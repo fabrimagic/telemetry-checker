@@ -51,6 +51,12 @@ export interface GpPrediction {
   notes: string[];
 }
 
+export interface GpPredictionMeta {
+  /** Number of races the system actually considered (e.g. last 4). */
+  racesConsidered?: number;
+}
+
+
 /** Map a qualitative confidence to a half-band width in score units (0..1). */
 const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = {
   high: 0.05,
