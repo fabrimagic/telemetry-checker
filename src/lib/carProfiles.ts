@@ -517,6 +517,9 @@ export async function computeCarProfiles(
   // Diagnostic-only: corner-vertices coverage (slow/medium/fast only).
   const accCornerCovSum = new Map<string, number>();
   const accCornerCovW = new Map<string, number>();
+  // Diagnostic-only: aggregated Procrustes alignment error per team.
+  const accAlignErrSum = new Map<string, number>();
+  const accAlignErrW = new Map<string, number>();
   const racesByTeam = new Map<string, number>();
   const lapsByTeam = new Map<string, number>();
   // For each team, collect the weights of the races it contributed to —
