@@ -653,6 +653,62 @@ function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStr
   );
 }
 
+/**
+ * Compound timeline strip for an alternative strategy.
+ * Pure visualization of pit_laps + compounds — does NOT recompute any metric.
+ * Returns null if data is insufficient (no compounds or totalLaps unknown).
+ */
+function AlternativeCompoundStrip({
+  pitLaps,
+  compounds,
+  startLap,
+  totalLaps,
+}: {
+  pitLaps: number[];
+  compounds: string[];
+  startLap: number;
+  totalLaps: number;
+}) {
+  if (!compounds || compounds.length === 0 || totalLaps <= 0) return null;
+
+  // Build stints from pit_laps + compounds without inventing data.
+  // Stint i runs from cursor to pitLaps[i] (last stint ends at totalLaps).
+  const sortedPits = [...pitLaps].sort((a, b) => a - b);
+  const stints: { compound: string; lap_start: number; lap_end: number }[] = [];
+  let cursor = startLap;
+  for (let i = 0; i < compounds.length; i++) {
+    const isLast = i === compounds.length - 1;
+    const end = isLast
+      ? totalLaps
+      : (sortedPits[i] != null ? sortedPits[i] : totalLaps);
+    if (end < cursor) continue;
+    stints.push({ compound: compounds[i], lap_start: cursor, lap_end: end });
+    cursor = end + 1;
+    if (cursor > totalLaps) break;
+  }
+  if (stints.length === 0) return null;
+
+  return (
+    <div className="flex h-5 rounded overflow-hidden border border-border/50">
+      {stints.map((s, i) => {
+        const width = ((s.lap_end - s.lap_start + 1) / totalLaps) * 100;
+        const bg = COMPOUND_COLORS[s.compound] || "hsl(var(--muted))";
+        const isDark = s.compound === "HARD" || s.compound === "MEDIUM";
+        return (
+          <div
+            key={i}
+            className="flex items-center justify-center text-[9px] font-bold"
+            style={{ width: `${width}%`, backgroundColor: bg, color: isDark ? "#1a1a1a" : "#fff" }}
+            title={`${s.compound} L${s.lap_start}–${s.lap_end}`}
+          >
+            {width > 8 && <span>{s.compound.substring(0, 3)}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Breakdown Table (reusable for recommended + alternatives) ── */
 function BreakdownTable({ breakdown, riskMode, scenarioLabel, scenarioIsSimulated, scenarioModifiers }: {
   breakdown: StrategyBreakdown;
