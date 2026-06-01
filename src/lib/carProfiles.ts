@@ -750,10 +750,12 @@ export async function computeCarProfiles(
     const covW = accCoverageW.get(team) ?? 0;
     const covS = accCoverageSum.get(team) ?? 0;
     const coverageAgg = covW > 0 ? covS / covW : 0;
+    const coverageMeasured = covW > 0;
 
     let cornerTypeStrength: CarProfile["corner_type_strength"] = null;
     let cornerSource: CarProfile["corner_source"] = "sector_fallback";
-    if (covW > 0 && coverageAgg >= CORNER_COVERAGE_MIN) {
+    let coverageStatus: CarProfile["corner_coverage_status"] = "not_available";
+    if (coverageMeasured && coverageAgg >= CORNER_COVERAGE_MIN) {
       const slow = avgCorner("slow");
       const medium = avgCorner("medium");
       const fast = avgCorner("fast");
@@ -765,7 +767,14 @@ export async function computeCarProfiles(
           fast: fast ?? 0,
         };
         cornerSource = "location_geometry";
+        coverageStatus = "ok";
+      } else {
+        // Coverage was measured but no per-type value survived (degenerate
+        // analyzer output) → diagnostic-only fallback.
+        coverageStatus = "below_threshold";
       }
+    } else if (coverageMeasured) {
+      coverageStatus = "below_threshold";
     }
 
     profiles.push({
@@ -781,8 +790,11 @@ export async function computeCarProfiles(
       sample_laps: sampleLaps,
       confidence,
       corner_type_strength: cornerTypeStrength,
-      corner_data_coverage: covW > 0 ? coverageAgg : 0,
+      // Preserve real coverage value in every branch (even below threshold)
+      // so downstream consumers can diagnose; null only when not measurable.
+      corner_data_coverage: coverageMeasured ? coverageAgg : null,
       corner_source: cornerSource,
+      corner_coverage_status: coverageStatus,
     });
   }
 
