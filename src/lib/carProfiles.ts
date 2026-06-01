@@ -36,6 +36,7 @@ import {
   type Lap,
   type SessionInfo,
 } from "./openf1";
+import type { SessionCornerAnalysis } from "./cornerAnalysis";
 
 export interface CarProfile {
   team_name: string;
@@ -61,7 +62,30 @@ export interface CarProfile {
   effective_sample_races: number;
   sample_laps: number;
   confidence: "high" | "medium" | "low";
+  /**
+   * EXPERIMENTAL — per-corner-type strength (0..1, 1 = best in field) built
+   * from QUALIFYING /location + /car_data via cornerAnalysis. Populated
+   * only when the aggregated spatial coverage is ≥ CORNER_COVERAGE_MIN;
+   * otherwise null and the consumer should fall back to sector_strength.
+   */
+  corner_type_strength?: { slow: number; medium: number; fast: number } | null;
+  /** Aggregated 0..1 spatial coverage across the contributing GPs. */
+  corner_data_coverage?: number;
+  /**
+   * Which method produced the cornering signal for this team:
+   *  - "location_geometry": derived from GPS + circuit layout (granular)
+   *  - "sector_fallback":   coverage too low / no data → use sector_strength
+   */
+  corner_source?: "location_geometry" | "sector_fallback";
 }
+
+/**
+ * Minimum aggregated /location coverage for a team to be considered
+ * trustworthy on the per-corner-type dimension. Below this threshold the
+ * spatial alignment is too thin to be meaningful and we fall back to the
+ * sector-strength estimate, which doesn't depend on GPS alignment.
+ */
+export const CORNER_COVERAGE_MIN = 0.5;
 
 export type RaceDiagnosticStatus = "used" | "no_data" | "fetch_failed";
 
