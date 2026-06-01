@@ -840,6 +840,7 @@ export async function computeCarProfiles(
       corner_coverage_curve: cornerCoverageCurve,
       corner_source: cornerSource,
       corner_coverage_status: coverageStatus,
+      corner_alignment_error: cornerAlignmentError,
     });
   }
 
