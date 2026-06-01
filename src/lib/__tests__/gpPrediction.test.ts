@@ -184,5 +184,85 @@ describe("gpPrediction", () => {
     const out = predictGpAffinity(c, [geomCar, car("S", 0.5, [0.5, 0.5, 0.5], "high")]);
     expect(out.notes.some((n) => /geometria del tracciato/i.test(n))).toBe(true);
   });
+
+
+
+  // ---- Weighted-quadratic cornerWeight aggregation ----
+  // For a circuit with a single dominant corner type, the weighted quadratic
+  // mean Σ(wᵢ²)/Σ(wᵢ) must be strictly larger than the simple arithmetic
+  // mean. Concretely Monaco-like (slow=1, medium=0.6, fast=0.15) gives
+  // (1+0.36+0.0225)/1.75 ≈ 0.79 vs simple mean 0.5833.
+  it("weighted-quadratic cornerWeight amplifies extreme-character circuits", () => {
+    const dominant = circuit({
+      top_speed: 0.2,
+      slow_corner_traction: 1.0,
+      medium_corner: 0.6,
+      fast_corner: 0.15,
+    });
+    const balanced = circuit({
+      top_speed: 0.2,
+      slow_corner_traction: 0.583,
+      medium_corner: 0.583,
+      fast_corner: 0.583,
+    });
+    // Same car with equal top/cornering signals — the score is
+    //   wTop*top + wCorner*corner = wTop*0.5 + wCorner*0.5 = 0.5
+    // ONLY when top==corner. Use top≠corner so that a higher wCorner moves
+    // the score toward the cornering value.
+    const cars = [car("T", 0.2, [0.9, 0.9, 0.9])];
+    const dom = predictGpAffinity(dominant, cars).ranked[0].affinity_score;
+    const bal = predictGpAffinity(balanced, cars).ranked[0].affinity_score;
+    // Dominant circuit: higher wCorner ⇒ score closer to 0.9 than balanced.
+    expect(dom).toBeGreaterThan(bal);
+  });
+
+  it("weighted-quadratic equals simple mean when corner weights are equal", () => {
+    const c = circuit({
+      top_speed: 0.4,
+      slow_corner_traction: 0.6,
+      medium_corner: 0.6,
+      fast_corner: 0.6,
+    });
+    // With equal weights the aggregate is 0.6, so wCorner = 0.6/(0.4+0.6)=0.6.
+    // Score for car(top=0, corners=1) = 0.6*1 = 0.6.
+    const out = predictGpAffinity(c, [car("X", 0, [1, 1, 1])]);
+    expect(out.ranked[0].affinity_score).toBeCloseTo(0.6, 5);
+  });
+
+  it("cornerWeight handles all-zero corner weights without NaN (50/50 fallback)", () => {
+    const c = circuit({
+      top_speed: 0,
+      slow_corner_traction: 0,
+      medium_corner: 0,
+      fast_corner: 0,
+    });
+    const out = predictGpAffinity(c, [car("Z", 0.4, [0.8, 0.8, 0.8])]);
+    const s = out.ranked[0].affinity_score;
+    expect(Number.isFinite(s)).toBe(true);
+    // 50/50 fallback: 0.5*0.4 + 0.5*0.8 = 0.6
+    expect(s).toBeCloseTo(0.6, 5);
+  });
+
+  it("geometric branch still applies raw slow/medium/fast circuit weights inside cornerIdx (unchanged)", () => {
+    // Sanity: the per-team cornerIdx in the geometric branch uses the RAW
+    // circuit weights, not the quadratic aggregate. With slow=1,med=0,fast=0
+    // and corner_type_strength={slow:1,medium:0,fast:0}, cornerIdx must be 1.
+    const c = circuit({
+      top_speed: 0,
+      slow_corner_traction: 1,
+      medium_corner: 0,
+      fast_corner: 0,
+    });
+    const geomCar: CarProfile = {
+      ...car("G", 0, [0, 0, 0]),
+      corner_type_strength: { slow: 1, medium: 0, fast: 0 },
+      corner_data_coverage: 0.9,
+      corner_source: "location_geometry",
+    };
+    const out = predictGpAffinity(c, [geomCar]);
+    // wTop=0, wCorner=1, cornerIdx=1 → score=1.
+    expect(out.ranked[0].affinity_score).toBeCloseTo(1, 5);
+  });
 });
+
 

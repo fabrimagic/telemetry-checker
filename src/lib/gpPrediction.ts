@@ -95,6 +95,22 @@ function mean(xs: number[]): number {
   return s / xs.length;
 }
 
+/**
+ * Weighted quadratic mean: Σ(wᵢ²) / Σ(wᵢ). Emphasizes the largest weights
+ * (dominant corner-type character) without collapsing to max(). Returns 0
+ * if the sum of weights is 0 (avoids NaN; downstream handles the fallback).
+ */
+function weightedQuadratic(weights: number[]): number {
+  let sum = 0;
+  let sumSq = 0;
+  for (const w of weights) {
+    sum += w;
+    sumSq += w * w;
+  }
+  if (sum <= 0) return 0;
+  return sumSq / sum;
+}
+
 function downgrade(level: ConfidenceLevel): ConfidenceLevel {
   if (level === "high") return "medium";
   if (level === "medium") return "low";
@@ -127,8 +143,15 @@ export function predictGpAffinity(
 
   const notes: string[] = [];
 
-  // Aggregated corner weight (simple mean of the three corner-type weights).
-  const cornerWeight = mean([
+  // Aggregated corner weight balancing the cornering dimension against
+  // top_speed (wTop/wCorner). We use a WEIGHTED QUADRATIC mean
+  //   Σ(wᵢ²) / Σ(wᵢ)
+  // instead of a simple mean: it accentuates the dominant corner-type
+  // character of the circuit (e.g. Monaco slow=1.00, medium=0.60, fast=0.15
+  // → 0.79 vs simple-mean 0.58) without the extremism of a max(), and
+  // collapses to the simple mean when all three weights are equal.
+  // Handles Σ=0 by returning 0 (the downstream 50/50 fallback applies).
+  const cornerWeight = weightedQuadratic([
     circuit.slow_corner_traction,
     circuit.medium_corner,
     circuit.fast_corner,
