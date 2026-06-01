@@ -9,6 +9,7 @@ import Documentation from "./pages/Documentation.tsx";
 import Compare from "./pages/Compare.tsx";
 import PreRace from "./pages/PreRace.tsx";
 import Championship from "./pages/Championship.tsx";
+import GpPreview from "./pages/GpPreview.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const InternalLiveDashboard = lazy(() => import("./pages/InternalLiveDashboard.tsx"));
