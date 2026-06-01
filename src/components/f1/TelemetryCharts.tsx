@@ -11,6 +11,7 @@ import {
   ReferenceLine,
   CartesianGrid,
 } from "recharts";
+import type { SoftSensorsLapState } from "@/lib/softSensors";
 
 export interface DriverTelemetry {
   driverNumber: number;
