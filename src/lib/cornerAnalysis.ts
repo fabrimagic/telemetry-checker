@@ -112,7 +112,7 @@ export interface SessionCornerAnalysis {
    * null excluded). `null` when no driver produced a measurable
    * alignment.
    */
-  alignment_error: number | null;
+  alignment_error?: number | null;
 }
 
 // ---------------------------------------------------------------------------
