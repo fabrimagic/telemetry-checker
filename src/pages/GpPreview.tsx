@@ -21,6 +21,7 @@ import {
   strengthLabel,
 } from "@/lib/gpPreviewNarrative";
 import { analyzeCornersForSession } from "@/lib/cornerAnalysis";
+import { resolveCalendarGpName } from "@/lib/circuitGeometry";
 import type { SessionInfo } from "@/lib/openf1";
 
 
