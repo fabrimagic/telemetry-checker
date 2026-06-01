@@ -40,6 +40,16 @@ export interface TeamGpAffinity {
   confidence: ConfidenceLevel;
   /** How much each dimension contributed to the final score. */
   contributions: { top_speed: number; cornering: number };
+  /**
+   * Which method produced the cornering signal for this team:
+   *  - "location_geometry": granular slow/medium/fast strength matched
+   *                         against the circuit's per-corner-type weights;
+   *  - "sector_fallback":   aggregated sector_strength (the legacy path).
+   * Surfaced so the UI/narrative can be transparent about provenance.
+   */
+  corner_source?: "location_geometry" | "sector_fallback";
+  /** Aggregated /location coverage when corner_source = "location_geometry". */
+  corner_coverage?: number;
 }
 
 export interface GpPrediction {
