@@ -476,6 +476,16 @@ export default function Index() {
         } catch { /* optional */ }
       }
 
+      // Per-lap precipitation outlook — purely informative card.
+      // Race/Sprint single-driver only. NEVER used in any calculation.
+      setLapPrecip(null);
+      const isRaceOrSprintLocal = sessionType === "Race" || sessionType === "Sprint";
+      if (selectedDriverNumbers.length === 1 && isRaceOrSprintLocal && weatherStart && circuitKey) {
+        fetchLapPrecipOutlook(circuitKey, weatherStart)
+          .then((o) => setLapPrecip(o))
+          .catch(() => setLapPrecip(null));
+      }
+
       setDriverStates((prev) => {
         const next = new Map(prev);
         for (const [num, car, loc] of updates) {
@@ -489,7 +499,7 @@ export default function Index() {
     } finally {
       setLoadingTelemetry(false);
     }
-  }, [sessionKey, driverStates, selectedDriverNumbers, sessionType]);
+  }, [sessionKey, driverStates, selectedDriverNumbers, sessionType, circuitKey]);
 
   const handleReset = useCallback(() => {
     setAnalysisMode(null);
