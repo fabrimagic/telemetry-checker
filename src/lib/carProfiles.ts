@@ -300,6 +300,52 @@ function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
   };
 }
 
+/**
+ * Combine two per-session normalized maps (quali + race) into a single
+ * per-GP map using the provided weights. If a team is present in only
+ * one of the two sources, that source is used as-is for the team. Both
+ * sources missing → undefined.
+ */
+function combineMaps(
+  qMap: Map<string, number> | undefined,
+  rMap: Map<string, number> | undefined,
+  wQ: number,
+  wR: number,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const teams = new Set<string>([
+    ...(qMap ? qMap.keys() : []),
+    ...(rMap ? rMap.keys() : []),
+  ]);
+  for (const t of teams) {
+    const q = qMap?.get(t);
+    const r = rMap?.get(t);
+    if (q != null && r != null) out.set(t, (wQ * q + wR * r) / (wQ + wR));
+    else if (q != null) out.set(t, q);
+    else if (r != null) out.set(t, r);
+  }
+  return out;
+}
+
+function combineSessions(
+  quali: RaceTeamMetrics | null,
+  race: RaceTeamMetrics | null,
+): RaceTeamMetrics | null {
+  if (!quali && !race) return null;
+  const laps = new Map<string, number>();
+  for (const m of [quali?.lapsByTeam, race?.lapsByTeam]) {
+    if (!m) continue;
+    for (const [t, n] of m.entries()) laps.set(t, (laps.get(t) ?? 0) + n);
+  }
+  return {
+    topSpeed: combineMaps(quali?.topSpeed, race?.topSpeed, TOP_SPEED_QUALI_WEIGHT, TOP_SPEED_RACE_WEIGHT),
+    s1: combineMaps(quali?.s1, race?.s1, CORNER_QUALI_WEIGHT, CORNER_RACE_WEIGHT),
+    s2: combineMaps(quali?.s2, race?.s2, CORNER_QUALI_WEIGHT, CORNER_RACE_WEIGHT),
+    s3: combineMaps(quali?.s3, race?.s3, CORNER_QUALI_WEIGHT, CORNER_RACE_WEIGHT),
+    lapsByTeam: laps,
+  };
+}
+
 // ----- public API -----
 
 export async function computeCarProfiles(
