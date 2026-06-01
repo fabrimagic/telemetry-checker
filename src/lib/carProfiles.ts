@@ -40,7 +40,17 @@ export interface CarProfile {
   team_name: string;
   top_speed_index: number; // 0..1, 1 = best in field
   sector_strength: { s1: number; s2: number; s3: number }; // 0..1, 1 = best
+  /** Number of races with usable data that contributed to this team. */
   sample_races: number;
+  /**
+   * Kish effective sample size for this team:
+   *   (Σ w_i)² / Σ(w_i²)
+   * where w_i is the recency weight of each contributing race. Equals
+   * sample_races with uniform weights, lower when a few high-weight races
+   * dominate. Used for confidence so that including many low-weight old
+   * races does NOT inflate confidence.
+   */
+  effective_sample_races: number;
   sample_laps: number;
   confidence: "high" | "medium" | "low";
 }
@@ -57,11 +67,11 @@ export interface ComputeCarProfilesResult {
   profiles: CarProfile[];
   races_used: SessionInfo[];
   aborted: boolean;
-  /** Diagnostics for each of the last-N selected races (used | no_data | fetch_failed). */
+  /** Diagnostics for each considered race (used | no_data | fetch_failed). */
   races_diagnostics: RaceDiagnostic[];
-  /** Number of races among the last-N effectively iterated (== selected.length, minus aborted tail). */
+  /** Number of races effectively iterated. */
   races_considered: number;
-  /** Total number of past 2026 races known BEFORE the slice to last-N. */
+  /** Total number of past 2026 races. */
   total_past_races: number;
 }
 
@@ -70,6 +80,12 @@ function sessionDisplayName(s: SessionInfo): string {
 }
 
 export interface ComputeCarProfilesOptions {
+  /**
+   * Optional cap on how many of the most recent past races to consider.
+   * When omitted (default) ALL past 2026 races are included; recency is
+   * handled via continuous weight decay (see RECENCY_HALFLIFE_RACES), not
+   * via a hard cutoff. The parameter remains for backward-compat / tests.
+   */
   lastNRaces?: number;
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
@@ -77,7 +93,21 @@ export interface ComputeCarProfilesOptions {
   now?: Date;
 }
 
-const DEFAULT_LAST_N = 4;
+/**
+ * Half-life of the recency weight, in races.
+ *
+ * For a race with age a (a = 0 for the most recent, 1 for the previous, ...)
+ * the weight is:
+ *
+ *     w(a) = 0.5 ^ (a / RECENCY_HALFLIFE_RACES)
+ *
+ * The decay is smooth and continuous; there is no hard cutoff. A race that
+ * is RECENCY_HALFLIFE_RACES old contributes half as much as the most
+ * recent one. Rationale: 2026 has a new technical regulation and few
+ * races, so discarding old races wastes signal; at the same time, ongoing
+ * upgrades make recent races more representative of the current cars.
+ */
+export const RECENCY_HALFLIFE_RACES = 3;
 
 // ----- statistic helpers -----
 
