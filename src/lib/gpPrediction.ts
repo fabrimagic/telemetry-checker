@@ -81,6 +81,23 @@ export interface TeamGpAffinity {
    * the affinity score.
    */
   corner_alignment_error?: number | null;
+  /**
+   * Diagnostic-only: when corner_source === "sector_typed", the three per-type
+   * estimates derived by weighting the car's sector_strength via the circuit's
+   * sector_corner_map. null entries when the circuit weight on that type is 0.
+   * Undefined for other branches. Does NOT affect the score.
+   */
+  corner_type_estimate?: {
+    slow: number | null;
+    medium: number | null;
+    fast: number | null;
+  } | null;
+  /**
+   * Diagnostic-only: confidence of the circuit's sector_corner_map. Only set
+   * when corner_source === "sector_typed". Allows the UI/narrative to surface
+   * "stima approssimata" badge when low.
+   */
+  sector_corner_map_confidence?: "high" | "medium" | "low";
 }
 
 
