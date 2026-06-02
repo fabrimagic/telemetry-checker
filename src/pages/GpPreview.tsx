@@ -97,7 +97,139 @@ function CircuitProfileCard({ circuit }: { circuit: CircuitProfile }) {
   );
 }
 
-// ----- Result rendering (exported for tests) -----
+// ----- Per-team Technical Details (expandable, default closed) -----
+
+function mapConfidenceLabel(c?: "high" | "medium" | "low"): string {
+  if (c === "high") return "alta";
+  if (c === "medium") return "media";
+  if (c === "low") return "bassa";
+  return "n/d";
+}
+
+function fmt(n: number | null | undefined, digits = 2): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return n.toFixed(digits);
+}
+
+function TeamTechnicalDetails({
+  team,
+  car,
+  circuit,
+}: {
+  team: import("@/lib/gpPrediction").TeamGpAffinity;
+  car?: CarProfile;
+  circuit: CircuitProfile;
+}) {
+  const [open, setOpen] = useState(false);
+  // Show even without car (some fields still informative) but most useful with it.
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors pt-1"
+          data-testid={`tech-toggle-${team.team_name}`}
+        >
+          <ChevronDown
+            className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+          Dettagli tecnici
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent
+        className="pt-2"
+        data-testid={`tech-details-${team.team_name}`}
+      >
+        <div className="rounded-md border border-border/50 bg-background/60 p-3 space-y-3 text-[11px] text-muted-foreground">
+          {/* Velocità di punta */}
+          <div>
+            <div className="font-medium text-foreground/90 mb-0.5">
+              Indice velocità di punta
+            </div>
+            <div className="tabular-nums">
+              {fmt(car?.top_speed_index)} <span className="opacity-70">(0–1, dove 1 = miglior valore del campo)</span>
+            </div>
+          </div>
+
+          {/* Tenuta in curva — dipende dal corner_source */}
+          <div>
+            <div className="font-medium text-foreground/90 mb-0.5">Tenuta in curva</div>
+            {team.corner_source === "location_geometry" && car?.corner_type_strength && (
+              <div className="space-y-0.5 tabular-nums">
+                <div>
+                  Lente: {fmt(car.corner_type_strength.slow)} · Medie:{" "}
+                  {fmt(car.corner_type_strength.medium)} · Veloci:{" "}
+                  {fmt(car.corner_type_strength.fast)}
+                </div>
+                <div className="opacity-70 normal-case">
+                  Misura per tipo di curva, ricostruita dalla geometria del tracciato.
+                </div>
+              </div>
+            )}
+            {team.corner_source === "sector_typed" && (
+              <div className="space-y-0.5 tabular-nums">
+                {team.corner_type_estimate ? (
+                  <div>
+                    Stima — Lente: {fmt(team.corner_type_estimate.slow)} · Medie:{" "}
+                    {fmt(team.corner_type_estimate.medium)} · Veloci:{" "}
+                    {fmt(team.corner_type_estimate.fast)}
+                  </div>
+                ) : null}
+                {car && (
+                  <div>
+                    Forza per settore — S1: {fmt(car.sector_strength.s1)} · S2:{" "}
+                    {fmt(car.sector_strength.s2)} · S3: {fmt(car.sector_strength.s3)}
+                  </div>
+                )}
+                <div className="opacity-70 normal-case">
+                  Affidabilità classificazione settori:{" "}
+                  <span className="text-foreground/80">
+                    {mapConfidenceLabel(team.sector_corner_map_confidence)}
+                  </span>
+                  .
+                </div>
+              </div>
+            )}
+            {team.corner_source === "sector_fallback" && car && (
+              <div className="space-y-0.5 tabular-nums">
+                <div>
+                  Forza per settore — S1: {fmt(car.sector_strength.s1)} · S2:{" "}
+                  {fmt(car.sector_strength.s2)} · S3: {fmt(car.sector_strength.s3)}
+                </div>
+                <div className="opacity-70 normal-case">
+                  Media aggregata: non distingue per tipo di curva.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pesi del circuito */}
+          <div>
+            <div className="font-medium text-foreground/90 mb-0.5">
+              Pesi del circuito (cosa premia)
+            </div>
+            <div className="tabular-nums">
+              Velocità di punta: {fmt(circuit.top_speed)} · Lente:{" "}
+              {fmt(circuit.slow_corner_traction)} · Medie: {fmt(circuit.medium_corner)} ·
+              Veloci: {fmt(circuit.fast_corner)}
+            </div>
+          </div>
+
+          {/* Campione */}
+          {car && (
+            <div>
+              <div className="font-medium text-foreground/90 mb-0.5">Campione usato</div>
+              <div className="tabular-nums">
+                Gare: {car.sample_races} · Equivalente a peso pieno:{" "}
+                {fmt(car.effective_sample_races, 2)} · Giri: {car.sample_laps}
+              </div>
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export function GpPredictionResultView({
   circuit,
