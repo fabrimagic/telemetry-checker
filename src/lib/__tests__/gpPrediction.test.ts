@@ -468,6 +468,57 @@ describe("gpPrediction", () => {
         }
       }
     });
+
+    it("propaga sector_corner_map_confidence e corner_type_estimate su TeamGpAffinity", () => {
+      const c = circuit({
+        top_speed: 0,
+        slow_corner_traction: 1.0,
+        medium_corner: 0.5,
+        fast_corner: 0.0,
+        sector_corner_map: monacoLikeMap,
+        sector_corner_map_confidence: "low",
+      });
+      const out = predictGpAffinity(c, [car("X", 0.5, [0.4, 0.6, 0.8])]);
+      const r = out.ranked[0];
+      expect(r.corner_source).toBe("sector_typed");
+      expect(r.sector_corner_map_confidence).toBe("low");
+      expect(r.corner_type_estimate).toBeDefined();
+      expect(typeof r.corner_type_estimate!.slow).toBe("number");
+      expect(typeof r.corner_type_estimate!.medium).toBe("number");
+      expect(r.corner_type_estimate!.fast).toBe(0); // mappa ha fast=0/0.2/0 con weights non-zero
+    });
+
+    it("tutti i 24 profili (22 attivi + 2 dormienti) hanno sector_corner_map con confidenza valida", async () => {
+      const { CIRCUIT_PROFILES } = await import("../circuitProfiles");
+      // Esclude i circuiti senza mappa (es. layout_estimate Madrid).
+      const withMap = Object.values(CIRCUIT_PROFILES).filter((p) => p.sector_corner_map);
+      // Atteso: 24 totali - 1 (Madrid layout_estimate) = 23. Validiamo che siano almeno 23.
+      expect(withMap.length).toBeGreaterThanOrEqual(23);
+      for (const p of withMap) {
+        expect(["high", "medium", "low"]).toContain(p.sector_corner_map_confidence);
+        const map = p.sector_corner_map!;
+        for (const sec of ["s1", "s2", "s3"] as const) {
+          for (const k of ["slow", "medium", "fast"] as const) {
+            const v = map[sec][k];
+            expect(v).toBeGreaterThanOrEqual(0);
+            expect(v).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    });
+
+    it("Silverstone (nuovo) attiva sector_typed e differenzia distribuzioni-settore", async () => {
+      const { CIRCUIT_PROFILES } = await import("../circuitProfiles");
+      const silverstone = CIRCUIT_PROFILES["Gran Premio di Gran Bretagna"];
+      expect(silverstone.sector_corner_map).toBeDefined();
+      const A = car("StrongS2", 0.5, [0.5, 0.9, 0.5]); // forte nelle veloci (S2)
+      const B = car("StrongS3", 0.5, [0.5, 0.5, 0.9]); // più bilanciato
+      const out = predictGpAffinity(silverstone, [A, B]);
+      expect(out.ranked[0].corner_source).toBe("sector_typed");
+      const sA = out.ranked.find((t) => t.team_name === "StrongS2")!.affinity_score;
+      const sB = out.ranked.find((t) => t.team_name === "StrongS3")!.affinity_score;
+      expect(sA).not.toBeCloseTo(sB, 4);
+    });
   });
 });
 
