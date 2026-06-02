@@ -103,6 +103,7 @@ export function GpPredictionResultView({
   circuit,
   prediction,
   dataContext,
+  profiles,
 }: {
   circuit: CircuitProfile;
   prediction: GpPrediction;
@@ -112,7 +113,13 @@ export function GpPredictionResultView({
     racesWithData?: number;
     diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
   };
+  profiles?: CarProfile[];
 }) {
+  const profileByTeam = useMemo(() => {
+    const m = new Map<string, CarProfile>();
+    for (const p of profiles ?? []) m.set(p.team_name, p);
+    return m;
+  }, [profiles]);
   const ranked = prediction.ranked;
   const groupOf = useMemo(() => {
     const m = new Map<string, number>();
