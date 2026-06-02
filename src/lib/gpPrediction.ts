@@ -81,6 +81,23 @@ export interface TeamGpAffinity {
    * the affinity score.
    */
   corner_alignment_error?: number | null;
+  /**
+   * Diagnostic-only: when corner_source === "sector_typed", the three per-type
+   * estimates derived by weighting the car's sector_strength via the circuit's
+   * sector_corner_map. null entries when the circuit weight on that type is 0.
+   * Undefined for other branches. Does NOT affect the score.
+   */
+  corner_type_estimate?: {
+    slow: number | null;
+    medium: number | null;
+    fast: number | null;
+  } | null;
+  /**
+   * Diagnostic-only: confidence of the circuit's sector_corner_map. Only set
+   * when corner_source === "sector_typed". Allows the UI/narrative to surface
+   * "stima approssimata" badge when low.
+   */
+  sector_corner_map_confidence?: "high" | "medium" | "low";
 }
 
 
@@ -215,15 +232,9 @@ export function predictGpAffinity(
   const ranked: TeamGpAffinity[] = cars.map((car) => {
     const topIdx = clamp01(car.top_speed_index);
 
-    // HYBRID cornering signal:
-    //  - If the car has a per-corner-type strength (location_geometry path),
-    //    weight slow/medium/fast by the circuit's slow/medium/fast weights.
-    //    This is the FIRST place where slow_corner_traction/medium_corner/
-    //    fast_corner enter the score (previously descriptive only).
-    //  - Otherwise fall back to the legacy sector-mean estimate, which does
-    //    NOT depend on spatial alignment.
     let cornerIdx: number;
     let cornerSource: "location_geometry" | "sector_typed" | "sector_fallback";
+    let typeEstimate: TeamGpAffinity["corner_type_estimate"] = undefined;
     if (car.corner_type_strength) {
       const wS = circuit.slow_corner_traction;
       const wM = circuit.medium_corner;
@@ -247,12 +258,8 @@ export function predictGpAffinity(
       }
       cornerSource = "location_geometry";
     } else if (circuit.sector_corner_map) {
-      // RAMO sector_typed (Opzione 2): stima della corner-strength per tipo
-      // dai sector_strength della vettura via la matrice settore→tipo del
-      // circuito. È una stima a grana di settore, NON una misura pura.
       const map = circuit.sector_corner_map;
       const s = car.sector_strength;
-      // Per ciascun tipo: Σ_sec (mappa[sec][tipo] * sector_strength[sec]) / Σ_sec mappa[sec][tipo]
       const estimate = (
         key: "slow" | "medium" | "fast",
       ): number | null => {
@@ -265,6 +272,7 @@ export function predictGpAffinity(
       const estSlow = estimate("slow");
       const estMed = estimate("medium");
       const estFast = estimate("fast");
+      typeEstimate = { slow: estSlow, medium: estMed, fast: estFast };
       const wS = circuit.slow_corner_traction;
       const wM = circuit.medium_corner;
       const wF = circuit.fast_corner;
@@ -276,8 +284,6 @@ export function predictGpAffinity(
       if (den > 0) {
         cornerIdx = clamp01(num / den);
       } else {
-        // Tutti i pesi del circuito sono 0 sui tipi disponibili — usa la
-        // media degli est disponibili, oppure la media piatta dei settori.
         const ests = [estSlow, estMed, estFast].filter(
           (x): x is number => x !== null,
         );
@@ -299,7 +305,6 @@ export function predictGpAffinity(
 
     const carBand = CONFIDENCE_BAND[car.confidence];
     const circuitBand = CONFIDENCE_BAND[circuit.confidence];
-    // Combine the two independent uncertainty sources in quadrature.
     const uncertainty = Math.sqrt(carBand * carBand + circuitBand * circuitBand);
 
     return {
@@ -309,8 +314,6 @@ export function predictGpAffinity(
       confidence: minConfidence(car.confidence, circuit.confidence),
       contributions: { top_speed: cTop, cornering: cCorner },
       corner_source: cornerSource,
-      // Diagnostic-only: propagate coverage in BOTH branches (incl. fallback)
-      // so the UI can always show the measured value. Does not affect score.
       corner_coverage:
         car.corner_data_coverage === undefined ? null : car.corner_data_coverage,
       corner_coverage_curve:
@@ -318,6 +321,11 @@ export function predictGpAffinity(
       corner_coverage_status: car.corner_coverage_status ?? "not_available",
       corner_alignment_error:
         car.corner_alignment_error === undefined ? null : car.corner_alignment_error,
+      corner_type_estimate: typeEstimate,
+      sector_corner_map_confidence:
+        cornerSource === "sector_typed"
+          ? circuit.sector_corner_map_confidence
+          : undefined,
     };
   });
 

@@ -219,6 +219,14 @@ export function buildGpPreviewNarrative(
         );
       }
     }
+    // sector_typed branch with low map confidence: declare the approximation honestly.
+    const sectorTyped = prediction.ranked.filter((t) => t.corner_source === "sector_typed");
+    const lowMap = sectorTyped.filter((t) => t.sector_corner_map_confidence === "low");
+    if (lowMap.length > 0) {
+      sentences.push(
+        `Per questo circuito la classificazione per-settore (lente/medie/veloci) è meno solida nelle fonti pubbliche: la stima per tipo di curva va quindi trattata come approssimata.`,
+      );
+    }
   }
 
   // ----- 5. PARAGRAFO ESTESO SULLE GARE ESCLUSE -----

@@ -128,6 +128,71 @@ describe("GpPredictionResultView", () => {
     expect(screen.queryByTestId("corner-coverage-Fb")).toBeNull();
     expect(screen.queryByTestId("alignment-error-Geo")).toBeNull();
   });
+
+  it("renders the 'stima approssimata' badge when sector_corner_map_confidence === 'low'", () => {
+    const pred: GpPrediction = {
+      ranked: [
+        {
+          team_name: "Lowc",
+          affinity_score: 0.6, uncertainty: 0.05, confidence: "high",
+          contributions: { top_speed: 0.3, cornering: 0.3 },
+          corner_source: "sector_typed",
+          sector_corner_map_confidence: "low",
+        },
+        {
+          team_name: "Highc",
+          affinity_score: 0.65, uncertainty: 0.05, confidence: "high",
+          contributions: { top_speed: 0.3, cornering: 0.35 },
+          corner_source: "sector_typed",
+          sector_corner_map_confidence: "high",
+        },
+      ],
+      global_confidence: "medium",
+      indistinguishable_groups: [],
+      notes: [],
+    };
+    render(<GpPredictionResultView circuit={circuit} prediction={pred} />);
+    expect(screen.getByTestId("map-confidence-low-Lowc")).toBeTruthy();
+    expect(screen.queryByTestId("map-confidence-low-Highc")).toBeNull();
+  });
+
+  it("renders Technical Details expandable section per team, closed by default", () => {
+    const pred: GpPrediction = {
+      ranked: [
+        {
+          team_name: "Tech",
+          affinity_score: 0.7, uncertainty: 0.05, confidence: "high",
+          contributions: { top_speed: 0.4, cornering: 0.3 },
+          corner_source: "sector_typed",
+          sector_corner_map_confidence: "medium",
+          corner_type_estimate: { slow: 0.5, medium: 0.6, fast: 0.7 },
+        },
+      ],
+      global_confidence: "medium",
+      indistinguishable_groups: [],
+      notes: [],
+    };
+    const carProfile = {
+      team_name: "Tech",
+      top_speed_index: 0.82,
+      sector_strength: { s1: 0.5, s2: 0.6, s3: 0.7 },
+      sample_races: 4,
+      effective_sample_races: 3.2,
+      sample_laps: 180,
+      confidence: "high" as const,
+    };
+    render(
+      <GpPredictionResultView
+        circuit={circuit}
+        prediction={pred}
+        profiles={[carProfile]}
+      />,
+    );
+    expect(screen.getByTestId("tech-toggle-Tech")).toBeTruthy();
+    // CollapsibleContent is in the DOM but data-state=closed; check the toggle button exists.
+    const toggle = screen.getByTestId("tech-toggle-Tech");
+    expect(toggle.textContent).toMatch(/Dettagli tecnici/i);
+  });
 });
 
 describe("GpPreview page", () => {
