@@ -129,15 +129,6 @@ describe("GpPredictionResultView", () => {
     expect(screen.queryByTestId("alignment-error-Geo")).toBeNull();
   });
 });
-    // Bands visible (textual range)
-    expect(screen.getByText(/0\.77.{1}0\.87/)).toBeTruthy();
-    // Caveats section + note
-    expect(screen.getByTestId("caveats-card")).toBeTruthy();
-    expect(screen.getByText(/Circuito stimato dal solo layout/)).toBeTruthy();
-    expect(screen.getByText(/Confidenza complessiva: Media/)).toBeTruthy();
-    expect(screen.getByText(/non una previsione del risultato/i)).toBeTruthy();
-  });
-});
 
 describe("GpPreview page", () => {
   beforeEach(() => {
