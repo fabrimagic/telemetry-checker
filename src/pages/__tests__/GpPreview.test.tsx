@@ -73,6 +73,70 @@ describe("GpPredictionResultView", () => {
     expect(screen.getByText(/Confidenza complessiva: Media/)).toBeTruthy();
     expect(screen.getByText(/non una previsione del risultato/i)).toBeTruthy();
   });
+
+  it("renders the sector_typed badge and hides GPS diagnostic badges", () => {
+    const pred: GpPrediction = {
+      ranked: [
+        {
+          team_name: "Sec",
+          affinity_score: 0.7,
+          uncertainty: 0.05,
+          confidence: "high",
+          contributions: { top_speed: 0.4, cornering: 0.3 },
+          corner_source: "sector_typed",
+          corner_coverage: 0.11,
+          corner_coverage_curve: 0.08,
+          corner_alignment_error: 0.42,
+        },
+      ],
+      global_confidence: "medium",
+      indistinguishable_groups: [],
+      notes: [],
+    };
+    render(<GpPredictionResultView circuit={circuit} prediction={pred} />);
+    const badge = screen.getByTestId("corner-source-Sec");
+    expect(badge.textContent).toMatch(/stima per tipo/i);
+    expect(screen.queryByTestId("corner-coverage-Sec")).toBeNull();
+    expect(screen.queryByTestId("alignment-error-Sec")).toBeNull();
+  });
+
+  it("hides GPS diagnostic badges also in location_geometry and sector_fallback branches", () => {
+    const pred: GpPrediction = {
+      ranked: [
+        {
+          team_name: "Geo",
+          affinity_score: 0.7, uncertainty: 0.05, confidence: "high",
+          contributions: { top_speed: 0.4, cornering: 0.3 },
+          corner_source: "location_geometry",
+          corner_coverage: 0.8, corner_coverage_curve: 0.7, corner_alignment_error: 0.15,
+        },
+        {
+          team_name: "Fb",
+          affinity_score: 0.6, uncertainty: 0.05, confidence: "high",
+          contributions: { top_speed: 0.4, cornering: 0.2 },
+          corner_source: "sector_fallback",
+        },
+      ],
+      global_confidence: "medium",
+      indistinguishable_groups: [],
+      notes: [],
+    };
+    render(<GpPredictionResultView circuit={circuit} prediction={pred} />);
+    expect(screen.getByTestId("corner-source-Geo").textContent).toMatch(/geometria GPS/i);
+    expect(screen.getByTestId("corner-source-Fb").textContent).toMatch(/Curve da settori/i);
+    expect(screen.queryByTestId("corner-coverage-Geo")).toBeNull();
+    expect(screen.queryByTestId("corner-coverage-Fb")).toBeNull();
+    expect(screen.queryByTestId("alignment-error-Geo")).toBeNull();
+  });
+});
+    // Bands visible (textual range)
+    expect(screen.getByText(/0\.77.{1}0\.87/)).toBeTruthy();
+    // Caveats section + note
+    expect(screen.getByTestId("caveats-card")).toBeTruthy();
+    expect(screen.getByText(/Circuito stimato dal solo layout/)).toBeTruthy();
+    expect(screen.getByText(/Confidenza complessiva: Media/)).toBeTruthy();
+    expect(screen.getByText(/non una previsione del risultato/i)).toBeTruthy();
+  });
 });
 
 describe("GpPreview page", () => {
