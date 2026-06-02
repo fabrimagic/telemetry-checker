@@ -106,6 +106,15 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.80, slow_corner_traction: 0.85, medium_corner: 0.35, fast_corner: 0.25,
     tyre_deg: 0.40, overtaking_difficulty: 0.30,
     confidence: "high", source: "historical",
+    // Circuit Gilles Villeneuve — stop-and-go: hairpin Senna e L'Épingle lentissimi,
+    // chicane in 2ª marcia, Wall of Champions; carattere curvo prevalentemente lento,
+    // intervallato da lunghi rettilinei (top speed alto). Fonti settore-per-settore solide.
+    sector_corner_map: {
+      s1: { slow: 0.6, medium: 0.3, fast: 0.1 },
+      s2: { slow: 0.6, medium: 0.3, fast: 0.1 },
+      s3: { slow: 0.7, medium: 0.2, fast: 0.1 },
+    },
+    sector_corner_map_confidence: "high",
   },
   "Gran Premio di Monaco": {
     gpName: "Gran Premio di Monaco",
