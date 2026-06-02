@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Loader2, Sparkles, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, Sparkles, XCircle, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   getCircuitProfileForNextGP,
   type CircuitProfile,
