@@ -463,6 +463,8 @@ export function buildPerTeamExplanations(
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
       sourceClause = ` La tenuta in curva di questo team è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}: lettura più granulare ma con possibili imprecisioni di allineamento.`;
+    } else if (t.corner_source === "sector_typed") {
+      sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — una lettura più ricca della semplice media, pur restando una stima.`;
     } else if (t.corner_source === "sector_fallback") {
       sourceClause = ` La tenuta in curva di questo team è stimata dai tempi di settore aggregati (non disponibile la ricostruzione per tipo di curva).`;
     }
