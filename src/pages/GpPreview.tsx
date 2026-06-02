@@ -278,13 +278,24 @@ export function GpPredictionResultView({
                       </span>
                     )}
                     {t.corner_source === "sector_typed" && (
-                      <span
-                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border-amber-500/40"
-                        data-testid={`corner-source-${t.team_name}`}
-                        title="La tenuta in curva per tipo (lente/medie/veloci) è stimata dalla prestazione nei diversi settori del circuito, ciascuno con il suo carattere. È una stima a grana di settore — più ricca della semplice media, ma non una misura diretta per singola curva."
-                      >
-                        Curve: stima per tipo (settori)
-                      </span>
+                      <>
+                        <span
+                          className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border-amber-500/40"
+                          data-testid={`corner-source-${t.team_name}`}
+                          title="La tenuta in curva per tipo (lente/medie/veloci) è stimata dalla prestazione nei diversi settori del circuito, ciascuno con il suo carattere. È una stima a grana di settore — più ricca della semplice media, ma non una misura diretta per singola curva."
+                        >
+                          Curve: stima per tipo (settori)
+                        </span>
+                        {t.sector_corner_map_confidence === "low" && (
+                          <span
+                            className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/40 text-muted-foreground border-amber-500/30"
+                            data-testid={`map-confidence-low-${t.team_name}`}
+                            title="La classificazione per-settore di questo circuito è meno solida nelle fonti pubbliche: trattare come stima approssimata."
+                          >
+                            stima approssimata
+                          </span>
+                        )}
+                      </>
                     )}
                     {t.corner_source === "sector_fallback" && (
                       <span
@@ -309,6 +320,11 @@ export function GpPredictionResultView({
                       {perTeamMap.get(t.team_name)}
                     </p>
                   )}
+                  <TeamTechnicalDetails
+                    team={t}
+                    car={profileByTeam.get(t.team_name)}
+                    circuit={circuit}
+                  />
                 </div>
               );
             })
