@@ -490,10 +490,9 @@ describe("gpPrediction", () => {
 
     it("tutti i 24 profili (22 attivi + 2 dormienti) hanno sector_corner_map con confidenza valida", async () => {
       const { CIRCUIT_PROFILES } = await import("../circuitProfiles");
-      // Esclude i circuiti senza mappa (es. layout_estimate Madrid).
+      // Esclude i circuiti senza mappa (Madrid layout_estimate, Canada).
       const withMap = Object.values(CIRCUIT_PROFILES).filter((p) => p.sector_corner_map);
-      // Atteso: 24 totali - 1 (Madrid layout_estimate) = 23. Validiamo che siano almeno 23.
-      expect(withMap.length).toBeGreaterThanOrEqual(23);
+      expect(withMap.length).toBeGreaterThanOrEqual(22);
       for (const p of withMap) {
         expect(["high", "medium", "low"]).toContain(p.sector_corner_map_confidence);
         const map = p.sector_corner_map!;
