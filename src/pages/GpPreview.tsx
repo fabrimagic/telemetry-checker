@@ -269,6 +269,15 @@ export function GpPredictionResultView({
                         Curve da geometria GPS
                       </span>
                     )}
+                    {t.corner_source === "sector_typed" && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border-amber-500/40"
+                        data-testid={`corner-source-${t.team_name}`}
+                        title="La tenuta in curva per tipo (lente/medie/veloci) è stimata dalla prestazione nei diversi settori del circuito, ciascuno con il suo carattere. È una stima a grana di settore — più ricca della semplice media, ma non una misura diretta per singola curva."
+                      >
+                        Curve: stima per tipo (settori)
+                      </span>
+                    )}
                     {t.corner_source === "sector_fallback" && (
                       <span
                         className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/40 text-muted-foreground border-border"
@@ -276,31 +285,6 @@ export function GpPredictionResultView({
                         title="La tenuta in curva è stimata dai tempi di settore aggregati (metodo robusto ma meno granulare: non distingue fra curve lente, medie e veloci)."
                       >
                         Curve da settori (stima)
-                      </span>
-                    )}
-                    {/* Diagnostic-only: always show measured GPS coverage. */}
-                    <span
-                      className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/20 text-muted-foreground border-border/60"
-                      data-testid={`corner-coverage-${t.team_name}`}
-                      title="Globale = % di vertici dell'intero tracciato (rettilinei inclusi) toccati dal GPS. Curve = % dei soli vertici nei tratti in curva (slow/medium/fast). La metrica 'curve' è quella che conta per la classificazione per tipo di curva; mostrata a fini diagnostici, non incide sul punteggio."
-                    >
-                      {typeof t.corner_coverage === "number"
-                        ? <>Copertura dati posizione: {Math.round(t.corner_coverage * 100)}%</>
-                        : <>Copertura non disponibile</>}
-                      {typeof t.corner_coverage_curve === "number"
-                        ? <> · di cui curve: {Math.round(t.corner_coverage_curve * 100)}%</>
-                        : t.corner_coverage_curve === null && typeof t.corner_coverage === "number"
-                          ? <> · curve: n/d</>
-                          : null}
-                    </span>
-                    {/* Diagnostic-only: shape-alignment residual (Procrustes). */}
-                    {typeof t.corner_alignment_error === "number" && (
-                      <span
-                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/20 text-muted-foreground border-border/60"
-                        data-testid={`alignment-error-${t.team_name}`}
-                        title="Errore residuo dell'allineamento di forma (Procrustes) fra la nuvola di punti GPS e la geometria del tracciato. Più basso è meglio: valori ≪1 indicano che le due forme si sovrappongono bene; valori vicini o sopra 1 segnalano che l'allineamento non è riuscito. Diagnostica: non incide sul punteggio."
-                      >
-                        Errore allineamento: {t.corner_alignment_error.toFixed(2)}
                       </span>
                     )}
 
