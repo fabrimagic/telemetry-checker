@@ -907,6 +907,27 @@ export async function computeCarProfiles(
       coverageStatus = "below_threshold";
     }
 
+    // Priorità sorgenti per corner_type_strength (Opzione A):
+    //   1) location_geometry (GPS) — preferita se la copertura passa il gate;
+    //   2) sector_typed_history — stima dai settori delle gare passate usando
+    //      la sector_corner_map del circuito d'ORIGINE di ogni gara;
+    //   3) sector_fallback — nessuna delle due → corner_type_strength resta
+    //      null e il consumer userà sector_strength.
+    if (cornerTypeStrength == null) {
+      const histSlow = normSectorTyped.slow.get(team);
+      const histMed = normSectorTyped.medium.get(team);
+      const histFast = normSectorTyped.fast.get(team);
+      if (histSlow != null || histMed != null || histFast != null) {
+        cornerTypeStrength = {
+          slow: histSlow ?? 0,
+          medium: histMed ?? 0,
+          fast: histFast ?? 0,
+        };
+        cornerSource = "sector_typed_history";
+        // Non tocchiamo coverageStatus: rimane diagnostico del SOLO ramo GPS.
+      }
+    }
+
     profiles.push({
       team_name: team,
       top_speed_index: normTop.get(team) ?? 0,
