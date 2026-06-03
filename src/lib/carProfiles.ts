@@ -834,11 +834,15 @@ export async function computeCarProfiles(
       rawSectorTyped[k].set(t, s / wt);
     }
   }
-  const normSectorTyped = {
-    slow: normalizeHigherIsBetter(rawSectorTyped.slow),
-    medium: normalizeHigherIsBetter(rawSectorTyped.medium),
-    fast: normalizeHigherIsBetter(rawSectorTyped.fast),
-  };
+  // NOTE: we intentionally do NOT re-normalize across teams here. The raw
+  // weighted averages are already in [0,1] (each per-race sector value is
+  // 0..1 with 1=best in that race), and they preserve the per-type DISTRI-
+  // BUTION shape — which is the whole point of attributing performance
+  // through the origin-circuit's sector_corner_map. A cross-team normali-
+  // zation would flatten ratios between types and defeat the attribution.
+  // This matches the GPS branch (location_geometry) which also stores raw
+  // weighted averages without final cross-team normalization.
+  const normSectorTyped = rawSectorTyped;
 
   const profiles: CarProfile[] = [];
   for (const team of teams) {
