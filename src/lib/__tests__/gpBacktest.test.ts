@@ -444,7 +444,10 @@ describe("runBacktest — 3-way comparison (Opzione 1)", () => {
     const r = out.per_race[0];
     expect(r.rho_baseline_topsec).not.toBeNull();
     expect(r.rho_baseline_sectors).not.toBeNull();
-    expect(r.rho_baseline).toBe(r.rho_baseline_topsec);
+    // PROMOZIONE: legacy `rho_baseline` now mirrors the PRODUCTION baseline
+    // (sectors_only), not the old top_and_sectors.
+    expect(r.rho_baseline).toBe(r.rho_baseline_sectors);
+    expect(r.top3_baseline).toBe(r.top3_baseline_sectors);
     // sectors_only score: McL≈0.823, Mid=0.6, Aud≈0.41 → matches truth perfectly.
     expect(r.rho_baseline_sectors).toBeCloseTo(1, 6);
     expect(r.top3_baseline_sectors).toBe(true);
@@ -453,7 +456,7 @@ describe("runBacktest — 3-way comparison (Opzione 1)", () => {
         (out.aggregate.rho_baseline_topsec_mean ?? 0),
       6,
     );
-    expect(out.aggregate.rho_baseline_topsec_mean).toBe(out.aggregate.rho_baseline_mean);
+    expect(out.aggregate.rho_baseline_sectors_mean).toBe(out.aggregate.rho_baseline_mean);
   });
 });
 

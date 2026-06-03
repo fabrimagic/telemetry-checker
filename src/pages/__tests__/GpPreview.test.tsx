@@ -74,13 +74,14 @@ describe("GpPredictionResultView", () => {
     expect(screen.getAllByText(/non una previsione del risultato/i).length).toBeGreaterThan(0);
   });
 
-  it("does not render the misleading 'Più forte in' badge; shows composition disclaimer instead", () => {
+  it("PROMOZIONE — no 'Più forte in' badge, no top/corner composition split; shows score-basis note", () => {
     render(<GpPredictionResultView circuit={circuit} prediction={prediction} />);
     expect(screen.queryByTestId("strength-tag-Alpha")).toBeNull();
     expect(screen.queryAllByText(/Più forte in/i).length).toBe(0);
-    expect(screen.getByTestId("composition-note-Alpha")).toBeTruthy();
-    expect(screen.getAllByText(/composizione del punteggio/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Velocità massima rilevata/i).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("composition-note-Alpha")).toBeNull();
+    expect(screen.queryAllByText(/composizione del punteggio/i).length).toBe(0);
+    expect(screen.getByTestId("score-basis-Alpha")).toBeTruthy();
+    expect(screen.getAllByText(/tenuta nei tempi di settore/i).length).toBeGreaterThan(0);
   });
 
 

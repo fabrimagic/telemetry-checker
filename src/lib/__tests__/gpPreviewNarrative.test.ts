@@ -49,7 +49,7 @@ describe("buildGpPreviewNarrative", () => {
       car("Fast", 0.95, [0.3, 0.3, 0.3]),
       car("Cornering", 0.2, [0.95, 0.95, 0.95]),
     ];
-    const pred = predictGpAffinity(c, cars);
+    const pred = predictGpAffinity(c, cars, { useCircuitSpecificModel: true });
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
     expect(all).toMatch(/velocità di punta/i);
@@ -241,7 +241,7 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
     expect(all).toMatch(/sovrappongono/i);
   });
 
-  it("leader with top-speed-dominant contributions: prose says the score comes mostly from velocità di punta", () => {
+  it("PROMOZIONE — leader prose says the score is based on sector pace, NOT on trap speed", () => {
     const c = circuit({
       top_speed: 1.0,
       slow_corner_traction: 0.1,
@@ -255,11 +255,9 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
     const pred = predictGpAffinity(c, cars);
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
-    expect(all).toMatch(/Fast/);
-    // The leader's top-speed contribution should dominate — phrased as composition.
-    expect(all).toMatch(/velocità massima rilevata/i);
-    // One of the fraction phrases should appear.
-    expect(all).toMatch(/(tre quarti|due terzi|larghissima parte)/i);
+    expect(all).toMatch(/tempi di settore/i);
+    // No more "trap dominant" composition phrasing in the leader clause.
+    expect(all).not.toMatch(/composto\s+(in\s+larghissima|per\s+circa)/i);
   });
 
   it("indistinguishable leaders: no sole favorite, both teams cited together", () => {
@@ -320,25 +318,28 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     }
   });
 
-  it("top-speed-dominant contributions ⇒ describes composition with 'velocità massima rilevata' (no primato claim)", () => {
+  it("PROMOZIONE — per-team explanation says the score is from sector pace; no top/corner composition split", () => {
     const circ = c({ top_speed: 1.0, slow_corner_traction: 0.1, medium_corner: 0.1, fast_corner: 0.1 });
     const cars = [car("Fast", 0.95, [0.2, 0.2, 0.2]), car("Slow", 0.2, [0.5, 0.5, 0.5])];
     const pred = predictGpAffinity(circ, cars);
     const out = buildPerTeamExplanations(circ, pred);
     const fastText = out.find((e: { team_name: string; text: string }) => e.team_name === "Fast")!.text;
-    expect(fastText).toMatch(/velocità massima rilevata/i);
-    expect(fastText).toMatch(/composizione interna/i);
+    expect(fastText).toMatch(/tempi di settore/i);
+    expect(fastText).toMatch(/non entra nel calcolo|non entra/i);
+    // No legacy composition phrasing.
+    expect(fastText).not.toMatch(/composizione interna/i);
+    expect(fastText).not.toMatch(/\b\d{1,3}\s?%\b/);
     expect(fastText).not.toMatch(/punto di forza/i);
     expect(fastText).not.toMatch(/più forte in rettilineo/i);
   });
 
-  it("corner-dominant contributions ⇒ mentions 'tenuta in curva' as strength", () => {
+  it("corner-context test: per-team explanation still mentions sector pace for a corner-strong car", () => {
     const circ = c({ top_speed: 0.1, slow_corner_traction: 1.0, medium_corner: 1.0, fast_corner: 1.0 });
     const cars = [car("Corner", 0.2, [0.95, 0.95, 0.95]), car("Drag", 0.9, [0.3, 0.3, 0.3])];
     const pred = predictGpAffinity(circ, cars);
     const out = buildPerTeamExplanations(circ, pred);
     const cornerText = out.find((e: { team_name: string; text: string }) => e.team_name === "Corner")!.text;
-    expect(cornerText).toMatch(/tenuta in curva/i);
+    expect(cornerText).toMatch(/tempi di settore/i);
   });
 
   it("teams in an indistinguishable group name each other and say 'alla pari'", () => {
@@ -442,7 +443,9 @@ describe("buildGpPreviewNarrative — qualifying-source transparency", () => {
     expect(all).toMatch(/trap speed|velocità massima rilevata/i);
     expect(all).toMatch(/carico aerodinamico/i);
     expect(all).toMatch(/non come misura della potenza/i);
-    expect(all).toMatch(/in gara la velocità di punta è invece compressa/i);
+    // Trap is now framed as NOT used in the score.
+    expect(all).toMatch(/non è usata nel punteggio|non entra nel punteggio/i);
+    expect(all).toMatch(/tempi di settore/i);
   });
 
   it("flags GPs whose qualifying session was missing among used races", () => {

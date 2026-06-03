@@ -162,19 +162,37 @@ export const USE_CIRCUIT_SPECIFIC_MODEL = false;
 /**
  * Persistence score modes.
  *
- *  - "top_and_sectors" (DEFAULT, current production): mean of top_speed_index
- *    and the average sector strength. This is the formula in production and
- *    also what the backtest baseline currently uses.
- *  - "sectors_only" (EXPERIMENTAL): mean(s1,s2,s3) only — drops the trap
- *    speed entirely. Motivation: top_speed_index is a normalized TRAP speed,
- *    which depends on the aero setup the team chose, not on raw performance.
- *    A high-downforce favorite (e.g. McLaren at Monaco) gets penalized
- *    because its trap speed is naturally low; a low-downforce car with a
- *    weak engine gets rewarded. We want to MEASURE (via backtest) whether
- *    removing the trap component improves predictive power before changing
- *    the production default.
+ *  - "top_and_sectors" — historical formula, mean of top_speed_index and the
+ *    average sector strength. Kept as a HELPER variant for monitoring /
+ *    A-B comparison (the backtest still reports its rho beside the
+ *    production one).
+ *  - "sectors_only"    — mean(s1,s2,s3). DROPS the trap speed entirely.
+ *    Motivation: top_speed_index is a normalized TRAP speed which depends
+ *    on the aero setup chosen by the team, not on raw performance. A
+ *    high-downforce favorite (e.g. McLaren) is penalized because its trap
+ *    speed is naturally low; a low-downforce car with a weak engine
+ *    (e.g. Audi) is rewarded. The 3-way backtest showed this variant
+ *    predicts much better (Δ ≈ +0.209; ρ 0.841 vs 0.632; top-3 100% vs 25%).
+ *
+ * The helper's DEFAULT stays "top_and_sectors" for back-compat with any
+ * external consumer. PRODUCTION picks the active mode explicitly via
+ * {@link PRODUCTION_PERSISTENCE_MODE}.
  */
 export type PersistenceMode = "top_and_sectors" | "sectors_only";
+
+/**
+ * Mode used by the production engine in {@link predictGpAffinity} and by
+ * the backtest baseline that REPRESENTS production. Single source of
+ * truth — change here to swap formulas.
+ *
+ * Currently "sectors_only": validated by the 3-way backtest as a strict
+ * improvement over "top_and_sectors". The trap speed is excluded from the
+ * SCORE because it is misleading (depends on aero load, not pure
+ * performance) and removing it improves predictive accuracy. The trap
+ * value remains available in CarProfile as descriptive context (shown in
+ * "Dettagli tecnici"), it just doesn't drive the ranking.
+ */
+export const PRODUCTION_PERSISTENCE_MODE: PersistenceMode = "sectors_only";
 
 /**
  * Persistence score — the SAME formula used as the baseline in gpBacktest
@@ -414,30 +432,38 @@ export function predictGpAffinity(
     }
 
     // ----- SCORE -----
-    // Default (OPZIONE Z): pure persistence — same formula used as the
-    // backtest baseline (see computePersistenceScore + computeBaselineOrder
-    // in gpBacktest). The circuit-specific weighted sum is computed but
-    // kept dormant; the corner_source/contributions data above remains
-    // populated for the UI's DESCRIPTIVE context (badges, tech details,
-    // narrative) but does NOT drive the ranking unless the flag is on.
+    // Default (OPZIONE Z + PRODUCTION_PERSISTENCE_MODE="sectors_only"):
+    // pure persistence on sector pace only — same formula used as the
+    // production baseline in gpBacktest (see computeBaselineOrder). The
+    // trap-speed component (top_speed_index) is INTENTIONALLY EXCLUDED
+    // from the score because the 3-way backtest showed it hurts prediction
+    // (Δ ≈ +0.209 for sectors_only over top_and_sectors; ρ 0.841 vs 0.632;
+    // top-3 100% vs 25%). The circuit-specific weighted sum is computed
+    // but kept dormant; the corner_source data above remains populated
+    // for the UI's DESCRIPTIVE context (badges, tech details, narrative)
+    // but does NOT drive the ranking unless the flag is on.
     const useCircuitSpecific =
       meta?.useCircuitSpecificModel ?? USE_CIRCUIT_SPECIFIC_MODEL;
     const cTopCircuit = wTop * topIdx;
     const cCornerCircuit = wCorner * cornerIdx;
-    const persistence = clamp01(computePersistenceScore(car));
+    const persistence = clamp01(
+      computePersistenceScore(car, PRODUCTION_PERSISTENCE_MODE),
+    );
     const score = useCircuitSpecific
       ? clamp01(cTopCircuit + cCornerCircuit)
       : persistence;
-    // Contributions: when persistence is the active engine, expose the
-    // ADDITIVE persistence breakdown (top_speed_index/2 vs sectorMean/2)
-    // so the UI ratio "% rettilineo vs curva" still describes WHERE the
-    // team's overall strength sits, without implying any circuit-specific
-    // weighting. When the dormant circuit-specific engine is active, expose
-    // the legacy weighted contributions that sum to that score.
+    // Contributions:
+    //  - circuit-specific (dormant) mode: legacy weighted contributions
+    //    that sum to the score.
+    //  - persistence/sectors_only (production): trap speed is NOT part of
+    //    the score → top_speed contribution is 0; the entire score comes
+    //    from sector pace (mean(s1,s2,s3)). The cornering field equals
+    //    the score itself, so any UI/narrative summing top+corner gets the
+    //    correct total without falsely attributing weight to the trap.
     const sectorMean =
       (car.sector_strength.s1 + car.sector_strength.s2 + car.sector_strength.s3) / 3;
-    const cTop = useCircuitSpecific ? cTopCircuit : topIdx / 2;
-    const cCorner = useCircuitSpecific ? cCornerCircuit : sectorMean / 2;
+    const cTop = useCircuitSpecific ? cTopCircuit : 0;
+    const cCorner = useCircuitSpecific ? cCornerCircuit : sectorMean;
 
     const carBand = teamBandFromSample(car.effective_sample_races);
     const circuitBand = CONFIDENCE_BAND[circuit.confidence];

@@ -11,10 +11,8 @@
 import type { CircuitProfile } from "./circuitProfiles";
 import type { GpPrediction } from "./gpPrediction";
 
-/** Thresholds used purely for prose coloring. */
+/** Threshold used purely for prose coloring. */
 const HIGH_TRAIT = 0.7;
-const DOMINANT_TOP_RATIO = 0.6; // contributions.top_speed / total ≥ this ⇒ "velocità di punta"
-const DOMINANT_CORNER_RATIO = 0.6;
 
 export interface RaceDiagnosticLite {
   name: string;
@@ -42,19 +40,6 @@ function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
 }
 
-/** Format a ratio in [0,1] as a readable Italian fraction phrase. */
-function ratioPhrase(r: number): string {
-  if (!Number.isFinite(r)) return "in parte";
-  if (r >= 0.78) return "in larghissima parte";
-  if (r >= 0.68) return "per circa tre quarti";
-  if (r >= 0.6) return "per circa due terzi";
-  if (r >= 0.52) return "per poco più della metà";
-  if (r >= 0.48) return "per circa metà";
-  if (r >= 0.4) return "per poco meno della metà";
-  if (r >= 0.32) return "per circa un terzo";
-  if (r >= 0.22) return "per circa un quarto";
-  return "in piccola parte";
-}
 
 export function buildGpPreviewNarrative(
   circuit: CircuitProfile,
@@ -108,16 +93,15 @@ export function buildGpPreviewNarrative(
   }
 
   // ----- 2. COSA RAPPRESENTA IL PUNTEGGIO (didattica) -----
-  // OPZIONE Z: il punteggio è la PERSISTENZA pura (forza recente complessiva
-  // della vettura), NON una stima del match circuito↔vettura. Il carattere
-  // del circuito resta descritto sopra come contesto, ma non entra nel
-  // punteggio: il backtest ha mostrato che il modello circuito-specifico
-  // peggiora le predizioni con i dati 2026 attuali.
+  // OPZIONE Z + sectors_only: il punteggio è la PERSISTENZA pura calcolata
+  // sui SOLI tempi di settore (mean(s1,s2,s3)). La trap speed è esclusa
+  // perché dipende dal carico aerodinamico più che dalla performance pura
+  // e il backtest ha mostrato che includerla peggiora la previsione.
   sentences.push(
-    "Il punteggio di affinità è un indice da 0 a 1 che riflette la forza recente complessiva di ciascuna vettura — velocità di punta e tenuta in curva aggregata sui tre settori — misurata nelle gare già disputate. Non incorpora il carattere specifico di questo circuito: l'analisi per tipo di curva, disponibile più sotto come contesto, non è ancora usata per la previsione perché con i dati 2026 attuali non ha dimostrato di migliorarla. È quindi una lettura della forza recente, non una previsione del risultato.",
+    "Il punteggio di affinità è un indice da 0 a 1 che riflette la tenuta nei tempi di settore espressa da ciascuna vettura nelle gare già disputate (media di s1, s2 e s3). È una lettura della forza recente in curva — dove si fanno la maggior parte dei decimi — non una previsione del risultato di gara. Il carattere specifico di questo circuito è descritto sopra come contesto, ma non entra nel punteggio.",
   );
   sentences.push(
-    "L'indice di velocità riflette la velocità massima rilevata a fine rettilineo (trap speed): è quanto la vettura è andata veloce in quel punto, soprattutto in qualifica dove si spinge al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova. Va letta come \"velocità massima raggiunta\", non come misura della potenza del motore: dipende anche dal carico aerodinamico scelto dal team, quindi un valore alto può riflettere una scelta di poca ala. In gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
+    "La velocità massima rilevata a fine rettilineo (trap speed) compare nei dettagli tecnici come contesto, ma NON è usata nel punteggio: dipende anche dal livello di carico aerodinamico scelto dal team — un valore alto può riflettere un'ala più scarica, non necessariamente più cavalli — e il backtest ha confermato che includerla nel punteggio peggiora la previsione rispetto al fondarsi sui soli tempi di settore. Per leggerla onestamente va trattata come \"velocità raggiunta in quel punto\", non come misura della potenza del motore.",
   );
 
   // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
@@ -131,7 +115,7 @@ export function buildGpPreviewNarrative(
     );
   }
 
-  // ----- 3. TEAM FAVORITI E PERCHÉ (basato sulla persistenza, non sul circuito) -----
+  // ----- 3. TEAM FAVORITI E PERCHÉ (basato sulla persistenza sui settori) -----
   {
     const ranked = prediction.ranked;
     const leader = ranked[0];
@@ -142,46 +126,26 @@ export function buildGpPreviewNarrative(
     const topNames = leaderGroup ?? [leader.team_name];
     const topTeams = ranked.filter((t) => topNames.includes(t.team_name));
 
-    // Aggregate dominant dimension across top teams. In persistence mode
-    // these "contributions" describe WHERE the team's recent strength sits
-    // (velocità di punta vs tenuta in curva COMPLESSIVA), NOT a circuit-
-    // specific weighting.
-    let sumTop = 0;
-    let sumCorner = 0;
-    for (const t of topTeams) {
-      sumTop += t.contributions.top_speed;
-      sumCorner += t.contributions.cornering;
-    }
-    const totalC = sumTop + sumCorner;
-    const topRatio = totalC > 0 ? sumTop / totalC : 0.5;
-    const cornerRatio = 1 - topRatio;
-
-    let because: string;
-    if (topRatio >= DOMINANT_TOP_RATIO) {
-      because = `composto ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap) e ${ratioPhrase(cornerRatio)} dalla tenuta in curva, sui dati delle gare recenti`;
-    } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
-      because = `composto ${ratioPhrase(cornerRatio)} dalla tenuta in curva e ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap), sui dati delle gare recenti`;
-    } else {
-      because = "composto in misura simile da velocità massima rilevata (trap) e tenuta in curva sui dati delle gare recenti, senza una componente nettamente dominante";
-    }
+    const because =
+      "il loro punteggio riflette la tenuta media nei tempi di settore (s1, s2 e s3) delle gare recenti, non un giudizio sul match con questo circuito";
 
     if (topTeams.length > 1) {
       sentences.push(
         `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato è ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro — ${because}.`,
       );
       sentences.push(
         "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio è ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: ${because}.`,
       );
     }
   }
 
-  // ----- 4. CHI POTREBBE FATICARE (sulla persistenza, non sul match con il circuito) -----
+  // ----- 4. CHI POTREBBE FATICARE (sulla persistenza sui settori) -----
   {
     const ranked = prediction.ranked;
     if (ranked.length >= 3) {
@@ -191,7 +155,7 @@ export function buildGpPreviewNarrative(
       );
       if (!leaderGroup || !leaderGroup.includes(last.team_name)) {
         sentences.push(
-          `${last.team_name} risulta invece tra i meno forti su entrambe le dimensioni misurate (velocità di punta e tenuta in curva complessiva) nelle gare recenti.`,
+          `${last.team_name} risulta invece tra i meno forti nei tempi di settore delle gare recenti.`,
         );
       }
     }
@@ -416,23 +380,14 @@ export function buildPerTeamExplanations(
     for (const name of g) groupByTeam.set(name, g);
   }
 
-  // OPZIONE Z: il punteggio NON dipende dal carattere del circuito, quindi
-  // la frase per-team descrive solo dove si concentra la forza recente del
-  // team (rettilineo vs curva) senza legarla causalmente al circuito.
+  // OPZIONE Z + sectors_only: il punteggio NON dipende dal carattere del
+  // circuito né dalla trap speed. Si fonda sulla tenuta nei tempi di
+  // settore. La frase per-team lo dichiara esplicitamente.
   return ranked.map((t, i) => {
-    const total = t.contributions.top_speed + t.contributions.cornering;
-    const topPct = total > 0 ? Math.round((t.contributions.top_speed / total) * 100) : 50;
-    const cornerPct = 100 - topPct;
     const where = positionPhrase(i, ranked.length);
 
-    let strengthClause: string;
-    if (topPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}% del punteggio), più che dalla tenuta in curva (circa il ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
-    } else if (cornerPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla tenuta in curva (circa il ${cornerPct}% del punteggio), più che dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
-    } else {
-      strengthClause = `Nelle gare recenti velocità massima rilevata (trap) e tenuta in curva contribuiscono in misura simile al punteggio (circa ${topPct}% e ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
-    }
+    const strengthClause =
+      `Il suo punteggio (${t.affinity_score.toFixed(2)}) misura la tenuta media nei tempi di settore (s1, s2 e s3) delle gare recenti — la velocità massima rilevata a fine rettilineo (trap) non entra nel calcolo perché dipende dalle scelte aerodinamiche e il backtest ha mostrato che includerla peggiora la previsione`;
 
     let equivClause = "";
     const group = groupByTeam.get(t.team_name);
@@ -447,11 +402,11 @@ export function buildPerTeamExplanations(
         typeof t.corner_coverage === "number"
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
-      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva per tipo è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
+      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
     } else if (t.corner_source === "sector_typed_history") {
-      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
+      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
     } else if (t.corner_source === "sector_typed") {
-      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
+      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
     } else if (t.corner_source === "sector_fallback") {
       sourceClause = ` La tenuta in curva di questo team è disponibile solo dai tempi di settore aggregati (non è disponibile la ricostruzione per tipo di curva).`;
     }

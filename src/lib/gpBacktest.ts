@@ -35,6 +35,7 @@ import {
 import {
   predictGpAffinity as defaultPredictGpAffinity,
   computePersistenceScore,
+  PRODUCTION_PERSISTENCE_MODE,
   type GpPrediction,
   type PersistenceMode,
 } from "./gpPrediction";
@@ -58,15 +59,16 @@ export interface BacktestPerRace {
   gpName: string;
   rho_model: number | null;
   /**
-   * Persistence baseline using the CURRENT production formula
-   * (top_speed_index + mean(s1,s2,s3))/2. Kept under the legacy
-   * name `rho_baseline` for back-compat with existing consumers/tests;
-   * equals `rho_baseline_topsec`.
+   * Persistence baseline using the CURRENT PRODUCTION formula
+   * ({@link PRODUCTION_PERSISTENCE_MODE}, today = "sectors_only" →
+   * mean(s1,s2,s3)). Kept under the legacy name `rho_baseline` for
+   * back-compat with existing consumers/tests; equals
+   * `rho_baseline_sectors`.
    */
   rho_baseline: number | null;
-  /** Persistence with both trap + sectors. Same value as rho_baseline. */
+  /** MONITORING ONLY: previous persistence formula (trap + sectors). */
   rho_baseline_topsec: number | null;
-  /** EXPERIMENTAL persistence using sectors only (no trap speed). */
+  /** Production persistence: sectors only (no trap speed). */
   rho_baseline_sectors: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
@@ -90,14 +92,16 @@ export interface BacktestAggregate {
   rho_baseline_mean: number | null;
   rho_baseline_topsec_mean: number | null;
   rho_baseline_sectors_mean: number | null;
-  /** rho_model_mean − rho_baseline_mean. null if either is null. */
+  /**
+   * rho_model_mean − rho_baseline_mean, where rho_baseline_mean is the
+   * PRODUCTION baseline (sectors_only). Positive means the circuit-
+   * specific model beats production; negative means production wins.
+   */
   delta_mean: number | null;
   /**
-   * KEY METRIC for the Opzione 1 validation:
+   * MONITORING METRIC for the Opzione 1 validation:
    * rho_baseline_sectors_mean − rho_baseline_topsec_mean.
-   * If > 0 → dropping the trap speed improves prediction → candidate to
-   * become the new production persistence formula. If ≈ 0 or < 0 → trap
-   * speed, however counter-intuitive, is not hurting prediction.
+   * Promotion criterion: > 0 (validated, +0.209 on the 4-race sample).
    */
   delta_sectors_vs_topsec: number | null;
   top3_model_rate: number | null;
@@ -179,17 +183,19 @@ export function topKHit(
  * Persistence baseline: orders teams by an OVERALL strength index that does
  * NOT use any circuit-specific information. The `mode` argument selects the
  * persistence variant:
- *   - "top_and_sectors" (default, current production formula),
- *   - "sectors_only"    (experimental — drops trap speed).
- * Deterministic tie-break on team name to keep tests stable.
+ *   - "top_and_sectors" (legacy / monitoring),
+ *   - "sectors_only"    (current production — drops trap speed).
+ * The DEFAULT is {@link PRODUCTION_PERSISTENCE_MODE} so a bare
+ * `computeBaselineOrder(profiles)` call reproduces the production
+ * ranking bit-for-bit. Deterministic tie-break on team name to keep
+ * tests stable.
  */
 export function computeBaselineOrder(
   profiles: readonly CarProfile[],
-  mode: PersistenceMode = "top_and_sectors",
+  mode: PersistenceMode = PRODUCTION_PERSISTENCE_MODE,
 ): string[] {
   // Reuse the SAME helper exported from gpPrediction so the production
-  // ranking (OPZIONE Z: pure persistence) and the backtest baseline stay
-  // bit-for-bit identical. Tie-break on team name keeps tests stable.
+  // ranking and the backtest baseline stay bit-for-bit identical.
   const scored = profiles.map((p) => ({
     team: p.team_name,
     score: computePersistenceScore(p, mode),
@@ -419,11 +425,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     per_race.push({
       gpName,
       rho_model,
-      rho_baseline: rho_baseline_topsec,
+      // Legacy field mirrors the PRODUCTION baseline (sectors_only).
+      rho_baseline: rho_baseline_sectors,
       rho_baseline_topsec,
       rho_baseline_sectors,
       top3_model,
-      top3_baseline: top3_baseline_topsec,
+      top3_baseline: top3_baseline_sectors,
       top3_baseline_topsec,
       top3_baseline_sectors,
       n_teams,
@@ -441,9 +448,10 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const rhoBaseSectorsMean = meanOrNull(
     validated.map((r) => r.rho_baseline_sectors).filter((x): x is number => x != null),
   );
+  // delta_mean: model vs PRODUCTION baseline (sectors_only).
   const delta =
-    rhoModelMean != null && rhoBaseTopSecMean != null
-      ? rhoModelMean - rhoBaseTopSecMean
+    rhoModelMean != null && rhoBaseSectorsMean != null
+      ? rhoModelMean - rhoBaseSectorsMean
       : null;
   const deltaSectorsVsTopSec =
     rhoBaseSectorsMean != null && rhoBaseTopSecMean != null
@@ -455,13 +463,14 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     aggregate: {
       races_validated: validated.length,
       rho_model_mean: rhoModelMean,
-      rho_baseline_mean: rhoBaseTopSecMean,
+      // Legacy aggregate field mirrors the PRODUCTION baseline (sectors_only).
+      rho_baseline_mean: rhoBaseSectorsMean,
       rho_baseline_topsec_mean: rhoBaseTopSecMean,
       rho_baseline_sectors_mean: rhoBaseSectorsMean,
       delta_mean: delta,
       delta_sectors_vs_topsec: deltaSectorsVsTopSec,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
-      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
+      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
       top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
     },

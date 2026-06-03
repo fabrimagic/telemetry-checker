@@ -39,7 +39,7 @@ function car(
 }
 
 describe("gpPrediction", () => {
-  it("top-speed-dominant circuit rewards the team with highest top_speed_index", () => {
+  it("top-speed-dominant circuit rewards the team with highest top_speed_index (legacy circuit-specific engine)", () => {
     const c = circuit({
       top_speed: 1.0,
       slow_corner_traction: 0.1,
@@ -50,7 +50,9 @@ describe("gpPrediction", () => {
       car("Fast", 0.95, [0.3, 0.3, 0.3]),
       car("Cornering", 0.2, [0.95, 0.95, 0.95]),
     ];
-    const out = predictGpAffinity(c, cars);
+    // sectors_only production would put Cornering first; the assertion
+    // exercises the DORMANT circuit-specific engine explicitly.
+    const out = predictGpAffinity(c, cars, { useCircuitSpecificModel: true });
     expect(out.ranked[0].team_name).toBe("Fast");
   });
 
@@ -235,10 +237,10 @@ describe("gpPrediction", () => {
       medium_corner: 0,
       fast_corner: 0,
     });
-    const out = predictGpAffinity(c, [car("Z", 0.4, [0.8, 0.8, 0.8])]);
+    const out = predictGpAffinity(c, [car("Z", 0.4, [0.8, 0.8, 0.8])], { useCircuitSpecificModel: true });
     const s = out.ranked[0].affinity_score;
     expect(Number.isFinite(s)).toBe(true);
-    // 50/50 fallback: 0.5*0.4 + 0.5*0.8 = 0.6
+    // 50/50 fallback (legacy circuit-weighted engine): 0.5*0.4 + 0.5*0.8 = 0.6
     expect(s).toBeCloseTo(0.6, 5);
   });
 
@@ -621,20 +623,26 @@ describe("OPZIONE Z — pure persistence (default production engine)", () => {
     };
   }
 
-  it("affinity_score equals computePersistenceScore (matches backtest baseline)", async () => {
-    const { computePersistenceScore } = await import("../gpPrediction");
+  it("affinity_score equals computePersistenceScore(., PRODUCTION_PERSISTENCE_MODE)", async () => {
+    const { computePersistenceScore, PRODUCTION_PERSISTENCE_MODE } = await import(
+      "../gpPrediction"
+    );
     const cars = [ca("A", 0.8, [0.6, 0.5, 0.7]), ca("B", 0.4, [0.4, 0.5, 0.4])];
     const out = predictGpAffinity(circ(), cars);
     for (const t of out.ranked) {
       const car = cars.find((c) => c.team_name === t.team_name)!;
-      expect(t.affinity_score).toBeCloseTo(computePersistenceScore(car), 10);
+      expect(t.affinity_score).toBeCloseTo(
+        computePersistenceScore(car, PRODUCTION_PERSISTENCE_MODE),
+        10,
+      );
     }
   });
 
-  it("production ranking matches computeBaselineOrder bit-for-bit", async () => {
+  it("production ranking matches computeBaselineOrder bit-for-bit (default = production mode)", async () => {
     const { computeBaselineOrder } = await import("../gpBacktest");
     const cars = [ca("A", 0.8, [0.6, 0.5, 0.7]), ca("B", 0.4, [0.4, 0.5, 0.4]), ca("C", 0.6, [0.6, 0.6, 0.6])];
     const out = predictGpAffinity(circ(), cars);
+    // computeBaselineOrder default == PRODUCTION_PERSISTENCE_MODE ("sectors_only").
     expect(out.ranked.map((t) => t.team_name)).toEqual(computeBaselineOrder(cars));
   });
 
@@ -647,13 +655,44 @@ describe("OPZIONE Z — pure persistence (default production engine)", () => {
     expect(sA).toBeCloseTo(sB, 10);
   });
 
+  it("PROMOZIONE — production = 'sectors_only': trap speed does NOT affect the score", async () => {
+    const { PRODUCTION_PERSISTENCE_MODE } = await import("../gpPrediction");
+    expect(PRODUCTION_PERSISTENCE_MODE).toBe("sectors_only");
+    // Two cars with identical sectors but different trap → same score.
+    const c = circ();
+    const high = ca("HiTrap", 0.95, [0.5, 0.5, 0.5]);
+    const low = ca("LoTrap", 0.05, [0.5, 0.5, 0.5]);
+    const out = predictGpAffinity(c, [high, low]);
+    const sHi = out.ranked.find((t) => t.team_name === "HiTrap")!.affinity_score;
+    const sLo = out.ranked.find((t) => t.team_name === "LoTrap")!.affinity_score;
+    expect(sHi).toBeCloseTo(0.5, 10);
+    expect(sLo).toBeCloseTo(0.5, 10);
+    expect(sHi).toBe(sLo);
+  });
+
+  it("PROMOZIONE — McLaren-like (low trap, strong sectors) ranks ABOVE Audi-like (high trap, weak sectors)", () => {
+    const c = circ();
+    const mclaren = ca("McL", 0.36, [0.85, 0.80, 0.82]);
+    const audi = ca("Aud", 0.99, [0.40, 0.42, 0.41]);
+    const out = predictGpAffinity(c, [mclaren, audi]);
+    expect(out.ranked[0].team_name).toBe("McL");
+  });
+
+  it("PROMOZIONE — contributions: top_speed=0, cornering=sectorMean (trap excluded from score)", () => {
+    const car1 = ca("Z", 0.95, [0.5, 0.6, 0.7]);
+    const out = predictGpAffinity(circ(), [car1]);
+    const t = out.ranked[0];
+    expect(t.contributions.top_speed).toBe(0);
+    expect(t.contributions.cornering).toBeCloseTo(0.6, 10);
+  });
+
   it("flag override: useCircuitSpecificModel=true restores legacy circuit-weighted score", () => {
     const c = circ({ top_speed: 1, slow_corner_traction: 0, medium_corner: 0, fast_corner: 0 });
     const car1 = ca("F", 0.95, [0.1, 0.1, 0.1]);
     const persistence = predictGpAffinity(c, [car1]).ranked[0].affinity_score;
     const legacy = predictGpAffinity(c, [car1], { useCircuitSpecificModel: true }).ranked[0].affinity_score;
-    // Persistence ≈ (0.95 + 0.1)/2 = 0.525; legacy with wTop=1 = 0.95.
-    expect(persistence).toBeCloseTo(0.525, 5);
+    // Persistence (sectors_only) = mean(0.1,0.1,0.1) = 0.1; legacy wTop=1 = 0.95.
+    expect(persistence).toBeCloseTo(0.1, 5);
     expect(legacy).toBeCloseTo(0.95, 5);
   });
 

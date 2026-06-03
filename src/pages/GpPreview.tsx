@@ -147,18 +147,26 @@ function TeamTechnicalDetails({
         data-testid={`tech-details-${team.team_name}`}
       >
         <div className="rounded-md border border-border/50 bg-background/60 p-3 space-y-3 text-[11px] text-muted-foreground">
-          {/* Velocità massima rilevata (trap) */}
+          {/* Velocità massima rilevata (trap) — contesto, NON usata nel punteggio */}
           <div>
             <div className="font-medium text-foreground/90 mb-0.5">
-              Indice velocità massima rilevata (trap)
+              Indice velocità massima rilevata (trap) — contesto
             </div>
             <div className="tabular-nums">
               {fmt(car?.top_speed_index)} <span className="opacity-70">(0–1, dove 1 = miglior valore del campo)</span>
             </div>
             <div className="opacity-70 normal-case mt-1">
-              Misura la velocità massima rilevata a fine rettilineo (trap speed). Dipende anche dal livello di carico aerodinamico scelto dal team, non solo dalla potenza del motore: un valore alto può riflettere un'ala più scarica, non necessariamente più cavalli.
+              Misura la velocità massima rilevata a fine rettilineo (trap speed).{" "}
+              <span className="text-foreground/80 font-medium">
+                Non è usata nel punteggio
+              </span>{" "}
+              perché dipende anche dal livello di carico aerodinamico scelto dal team,
+              non solo dalla potenza del motore: un valore alto può riflettere un'ala più
+              scarica, non necessariamente più cavalli — e il backtest ha confermato che
+              includerla nel punteggio peggiora la previsione.
             </div>
           </div>
+
 
           {/* Tenuta in curva — dipende dal corner_source */}
           <div>
@@ -328,13 +336,16 @@ export function GpPredictionResultView({
           </div>
           <div className="text-xs text-muted-foreground pt-1 space-y-2 leading-relaxed">
             <p>
-              Il punteggio (0–1) riflette la <span className="font-medium">forza recente
-              complessiva</span> di ciascuna vettura — velocità di punta e tenuta in curva
-              aggregate dalle gare già disputate. Non incorpora il carattere specifico di
-              questo circuito: l'analisi per tipo di curva è mostrata sotto come
-              <span className="font-medium"> contesto descrittivo</span>, ma non viene usata
-              per la previsione perché, con i dati 2026 attuali, non ha ancora dimostrato
-              di migliorarla.
+              Il punteggio (0–1) riflette la <span className="font-medium">tenuta nei
+              tempi di settore</span> espressa da ciascuna vettura nelle gare già
+              disputate (media di s1, s2 e s3). La velocità massima rilevata a fine
+              rettilineo (trap) è mostrata sotto come <span className="font-medium">
+              contesto, ma non entra nel punteggio</span>: dipende dal carico
+              aerodinamico scelto dal team più che dalla performance pura, e il
+              backtest ha confermato che includerla peggiora la previsione.
+              Nemmeno il carattere specifico del circuito entra nel punteggio:
+              l'analisi per tipo di curva è mostrata come contesto descrittivo,
+              non come componente predittiva.
             </p>
             <p>
               Accanto a ogni numero compare un piccolo margine di incertezza (ad esempio
@@ -357,9 +368,6 @@ export function GpPredictionResultView({
               const inGroup = gIdx != null;
               const lo = Math.max(0, t.affinity_score - t.uncertainty);
               const hi = Math.min(1, t.affinity_score + t.uncertainty);
-              const total = t.contributions.top_speed + t.contributions.cornering;
-              const topPct = total > 0 ? (t.contributions.top_speed / total) * 100 : 50;
-              const cornerPct = 100 - topPct;
               return (
                 <div
                   key={t.team_name}
@@ -398,26 +406,17 @@ export function GpPredictionResultView({
                       style={{ left: `calc(${t.affinity_score * 100}% - 1px)` }}
                     />
                   </div>
-                  {/* Composizione del punteggio (NON un primato rispetto al campo) */}
+                  {/* Basis of the score (NOT a composition split): the score is 100% sector pace. */}
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
-                    <span title="Quanto la componente di velocità massima rilevata (trap) contribuisce al punteggio di questo team. Non è la posizione del team rispetto agli altri in rettilineo.">
-                      Velocità massima rilevata:&nbsp;
-                      <span className="text-foreground font-medium tabular-nums">
-                        {Math.round(topPct)}%
-                      </span>
-                    </span>
-                    <span title="Quanto la componente di tenuta in curva contribuisce al punteggio di questo team. Non è la posizione del team rispetto agli altri in curva.">
-                      Curve:&nbsp;
-                      <span className="text-foreground font-medium tabular-nums">
-                        {Math.round(cornerPct)}%
-                      </span>
-                    </span>
                     <span
-                      className="text-[10px] normal-case opacity-70"
-                      data-testid={`composition-note-${t.team_name}`}
-                      title="Composizione interna del punteggio del team: dice da quale componente proviene di più, non se il team sia primo del campo su quella componente."
+                      data-testid={`score-basis-${t.team_name}`}
+                      title="Il punteggio è la tenuta media nei tempi di settore (s1, s2, s3) delle gare recenti. La velocità massima rilevata (trap) è mostrata nei dettagli tecnici come contesto, ma non entra nel punteggio."
                     >
-                      (composizione del punteggio, non confronto col campo)
+                      Punteggio basato sulla{" "}
+                      <span className="text-foreground font-medium">
+                        tenuta nei tempi di settore
+                      </span>{" "}
+                      delle gare recenti
                     </span>
                     {t.corner_source === "location_geometry" && (
                       <span
