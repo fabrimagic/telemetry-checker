@@ -443,7 +443,9 @@ describe("buildGpPreviewNarrative — qualifying-source transparency", () => {
     expect(all).toMatch(/trap speed|velocità massima rilevata/i);
     expect(all).toMatch(/carico aerodinamico/i);
     expect(all).toMatch(/non come misura della potenza/i);
-    expect(all).toMatch(/in gara la velocità di punta è invece compressa/i);
+    // Trap is now framed as NOT used in the score.
+    expect(all).toMatch(/non è usata nel punteggio|non entra nel punteggio/i);
+    expect(all).toMatch(/tempi di settore/i);
   });
 
   it("flags GPs whose qualifying session was missing among used races", () => {
