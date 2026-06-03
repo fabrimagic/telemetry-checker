@@ -383,7 +383,17 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       continue;
     }
     const predOrder = prediction.ranked.map((t) => t.team_name);
-    const baselineOrder = computeBaselineOrder(profilesResult.profiles);
+    const baselineOrderTopSec = computeBaselineOrder(
+      profilesResult.profiles,
+      "top_and_sectors",
+    );
+    const baselineOrderSectors = computeBaselineOrder(
+      profilesResult.profiles,
+      "sectors_only",
+    );
+    // Legacy alias: rho_baseline tracks the current production baseline
+    // (top_and_sectors). Preserved for back-compat consumers.
+    const baselineOrder = baselineOrderTopSec;
 
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
