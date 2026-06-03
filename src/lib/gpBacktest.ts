@@ -272,7 +272,7 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     }
     const target = targets[i];
     const gpName =
-      resolveGp(target.location, target.country_name) ??
+      resolveGp(target.location, target.country_name, target.circuit_key) ??
       target.location ??
       target.country_name ??
       `meeting_${target.meeting_key}`;
