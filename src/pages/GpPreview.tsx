@@ -166,6 +166,18 @@ function TeamTechnicalDetails({
                 </div>
               </div>
             )}
+            {team.corner_source === "sector_typed_history" && car?.corner_type_strength && (
+              <div className="space-y-0.5 tabular-nums">
+                <div>
+                  Lente: {fmt(car.corner_type_strength.slow)} · Medie:{" "}
+                  {fmt(car.corner_type_strength.medium)} · Veloci:{" "}
+                  {fmt(car.corner_type_strength.fast)}
+                </div>
+                <div className="opacity-70 normal-case">
+                  Stima per tipo dai settori delle gare precedenti, classificati per carattere di ciascun circuito.
+                </div>
+              </div>
+            )}
             {team.corner_source === "sector_typed" && (
               <div className="space-y-0.5 tabular-nums">
                 {team.corner_type_estimate ? (
