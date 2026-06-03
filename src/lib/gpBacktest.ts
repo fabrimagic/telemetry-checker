@@ -391,9 +391,6 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       profilesResult.profiles,
       "sectors_only",
     );
-    // Legacy alias: rho_baseline tracks the current production baseline
-    // (top_and_sectors). Preserved for back-compat consumers.
-    const baselineOrder = baselineOrderTopSec;
 
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
