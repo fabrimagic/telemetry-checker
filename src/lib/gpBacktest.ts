@@ -425,11 +425,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     per_race.push({
       gpName,
       rho_model,
-      rho_baseline: rho_baseline_topsec,
+      // Legacy field mirrors the PRODUCTION baseline (sectors_only).
+      rho_baseline: rho_baseline_sectors,
       rho_baseline_topsec,
       rho_baseline_sectors,
       top3_model,
-      top3_baseline: top3_baseline_topsec,
+      top3_baseline: top3_baseline_sectors,
       top3_baseline_topsec,
       top3_baseline_sectors,
       n_teams,
@@ -447,9 +448,10 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const rhoBaseSectorsMean = meanOrNull(
     validated.map((r) => r.rho_baseline_sectors).filter((x): x is number => x != null),
   );
+  // delta_mean: model vs PRODUCTION baseline (sectors_only).
   const delta =
-    rhoModelMean != null && rhoBaseTopSecMean != null
-      ? rhoModelMean - rhoBaseTopSecMean
+    rhoModelMean != null && rhoBaseSectorsMean != null
+      ? rhoModelMean - rhoBaseSectorsMean
       : null;
   const deltaSectorsVsTopSec =
     rhoBaseSectorsMean != null && rhoBaseTopSecMean != null
@@ -461,13 +463,14 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     aggregate: {
       races_validated: validated.length,
       rho_model_mean: rhoModelMean,
-      rho_baseline_mean: rhoBaseTopSecMean,
+      // Legacy aggregate field mirrors the PRODUCTION baseline (sectors_only).
+      rho_baseline_mean: rhoBaseSectorsMean,
       rho_baseline_topsec_mean: rhoBaseTopSecMean,
       rho_baseline_sectors_mean: rhoBaseSectorsMean,
       delta_mean: delta,
       delta_sectors_vs_topsec: deltaSectorsVsTopSec,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
-      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
+      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
       top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
     },
