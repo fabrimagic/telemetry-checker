@@ -169,14 +169,14 @@ export function buildGpPreviewNarrative(
       sentences.push(
         `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato è ${because}.`,
       );
       sentences.push(
         "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio deriva ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio è ${because}.`,
       );
     }
   }
