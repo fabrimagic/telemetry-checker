@@ -394,6 +394,7 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     const out = buildPerTeamExplanations(circ, pred);
     expect(out[0].text).toMatch(/settore aggregati/i);
     expect(out[0].text).not.toMatch(/stimata per tipo/i);
+  });
 
   it("sector_typed_history branch ⇒ usa la variante 'storico settori' nel per-team", () => {
     const circ = c({ top_speed: 0.3, slow_corner_traction: 0.7, medium_corner: 0.5, fast_corner: 0.4 });
