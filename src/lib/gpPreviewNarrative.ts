@@ -40,19 +40,6 @@ function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
 }
 
-/** Format a ratio in [0,1] as a readable Italian fraction phrase. */
-function ratioPhrase(r: number): string {
-  if (!Number.isFinite(r)) return "in parte";
-  if (r >= 0.78) return "in larghissima parte";
-  if (r >= 0.68) return "per circa tre quarti";
-  if (r >= 0.6) return "per circa due terzi";
-  if (r >= 0.52) return "per poco più della metà";
-  if (r >= 0.48) return "per circa metà";
-  if (r >= 0.4) return "per poco meno della metà";
-  if (r >= 0.32) return "per circa un terzo";
-  if (r >= 0.22) return "per circa un quarto";
-  return "in piccola parte";
-}
 
 export function buildGpPreviewNarrative(
   circuit: CircuitProfile,
