@@ -403,17 +403,6 @@ function positionPhrase(index: number, total: number): string {
   return "si trova in una posizione intermedia della classifica di affinità";
 }
 
-function circuitFavoursTopSpeed(circuit: CircuitProfile): boolean {
-  const cornerMean =
-    (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
-  return circuit.top_speed > cornerMean;
-}
-
-function circuitDimensionGap(circuit: CircuitProfile): number {
-  const cornerMean =
-    (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
-  return Math.abs(circuit.top_speed - cornerMean);
-}
 
 export function buildPerTeamExplanations(
   circuit: CircuitProfile,
