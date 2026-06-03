@@ -662,3 +662,51 @@ describe("OPZIONE Z — pure persistence (default production engine)", () => {
     expect(mod.USE_CIRCUIT_SPECIFIC_MODEL).toBe(false);
   });
 });
+
+describe("computePersistenceScore — mode parameter (Opzione 1 validation)", () => {
+  function ca(top: number, s: [number, number, number]) {
+    return {
+      top_speed_index: top,
+      sector_strength: { s1: s[0], s2: s[1], s3: s[2] },
+    };
+  }
+
+  it("default mode = 'top_and_sectors' (non-regression, unchanged production formula)", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const car = ca(0.8, [0.6, 0.5, 0.7]);
+    // Default = single-arg call: identical to explicit "top_and_sectors".
+    const a = computePersistenceScore(car);
+    const b = computePersistenceScore(car, "top_and_sectors");
+    expect(a).toBe(b);
+    expect(a).toBeCloseTo((0.8 + 0.6) / 2, 10); // sectorMean = 0.6
+  });
+
+  it("'sectors_only' = mean(s1,s2,s3) and IGNORES top_speed_index", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const carHighTrap = ca(0.95, [0.5, 0.5, 0.5]);
+    const carLowTrap = ca(0.05, [0.5, 0.5, 0.5]);
+    const sH = computePersistenceScore(carHighTrap, "sectors_only");
+    const sL = computePersistenceScore(carLowTrap, "sectors_only");
+    expect(sH).toBeCloseTo(0.5, 10);
+    expect(sL).toBeCloseTo(0.5, 10);
+    expect(sH).toBe(sL);
+    // For comparison, top_and_sectors DOES distinguish them.
+    expect(computePersistenceScore(carHighTrap)).not.toBeCloseTo(
+      computePersistenceScore(carLowTrap),
+      5,
+    );
+  });
+
+  it("McLaren-like case (low trap, strong sectors): sectors_only ranks it higher than top_and_sectors", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const mclaren = ca(0.36, [0.85, 0.80, 0.82]); // weak trap, strong sectors
+    const audi = ca(0.99, [0.40, 0.42, 0.41]); // high trap, weak sectors
+    // top_and_sectors: Audi wins (penalizes McLaren).
+    expect(computePersistenceScore(audi)).toBeGreaterThan(computePersistenceScore(mclaren));
+    // sectors_only: McLaren wins (reflects real performance, not aero choice).
+    expect(computePersistenceScore(mclaren, "sectors_only")).toBeGreaterThan(
+      computePersistenceScore(audi, "sectors_only"),
+    );
+  });
+});
+
