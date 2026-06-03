@@ -395,23 +395,14 @@ export function buildPerTeamExplanations(
     for (const name of g) groupByTeam.set(name, g);
   }
 
-  // OPZIONE Z: il punteggio NON dipende dal carattere del circuito, quindi
-  // la frase per-team descrive solo dove si concentra la forza recente del
-  // team (rettilineo vs curva) senza legarla causalmente al circuito.
+  // OPZIONE Z + sectors_only: il punteggio NON dipende dal carattere del
+  // circuito né dalla trap speed. Si fonda sulla tenuta nei tempi di
+  // settore. La frase per-team lo dichiara esplicitamente.
   return ranked.map((t, i) => {
-    const total = t.contributions.top_speed + t.contributions.cornering;
-    const topPct = total > 0 ? Math.round((t.contributions.top_speed / total) * 100) : 50;
-    const cornerPct = 100 - topPct;
     const where = positionPhrase(i, ranked.length);
 
-    let strengthClause: string;
-    if (topPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}% del punteggio), più che dalla tenuta in curva (circa il ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
-    } else if (cornerPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla tenuta in curva (circa il ${cornerPct}% del punteggio), più che dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
-    } else {
-      strengthClause = `Nelle gare recenti velocità massima rilevata (trap) e tenuta in curva contribuiscono in misura simile al punteggio (circa ${topPct}% e ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
-    }
+    const strengthClause =
+      `Il suo punteggio (${t.affinity_score.toFixed(2)}) misura la tenuta media nei tempi di settore (s1, s2 e s3) delle gare recenti — la velocità massima rilevata a fine rettilineo (trap) non entra nel calcolo perché dipende dalle scelte aerodinamiche e il backtest ha mostrato che includerla peggiora la previsione`;
 
     let equivClause = "";
     const group = groupByTeam.get(t.team_name);
@@ -426,11 +417,11 @@ export function buildPerTeamExplanations(
         typeof t.corner_coverage === "number"
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
-      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva per tipo è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
+      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
     } else if (t.corner_source === "sector_typed_history") {
-      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
+      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
     } else if (t.corner_source === "sector_typed") {
-      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
+      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
     } else if (t.corner_source === "sector_fallback") {
       sourceClause = ` La tenuta in curva di questo team è disponibile solo dai tempi di settore aggregati (non è disponibile la ricostruzione per tipo di curva).`;
     }
