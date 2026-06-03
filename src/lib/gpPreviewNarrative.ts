@@ -117,7 +117,7 @@ export function buildGpPreviewNarrative(
     "Il punteggio di affinità è un indice da 0 a 1 che riflette la forza recente complessiva di ciascuna vettura — velocità di punta e tenuta in curva aggregata sui tre settori — misurata nelle gare già disputate. Non incorpora il carattere specifico di questo circuito: l'analisi per tipo di curva, disponibile più sotto come contesto, non è ancora usata per la previsione perché con i dati 2026 attuali non ha dimostrato di migliorarla. È quindi una lettura della forza recente, non una previsione del risultato.",
   );
   sentences.push(
-    "La velocità di punta riflette soprattutto il potenziale espresso in qualifica, quando le vetture spingono al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova; in gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
+    "L'indice di velocità riflette la velocità massima rilevata a fine rettilineo (trap speed): è quanto la vettura è andata veloce in quel punto, soprattutto in qualifica dove si spinge al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova. Va letta come \"velocità massima raggiunta\", non come misura della potenza del motore: dipende anche dal carico aerodinamico scelto dal team, quindi un valore alto può riflettere una scelta di poca ala. In gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
   );
 
   // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
