@@ -460,3 +460,51 @@ describe("runBacktest — 3-way comparison (Opzione 1)", () => {
   });
 });
 
+
+describe("Role B — circuit-specific 4th-way monitoring", () => {
+  it("produces rho_circuit_specific and delta_circuit_vs_sectors; flag passed to predict", async () => {
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+    ];
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+      mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
+    ];
+    const lapsBySession = new Map<number, Lap[]>([
+      [22, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+    ]);
+    const driversBySession = new Map<number, Driver[]>([
+      [22, [mkDriver(1, "Alpha"), mkDriver(2, "Bravo"), mkDriver(3, "Charlie")]],
+    ]);
+    const deps = makeDeps({
+      races, qualis, lapsBySession, driversBySession,
+      predictImpl: (c, p) => {
+        // We can't see meta here directly via this helper; tests below check
+        // that predict was called twice per race (default + circuit-specific).
+        const ranked = [...p]
+          .sort((a, b) => b.top_speed_index - a.top_speed_index)
+          .map((x) => ({
+            team_name: x.team_name,
+            affinity_score: x.top_speed_index,
+            uncertainty: 0.05,
+            confidence: "high" as const,
+            contributions: { top_speed: 0.5, cornering: 0.5 },
+          }));
+        return { ranked, global_confidence: "high", indistinguishable_groups: [], notes: [] };
+      },
+    });
+    const out = await runBacktest({ deps });
+    // Two calls per validated race: default + useCircuitSpecificModel:true
+    expect(deps.predictGpAffinity).toHaveBeenCalledTimes(2);
+    const metas = deps.predictGpAffinity.mock.calls.map((c) => c[2]);
+    expect(metas.some((m) => m?.useCircuitSpecificModel === true)).toBe(true);
+    expect(metas.some((m) => !m?.useCircuitSpecificModel)).toBe(true);
+    expect(out.per_race[0].rho_circuit_specific).not.toBeNull();
+    expect(out.aggregate.rho_circuit_specific_mean).not.toBeNull();
+    expect(out.aggregate.delta_circuit_vs_sectors).toBeCloseTo(
+      (out.aggregate.rho_circuit_specific_mean ?? 0) - (out.aggregate.rho_baseline_sectors_mean ?? 0),
+      6,
+    );
+  });
+});
