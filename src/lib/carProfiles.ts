@@ -90,10 +90,14 @@ export interface CarProfile {
   corner_coverage_curve?: number | null;
   /**
    * Which method produced the cornering signal for this team:
-   *  - "location_geometry": derived from GPS + circuit layout (granular)
-   *  - "sector_fallback":   coverage too low / no data → use sector_strength
+   *  - "location_geometry":     derived from GPS + circuit layout (granular, gold standard)
+   *  - "sector_typed_history":  estimate per corner-type aggregated from past
+   *                             races using the sector_corner_map of EACH past
+   *                             circuit (Opzione A). Available far more often
+   *                             than location_geometry — does not depend on GPS.
+   *  - "sector_fallback":       neither available → consumer falls back to sector_strength
    */
-  corner_source?: "location_geometry" | "sector_fallback";
+  corner_source?: "location_geometry" | "sector_typed_history" | "sector_fallback";
   /**
    * Diagnostic summary of the GPS-coverage gate outcome for this team:
    *  - "ok":              coverage measured and ≥ CORNER_COVERAGE_MIN
