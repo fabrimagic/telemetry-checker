@@ -70,11 +70,21 @@ export interface BacktestPerRace {
   rho_baseline_topsec: number | null;
   /** Production persistence: sectors only (no trap speed). */
   rho_baseline_sectors: number | null;
+  /**
+   * MONITORING ONLY (Role B): rho from the circuit-specific model that
+   * USES the per-type corner distinction (predict with
+   * useCircuitSpecificModel:true). Does NOT change the production score.
+   * The day delta_circuit_vs_sectors becomes ≥ 0 stably, the per-type
+   * distinction is a candidate to enter the production score.
+   */
+  rho_circuit_specific: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
   top3_baseline_topsec: boolean | null;
   top3_baseline_sectors: boolean | null;
+  /** MONITORING ONLY (Role B): top-3 hit from the circuit-specific model. */
+  top3_circuit_specific: boolean | null;
   /** Intersection size between predicted set and quali set. */
   n_teams: number;
   /** Set when the race could not be validated. */
