@@ -421,6 +421,15 @@ export function GpPredictionResultView({
                         Curve da geometria GPS
                       </span>
                     )}
+                    {t.corner_source === "sector_typed_history" && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-emerald-500/10 text-emerald-300 border-emerald-500/40"
+                        data-testid={`corner-source-${t.team_name}`}
+                        title="La tenuta in curva per tipo (lente/medie/veloci) è stimata dalla prestazione nei settori delle gare precedenti, classificati secondo il carattere di ciascun circuito. È la stima più solida disponibile quando non c'è la ricostruzione GPS."
+                      >
+                        Curve: stima per tipo (storico settori)
+                      </span>
+                    )}
                     {t.corner_source === "sector_typed" && (
                       <>
                         <span
