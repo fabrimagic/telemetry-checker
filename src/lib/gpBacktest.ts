@@ -245,6 +245,26 @@ function rateOrNull(xs: (boolean | null)[]): number | null {
   return f.filter(Boolean).length / f.length;
 }
 
+function skippedRace(
+  gpName: string,
+  reason: BacktestPerRace["skipped_reason"],
+  n_teams = 0,
+): BacktestPerRace {
+  return {
+    gpName,
+    rho_model: null,
+    rho_baseline: null,
+    rho_baseline_topsec: null,
+    rho_baseline_sectors: null,
+    top3_model: null,
+    top3_baseline: null,
+    top3_baseline_topsec: null,
+    top3_baseline_sectors: null,
+    n_teams,
+    skipped_reason: reason,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // runBacktest
 // ---------------------------------------------------------------------------
