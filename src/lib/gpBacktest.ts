@@ -412,17 +412,23 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     }
 
     const rho_model = spearman(predOrder, truthOrder);
-    const rho_baseline = spearman(baselineOrder, truthOrder);
+    const rho_baseline_topsec = spearman(baselineOrderTopSec, truthOrder);
+    const rho_baseline_sectors = spearman(baselineOrderSectors, truthOrder);
     const top3_model = topKHit(predOrder, truthOrder, 3);
-    const top3_baseline = topKHit(baselineOrder, truthOrder, 3);
+    const top3_baseline_topsec = topKHit(baselineOrderTopSec, truthOrder, 3);
+    const top3_baseline_sectors = topKHit(baselineOrderSectors, truthOrder, 3);
     const n_teams = predOrder.filter((t) => truthOrder.includes(t)).length;
 
     per_race.push({
       gpName,
       rho_model,
-      rho_baseline,
+      rho_baseline: rho_baseline_topsec,
+      rho_baseline_topsec,
+      rho_baseline_sectors,
       top3_model,
-      top3_baseline,
+      top3_baseline: top3_baseline_topsec,
+      top3_baseline_topsec,
+      top3_baseline_sectors,
       n_teams,
     });
   }
@@ -432,21 +438,35 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const rhoModelMean = meanOrNull(
     validated.map((r) => r.rho_model).filter((x): x is number => x != null),
   );
-  const rhoBaseMean = meanOrNull(
-    validated.map((r) => r.rho_baseline).filter((x): x is number => x != null),
+  const rhoBaseTopSecMean = meanOrNull(
+    validated.map((r) => r.rho_baseline_topsec).filter((x): x is number => x != null),
+  );
+  const rhoBaseSectorsMean = meanOrNull(
+    validated.map((r) => r.rho_baseline_sectors).filter((x): x is number => x != null),
   );
   const delta =
-    rhoModelMean != null && rhoBaseMean != null ? rhoModelMean - rhoBaseMean : null;
+    rhoModelMean != null && rhoBaseTopSecMean != null
+      ? rhoModelMean - rhoBaseTopSecMean
+      : null;
+  const deltaSectorsVsTopSec =
+    rhoBaseSectorsMean != null && rhoBaseTopSecMean != null
+      ? rhoBaseSectorsMean - rhoBaseTopSecMean
+      : null;
 
   return {
     per_race,
     aggregate: {
       races_validated: validated.length,
       rho_model_mean: rhoModelMean,
-      rho_baseline_mean: rhoBaseMean,
+      rho_baseline_mean: rhoBaseTopSecMean,
+      rho_baseline_topsec_mean: rhoBaseTopSecMean,
+      rho_baseline_sectors_mean: rhoBaseSectorsMean,
       delta_mean: delta,
+      delta_sectors_vs_topsec: deltaSectorsVsTopSec,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
-      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline)),
+      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
+      top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
+      top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
     },
     total_races: total,
     notes,
