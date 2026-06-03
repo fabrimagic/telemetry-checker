@@ -128,6 +128,29 @@ describe("computeBaselineOrder", () => {
     ];
     expect(computeBaselineOrder(profiles)).toEqual(["Fast", "Mid", "Slow"]);
   });
+
+  it("sectors_only mode ignores top_speed_index → McLaren-like climbs the order", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const profiles = [
+      // top low, sectors high (McLaren-like)
+      profile("McL", 0.36, [0.85, 0.80, 0.82]),
+      // top high, sectors low (Audi-like)
+      profile("Aud", 0.99, [0.40, 0.42, 0.41]),
+      profile("Mid", 0.5, [0.5, 0.5, 0.5]),
+    ];
+    const topsec = computeBaselineOrder(profiles, "top_and_sectors");
+    const sectors = computeBaselineOrder(profiles, "sectors_only");
+    // top_and_sectors: Audi ahead of McLaren.
+    expect(topsec.indexOf("Aud")).toBeLessThan(topsec.indexOf("McL"));
+    // sectors_only: McLaren ahead of Audi.
+    expect(sectors.indexOf("McL")).toBeLessThan(sectors.indexOf("Aud"));
+    // Coherence: order matches computePersistenceScore(.,"sectors_only") sorted desc.
+    const expected = [...profiles]
+      .map((p) => ({ t: p.team_name, s: computePersistenceScore(p, "sectors_only") }))
+      .sort((a, b) => b.s - a.s || a.t.localeCompare(b.t))
+      .map((x) => x.t);
+    expect(sectors).toEqual(expected);
+  });
 });
 
 describe("computeQualifyingOrderByTeam", () => {
