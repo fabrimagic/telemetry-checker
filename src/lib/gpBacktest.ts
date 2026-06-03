@@ -283,10 +283,12 @@ function skippedRace(
     rho_baseline: null,
     rho_baseline_topsec: null,
     rho_baseline_sectors: null,
+    rho_circuit_specific: null,
     top3_model: null,
     top3_baseline: null,
     top3_baseline_topsec: null,
     top3_baseline_sectors: null,
+    top3_circuit_specific: null,
     n_teams,
     skipped_reason: reason,
   };
