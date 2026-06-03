@@ -453,7 +453,7 @@ export function buildPerTeamExplanations(
     } else if (t.corner_source === "sector_typed") {
       sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
     } else if (t.corner_source === "sector_fallback") {
-      sourceClause = ` La tenuta in curva di questo team è disponibile solo come media aggregata dei tempi di settore (non è disponibile la ricostruzione per tipo di curva).`;
+      sourceClause = ` La tenuta in curva di questo team è disponibile solo dai tempi di settore aggregati (non è disponibile la ricostruzione per tipo di curva).`;
     }
 
     const text = `${t.team_name} ${where}. ${strengthClause}.${equivClause}${sourceClause}`;
