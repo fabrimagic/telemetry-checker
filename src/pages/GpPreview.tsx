@@ -147,13 +147,16 @@ function TeamTechnicalDetails({
         data-testid={`tech-details-${team.team_name}`}
       >
         <div className="rounded-md border border-border/50 bg-background/60 p-3 space-y-3 text-[11px] text-muted-foreground">
-          {/* Velocità di punta */}
+          {/* Velocità massima rilevata (trap) */}
           <div>
             <div className="font-medium text-foreground/90 mb-0.5">
-              Indice velocità di punta
+              Indice velocità massima rilevata (trap)
             </div>
             <div className="tabular-nums">
               {fmt(car?.top_speed_index)} <span className="opacity-70">(0–1, dove 1 = miglior valore del campo)</span>
+            </div>
+            <div className="opacity-70 normal-case mt-1">
+              Misura la velocità massima rilevata a fine rettilineo (trap speed). Dipende anche dal livello di carico aerodinamico scelto dal team, non solo dalla potenza del motore: un valore alto può riflettere un'ala più scarica, non necessariamente più cavalli.
             </div>
           </div>
 
