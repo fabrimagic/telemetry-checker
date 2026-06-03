@@ -49,7 +49,7 @@ describe("buildGpPreviewNarrative", () => {
       car("Fast", 0.95, [0.3, 0.3, 0.3]),
       car("Cornering", 0.2, [0.95, 0.95, 0.95]),
     ];
-    const pred = predictGpAffinity(c, cars);
+    const pred = predictGpAffinity(c, cars, { useCircuitSpecificModel: true });
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
     expect(all).toMatch(/velocità di punta/i);
