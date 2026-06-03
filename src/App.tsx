@@ -13,6 +13,7 @@ import GpPreview from "./pages/GpPreview.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const InternalLiveDashboard = lazy(() => import("./pages/InternalLiveDashboard.tsx"));
+const InternalBacktest = lazy(() => import("./pages/InternalBacktest.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,14 @@ const App = () => (
             element={
               <Suspense fallback={<div className="p-6">Caricamento dashboard…</div>}>
                 <InternalLiveDashboard />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/internal-backtest-q8h3v5"
+            element={
+              <Suspense fallback={<div className="p-6">Caricamento backtest…</div>}>
+                <InternalBacktest />
               </Suspense>
             }
           />
