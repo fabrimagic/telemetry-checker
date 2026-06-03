@@ -37,6 +37,8 @@ import {
   type SessionInfo,
 } from "./openf1";
 import type { SessionCornerAnalysis } from "./cornerAnalysis";
+import { CIRCUIT_PROFILES } from "./circuitProfiles";
+import { resolveCalendarGpName } from "./circuitGeometry";
 
 export interface CarProfile {
   team_name: string;
@@ -88,10 +90,14 @@ export interface CarProfile {
   corner_coverage_curve?: number | null;
   /**
    * Which method produced the cornering signal for this team:
-   *  - "location_geometry": derived from GPS + circuit layout (granular)
-   *  - "sector_fallback":   coverage too low / no data → use sector_strength
+   *  - "location_geometry":     derived from GPS + circuit layout (granular, gold standard)
+   *  - "sector_typed_history":  estimate per corner-type aggregated from past
+   *                             races using the sector_corner_map of EACH past
+   *                             circuit (Opzione A). Available far more often
+   *                             than location_geometry — does not depend on GPS.
+   *  - "sector_fallback":       neither available → consumer falls back to sector_strength
    */
-  corner_source?: "location_geometry" | "sector_fallback";
+  corner_source?: "location_geometry" | "sector_typed_history" | "sector_fallback";
   /**
    * Diagnostic summary of the GPS-coverage gate outcome for this team:
    *  - "ok":              coverage measured and ≥ CORNER_COVERAGE_MIN
@@ -512,6 +518,21 @@ export async function computeCarProfiles(
     medium: new Map<string, number>(),
     fast: new Map<string, number>(),
   };
+  // SEPARATE accumulators for the historic-sector-map estimate (Opzione A).
+  // We do NOT merge them with the GPS accumulators above: the two sources
+  // are conceptually distinct (direct geometric measurement vs. estimate
+  // through sector→type maps) and we want to pick GPS-when-available, then
+  // sector-history. Keeping them separate makes the priority explicit.
+  const accCornerFromSectorsSum = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
+  const accCornerFromSectorsW = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
   const accCoverageSum = new Map<string, number>();
   const accCoverageW = new Map<string, number>();
   // Diagnostic-only: corner-vertices coverage (slow/medium/fast only).
@@ -618,6 +639,49 @@ export async function computeCarProfiles(
       }
       for (const [t, n] of agg.lapsByTeam.entries()) {
         lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
+      }
+
+      // ----- Opzione A: stima per-tipo dai SETTORI STORICI -----
+      // Use the sector_corner_map of THIS past circuit (origin) to attribute
+      // the team's per-sector strength to corner types. Without an origin
+      // map (gpName unresolved or no map for that circuit) this race simply
+      // does NOT contribute to the historic-sector estimate — no fabrication.
+      const originGpName = resolveCalendarGpName(
+        session.location,
+        session.country_name,
+      );
+      const originMap = originGpName
+        ? CIRCUIT_PROFILES[originGpName]?.sector_corner_map
+        : undefined;
+      if (originMap) {
+        const teamsForEstimate = new Set<string>([
+          ...agg.s1.keys(),
+          ...agg.s2.keys(),
+          ...agg.s3.keys(),
+        ]);
+        for (const team of teamsForEstimate) {
+          const v1 = agg.s1.get(team);
+          const v2 = agg.s2.get(team);
+          const v3 = agg.s3.get(team);
+          for (const k of ["slow", "medium", "fast"] as const) {
+            let num = 0;
+            let den = 0;
+            if (v1 != null) { num += originMap.s1[k] * v1; den += originMap.s1[k]; }
+            if (v2 != null) { num += originMap.s2[k] * v2; den += originMap.s2[k]; }
+            if (v3 != null) { num += originMap.s3[k] * v3; den += originMap.s3[k]; }
+            if (den > 0) {
+              const contrib = num / den;
+              accCornerFromSectorsSum[k].set(
+                team,
+                (accCornerFromSectorsSum[k].get(team) ?? 0) + contrib * w,
+              );
+              accCornerFromSectorsW[k].set(
+                team,
+                (accCornerFromSectorsW[k].get(team) ?? 0) + w,
+              );
+            }
+          }
+        }
       }
     } else if (raceFetchFailed && !qualiAvailable) {
       // Both sources unusable AND race fetch errored → fetch_failed.
@@ -754,6 +818,32 @@ export async function computeCarProfiles(
   const normS2 = normalizeHigherIsBetter(rawS2);
   const normS3 = normalizeHigherIsBetter(rawS3);
 
+  // Sector-history per-type raw averages, then cross-team normalization
+  // so the resulting index is in [0,1] with 1 = best in field (same
+  // contract as location_geometry/sector_strength).
+  const rawSectorTyped: Record<"slow" | "medium" | "fast", Map<string, number>> = {
+    slow: new Map(),
+    medium: new Map(),
+    fast: new Map(),
+  };
+  for (const t of teams) {
+    for (const k of ["slow", "medium", "fast"] as const) {
+      const s = accCornerFromSectorsSum[k].get(t);
+      const wt = accCornerFromSectorsW[k].get(t);
+      if (s == null || !wt || wt <= 0) continue;
+      rawSectorTyped[k].set(t, s / wt);
+    }
+  }
+  // NOTE: we intentionally do NOT re-normalize across teams here. The raw
+  // weighted averages are already in [0,1] (each per-race sector value is
+  // 0..1 with 1=best in that race), and they preserve the per-type DISTRI-
+  // BUTION shape — which is the whole point of attributing performance
+  // through the origin-circuit's sector_corner_map. A cross-team normali-
+  // zation would flatten ratios between types and defeat the attribution.
+  // This matches the GPS branch (location_geometry) which also stores raw
+  // weighted averages without final cross-team normalization.
+  const normSectorTyped = rawSectorTyped;
+
   const profiles: CarProfile[] = [];
   for (const team of teams) {
     const sampleRaces = racesByTeam.get(team) ?? 0;
@@ -819,6 +909,27 @@ export async function computeCarProfiles(
       }
     } else if (coverageMeasured) {
       coverageStatus = "below_threshold";
+    }
+
+    // Priorità sorgenti per corner_type_strength (Opzione A):
+    //   1) location_geometry (GPS) — preferita se la copertura passa il gate;
+    //   2) sector_typed_history — stima dai settori delle gare passate usando
+    //      la sector_corner_map del circuito d'ORIGINE di ogni gara;
+    //   3) sector_fallback — nessuna delle due → corner_type_strength resta
+    //      null e il consumer userà sector_strength.
+    if (cornerTypeStrength == null) {
+      const histSlow = normSectorTyped.slow.get(team);
+      const histMed = normSectorTyped.medium.get(team);
+      const histFast = normSectorTyped.fast.get(team);
+      if (histSlow != null || histMed != null || histFast != null) {
+        cornerTypeStrength = {
+          slow: histSlow ?? 0,
+          medium: histMed ?? 0,
+          fast: histFast ?? 0,
+        };
+        cornerSource = "sector_typed_history";
+        // Non tocchiamo coverageStatus: rimane diagnostico del SOLO ramo GPS.
+      }
     }
 
     profiles.push({
