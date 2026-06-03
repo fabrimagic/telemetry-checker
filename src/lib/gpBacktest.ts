@@ -177,20 +177,32 @@ export function topKHit(
 
 /**
  * Persistence baseline: orders teams by an OVERALL strength index that does
- * NOT use any circuit-specific information. Score = mean of top_speed_index
- * and mean(s1,s2,s3). Higher = stronger. Deterministic tie-break on team
- * name to keep tests stable.
+ * NOT use any circuit-specific information. The `mode` argument selects the
+ * persistence variant:
+ *   - "top_and_sectors" (default, current production formula),
+ *   - "sectors_only"    (experimental — drops trap speed).
+ * Deterministic tie-break on team name to keep tests stable.
  */
-export function computeBaselineOrder(profiles: readonly CarProfile[]): string[] {
+export function computeBaselineOrder(
+  profiles: readonly CarProfile[],
+  mode: PersistenceMode = "top_and_sectors",
+): string[] {
   // Reuse the SAME helper exported from gpPrediction so the production
   // ranking (OPZIONE Z: pure persistence) and the backtest baseline stay
   // bit-for-bit identical. Tie-break on team name keeps tests stable.
   const scored = profiles.map((p) => ({
     team: p.team_name,
-    score: computePersistenceScore(p),
+    score: computePersistenceScore(p, mode),
   }));
   scored.sort((a, b) => b.score - a.score || a.team.localeCompare(b.team));
   return scored.map((x) => x.team);
+}
+
+/** Convenience: sectors-only baseline. Equivalent to computeBaselineOrder(p, "sectors_only"). */
+export function computeBaselineOrderSectorsOnly(
+  profiles: readonly CarProfile[],
+): string[] {
+  return computeBaselineOrder(profiles, "sectors_only");
 }
 
 /**
