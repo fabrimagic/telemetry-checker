@@ -612,7 +612,167 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
       expect(typeof p.corner_coverage_curve).toBe("number");
       expect(p.corner_coverage_curve!).toBeGreaterThan(p.corner_data_coverage!);
     }
+});
+
+// =====================================================================
+// Opzione A — corner_type_strength STIMATA dai settori storici usando la
+// sector_corner_map del circuito d'ORIGINE di ogni gara.
+// =====================================================================
+describe("computeCarProfiles — sector_typed_history (Opzione A)", () => {
+  const NOW = new Date("2026-12-01T00:00:00Z");
+
+  function mkSessionLoc(
+    key: number,
+    dateEnd: string,
+    location: string,
+  ): SessionInfo {
+    return {
+      session_key: key,
+      session_type: "Race",
+      session_name: "Race",
+      meeting_key: key,
+      date_start: dateEnd,
+      date_end: dateEnd,
+      location,
+    };
+  }
+
+  it("(a) attribuisce la prestazione ai tipi di curva via mappa del circuito d'origine", async () => {
+    // Una sola gara a MONACO (slow-dominante in tutti i settori).
+    // Team SlowKing è migliore di Team Other in tutti i settori → la sua
+    // forza, attribuita via mappa di Monaco, finisce prevalentemente su slow.
+    mockedSessions.mockResolvedValue([
+      mkSessionLoc(1, "2026-05-25T15:00:00Z", "Monte Carlo"),
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "SlowKing"), mkDriver(2, "Other")]);
+    mockedLaps.mockResolvedValue([
+      ...Array.from({ length: 10 }, (_, i) => mkLap(1, { s1: 28, s2: 28, s3: 28, lap: i + 2 })),
+      ...Array.from({ length: 10 }, (_, i) => mkLap(2, { s1: 32, s2: 32, s3: 32, lap: i + 2 })),
+    ]);
+    const { profiles } = await computeCarProfiles({ now: NOW });
+    const slowK = profiles.find((p) => p.team_name === "SlowKing")!;
+    expect(slowK.corner_source).toBe("sector_typed_history");
+    expect(slowK.corner_type_strength).not.toBeNull();
+    // Monaco s* hanno tutti slow >> fast nella mappa, quindi SlowKing
+    // (migliore in tutti i settori) ottiene slow al massimo del campo.
+    expect(slowK.corner_type_strength!.slow).toBeCloseTo(1, 5);
+  });
+
+  it("(b) STESSA prestazione posizionale ma su circuiti con CARATTERE OPPOSTO produce strength diverse", async () => {
+    // Caso 1: il team A è "il migliore" a MONACO (slow-dominante).
+    // Caso 2: il team A è "il migliore" a MONZA (fast-dominante).
+    // La prestazione per-settore normalizzata è identica (max in ogni s),
+    // ma la mappa del circuito d'origine attribuisce a tipi diversi.
+    async function runAt(location: string) {
+      mockedSessions.mockResolvedValue([
+        mkSessionLoc(1, "2026-05-25T15:00:00Z", location),
+      ]);
+      mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+      mockedLaps.mockResolvedValue([
+        ...Array.from({ length: 10 }, (_, i) => mkLap(1, { s1: 28, s2: 28, s3: 28, lap: i + 2 })),
+        ...Array.from({ length: 10 }, (_, i) => mkLap(2, { s1: 32, s2: 32, s3: 32, lap: i + 2 })),
+      ]);
+      const { profiles } = await computeCarProfiles({ now: NOW });
+      return profiles.find((p) => p.team_name === "A")!;
+    }
+    const atMonaco = await runAt("Monte Carlo");
+    const atMonza = await runAt("Monza");
+    expect(atMonaco.corner_source).toBe("sector_typed_history");
+    expect(atMonza.corner_source).toBe("sector_typed_history");
+    // Monaco è slow-pesante → slow alto; Monza è fast-pesante → fast alto.
+    expect(atMonaco.corner_type_strength!.slow).toBeGreaterThan(
+      atMonza.corner_type_strength!.slow,
+    );
+    expect(atMonza.corner_type_strength!.fast).toBeGreaterThan(
+      atMonaco.corner_type_strength!.fast,
+    );
+  });
+
+  it("(c) GPS (location_geometry) prevale sulla stima-settori-storici", async () => {
+    mockedSessions.mockResolvedValue([
+      mkSessionLoc(1, "2026-05-25T15:00:00Z", "Monte Carlo"),
+    ]);
+    mockedQuali.mockResolvedValue([
+      { ...mkSessionLoc(2, "2026-05-24T15:00:00Z", "Monte Carlo"), session_type: "Qualifying", session_name: "Qualifying" },
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+    mockedLaps.mockResolvedValue([
+      mkLap(1, { speed: 320 }), mkLap(2, { speed: 300 }),
+    ]);
+    const analyzeQualiCorners = vi.fn(async () => ({
+      gpName: "Monaco", sessionKey: 2, segments: [],
+      per_driver: [
+        { driver_number: 1, slow_corner_speed: 120, medium_corner_speed: 180, fast_corner_speed: 240, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.8, corner_coverage: 0.9, partial: false, notes: [] },
+        { driver_number: 2, slow_corner_speed: 100, medium_corner_speed: 200, fast_corner_speed: 220, sample_counts: { slow: 50, medium: 50, fast: 50, straight: 100 }, coverage: 0.75, corner_coverage: 0.85, partial: false, notes: [] },
+      ],
+      notes: [], aborted: false,
+    }));
+    const { profiles } = await computeCarProfiles({ now: NOW, analyzeQualiCorners });
+    for (const p of profiles) {
+      expect(p.corner_source).toBe("location_geometry");
+    }
+  });
+
+  it("(d) gara su circuito SENZA sector_corner_map non contribuisce alla stima per-tipo (no crash)", async () => {
+    // "Imola" non risolve (non in OPENF1_LOCATION_TO_GP_NAME).
+    mockedSessions.mockResolvedValue([
+      mkSessionLoc(1, "2026-05-25T15:00:00Z", "Imola"),
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+    mockedLaps.mockResolvedValue([
+      mkLap(1, { s1: 28 }), mkLap(2, { s1: 32 }),
+    ]);
+    const { profiles } = await computeCarProfiles({ now: NOW });
+    for (const p of profiles) {
+      // Nessun contributo storico → resta sector_fallback con type=null.
+      expect(p.corner_source).toBe("sector_fallback");
+      expect(p.corner_type_strength).toBeNull();
+    }
+  });
+
+  it("(e) NON-REGRESSIONE: top_speed_index e sector_strength restano invariati", async () => {
+    mockedSessions.mockResolvedValue([
+      mkSessionLoc(1, "2026-05-25T15:00:00Z", "Monte Carlo"),
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+    mockedLaps.mockResolvedValue([
+      ...Array.from({ length: 10 }, (_, i) => mkLap(1, { speed: 320, s1: 28, lap: i + 2 })),
+      ...Array.from({ length: 10 }, (_, i) => mkLap(2, { speed: 300, s1: 32, lap: i + 2 })),
+    ]);
+    const { profiles } = await computeCarProfiles({ now: NOW });
+    const a = profiles.find((p) => p.team_name === "A")!;
+    expect(a.top_speed_index).toBeCloseTo(1, 5);
+    expect(a.sector_strength.s1).toBeCloseTo(1, 5);
+  });
+
+  it("(f) recency: una gara recente pesa più di una più vecchia per la stima dai settori", async () => {
+    // 2 gare entrambe a Monaco (così la mappa è la stessa) ma con vincitori
+    // diversi nei settori: A vince la PIÙ RECENTE → corner_type_strength.slow
+    // di A deve essere > quello di B (perché Monaco è slow-pesante e la
+    // gara recente pesa più di quella vecchia).
+    mockedSessions.mockResolvedValue([
+      mkSessionLoc(1, "2026-03-01T15:00:00Z", "Monte Carlo"),
+      mkSessionLoc(2, "2026-09-01T15:00:00Z", "Monte Carlo"),
+    ]);
+    mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
+    mockedLaps.mockImplementation(async (key: number) => {
+      if (key === 1) return [
+        ...Array.from({ length: 10 }, (_, i) => mkLap(1, { s1: 32, s2: 32, s3: 32, lap: i + 2 })),
+        ...Array.from({ length: 10 }, (_, i) => mkLap(2, { s1: 28, s2: 28, s3: 28, lap: i + 2 })),
+      ];
+      return [
+        ...Array.from({ length: 10 }, (_, i) => mkLap(1, { s1: 28, s2: 28, s3: 28, lap: i + 2 })),
+        ...Array.from({ length: 10 }, (_, i) => mkLap(2, { s1: 32, s2: 32, s3: 32, lap: i + 2 })),
+      ];
+    });
+    const { profiles } = await computeCarProfiles({ now: NOW });
+    const a = profiles.find((p) => p.team_name === "A")!;
+    const b = profiles.find((p) => p.team_name === "B")!;
+    expect(a.corner_source).toBe("sector_typed_history");
+    expect(b.corner_source).toBe("sector_typed_history");
+    expect(a.corner_type_strength!.slow).toBeGreaterThan(b.corner_type_strength!.slow);
   });
 });
+
 
 
