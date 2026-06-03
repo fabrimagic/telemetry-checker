@@ -63,7 +63,7 @@ function CircuitProfileCard({ circuit }: { circuit: CircuitProfile }) {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <CardTitle className="text-lg">Caratteristiche del circuito</CardTitle>
+          <CardTitle className="text-lg">Contesto: caratteristiche del circuito</CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
               Confidenza profilo: {confidenceLabelIt(circuit.confidence)}
@@ -75,6 +75,12 @@ function CircuitProfileCard({ circuit }: { circuit: CircuitProfile }) {
             )}
           </div>
         </div>
+        <p className="text-[11px] text-muted-foreground pt-2 leading-relaxed">
+          Descrizione del carattere del tracciato. <span className="font-medium">Non</span> entra nel
+          punteggio dei team: il backtest ha mostrato che, con i dati 2026 attuali, l'analisi
+          circuito-specifica non migliora ancora la previsione rispetto alla pura forza recente
+          delle vetture.
+        </p>
       </CardHeader>
       <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {dims.map((d) => {
