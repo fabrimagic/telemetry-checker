@@ -398,30 +398,26 @@ export function GpPredictionResultView({
                       style={{ left: `calc(${t.affinity_score * 100}% - 1px)` }}
                     />
                   </div>
-                  {/* Contributions + verbal strength tag */}
+                  {/* Composizione del punteggio (NON un primato rispetto al campo) */}
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
-                    <span>
-                      Velocità di punta:&nbsp;
+                    <span title="Quanto la componente di velocità massima rilevata (trap) contribuisce al punteggio di questo team. Non è la posizione del team rispetto agli altri in rettilineo.">
+                      Velocità massima rilevata:&nbsp;
                       <span className="text-foreground font-medium tabular-nums">
                         {Math.round(topPct)}%
                       </span>
                     </span>
-                    <span>
+                    <span title="Quanto la componente di tenuta in curva contribuisce al punteggio di questo team. Non è la posizione del team rispetto agli altri in curva.">
                       Curve:&nbsp;
                       <span className="text-foreground font-medium tabular-nums">
                         {Math.round(cornerPct)}%
                       </span>
                     </span>
                     <span
-                      className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-muted/40 text-foreground/80 border-border"
-                      data-testid={`strength-tag-${t.team_name}`}
+                      className="text-[10px] normal-case opacity-70"
+                      data-testid={`composition-note-${t.team_name}`}
+                      title="Composizione interna del punteggio del team: dice da quale componente proviene di più, non se il team sia primo del campo su quella componente."
                     >
-                      Più forte in:{" "}
-                      {strengthLabel(topPct) === "rettilineo"
-                        ? "rettilineo"
-                        : strengthLabel(topPct) === "curve"
-                          ? "curve"
-                          : "equilibrato"}
+                      (composizione del punteggio, non confronto col campo)
                     </span>
                     {t.corner_source === "location_geometry" && (
                       <span
