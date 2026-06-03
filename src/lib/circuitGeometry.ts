@@ -138,7 +138,14 @@ const AMBIGUOUS_COUNTRY_KEYS = new Set<string>([
 export function resolveCalendarGpName(
   location?: string | null,
   countryName?: string | null,
+  circuitKey?: number | null,
 ): string | null {
+  // PRIMARY: stable numeric circuit_key from OpenF1 (no ambiguity).
+  if (circuitKey != null && Number.isFinite(circuitKey)) {
+    const byKey = CIRCUIT_KEY_TO_GP_NAME[circuitKey];
+    if (byKey) return byKey;
+  }
+
   const normalize = (s?: string | null): string | null => {
     if (!s) return null;
     const k = s.trim().toLowerCase();
