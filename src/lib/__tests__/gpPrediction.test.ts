@@ -237,10 +237,10 @@ describe("gpPrediction", () => {
       medium_corner: 0,
       fast_corner: 0,
     });
-    const out = predictGpAffinity(c, [car("Z", 0.4, [0.8, 0.8, 0.8])]);
+    const out = predictGpAffinity(c, [car("Z", 0.4, [0.8, 0.8, 0.8])], { useCircuitSpecificModel: true });
     const s = out.ranked[0].affinity_score;
     expect(Number.isFinite(s)).toBe(true);
-    // 50/50 fallback: 0.5*0.4 + 0.5*0.8 = 0.6
+    // 50/50 fallback (legacy circuit-weighted engine): 0.5*0.4 + 0.5*0.8 = 0.6
     expect(s).toBeCloseTo(0.6, 5);
   });
 
