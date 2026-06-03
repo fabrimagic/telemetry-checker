@@ -156,12 +156,13 @@ export function topKHit(
  * name to keep tests stable.
  */
 export function computeBaselineOrder(profiles: readonly CarProfile[]): string[] {
-  const scored = profiles.map((p) => {
-    const sectorMean =
-      (p.sector_strength.s1 + p.sector_strength.s2 + p.sector_strength.s3) / 3;
-    const score = (p.top_speed_index + sectorMean) / 2;
-    return { team: p.team_name, score };
-  });
+  // Reuse the SAME helper exported from gpPrediction so the production
+  // ranking (OPZIONE Z: pure persistence) and the backtest baseline stay
+  // bit-for-bit identical. Tie-break on team name keeps tests stable.
+  const scored = profiles.map((p) => ({
+    team: p.team_name,
+    score: computePersistenceScore(p),
+  }));
   scored.sort((a, b) => b.score - a.score || a.team.localeCompare(b.team));
   return scored.map((x) => x.team);
 }
