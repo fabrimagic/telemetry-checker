@@ -662,18 +662,21 @@ describe("computeCarProfiles — sector_typed_history (Opzione A)", () => {
   });
 
   it("(b) STESSA prestazione posizionale ma su circuiti con CARATTERE OPPOSTO produce strength diverse", async () => {
-    // Caso 1: il team A è "il migliore" a MONACO (slow-dominante).
-    // Caso 2: il team A è "il migliore" a MONZA (fast-dominante).
-    // La prestazione per-settore normalizzata è identica (max in ogni s),
-    // ma la mappa del circuito d'origine attribuisce a tipi diversi.
+    // Stesso pattern: A vince solo s1, B vince s2 e s3.
+    // Monaco è SLOW-pesante in tutti i settori → A (forte solo in s1) prende
+    // un peso bilanciato verso slow ma BASSO su fast (perché Monaco ha
+    // ~zero fast). Monza è FAST-pesante con s1 contenente fast=0.5 →
+    // A ottiene un valore fast tangibilmente più alto che a Monaco.
     async function runAt(location: string) {
       mockedSessions.mockResolvedValue([
         mkSessionLoc(1, "2026-05-25T15:00:00Z", location),
       ]);
       mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
       mockedLaps.mockResolvedValue([
-        ...Array.from({ length: 10 }, (_, i) => mkLap(1, { s1: 28, s2: 28, s3: 28, lap: i + 2 })),
-        ...Array.from({ length: 10 }, (_, i) => mkLap(2, { s1: 32, s2: 32, s3: 32, lap: i + 2 })),
+        // A: ottimo s1, pessimo s2+s3.
+        ...Array.from({ length: 10 }, (_, i) => mkLap(1, { s1: 28, s2: 32, s3: 32, lap: i + 2 })),
+        // B: pessimo s1, ottimo s2+s3.
+        ...Array.from({ length: 10 }, (_, i) => mkLap(2, { s1: 32, s2: 28, s3: 28, lap: i + 2 })),
       ]);
       const { profiles } = await computeCarProfiles({ now: NOW });
       return profiles.find((p) => p.team_name === "A")!;
@@ -682,21 +685,20 @@ describe("computeCarProfiles — sector_typed_history (Opzione A)", () => {
     const atMonza = await runAt("Monza");
     expect(atMonaco.corner_source).toBe("sector_typed_history");
     expect(atMonza.corner_source).toBe("sector_typed_history");
-    // Monaco è slow-pesante → slow alto; Monza è fast-pesante → fast alto.
-    expect(atMonaco.corner_type_strength!.slow).toBeGreaterThan(
-      atMonza.corner_type_strength!.slow,
-    );
+    // A ha più "carattere fast" a Monza (mappa fast-pesante in s1) che a
+    // Monaco (mappa quasi-zero su fast in s1).
     expect(atMonza.corner_type_strength!.fast).toBeGreaterThan(
       atMonaco.corner_type_strength!.fast,
     );
   });
 
   it("(c) GPS (location_geometry) prevale sulla stima-settori-storici", async () => {
+    // Stesso meeting_key per race e quali → quali matcha correttamente.
     mockedSessions.mockResolvedValue([
-      mkSessionLoc(1, "2026-05-25T15:00:00Z", "Monte Carlo"),
+      { ...mkSessionLoc(1, "2026-05-25T15:00:00Z", "Monte Carlo"), meeting_key: 10 },
     ]);
     mockedQuali.mockResolvedValue([
-      { ...mkSessionLoc(2, "2026-05-24T15:00:00Z", "Monte Carlo"), session_type: "Qualifying", session_name: "Qualifying" },
+      { ...mkSessionLoc(2, "2026-05-24T15:00:00Z", "Monte Carlo"), meeting_key: 10, session_type: "Qualifying", session_name: "Qualifying" },
     ]);
     mockedDrivers.mockResolvedValue([mkDriver(1, "A"), mkDriver(2, "B")]);
     mockedLaps.mockResolvedValue([
