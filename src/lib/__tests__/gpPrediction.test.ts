@@ -604,3 +604,61 @@ describe("teamBandFromSample", () => {
 
 
 
+
+describe("OPZIONE Z — pure persistence (default production engine)", () => {
+  function circ(o: Partial<CircuitProfile> = {}): CircuitProfile {
+    return {
+      gpName: "Z", top_speed: 0.5, slow_corner_traction: 0.5,
+      medium_corner: 0.5, fast_corner: 0.5, tyre_deg: 0.5,
+      overtaking_difficulty: 0.5, confidence: "high", source: "historical", ...o,
+    };
+  }
+  function ca(name: string, top: number, s: [number, number, number]): CarProfile {
+    return {
+      team_name: name, top_speed_index: top,
+      sector_strength: { s1: s[0], s2: s[1], s3: s[2] },
+      sample_races: 4, effective_sample_races: 4, sample_laps: 200, confidence: "high",
+    };
+  }
+
+  it("affinity_score equals computePersistenceScore (matches backtest baseline)", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const cars = [ca("A", 0.8, [0.6, 0.5, 0.7]), ca("B", 0.4, [0.4, 0.5, 0.4])];
+    const out = predictGpAffinity(circ(), cars);
+    for (const t of out.ranked) {
+      const car = cars.find((c) => c.team_name === t.team_name)!;
+      expect(t.affinity_score).toBeCloseTo(computePersistenceScore(car), 10);
+    }
+  });
+
+  it("production ranking matches computeBaselineOrder bit-for-bit", async () => {
+    const { computeBaselineOrder } = await import("../gpBacktest");
+    const cars = [ca("A", 0.8, [0.6, 0.5, 0.7]), ca("B", 0.4, [0.4, 0.5, 0.4]), ca("C", 0.6, [0.6, 0.6, 0.6])];
+    const out = predictGpAffinity(circ(), cars);
+    expect(out.ranked.map((t) => t.team_name)).toEqual(computeBaselineOrder(cars));
+  });
+
+  it("score is INVARIANT w.r.t. the circuit profile (persistence ignores it)", () => {
+    const car1 = ca("X", 0.7, [0.5, 0.6, 0.5]);
+    const cA = circ({ top_speed: 1.0, slow_corner_traction: 0, medium_corner: 0, fast_corner: 0 });
+    const cB = circ({ top_speed: 0, slow_corner_traction: 1, medium_corner: 1, fast_corner: 1 });
+    const sA = predictGpAffinity(cA, [car1]).ranked[0].affinity_score;
+    const sB = predictGpAffinity(cB, [car1]).ranked[0].affinity_score;
+    expect(sA).toBeCloseTo(sB, 10);
+  });
+
+  it("flag override: useCircuitSpecificModel=true restores legacy circuit-weighted score", () => {
+    const c = circ({ top_speed: 1, slow_corner_traction: 0, medium_corner: 0, fast_corner: 0 });
+    const car1 = ca("F", 0.95, [0.1, 0.1, 0.1]);
+    const persistence = predictGpAffinity(c, [car1]).ranked[0].affinity_score;
+    const legacy = predictGpAffinity(c, [car1], { useCircuitSpecificModel: true }).ranked[0].affinity_score;
+    // Persistence ≈ (0.95 + 0.1)/2 = 0.525; legacy with wTop=1 = 0.95.
+    expect(persistence).toBeCloseTo(0.525, 5);
+    expect(legacy).toBeCloseTo(0.95, 5);
+  });
+
+  it("USE_CIRCUIT_SPECIFIC_MODEL is false by default", async () => {
+    const mod = await import("../gpPrediction");
+    expect(mod.USE_CIRCUIT_SPECIFIC_MODEL).toBe(false);
+  });
+});
