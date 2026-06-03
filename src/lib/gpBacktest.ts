@@ -57,10 +57,22 @@ export const DEFAULT_PRE_WEEKEND_MARGIN_MS = 60_000;
 export interface BacktestPerRace {
   gpName: string;
   rho_model: number | null;
+  /**
+   * Persistence baseline using the CURRENT production formula
+   * (top_speed_index + mean(s1,s2,s3))/2. Kept under the legacy
+   * name `rho_baseline` for back-compat with existing consumers/tests;
+   * equals `rho_baseline_topsec`.
+   */
   rho_baseline: number | null;
+  /** Persistence with both trap + sectors. Same value as rho_baseline. */
+  rho_baseline_topsec: number | null;
+  /** EXPERIMENTAL persistence using sectors only (no trap speed). */
+  rho_baseline_sectors: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
+  top3_baseline_topsec: boolean | null;
+  top3_baseline_sectors: boolean | null;
   /** Intersection size between predicted set and quali set. */
   n_teams: number;
   /** Set when the race could not be validated. */
@@ -76,10 +88,22 @@ export interface BacktestAggregate {
   races_validated: number;
   rho_model_mean: number | null;
   rho_baseline_mean: number | null;
+  rho_baseline_topsec_mean: number | null;
+  rho_baseline_sectors_mean: number | null;
   /** rho_model_mean − rho_baseline_mean. null if either is null. */
   delta_mean: number | null;
+  /**
+   * KEY METRIC for the Opzione 1 validation:
+   * rho_baseline_sectors_mean − rho_baseline_topsec_mean.
+   * If > 0 → dropping the trap speed improves prediction → candidate to
+   * become the new production persistence formula. If ≈ 0 or < 0 → trap
+   * speed, however counter-intuitive, is not hurting prediction.
+   */
+  delta_sectors_vs_topsec: number | null;
   top3_model_rate: number | null;
   top3_baseline_rate: number | null;
+  top3_baseline_topsec_rate: number | null;
+  top3_baseline_sectors_rate: number | null;
 }
 
 export interface BacktestResult {
