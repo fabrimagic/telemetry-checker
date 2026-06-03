@@ -158,11 +158,11 @@ export function buildGpPreviewNarrative(
 
     let because: string;
     if (topRatio >= DOMINANT_TOP_RATIO) {
-      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva, sui dati delle gare recenti`;
+      because = `composto ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap) e ${ratioPhrase(cornerRatio)} dalla tenuta in curva, sui dati delle gare recenti`;
     } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
-      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta, sui dati delle gare recenti`;
+      because = `composto ${ratioPhrase(cornerRatio)} dalla tenuta in curva e ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap), sui dati delle gare recenti`;
     } else {
-      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva sui dati delle gare recenti, senza una vera dimensione dominante";
+      because = "composto in misura simile da velocità massima rilevata (trap) e tenuta in curva sui dati delle gare recenti, senza una componente nettamente dominante";
     }
 
     if (topTeams.length > 1) {
