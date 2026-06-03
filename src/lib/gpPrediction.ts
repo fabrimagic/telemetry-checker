@@ -498,6 +498,25 @@ export function predictGpAffinity(
         cornerSource === "sector_typed"
           ? circuit.sector_corner_map_confidence
           : undefined,
+      corner_type_values:
+        (cornerSource === "location_geometry" || cornerSource === "sector_typed_history") &&
+        car.corner_type_strength
+          ? {
+              slow: car.corner_type_strength.slow,
+              medium: car.corner_type_strength.medium,
+              fast: car.corner_type_strength.fast,
+            }
+          : cornerSource === "sector_typed" &&
+            typeEstimate &&
+            typeEstimate.slow !== null &&
+            typeEstimate.medium !== null &&
+            typeEstimate.fast !== null
+          ? {
+              slow: typeEstimate.slow,
+              medium: typeEstimate.medium,
+              fast: typeEstimate.fast,
+            }
+          : undefined,
     };
   });
 
