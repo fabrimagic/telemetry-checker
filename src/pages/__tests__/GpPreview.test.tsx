@@ -156,6 +156,43 @@ describe("GpPredictionResultView", () => {
     expect(screen.queryByTestId("map-confidence-low-Highc")).toBeNull();
   });
 
+  it("renders the sector_typed_history badge and per-type values in tech details", () => {
+    const pred: GpPrediction = {
+      ranked: [
+        {
+          team_name: "Hist",
+          affinity_score: 0.7, uncertainty: 0.05, confidence: "high",
+          contributions: { top_speed: 0.4, cornering: 0.3 },
+          corner_source: "sector_typed_history",
+        },
+      ],
+      global_confidence: "medium",
+      indistinguishable_groups: [],
+      notes: [],
+    };
+    const carProfile = {
+      team_name: "Hist",
+      top_speed_index: 0.7,
+      sector_strength: { s1: 0.6, s2: 0.6, s3: 0.6 },
+      corner_type_strength: { slow: 0.71, medium: 0.55, fast: 0.33 },
+      corner_source: "sector_typed_history" as const,
+      sample_races: 4,
+      effective_sample_races: 3.5,
+      sample_laps: 200,
+      confidence: "high" as const,
+    };
+    render(
+      <GpPredictionResultView
+        circuit={circuit}
+        prediction={pred}
+        profiles={[carProfile]}
+      />,
+    );
+    const badge = screen.getByTestId("corner-source-Hist");
+    expect(badge.textContent).toMatch(/storico settori/i);
+    expect(badge.textContent).not.toMatch(/GPS|geometria/i);
+  });
+
   it("renders Technical Details expandable section per team, closed by default", () => {
     const pred: GpPrediction = {
       ranked: [

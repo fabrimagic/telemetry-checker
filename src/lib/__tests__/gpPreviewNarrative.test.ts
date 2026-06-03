@@ -395,6 +395,38 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     expect(out[0].text).toMatch(/settore aggregati/i);
     expect(out[0].text).not.toMatch(/stimata per tipo/i);
   });
+
+  it("sector_typed_history branch ⇒ usa la variante 'storico settori' nel per-team", () => {
+    const circ = c({ top_speed: 0.3, slow_corner_traction: 0.7, medium_corner: 0.5, fast_corner: 0.4 });
+    const cars: CarProfile[] = [
+      {
+        ...car("Hist", 0.4, [0.6, 0.6, 0.6]),
+        corner_type_strength: { slow: 0.7, medium: 0.5, fast: 0.3 },
+        corner_source: "sector_typed_history",
+      },
+    ];
+    const pred = predictGpAffinity(circ, cars);
+    expect(pred.ranked[0].corner_source).toBe("sector_typed_history");
+    const out = buildPerTeamExplanations(circ, pred);
+    expect(out[0].text).toMatch(/storico|gare precedenti/i);
+    expect(out[0].text).not.toMatch(/geometria GPS|geometria del tracciato/i);
+  });
+
+  it("intro paragraph mentions sector_typed_history teams distinctly", () => {
+    const circ = c({ top_speed: 0.3, slow_corner_traction: 0.7, medium_corner: 0.5, fast_corner: 0.4 });
+    const cars: CarProfile[] = [
+      {
+        ...car("Hist", 0.4, [0.6, 0.6, 0.6]),
+        corner_type_strength: { slow: 0.7, medium: 0.5, fast: 0.3 },
+        corner_source: "sector_typed_history",
+      },
+    ];
+    const pred = predictGpAffinity(circ, cars);
+    const lines = buildGpPreviewNarrative(circ, pred);
+    const all = lines.join(" ");
+    expect(all).toMatch(/gare già disputate|gare precedenti/i);
+    expect(all).toMatch(/Hist/);
+  });
 });
 
 describe("buildGpPreviewNarrative — qualifying-source transparency", () => {

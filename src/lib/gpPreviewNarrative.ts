@@ -208,16 +208,22 @@ export function buildGpPreviewNarrative(
   {
     const ranked = prediction.ranked;
     const geom = ranked.filter((t) => t.corner_source === "location_geometry");
+    const history = ranked.filter((t) => t.corner_source === "sector_typed_history");
     const fallback = ranked.filter((t) => t.corner_source === "sector_fallback");
     if (geom.length > 0) {
       sentences.push(
         `Per ${geom.length === 1 ? "un team" : `${geom.length} team`} (${joinNames(geom.map((t) => t.team_name))}) la valutazione per tipo di curva — lente, medie e veloci — è ricostruita incrociando la geometria del circuito con la posizione GPS delle vetture in qualifica. È una lettura più granulare, ma sperimentale: l'allineamento spaziale può contenere imprecisioni, quindi va interpretata con prudenza.`,
       );
-      if (fallback.length > 0) {
-        sentences.push(
-          `Per ${fallback.length === 1 ? "il team rimanente" : `i ${fallback.length} team rimanenti`} (${joinNames(fallback.map((t) => t.team_name))}) la copertura dei dati GPS non era sufficiente: la tenuta in curva viene quindi stimata dai tempi di settore aggregati, un metodo robusto ma meno granulare (non distingue fra curve lente, medie e veloci).`,
-        );
-      }
+    }
+    if (history.length > 0) {
+      sentences.push(
+        `Per ${history.length === 1 ? "un team" : `${history.length} team`} (${joinNames(history.map((t) => t.team_name))}) la valutazione per tipo di curva — lente, medie e veloci — è stimata dalla loro prestazione nei settori delle gare già disputate quest'anno, classificati in base al carattere di ciascun circuito. È una lettura più ricca della semplice media in curva, fondata sui dati reali delle gare precedenti.`,
+      );
+    }
+    if (fallback.length > 0 && (geom.length > 0 || history.length > 0)) {
+      sentences.push(
+        `Per ${fallback.length === 1 ? "il team rimanente" : `i ${fallback.length} team rimanenti`} (${joinNames(fallback.map((t) => t.team_name))}) non è disponibile una stima per tipo: la tenuta in curva viene quindi calcolata dai tempi di settore aggregati, un metodo robusto ma meno granulare (non distingue fra curve lente, medie e veloci).`,
+      );
     }
     // sector_typed branch with low map confidence: declare the approximation honestly.
     const sectorTyped = prediction.ranked.filter((t) => t.corner_source === "sector_typed");
@@ -471,6 +477,8 @@ export function buildPerTeamExplanations(
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
       sourceClause = ` La tenuta in curva di questo team è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}: lettura più granulare ma con possibili imprecisioni di allineamento.`;
+    } else if (t.corner_source === "sector_typed_history") {
+      sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — la stima più solida quando non c'è la ricostruzione GPS.`;
     } else if (t.corner_source === "sector_typed") {
       sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — una lettura più ricca della semplice media, pur restando una stima.`;
     } else if (t.corner_source === "sector_fallback") {

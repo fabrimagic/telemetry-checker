@@ -166,6 +166,18 @@ function TeamTechnicalDetails({
                 </div>
               </div>
             )}
+            {team.corner_source === "sector_typed_history" && car?.corner_type_strength && (
+              <div className="space-y-0.5 tabular-nums">
+                <div>
+                  Lente: {fmt(car.corner_type_strength.slow)} · Medie:{" "}
+                  {fmt(car.corner_type_strength.medium)} · Veloci:{" "}
+                  {fmt(car.corner_type_strength.fast)}
+                </div>
+                <div className="opacity-70 normal-case">
+                  Stima per tipo dai settori delle gare precedenti, classificati per carattere di ciascun circuito.
+                </div>
+              </div>
+            )}
             {team.corner_source === "sector_typed" && (
               <div className="space-y-0.5 tabular-nums">
                 {team.corner_type_estimate ? (
@@ -407,6 +419,15 @@ export function GpPredictionResultView({
                         title="La tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del circuito e dalla posizione GPS in qualifica: lettura più granulare ma sperimentale, può contenere imprecisioni di allineamento."
                       >
                         Curve da geometria GPS
+                      </span>
+                    )}
+                    {t.corner_source === "sector_typed_history" && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 bg-emerald-500/10 text-emerald-300 border-emerald-500/40"
+                        data-testid={`corner-source-${t.team_name}`}
+                        title="La tenuta in curva per tipo (lente/medie/veloci) è stimata dalla prestazione nei settori delle gare precedenti, classificati secondo il carattere di ciascun circuito. È la stima più solida disponibile quando non c'è la ricostruzione GPS."
+                      >
+                        Curve: stima per tipo (storico settori)
                       </span>
                     )}
                     {t.corner_source === "sector_typed" && (
