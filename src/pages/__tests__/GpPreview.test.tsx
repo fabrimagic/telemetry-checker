@@ -74,6 +74,14 @@ describe("GpPredictionResultView", () => {
     expect(screen.getAllByText(/non una previsione del risultato/i).length).toBeGreaterThan(0);
   });
 
+  it("does not render the misleading 'Più forte in' badge; shows composition disclaimer instead", () => {
+    render(<GpPredictionResultView circuit={circuit} prediction={prediction} />);
+    expect(screen.queryByTestId("strength-tag-Alpha")).toBeNull();
+    expect(screen.queryAllByText(/Più forte in/i).length).toBe(0);
+    expect(screen.getByTestId("composition-note-Alpha")).toBeTruthy();
+    expect(screen.getAllByText(/composizione del punteggio/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Velocità massima rilevata/i).length).toBeGreaterThan(0);
+
   it("renders the sector_typed badge and hides GPS diagnostic badges", () => {
     const pred: GpPrediction = {
       ranked: [
