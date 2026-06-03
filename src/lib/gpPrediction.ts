@@ -41,17 +41,24 @@ export interface TeamGpAffinity {
   /** How much each dimension contributed to the final score. */
   contributions: { top_speed: number; cornering: number };
   /**
-   * Which method produced the cornering signal for this team:
-   *  - "location_geometry": granular slow/medium/fast strength matched
-   *                         against the circuit's per-corner-type weights
-   *                         (dato reale dalla geometria GPS);
-   *  - "sector_typed":      STIMA della corner-strength per tipo ottenuta
-   *                         pesando sector_strength via la matrice
-   *                         settore→tipo del circuito (sector_corner_map);
-   *  - "sector_fallback":   media piatta dei sector_strength (legacy).
+   * Which method produced the cornering signal for this team. Priorità
+   * (Opzione A): location_geometry > sector_typed_history > sector_typed
+   * (downstream residuale) > sector_fallback.
+   *  - "location_geometry":     strength per tipo dal GPS + layout (gold standard);
+   *  - "sector_typed_history":  strength per tipo STIMATA a MONTE da carProfiles
+   *                             pesando i settori delle gare passate via la
+   *                             sector_corner_map del circuito d'ORIGINE;
+   *  - "sector_typed":          STIMA a VALLE — fallback residuale quando il
+   *                             car non ha corner_type_strength ma il circuito
+   *                             target ha una sector_corner_map;
+   *  - "sector_fallback":       media piatta dei sector_strength (legacy).
    * Surfaced so the UI/narrative can be transparent about provenance.
    */
-  corner_source?: "location_geometry" | "sector_typed" | "sector_fallback";
+  corner_source?:
+    | "location_geometry"
+    | "sector_typed_history"
+    | "sector_typed"
+    | "sector_fallback";
   /**
    * Aggregated /location coverage as measured by the analyzer. ALWAYS
    * propagated when the analyzer produced a measurement, including when
