@@ -353,7 +353,7 @@ export function predictGpAffinity(
     const cCorner = wCorner * cornerIdx;
     const score = clamp01(cTop + cCorner);
 
-    const carBand = CONFIDENCE_BAND[car.confidence];
+    const carBand = teamBandFromSample(car.effective_sample_races);
     const circuitBand = CONFIDENCE_BAND[circuit.confidence];
     const uncertainty = Math.sqrt(carBand * carBand + circuitBand * circuitBand);
 
