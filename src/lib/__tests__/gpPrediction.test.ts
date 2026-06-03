@@ -571,6 +571,36 @@ describe("gpPrediction", () => {
   });
 });
 
+describe("teamBandFromSample", () => {
+  it("is calibrated to the legacy step mapping at the typical-sample anchor", async () => {
+    const { teamBandFromSample } = await import("../gpPrediction");
+    expect(teamBandFromSample(4)).toBeCloseTo(0.12, 2);
+    expect(teamBandFromSample(7)).toBeCloseTo(0.24 / Math.sqrt(7), 4);
+    expect(teamBandFromSample(7)).toBeLessThan(teamBandFromSample(4));
+  });
+
+  it("clamps to [MIN, MAX] for extreme sample sizes", async () => {
+    const { teamBandFromSample, TEAM_BAND_MIN, TEAM_BAND_MAX } = await import(
+      "../gpPrediction"
+    );
+    expect(teamBandFromSample(1)).toBeLessThanOrEqual(TEAM_BAND_MAX);
+    expect(teamBandFromSample(0.1)).toBeLessThanOrEqual(TEAM_BAND_MAX);
+    expect(teamBandFromSample(50)).toBeGreaterThanOrEqual(TEAM_BAND_MIN);
+    expect(teamBandFromSample(1000)).toBe(TEAM_BAND_MIN);
+  });
+
+  it("handles missing/zero effective sample without NaN (EFF_MIN floor)", async () => {
+    const { teamBandFromSample, TEAM_BAND_K, TEAM_BAND_EFF_MIN } = await import(
+      "../gpPrediction"
+    );
+    const expected = TEAM_BAND_K / Math.sqrt(TEAM_BAND_EFF_MIN);
+    expect(teamBandFromSample(0)).toBeCloseTo(expected, 6);
+    expect(Number.isFinite(teamBandFromSample(Number.NaN))).toBe(true);
+    expect(Number.isFinite(teamBandFromSample(-1))).toBe(true);
+  });
+});
+
+
 
 
 
