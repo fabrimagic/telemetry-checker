@@ -37,6 +37,8 @@ import {
   type SessionInfo,
 } from "./openf1";
 import type { SessionCornerAnalysis } from "./cornerAnalysis";
+import { CIRCUIT_PROFILES } from "./circuitProfiles";
+import { resolveCalendarGpName } from "./circuitGeometry";
 
 export interface CarProfile {
   team_name: string;
