@@ -136,6 +136,38 @@ const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = {
 };
 
 /**
+ * OPZIONE Z — Production currently uses PURE PERSISTENCE for the score.
+ *
+ * The backtest with circuit_key resolution (4 validated races) showed
+ * Δ = rho_model − rho_baseline = −0.166: the circuit-specific model
+ * predicts SYSTEMATICALLY WORSE than the persistence baseline. Until a
+ * future backtest demonstrates Δ ≥ 0, the production "Anteprima GP" ranks
+ * teams by their overall recent strength and treats circuit character as
+ * DESCRIPTIVE context only.
+ *
+ * The circuit-specific model is NOT deleted — it is kept as dormant
+ * infrastructure behind this flag and can be reactivated (or mixed) when
+ * the data justifies it. Tests covering the dormant behaviour pass
+ * `{ useCircuitSpecificModel: true }` explicitly.
+ */
+export const USE_CIRCUIT_SPECIFIC_MODEL = false;
+
+/**
+ * Persistence score — the SAME formula used as the baseline in gpBacktest
+ * (see `computeBaselineOrder`). MUST stay in lock-step with the baseline so
+ * that what the user sees in production coincides with what the backtest
+ * validated as the winning policy. Higher = stronger overall.
+ */
+export function computePersistenceScore(car: {
+  top_speed_index: number;
+  sector_strength: { s1: number; s2: number; s3: number };
+}): number {
+  const sectorMean =
+    (car.sector_strength.s1 + car.sector_strength.s2 + car.sector_strength.s3) / 3;
+  return (car.top_speed_index + sectorMean) / 2;
+}
+
+/**
  * Calibration constants for the team half-band as a CONTINUOUS function of
  * the effective sample size: `band = K / sqrt(max(effective, EFF_MIN))`.
  *
