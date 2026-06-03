@@ -23,10 +23,28 @@ describe("resolveCalendarGpName", () => {
     }
   });
 
-  it("falls back to country_name when location is missing", () => {
-    expect(resolveCalendarGpName(undefined, "Italy")).toBe("Gran Premio d'Italia");
-    expect(resolveCalendarGpName(null, "Japan")).toBe("Gran Premio del Giappone");
+  it("falls back to country_name only for mono-GP countries", () => {
+    // Mono-GP countries: country fallback is safe.
+    expect(resolveCalendarGpName(undefined, "Japan")).toBe("Gran Premio del Giappone");
+    expect(resolveCalendarGpName(undefined, "Hungary")).toBe("Gran Premio d'Ungheria");
+    expect(resolveCalendarGpName(undefined, "Canada")).toBe("Gran Premio del Canada");
   });
+
+  it("(bug-fix) refuses country fallback for MULTI-GP countries", () => {
+    // USA hosts Miami, COTA, Las Vegas → country alone cannot disambiguate.
+    // Must return null (honest degradation), NOT silently resolve to COTA.
+    expect(resolveCalendarGpName(undefined, "United States")).toBeNull();
+    expect(resolveCalendarGpName(undefined, "USA")).toBeNull();
+    expect(resolveCalendarGpName("", "United States")).toBeNull();
+    // Italy hosts Monza (and potentially Imola) → also ambiguous by country.
+    expect(resolveCalendarGpName(undefined, "Italy")).toBeNull();
+    // But a specific location for the same country still resolves correctly.
+    expect(resolveCalendarGpName("Miami", "United States")).toBe("Gran Premio di Miami");
+    expect(resolveCalendarGpName("Austin", "United States")).toBe("Gran Premio degli Stati Uniti");
+    expect(resolveCalendarGpName("Las Vegas", "United States")).toBe("Gran Premio di Las Vegas");
+    expect(resolveCalendarGpName("Monza", "Italy")).toBe("Gran Premio d'Italia");
+  });
+
 
   it("is case-insensitive and trims whitespace", () => {
     expect(resolveCalendarGpName("  MONACO ")).toBe("Gran Premio di Monaco");
