@@ -105,6 +105,16 @@ export interface TeamGpAffinity {
    * "stima approssimata" badge when low.
    */
   sector_corner_map_confidence?: "high" | "medium" | "low";
+  /**
+   * Unified per-type values (slow/medium/fast) for UI/narrative, regardless of
+   * branch. Populated when the underlying source actually has three numbers:
+   *  - location_geometry / sector_typed_history → mirrors car.corner_type_strength
+   *  - sector_typed                              → mirrors corner_type_estimate
+   *                                                when all three are non-null
+   *  - sector_fallback                           → undefined
+   * DESCRIPTIVE only — never enters the score.
+   */
+  corner_type_values?: { slow: number; medium: number; fast: number } | null;
 }
 
 
@@ -487,6 +497,25 @@ export function predictGpAffinity(
       sector_corner_map_confidence:
         cornerSource === "sector_typed"
           ? circuit.sector_corner_map_confidence
+          : undefined,
+      corner_type_values:
+        (cornerSource === "location_geometry" || cornerSource === "sector_typed_history") &&
+        car.corner_type_strength
+          ? {
+              slow: car.corner_type_strength.slow,
+              medium: car.corner_type_strength.medium,
+              fast: car.corner_type_strength.fast,
+            }
+          : cornerSource === "sector_typed" &&
+            typeEstimate &&
+            typeEstimate.slow !== null &&
+            typeEstimate.medium !== null &&
+            typeEstimate.fast !== null
+          ? {
+              slow: typeEstimate.slow,
+              medium: typeEstimate.medium,
+              fast: typeEstimate.fast,
+            }
           : undefined,
     };
   });

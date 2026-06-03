@@ -14,6 +14,43 @@ import type { GpPrediction } from "./gpPrediction";
 /** Threshold used purely for prose coloring. */
 const HIGH_TRAIT = 0.7;
 
+/**
+ * Minimum spread max−min across the three per-type corner values (slow/medium/
+ * fast) required to TREAT the per-type estimate as actually differentiating.
+ * Below this threshold the three numbers are nearly identical and pretending
+ * they represent a true per-type strength is misleading: the UI shows a single
+ * aggregate value, the narrative avoids per-type claims.
+ *
+ * Calibration note: 0.05 on a 0..1 index corresponds to about 5% of the
+ * normalized span — sectors that disagree by less than this are noise-level on
+ * the data we have (e.g. Ferrari 0.64/0.64/0.63, spread 0.002 ≪ 0.05).
+ */
+export const CORNER_TYPE_SPREAD_MIN = 0.05;
+
+export interface CornerTypeValues {
+  slow: number;
+  medium: number;
+  fast: number;
+}
+
+export function cornerTypeSpread(v: CornerTypeValues): number {
+  return (
+    Math.max(v.slow, v.medium, v.fast) - Math.min(v.slow, v.medium, v.fast)
+  );
+}
+
+export function cornerTypeMean(v: CornerTypeValues): number {
+  return (v.slow + v.medium + v.fast) / 3;
+}
+
+export function isCornerTypeDifferentiating(
+  v: CornerTypeValues | null | undefined,
+): boolean {
+  if (!v) return false;
+  return cornerTypeSpread(v) >= CORNER_TYPE_SPREAD_MIN;
+}
+
+
 export interface RaceDiagnosticLite {
   name: string;
   date_end: string;
@@ -396,19 +433,41 @@ export function buildPerTeamExplanations(
       equivClause = ` Il suo punteggio è troppo vicino a quello di ${joinNames(others)} per distinguerli con certezza con i dati attuali: vanno considerati alla pari.`;
     }
 
+    // Limit telaio/motore: i tempi di settore includono anche tratti in
+    // rettilineo, quindi quanto la vettura "tiene in curva" deriva da una
+    // misura mista, non isolata dalla potenza del motore.
+    const chassisEngineDisclosure =
+      " Va letto come stima derivata dai tempi di settore (che includono anche i tratti in rettilineo): una vettura con poca potenza può quindi risultare più debole in curva di quanto il suo telaio sia in realtà.";
+
+    // Per-type honesty: se i tre numeri sono quasi identici, NON affermare
+    // forza/debolezza per tipo specifico.
+    const differentiated = isCornerTypeDifferentiating(t.corner_type_values);
+
     let sourceClause = "";
     if (t.corner_source === "location_geometry") {
       const covPct =
         typeof t.corner_coverage === "number"
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
-      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
+      if (differentiated) {
+        sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva per tipo (lente/medie/veloci) è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.${chassisEngineDisclosure}`;
+      } else {
+        sourceClause = ` Come contesto (non usato nel punteggio): la prestazione nei tre tipi di curva (lente/medie/veloci) risulta sostanzialmente uniforme${covPct}: i dati non permettono di distinguere la sua forza per tipo di curva.${chassisEngineDisclosure}`;
+      }
     } else if (t.corner_source === "sector_typed_history") {
-      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
+      if (differentiated) {
+        sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.${chassisEngineDisclosure}`;
+      } else {
+        sourceClause = ` Come contesto (non usato nel punteggio): la prestazione nei settori delle gare precedenti risulta uniforme tra i tipi di curva (lente/medie/veloci): i dati non permettono di distinguere la sua forza per tipo di curva.${chassisEngineDisclosure}`;
+      }
     } else if (t.corner_source === "sector_typed") {
-      sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
+      if (differentiated) {
+        sourceClause = ` Come contesto (non usato nel punteggio): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.${chassisEngineDisclosure}`;
+      } else {
+        sourceClause = ` Come contesto (non usato nel punteggio): la stima per tipo (lente/medie/veloci) ricavata dai diversi settori del circuito risulta uniforme: i dati non permettono di distinguere la sua forza per tipo di curva.${chassisEngineDisclosure}`;
+      }
     } else if (t.corner_source === "sector_fallback") {
-      sourceClause = ` La tenuta in curva di questo team è disponibile solo dai tempi di settore aggregati (non è disponibile la ricostruzione per tipo di curva).`;
+      sourceClause = ` La tenuta in curva di questo team è disponibile solo dai tempi di settore aggregati (non è disponibile la ricostruzione per tipo di curva).${chassisEngineDisclosure}`;
     }
 
     const text = `${t.team_name} ${where}. ${strengthClause}.${equivClause}${sourceClause}`;

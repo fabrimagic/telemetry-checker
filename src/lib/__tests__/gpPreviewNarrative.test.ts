@@ -486,3 +486,34 @@ describe("buildGpPreviewNarrative — qualifying-source transparency", () => {
     expect(all).not.toMatch(/non era disponibile la sessione di qualifica/i);
   });
 });
+
+describe("Role A — corner-type spread threshold + chassis/engine disclosure", () => {
+  it("flat per-type (spread < 0.05) ⇒ narrative does NOT claim per-type strength + chassis/engine disclosure present", () => {
+    const c = circuit({ top_speed: 0.3, slow_corner_traction: 0.7, medium_corner: 0.5, fast_corner: 0.4 });
+    const cars: CarProfile[] = [{
+      ...car("Flat", 0.5, [0.6, 0.6, 0.6]),
+      corner_type_strength: { slow: 0.64, medium: 0.64, fast: 0.63 },
+      corner_source: "sector_typed_history",
+    }];
+    const pred = predictGpAffinity(c, cars);
+    const out = buildPerTeamExplanations(c, pred);
+    const text = out[0].text;
+    expect(text).toMatch(/uniforme/i);
+    expect(text).toMatch(/non permettono di distinguere/i);
+    expect(text).toMatch(/poca potenza|tratti in rettilineo/i);
+  });
+
+  it("differentiated per-type (spread ≥ 0.05) ⇒ keeps per-type framing", () => {
+    const c = circuit({ top_speed: 0.3, slow_corner_traction: 0.7, medium_corner: 0.5, fast_corner: 0.4 });
+    const cars: CarProfile[] = [{
+      ...car("Diff", 0.5, [0.6, 0.6, 0.6]),
+      corner_type_strength: { slow: 0.75, medium: 0.55, fast: 0.30 },
+      corner_source: "sector_typed_history",
+    }];
+    const pred = predictGpAffinity(c, cars);
+    const out = buildPerTeamExplanations(c, pred);
+    const text = out[0].text;
+    expect(text).toMatch(/per tipo|lente\/medie\/veloci/i);
+    expect(text).not.toMatch(/non permettono di distinguere/i);
+  });
+});

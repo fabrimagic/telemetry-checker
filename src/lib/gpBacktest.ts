@@ -70,11 +70,21 @@ export interface BacktestPerRace {
   rho_baseline_topsec: number | null;
   /** Production persistence: sectors only (no trap speed). */
   rho_baseline_sectors: number | null;
+  /**
+   * MONITORING ONLY (Role B): rho from the circuit-specific model that
+   * USES the per-type corner distinction (predict with
+   * useCircuitSpecificModel:true). Does NOT change the production score.
+   * The day delta_circuit_vs_sectors becomes ≥ 0 stably, the per-type
+   * distinction is a candidate to enter the production score.
+   */
+  rho_circuit_specific: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
   top3_baseline_topsec: boolean | null;
   top3_baseline_sectors: boolean | null;
+  /** MONITORING ONLY (Role B): top-3 hit from the circuit-specific model. */
+  top3_circuit_specific: boolean | null;
   /** Intersection size between predicted set and quali set. */
   n_teams: number;
   /** Set when the race could not be validated. */
@@ -92,6 +102,8 @@ export interface BacktestAggregate {
   rho_baseline_mean: number | null;
   rho_baseline_topsec_mean: number | null;
   rho_baseline_sectors_mean: number | null;
+  /** MONITORING ONLY (Role B): mean rho for the circuit-specific model. */
+  rho_circuit_specific_mean: number | null;
   /**
    * rho_model_mean − rho_baseline_mean, where rho_baseline_mean is the
    * PRODUCTION baseline (sectors_only). Positive means the circuit-
@@ -104,10 +116,19 @@ export interface BacktestAggregate {
    * Promotion criterion: > 0 (validated, +0.209 on the 4-race sample).
    */
   delta_sectors_vs_topsec: number | null;
+  /**
+   * MONITORING METRIC for Role B (per-type corner distinction):
+   * rho_circuit_specific_mean − rho_baseline_sectors_mean. Today expected
+   * ≤ 0 (per-type distinction does not yet beat sectors-only). The day
+   * it becomes ≥ 0 stably on multiple races, the per-type distinction is
+   * a candidate for promotion into the production score.
+   */
+  delta_circuit_vs_sectors: number | null;
   top3_model_rate: number | null;
   top3_baseline_rate: number | null;
   top3_baseline_topsec_rate: number | null;
   top3_baseline_sectors_rate: number | null;
+  top3_circuit_specific_rate: number | null;
 }
 
 export interface BacktestResult {
@@ -262,10 +283,12 @@ function skippedRace(
     rho_baseline: null,
     rho_baseline_topsec: null,
     rho_baseline_sectors: null,
+    rho_circuit_specific: null,
     top3_model: null,
     top3_baseline: null,
     top3_baseline_topsec: null,
     top3_baseline_sectors: null,
+    top3_circuit_specific: null,
     n_teams,
     skipped_reason: reason,
   };
@@ -309,12 +332,15 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
         rho_baseline_mean: null,
         rho_baseline_topsec_mean: null,
         rho_baseline_sectors_mean: null,
+        rho_circuit_specific_mean: null,
         delta_mean: null,
         delta_sectors_vs_topsec: null,
+        delta_circuit_vs_sectors: null,
         top3_model_rate: null,
         top3_baseline_rate: null,
         top3_baseline_topsec_rate: null,
         top3_baseline_sectors_rate: null,
+        top3_circuit_specific_rate: null,
       },
       total_races: 0,
       notes: ["Errore nel recupero del calendario"],
@@ -398,6 +424,21 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       "sectors_only",
     );
 
+    // Role B (monitoring) — circuit-specific model that USES the per-type
+    // distinction. Same predict() function, just the dormant flag flipped on.
+    // Does NOT change production (the default predict() call above stays
+    // sectors_only).
+    const predictionCircuit: GpPrediction = predict(
+      circuit,
+      profilesResult.profiles,
+      {
+        racesConsidered: profilesResult.races_considered,
+        useCircuitSpecificModel: true,
+      },
+    );
+    const predOrderCircuit =
+      predictionCircuit.ranked?.map((t) => t.team_name) ?? [];
+
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
     let qDrivers: Driver[] = [];
@@ -417,9 +458,13 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     const rho_model = spearman(predOrder, truthOrder);
     const rho_baseline_topsec = spearman(baselineOrderTopSec, truthOrder);
     const rho_baseline_sectors = spearman(baselineOrderSectors, truthOrder);
+    const rho_circuit_specific =
+      predOrderCircuit.length > 0 ? spearman(predOrderCircuit, truthOrder) : null;
     const top3_model = topKHit(predOrder, truthOrder, 3);
     const top3_baseline_topsec = topKHit(baselineOrderTopSec, truthOrder, 3);
     const top3_baseline_sectors = topKHit(baselineOrderSectors, truthOrder, 3);
+    const top3_circuit_specific =
+      predOrderCircuit.length > 0 ? topKHit(predOrderCircuit, truthOrder, 3) : null;
     const n_teams = predOrder.filter((t) => truthOrder.includes(t)).length;
 
     per_race.push({
@@ -429,10 +474,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       rho_baseline: rho_baseline_sectors,
       rho_baseline_topsec,
       rho_baseline_sectors,
+      rho_circuit_specific,
       top3_model,
       top3_baseline: top3_baseline_sectors,
       top3_baseline_topsec,
       top3_baseline_sectors,
+      top3_circuit_specific,
       n_teams,
     });
   }
@@ -448,6 +495,9 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const rhoBaseSectorsMean = meanOrNull(
     validated.map((r) => r.rho_baseline_sectors).filter((x): x is number => x != null),
   );
+  const rhoCircuitSpecificMean = meanOrNull(
+    validated.map((r) => r.rho_circuit_specific).filter((x): x is number => x != null),
+  );
   // delta_mean: model vs PRODUCTION baseline (sectors_only).
   const delta =
     rhoModelMean != null && rhoBaseSectorsMean != null
@@ -456,6 +506,10 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const deltaSectorsVsTopSec =
     rhoBaseSectorsMean != null && rhoBaseTopSecMean != null
       ? rhoBaseSectorsMean - rhoBaseTopSecMean
+      : null;
+  const deltaCircuitVsSectors =
+    rhoCircuitSpecificMean != null && rhoBaseSectorsMean != null
+      ? rhoCircuitSpecificMean - rhoBaseSectorsMean
       : null;
 
   return {
@@ -467,12 +521,15 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       rho_baseline_mean: rhoBaseSectorsMean,
       rho_baseline_topsec_mean: rhoBaseTopSecMean,
       rho_baseline_sectors_mean: rhoBaseSectorsMean,
+      rho_circuit_specific_mean: rhoCircuitSpecificMean,
       delta_mean: delta,
       delta_sectors_vs_topsec: deltaSectorsVsTopSec,
+      delta_circuit_vs_sectors: deltaCircuitVsSectors,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
       top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
       top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
+      top3_circuit_specific_rate: rateOrNull(validated.map((r) => r.top3_circuit_specific)),
     },
     total_races: total,
     notes,

@@ -20,6 +20,8 @@ import {
   buildGpPreviewNarrative,
   buildPerTeamExplanations,
   
+  isCornerTypeDifferentiating,
+  cornerTypeMean,
 } from "@/lib/gpPreviewNarrative";
 import { analyzeCornersForSession } from "@/lib/cornerAnalysis";
 import { resolveCalendarGpName } from "@/lib/circuitGeometry";
@@ -171,33 +173,68 @@ function TeamTechnicalDetails({
           {/* Tenuta in curva — dipende dal corner_source */}
           <div>
             <div className="font-medium text-foreground/90 mb-0.5">Tenuta in curva</div>
-            {team.corner_source === "location_geometry" && car?.corner_type_strength && (
-              <div className="space-y-0.5 tabular-nums">
-                <div>
-                  Lente: {fmt(car.corner_type_strength.slow)} · Medie:{" "}
-                  {fmt(car.corner_type_strength.medium)} · Veloci:{" "}
-                  {fmt(car.corner_type_strength.fast)}
+            {(team.corner_source === "location_geometry" ||
+              team.corner_source === "sector_typed_history") &&
+              car?.corner_type_strength && (
+                <div
+                  className="space-y-0.5 tabular-nums"
+                  data-testid={`corner-type-block-${team.team_name}`}
+                >
+                  {isCornerTypeDifferentiating(car.corner_type_strength) ? (
+                    <>
+                      <div data-testid={`corner-type-split-${team.team_name}`}>
+                        Lente: {fmt(car.corner_type_strength.slow)} · Medie:{" "}
+                        {fmt(car.corner_type_strength.medium)} · Veloci:{" "}
+                        {fmt(car.corner_type_strength.fast)}
+                      </div>
+                      <div className="opacity-70 normal-case">
+                        {team.corner_source === "location_geometry"
+                          ? "Misura per tipo di curva, ricostruita dalla geometria del tracciato."
+                          : "Stima per tipo dai settori delle gare precedenti, classificati per carattere di ciascun circuito."}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div data-testid={`corner-type-aggregate-${team.team_name}`}>
+                        Tenuta in curva (settori): ~{fmt(cornerTypeMean(car.corner_type_strength))}
+                      </div>
+                      <div
+                        className="opacity-70 normal-case"
+                        data-testid={`corner-type-uniform-note-${team.team_name}`}
+                      >
+                        Prestazione uniforme nei settori: i dati non distinguono la forza per
+                        tipo di curva per questa vettura.
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="opacity-70 normal-case">
-                  Misura per tipo di curva, ricostruita dalla geometria del tracciato.
-                </div>
-              </div>
-            )}
-            {team.corner_source === "sector_typed_history" && car?.corner_type_strength && (
-              <div className="space-y-0.5 tabular-nums">
-                <div>
-                  Lente: {fmt(car.corner_type_strength.slow)} · Medie:{" "}
-                  {fmt(car.corner_type_strength.medium)} · Veloci:{" "}
-                  {fmt(car.corner_type_strength.fast)}
-                </div>
-                <div className="opacity-70 normal-case">
-                  Stima per tipo dai settori delle gare precedenti, classificati per carattere di ciascun circuito.
-                </div>
-              </div>
-            )}
+              )}
             {team.corner_source === "sector_typed" && (
-              <div className="space-y-0.5 tabular-nums">
-                {team.corner_type_estimate ? (
+              <div
+                className="space-y-0.5 tabular-nums"
+                data-testid={`corner-type-block-${team.team_name}`}
+              >
+                {team.corner_type_values &&
+                isCornerTypeDifferentiating(team.corner_type_values) ? (
+                  <div data-testid={`corner-type-split-${team.team_name}`}>
+                    Stima — Lente: {fmt(team.corner_type_values.slow)} · Medie:{" "}
+                    {fmt(team.corner_type_values.medium)} · Veloci:{" "}
+                    {fmt(team.corner_type_values.fast)}
+                  </div>
+                ) : team.corner_type_values ? (
+                  <>
+                    <div data-testid={`corner-type-aggregate-${team.team_name}`}>
+                      Tenuta in curva (settori): ~{fmt(cornerTypeMean(team.corner_type_values))}
+                    </div>
+                    <div
+                      className="opacity-70 normal-case"
+                      data-testid={`corner-type-uniform-note-${team.team_name}`}
+                    >
+                      Prestazione uniforme nei settori: i dati non distinguono la forza per
+                      tipo di curva per questa vettura.
+                    </div>
+                  </>
+                ) : team.corner_type_estimate ? (
                   <div>
                     Stima — Lente: {fmt(team.corner_type_estimate.slow)} · Medie:{" "}
                     {fmt(team.corner_type_estimate.medium)} · Veloci:{" "}
@@ -230,6 +267,16 @@ function TeamTechnicalDetails({
                 </div>
               </div>
             )}
+            {/* A2 — Limite onesto telaio/motore: SEMPRE presente */}
+            <div
+              className="opacity-70 normal-case pt-1"
+              data-testid={`chassis-engine-note-${team.team_name}`}
+            >
+              La stima deriva dai tempi di settore, che includono anche i tratti in
+              rettilineo: una vettura con poca potenza può quindi risultare più debole
+              in curva di quanto il suo telaio sia in realtà. Non è una misura isolata
+              del comportamento in curva.
+            </div>
           </div>
 
           {/* Pesi del circuito */}
