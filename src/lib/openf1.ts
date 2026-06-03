@@ -474,6 +474,19 @@ export interface SessionInfo {
   date_end?: string;
   location?: string;
   country_name?: string;
+  /**
+   * Stable numeric circuit identifier provided by OpenF1 in both /sessions
+   * and /meetings responses. Preferred over location/country_name for circuit
+   * resolution because location strings vary ("Miami" vs "Miami Gardens",
+   * "Monaco" vs "Monte Carlo") and country_name is ambiguous for multi-GP
+   * countries (USA: Miami/COTA/Vegas; Italy: Monza/Imola).
+   *
+   * Additive/optional for backward compatibility: callers and tests that
+   * don't populate it fall back to the legacy string-based resolution.
+   */
+  circuit_key?: number;
+  /** Short circuit name from OpenF1, propagated when present (diagnostic). */
+  circuit_short_name?: string;
 }
 
 export function getSessionsByMeetingKey(meetingKey: number) {
