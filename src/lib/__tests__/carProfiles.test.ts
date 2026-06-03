@@ -612,7 +612,10 @@ describe("computeCarProfiles — corner_type_strength hybrid gating", () => {
       expect(typeof p.corner_coverage_curve).toBe("number");
       expect(p.corner_coverage_curve!).toBeGreaterThan(p.corner_data_coverage!);
     }
+  });
 });
+
+
 
 // =====================================================================
 // Opzione A — corner_type_strength STIMATA dai settori storici usando la
