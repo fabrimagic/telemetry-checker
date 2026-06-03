@@ -241,7 +241,7 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
     expect(all).toMatch(/sovrappongono/i);
   });
 
-  it("leader with top-speed-dominant contributions: prose says the score comes mostly from velocità di punta", () => {
+  it("PROMOZIONE — leader prose says the score is based on sector pace, NOT on trap speed", () => {
     const c = circuit({
       top_speed: 1.0,
       slow_corner_traction: 0.1,
@@ -255,11 +255,9 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
     const pred = predictGpAffinity(c, cars);
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
-    expect(all).toMatch(/Fast/);
-    // The leader's top-speed contribution should dominate — phrased as composition.
-    expect(all).toMatch(/velocità massima rilevata/i);
-    // One of the fraction phrases should appear.
-    expect(all).toMatch(/(tre quarti|due terzi|larghissima parte)/i);
+    expect(all).toMatch(/tempi di settore/i);
+    // No more "trap dominant" composition phrasing in the leader clause.
+    expect(all).not.toMatch(/composto\s+(in\s+larghissima|per\s+circa)/i);
   });
 
   it("indistinguishable leaders: no sole favorite, both teams cited together", () => {
