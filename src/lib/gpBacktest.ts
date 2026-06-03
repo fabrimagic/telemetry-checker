@@ -183,17 +183,19 @@ export function topKHit(
  * Persistence baseline: orders teams by an OVERALL strength index that does
  * NOT use any circuit-specific information. The `mode` argument selects the
  * persistence variant:
- *   - "top_and_sectors" (default, current production formula),
- *   - "sectors_only"    (experimental — drops trap speed).
- * Deterministic tie-break on team name to keep tests stable.
+ *   - "top_and_sectors" (legacy / monitoring),
+ *   - "sectors_only"    (current production — drops trap speed).
+ * The DEFAULT is {@link PRODUCTION_PERSISTENCE_MODE} so a bare
+ * `computeBaselineOrder(profiles)` call reproduces the production
+ * ranking bit-for-bit. Deterministic tie-break on team name to keep
+ * tests stable.
  */
 export function computeBaselineOrder(
   profiles: readonly CarProfile[],
-  mode: PersistenceMode = "top_and_sectors",
+  mode: PersistenceMode = PRODUCTION_PERSISTENCE_MODE,
 ): string[] {
   // Reuse the SAME helper exported from gpPrediction so the production
-  // ranking (OPZIONE Z: pure persistence) and the backtest baseline stay
-  // bit-for-bit identical. Tie-break on team name keeps tests stable.
+  // ranking and the backtest baseline stay bit-for-bit identical.
   const scored = profiles.map((p) => ({
     team: p.team_name,
     score: computePersistenceScore(p, mode),
