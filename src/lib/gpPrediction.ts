@@ -123,12 +123,45 @@ export interface GpPredictionMeta {
 }
 
 
-/** Map a qualitative confidence to a half-band width in score units (0..1). */
+/**
+ * Half-band width (score units, 0..1) by qualitative confidence level.
+ * Used for `circuitBand` only: the circuit confidence is curated/qualitative
+ * and has no "effective sample" to drive a continuous formula. The team
+ * component is computed continuously via {@link teamBandFromSample}.
+ */
 const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = {
   high: 0.05,
   medium: 0.12,
   low: 0.22,
 };
+
+/**
+ * Calibration constants for the team half-band as a CONTINUOUS function of
+ * the effective sample size: `band = K / sqrt(max(effective, EFF_MIN))`.
+ *
+ * Derivation: standard error scales as 1/√n. We anchor to the legacy
+ * step mapping in the typical-sample zone: at effective ≈ 4 we want
+ * band ≈ 0.12 (the previous "medium" step), giving k = 0.12 × √4 = 0.24.
+ * The result is clamped to [MIN, MAX] so we never promise absolute
+ * certainty and never blow up with minimal samples. `sample_laps` is
+ * intentionally NOT factored in: `effective_sample_races` is the principal
+ * driver and already absorbs recency weighting from carProfiles.
+ */
+export const TEAM_BAND_K = 0.24;
+export const TEAM_BAND_EFF_MIN = 1;
+export const TEAM_BAND_MIN = 0.04;
+export const TEAM_BAND_MAX = 0.25;
+
+export function teamBandFromSample(effectiveSampleRaces: number): number {
+  const eff = Number.isFinite(effectiveSampleRaces) && effectiveSampleRaces > 0
+    ? effectiveSampleRaces
+    : 0;
+  const denom = Math.sqrt(Math.max(eff, TEAM_BAND_EFF_MIN));
+  const raw = TEAM_BAND_K / denom;
+  if (raw < TEAM_BAND_MIN) return TEAM_BAND_MIN;
+  if (raw > TEAM_BAND_MAX) return TEAM_BAND_MAX;
+  return raw;
+}
 
 /**
  * Threshold above which overtaking_difficulty downgrades the global
@@ -320,7 +353,7 @@ export function predictGpAffinity(
     const cCorner = wCorner * cornerIdx;
     const score = clamp01(cTop + cCorner);
 
-    const carBand = CONFIDENCE_BAND[car.confidence];
+    const carBand = teamBandFromSample(car.effective_sample_races);
     const circuitBand = CONFIDENCE_BAND[circuit.confidence];
     const uncertainty = Math.sqrt(carBand * carBand + circuitBand * circuitBand);
 
