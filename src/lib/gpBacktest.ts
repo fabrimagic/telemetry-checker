@@ -495,6 +495,9 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const rhoBaseSectorsMean = meanOrNull(
     validated.map((r) => r.rho_baseline_sectors).filter((x): x is number => x != null),
   );
+  const rhoCircuitSpecificMean = meanOrNull(
+    validated.map((r) => r.rho_circuit_specific).filter((x): x is number => x != null),
+  );
   // delta_mean: model vs PRODUCTION baseline (sectors_only).
   const delta =
     rhoModelMean != null && rhoBaseSectorsMean != null
@@ -503,6 +506,10 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const deltaSectorsVsTopSec =
     rhoBaseSectorsMean != null && rhoBaseTopSecMean != null
       ? rhoBaseSectorsMean - rhoBaseTopSecMean
+      : null;
+  const deltaCircuitVsSectors =
+    rhoCircuitSpecificMean != null && rhoBaseSectorsMean != null
+      ? rhoCircuitSpecificMean - rhoBaseSectorsMean
       : null;
 
   return {
@@ -514,12 +521,15 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       rho_baseline_mean: rhoBaseSectorsMean,
       rho_baseline_topsec_mean: rhoBaseTopSecMean,
       rho_baseline_sectors_mean: rhoBaseSectorsMean,
+      rho_circuit_specific_mean: rhoCircuitSpecificMean,
       delta_mean: delta,
       delta_sectors_vs_topsec: deltaSectorsVsTopSec,
+      delta_circuit_vs_sectors: deltaCircuitVsSectors,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
       top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
       top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
+      top3_circuit_specific_rate: rateOrNull(validated.map((r) => r.top3_circuit_specific)),
     },
     total_races: total,
     notes,
