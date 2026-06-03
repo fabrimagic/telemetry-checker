@@ -102,21 +102,40 @@ export default function InternalBacktest() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               <Stat label="Gare validate" value={String(result.aggregate.races_validated)} />
               <Stat label="ρ modello (media)" value={fmt(result.aggregate.rho_model_mean)} />
-              <Stat label="ρ baseline (media)" value={fmt(result.aggregate.rho_baseline_mean)} />
               <Stat
-                label="Δ (modello − baseline)"
+                label="ρ baseline trap+settori"
+                value={fmt(result.aggregate.rho_baseline_topsec_mean)}
+              />
+              <Stat
+                label="ρ baseline solo-settori"
+                value={fmt(result.aggregate.rho_baseline_sectors_mean)}
+              />
+              <Stat
+                label="Δ (modello − trap+settori)"
                 value={fmt(result.aggregate.delta_mean)}
+              />
+              <Stat
+                label="Δ (solo-settori − trap+settori)"
+                value={fmt(result.aggregate.delta_sectors_vs_topsec)}
                 highlight
               />
-              <Stat label="Top-3 hit modello" value={fmtPct(result.aggregate.top3_model_rate)} />
-              <Stat label="Top-3 hit baseline" value={fmtPct(result.aggregate.top3_baseline_rate)} />
+              <Stat label="Top-3 modello" value={fmtPct(result.aggregate.top3_model_rate)} />
+              <Stat
+                label="Top-3 trap+settori"
+                value={fmtPct(result.aggregate.top3_baseline_topsec_rate)}
+              />
+              <Stat
+                label="Top-3 solo-settori"
+                value={fmtPct(result.aggregate.top3_baseline_sectors_rate)}
+              />
             </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-              Lettura: se ρ modello &gt; ρ baseline (Δ &gt; 0), l'analisi circuito-specifica
-              aggiunge potere predittivo. Se Δ ≈ 0 o &lt; 0, con i dati attuali il
-              modello non batte la semplice persistenza ("chi era forte resta forte").
-              Con poche gare validate (N piccolo) questi numeri sono <strong>indicativi</strong>,
-              non conclusivi.
+              Lettura: il numero CHIAVE è <strong>Δ (solo-settori − trap+settori)</strong>.
+              Se &gt; 0, togliere la velocità di punta migliora la predizione → l'Opzione 1
+              (persistenza solo-settori) è candidata per la produzione. Se ≈ 0 o &lt; 0,
+              la trap — per quanto controintuitiva — non sta peggiorando la predizione,
+              e ne riparliamo. Con poche gare validate (N piccolo) questi numeri sono
+              <strong> indicativi</strong>, non conclusivi.
             </p>
           </section>
 
@@ -128,9 +147,11 @@ export default function InternalBacktest() {
                   <tr>
                     <th className="py-2 pr-3">GP</th>
                     <th className="py-2 pr-3">ρ modello</th>
-                    <th className="py-2 pr-3">ρ baseline</th>
+                    <th className="py-2 pr-3">ρ trap+sett</th>
+                    <th className="py-2 pr-3">ρ solo-sett</th>
                     <th className="py-2 pr-3">Top-3 mod</th>
-                    <th className="py-2 pr-3">Top-3 base</th>
+                    <th className="py-2 pr-3">Top-3 t+s</th>
+                    <th className="py-2 pr-3">Top-3 s</th>
                     <th className="py-2 pr-3">n team</th>
                     <th className="py-2 pr-3">Stato</th>
                   </tr>
@@ -140,9 +161,11 @@ export default function InternalBacktest() {
                     <tr key={i} className="border-b border-border/40">
                       <td className="py-2 pr-3">{r.gpName}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_model)}</td>
-                      <td className="py-2 pr-3">{fmt(r.rho_baseline)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_baseline_topsec)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_model)}</td>
-                      <td className="py-2 pr-3">{fmtBool(r.top3_baseline)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_baseline_topsec)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors)}</td>
                       <td className="py-2 pr-3">{r.n_teams || "—"}</td>
                       <td className="py-2 pr-3 text-xs text-muted-foreground">
                         {r.skipped_reason ?? "validata"}
