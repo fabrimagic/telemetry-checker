@@ -128,15 +128,34 @@ export default function InternalBacktest() {
                 label="Top-3 solo-settori (PRODUZIONE)"
                 value={fmtPct(result.aggregate.top3_baseline_sectors_rate)}
               />
+              <Stat
+                label="ρ modello circuito-specifico (per-tipo, monitoring)"
+                value={fmt(result.aggregate.rho_circuit_specific_mean)}
+              />
+              <Stat
+                label="Top-3 circuito-specifico"
+                value={fmtPct(result.aggregate.top3_circuit_specific_rate)}
+              />
+              <Stat
+                label="Δ (circuito-specifico − solo-settori)"
+                value={fmt(result.aggregate.delta_circuit_vs_sectors)}
+                highlight
+              />
             </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-              La baseline che rappresenta la <strong>produzione</strong> è ora{" "}
-              <strong>solo-settori</strong> (promossa dall'Opzione 1, Δ ≈ +0.209
-              sui dati validati). Il numero di monitoring{" "}
-              <strong>Δ (solo-settori − trap+settori)</strong> resta visibile per
-              tenere d'occhio una eventuale regressione del nuovo formula vs la
-              vecchia. Con poche gare validate (N piccolo) questi numeri sono
+              La baseline che rappresenta la <strong>produzione</strong> è{" "}
+              <strong>solo-settori</strong> (promossa dall'Opzione 1). Con poche
+              gare validate (N piccolo) questi numeri sono
               <strong> indicativi</strong>, non conclusivi.
+            </p>
+            <p className="text-xs text-muted-foreground pt-2 border-t border-border">
+              <strong>Ruolo B — monitoraggio per-tipo di curva.</strong> Il
+              modello circuito-specifico USA la distinzione lente/medie/veloci.
+              Se <strong>Δ (circuito-specifico − solo-settori) &gt; 0</strong>{" "}
+              e stabile su più gare, la distinzione per tipo di curva inizia a
+              migliorare la previsione → candidarla al punteggio. Oggi atteso
+              ≤ 0. È il segnale di monitoraggio per il ruolo predittivo (B);
+              il punteggio di produzione resta <strong>solo-settori</strong>.
             </p>
           </section>
 
@@ -150,9 +169,11 @@ export default function InternalBacktest() {
                     <th className="py-2 pr-3">ρ modello</th>
                     <th className="py-2 pr-3">ρ trap+sett</th>
                     <th className="py-2 pr-3">ρ solo-sett</th>
+                    <th className="py-2 pr-3">ρ circ-spec</th>
                     <th className="py-2 pr-3">Top-3 mod</th>
                     <th className="py-2 pr-3">Top-3 t+s</th>
                     <th className="py-2 pr-3">Top-3 s</th>
+                    <th className="py-2 pr-3">Top-3 c-s</th>
                     <th className="py-2 pr-3">n team</th>
                     <th className="py-2 pr-3">Stato</th>
                   </tr>
@@ -164,9 +185,11 @@ export default function InternalBacktest() {
                       <td className="py-2 pr-3">{fmt(r.rho_model)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_circuit_specific)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_model)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_circuit_specific)}</td>
                       <td className="py-2 pr-3">{r.n_teams || "—"}</td>
                       <td className="py-2 pr-3 text-xs text-muted-foreground">
                         {r.skipped_reason ?? "validata"}
