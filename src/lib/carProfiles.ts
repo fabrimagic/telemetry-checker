@@ -518,6 +518,21 @@ export async function computeCarProfiles(
     medium: new Map<string, number>(),
     fast: new Map<string, number>(),
   };
+  // SEPARATE accumulators for the historic-sector-map estimate (Opzione A).
+  // We do NOT merge them with the GPS accumulators above: the two sources
+  // are conceptually distinct (direct geometric measurement vs. estimate
+  // through sector→type maps) and we want to pick GPS-when-available, then
+  // sector-history. Keeping them separate makes the priority explicit.
+  const accCornerFromSectorsSum = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
+  const accCornerFromSectorsW = {
+    slow: new Map<string, number>(),
+    medium: new Map<string, number>(),
+    fast: new Map<string, number>(),
+  };
   const accCoverageSum = new Map<string, number>();
   const accCoverageW = new Map<string, number>();
   // Diagnostic-only: corner-vertices coverage (slow/medium/fast only).
