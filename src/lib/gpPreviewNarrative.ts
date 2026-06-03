@@ -11,10 +11,8 @@
 import type { CircuitProfile } from "./circuitProfiles";
 import type { GpPrediction } from "./gpPrediction";
 
-/** Thresholds used purely for prose coloring. */
+/** Threshold used purely for prose coloring. */
 const HIGH_TRAIT = 0.7;
-const DOMINANT_TOP_RATIO = 0.6; // contributions.top_speed / total ≥ this ⇒ "velocità di punta"
-const DOMINANT_CORNER_RATIO = 0.6;
 
 export interface RaceDiagnosticLite {
   name: string;
