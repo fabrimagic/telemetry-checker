@@ -256,8 +256,8 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
     expect(all).toMatch(/Fast/);
-    // The leader's top-speed contribution should dominate.
-    expect(all).toMatch(/grazie alla velocità di punta/i);
+    // The leader's top-speed contribution should dominate — phrased as composition.
+    expect(all).toMatch(/velocità massima rilevata/i);
     // One of the fraction phrases should appear.
     expect(all).toMatch(/(tre quarti|due terzi|larghissima parte)/i);
   });
