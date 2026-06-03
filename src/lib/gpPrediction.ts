@@ -240,7 +240,11 @@ export function predictGpAffinity(
     const topIdx = clamp01(car.top_speed_index);
 
     let cornerIdx: number;
-    let cornerSource: "location_geometry" | "sector_typed" | "sector_fallback";
+    let cornerSource:
+      | "location_geometry"
+      | "sector_typed_history"
+      | "sector_typed"
+      | "sector_fallback";
     let typeEstimate: TeamGpAffinity["corner_type_estimate"] = undefined;
     if (car.corner_type_strength) {
       const wS = circuit.slow_corner_traction;
@@ -263,7 +267,13 @@ export function predictGpAffinity(
           ]),
         );
       }
-      cornerSource = "location_geometry";
+      // La corner_type_strength può arrivare dal GPS (location_geometry) o
+      // dalla stima sui settori storici (sector_typed_history, Opzione A);
+      // propaghiamo verbatim la sorgente dichiarata dal CarProfile.
+      cornerSource =
+        car.corner_source === "sector_typed_history"
+          ? "sector_typed_history"
+          : "location_geometry";
     } else if (circuit.sector_corner_map) {
       const map = circuit.sector_corner_map;
       const s = car.sector_strength;
