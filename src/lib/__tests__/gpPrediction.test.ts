@@ -65,7 +65,7 @@ describe("gpPrediction", () => {
       car("Fast", 0.95, [0.3, 0.3, 0.3]),
       car("Cornering", 0.2, [0.95, 0.95, 0.95]),
     ];
-    const out = predictGpAffinity(c, cars);
+    const out = predictGpAffinity(c, cars, { useCircuitSpecificModel: true });
     expect(out.ranked[0].team_name).toBe("Cornering");
   });
 
@@ -209,8 +209,8 @@ describe("gpPrediction", () => {
     // ONLY when top==corner. Use top≠corner so that a higher wCorner moves
     // the score toward the cornering value.
     const cars = [car("T", 0.2, [0.9, 0.9, 0.9])];
-    const dom = predictGpAffinity(dominant, cars).ranked[0].affinity_score;
-    const bal = predictGpAffinity(balanced, cars).ranked[0].affinity_score;
+    const dom = predictGpAffinity(dominant, cars, { useCircuitSpecificModel: true }).ranked[0].affinity_score;
+    const bal = predictGpAffinity(balanced, cars, { useCircuitSpecificModel: true }).ranked[0].affinity_score;
     // Dominant circuit: higher wCorner ⇒ score closer to 0.9 than balanced.
     expect(dom).toBeGreaterThan(bal);
   });
@@ -224,7 +224,7 @@ describe("gpPrediction", () => {
     });
     // With equal weights the aggregate is 0.6, so wCorner = 0.6/(0.4+0.6)=0.6.
     // Score for car(top=0, corners=1) = 0.6*1 = 0.6.
-    const out = predictGpAffinity(c, [car("X", 0, [1, 1, 1])]);
+    const out = predictGpAffinity(c, [car("X", 0, [1, 1, 1])], { useCircuitSpecificModel: true });
     expect(out.ranked[0].affinity_score).toBeCloseTo(0.6, 5);
   });
 
@@ -258,7 +258,7 @@ describe("gpPrediction", () => {
       corner_data_coverage: 0.9,
       corner_source: "location_geometry",
     };
-    const out = predictGpAffinity(c, [geomCar]);
+    const out = predictGpAffinity(c, [geomCar], { useCircuitSpecificModel: true });
     // wTop=0, wCorner=1, cornerIdx=1 → score=1.
     expect(out.ranked[0].affinity_score).toBeCloseTo(1, 5);
   });
@@ -376,7 +376,7 @@ describe("gpPrediction", () => {
         sector_corner_map: monacoLikeMap,
       });
       const strongInSlow = car("Slow", 0.5, [0.95, 0.95, 0.95]);
-      const out = predictGpAffinity(c, [strongInSlow]);
+      const out = predictGpAffinity(c, [strongInSlow], { useCircuitSpecificModel: true });
       expect(out.ranked[0].corner_source).toBe("sector_typed");
       expect(out.ranked[0].affinity_score).toBeGreaterThan(0.9);
     });
@@ -391,7 +391,7 @@ describe("gpPrediction", () => {
       });
       const A = car("FrontInSlow", 0.5, [0.5, 0.5, 0.8]);
       const B = car("FrontInFast", 0.5, [0.8, 0.5, 0.5]);
-      const out = predictGpAffinity(c, [A, B]);
+      const out = predictGpAffinity(c, [A, B], { useCircuitSpecificModel: true });
       const sA = out.ranked.find((t) => t.team_name === "FrontInSlow")!.affinity_score;
       const sB = out.ranked.find((t) => t.team_name === "FrontInFast")!.affinity_score;
       expect(sA).toBeGreaterThan(sB);
@@ -399,7 +399,7 @@ describe("gpPrediction", () => {
       const cFlat = circuit({
         top_speed: 0, slow_corner_traction: 1.0, medium_corner: 0.2, fast_corner: 0.0,
       });
-      const outFlat = predictGpAffinity(cFlat, [A, B]);
+      const outFlat = predictGpAffinity(cFlat, [A, B], { useCircuitSpecificModel: true });
       const fA = outFlat.ranked.find((t) => t.team_name === "FrontInSlow")!.affinity_score;
       const fB = outFlat.ranked.find((t) => t.team_name === "FrontInFast")!.affinity_score;
       expect(fA).toBeCloseTo(fB, 10);
@@ -423,7 +423,7 @@ describe("gpPrediction", () => {
         corner_data_coverage: 0.8,
         corner_source: "location_geometry",
       };
-      const out = predictGpAffinity(c, [geomCar]);
+      const out = predictGpAffinity(c, [geomCar], { useCircuitSpecificModel: true });
       expect(out.ranked[0].corner_source).toBe("location_geometry");
       expect(out.ranked[0].affinity_score).toBeCloseTo(1, 5);
     });
@@ -511,7 +511,7 @@ describe("gpPrediction", () => {
       expect(silverstone.sector_corner_map).toBeDefined();
       const A = car("StrongS2", 0.5, [0.5, 0.9, 0.5]); // forte nelle veloci (S2)
       const B = car("StrongS3", 0.5, [0.5, 0.5, 0.9]); // più bilanciato
-      const out = predictGpAffinity(silverstone, [A, B]);
+      const out = predictGpAffinity(silverstone, [A, B], { useCircuitSpecificModel: true });
       expect(out.ranked[0].corner_source).toBe("sector_typed");
       const sA = out.ranked.find((t) => t.team_name === "StrongS2")!.affinity_score;
       const sB = out.ranked.find((t) => t.team_name === "StrongS3")!.affinity_score;
@@ -530,7 +530,7 @@ describe("gpPrediction", () => {
         corner_type_strength: { slow: 1.0, medium: 0, fast: 0 },
         corner_source: "sector_typed_history",
       };
-      const out = predictGpAffinity(c, [historyCar]);
+      const out = predictGpAffinity(c, [historyCar], { useCircuitSpecificModel: true });
       expect(out.ranked[0].corner_source).toBe("sector_typed_history");
       // Il punteggio usa direttamente corner_type_strength (priorità a monte),
       // non il vecchio sector_typed a valle.
@@ -551,7 +551,7 @@ describe("gpPrediction", () => {
         corner_type_strength: { slow: 1.0, medium: 0, fast: 0 },
         corner_source: "sector_typed_history",
       };
-      const out = predictGpAffinity(c, [historyCar]);
+      const out = predictGpAffinity(c, [historyCar], { useCircuitSpecificModel: true });
       // Quando corner_type_strength è presente, il ramo a valle è bypassato.
       expect(out.ranked[0].corner_source).toBe("sector_typed_history");
       expect(out.ranked[0].affinity_score).toBeCloseTo(1, 5);
@@ -604,3 +604,61 @@ describe("teamBandFromSample", () => {
 
 
 
+
+describe("OPZIONE Z — pure persistence (default production engine)", () => {
+  function circ(o: Partial<CircuitProfile> = {}): CircuitProfile {
+    return {
+      gpName: "Z", top_speed: 0.5, slow_corner_traction: 0.5,
+      medium_corner: 0.5, fast_corner: 0.5, tyre_deg: 0.5,
+      overtaking_difficulty: 0.5, confidence: "high", source: "historical", ...o,
+    };
+  }
+  function ca(name: string, top: number, s: [number, number, number]): CarProfile {
+    return {
+      team_name: name, top_speed_index: top,
+      sector_strength: { s1: s[0], s2: s[1], s3: s[2] },
+      sample_races: 4, effective_sample_races: 4, sample_laps: 200, confidence: "high",
+    };
+  }
+
+  it("affinity_score equals computePersistenceScore (matches backtest baseline)", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const cars = [ca("A", 0.8, [0.6, 0.5, 0.7]), ca("B", 0.4, [0.4, 0.5, 0.4])];
+    const out = predictGpAffinity(circ(), cars);
+    for (const t of out.ranked) {
+      const car = cars.find((c) => c.team_name === t.team_name)!;
+      expect(t.affinity_score).toBeCloseTo(computePersistenceScore(car), 10);
+    }
+  });
+
+  it("production ranking matches computeBaselineOrder bit-for-bit", async () => {
+    const { computeBaselineOrder } = await import("../gpBacktest");
+    const cars = [ca("A", 0.8, [0.6, 0.5, 0.7]), ca("B", 0.4, [0.4, 0.5, 0.4]), ca("C", 0.6, [0.6, 0.6, 0.6])];
+    const out = predictGpAffinity(circ(), cars);
+    expect(out.ranked.map((t) => t.team_name)).toEqual(computeBaselineOrder(cars));
+  });
+
+  it("score is INVARIANT w.r.t. the circuit profile (persistence ignores it)", () => {
+    const car1 = ca("X", 0.7, [0.5, 0.6, 0.5]);
+    const cA = circ({ top_speed: 1.0, slow_corner_traction: 0, medium_corner: 0, fast_corner: 0 });
+    const cB = circ({ top_speed: 0, slow_corner_traction: 1, medium_corner: 1, fast_corner: 1 });
+    const sA = predictGpAffinity(cA, [car1]).ranked[0].affinity_score;
+    const sB = predictGpAffinity(cB, [car1]).ranked[0].affinity_score;
+    expect(sA).toBeCloseTo(sB, 10);
+  });
+
+  it("flag override: useCircuitSpecificModel=true restores legacy circuit-weighted score", () => {
+    const c = circ({ top_speed: 1, slow_corner_traction: 0, medium_corner: 0, fast_corner: 0 });
+    const car1 = ca("F", 0.95, [0.1, 0.1, 0.1]);
+    const persistence = predictGpAffinity(c, [car1]).ranked[0].affinity_score;
+    const legacy = predictGpAffinity(c, [car1], { useCircuitSpecificModel: true }).ranked[0].affinity_score;
+    // Persistence ≈ (0.95 + 0.1)/2 = 0.525; legacy with wTop=1 = 0.95.
+    expect(persistence).toBeCloseTo(0.525, 5);
+    expect(legacy).toBeCloseTo(0.95, 5);
+  });
+
+  it("USE_CIRCUIT_SPECIFIC_MODEL is false by default", async () => {
+    const mod = await import("../gpPrediction");
+    expect(mod.USE_CIRCUIT_SPECIFIC_MODEL).toBe(false);
+  });
+});

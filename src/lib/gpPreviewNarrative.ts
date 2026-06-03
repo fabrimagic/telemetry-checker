@@ -108,8 +108,13 @@ export function buildGpPreviewNarrative(
   }
 
   // ----- 2. COSA RAPPRESENTA IL PUNTEGGIO (didattica) -----
+  // OPZIONE Z: il punteggio è la PERSISTENZA pura (forza recente complessiva
+  // della vettura), NON una stima del match circuito↔vettura. Il carattere
+  // del circuito resta descritto sopra come contesto, ma non entra nel
+  // punteggio: il backtest ha mostrato che il modello circuito-specifico
+  // peggiora le predizioni con i dati 2026 attuali.
   sentences.push(
-    "Il punteggio di affinità è un indice da 0 a 1 che stima quanto le caratteristiche misurate di ogni vettura — velocità di punta e tenuta in curva aggregata sui tre settori — si sposano con ciò che questo circuito richiede. Non è una previsione del risultato della gara, ma una lettura tecnica del match circuito-vettura sui dati raccolti finora.",
+    "Il punteggio di affinità è un indice da 0 a 1 che riflette la forza recente complessiva di ciascuna vettura — velocità di punta e tenuta in curva aggregata sui tre settori — misurata nelle gare già disputate. Non incorpora il carattere specifico di questo circuito: l'analisi per tipo di curva, disponibile più sotto come contesto, non è ancora usata per la previsione perché con i dati 2026 attuali non ha dimostrato di migliorarla. È quindi una lettura della forza recente, non una previsione del risultato.",
   );
   sentences.push(
     "La velocità di punta riflette soprattutto il potenziale espresso in qualifica, quando le vetture spingono al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova; in gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
@@ -126,7 +131,7 @@ export function buildGpPreviewNarrative(
     );
   }
 
-  // ----- 3. TEAM FAVORITI E PERCHÉ (esteso) -----
+  // ----- 3. TEAM FAVORITI E PERCHÉ (basato sulla persistenza, non sul circuito) -----
   {
     const ranked = prediction.ranked;
     const leader = ranked[0];
@@ -137,7 +142,10 @@ export function buildGpPreviewNarrative(
     const topNames = leaderGroup ?? [leader.team_name];
     const topTeams = ranked.filter((t) => topNames.includes(t.team_name));
 
-    // Aggregate dominant dimension across top teams.
+    // Aggregate dominant dimension across top teams. In persistence mode
+    // these "contributions" describe WHERE the team's recent strength sits
+    // (velocità di punta vs tenuta in curva COMPLESSIVA), NOT a circuit-
+    // specific weighting.
     let sumTop = 0;
     let sumCorner = 0;
     for (const t of topTeams) {
@@ -150,30 +158,30 @@ export function buildGpPreviewNarrative(
 
     let because: string;
     if (topRatio >= DOMINANT_TOP_RATIO) {
-      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva`;
+      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva, sui dati delle gare recenti`;
     } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
-      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta`;
+      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta, sui dati delle gare recenti`;
     } else {
-      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva, senza una vera dimensione dominante";
+      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva sui dati delle gare recenti, senza una vera dimensione dominante";
     }
 
     if (topTeams.length > 1) {
       sentences.push(
         `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} risultano sostanzialmente equivalenti in cima alla classifica di affinità: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
       );
       sentences.push(
         "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} sembra il team più in linea con questo tracciato: il suo punteggio deriva ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio deriva ${because}.`,
       );
     }
   }
 
-  // ----- 4. CHI POTREBBE FATICARE (collegato al perché) -----
+  // ----- 4. CHI POTREBBE FATICARE (sulla persistenza, non sul match con il circuito) -----
   {
     const ranked = prediction.ranked;
     if (ranked.length >= 3) {
@@ -182,23 +190,8 @@ export function buildGpPreviewNarrative(
         g.includes(ranked[0].team_name),
       );
       if (!leaderGroup || !leaderGroup.includes(last.team_name)) {
-        const total =
-          last.contributions.top_speed + last.contributions.cornering;
-        const lastTopRatio = total > 0 ? last.contributions.top_speed / total : 0.5;
-        // Identify which trait the circuit rewards most to explain the mismatch.
-        const cornerMean =
-          (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
-        const circuitFavoursTop = circuit.top_speed >= cornerMean;
-        let why: string;
-        if (circuitFavoursTop && lastTopRatio < 0.5) {
-          why = "perché il suo punto di forza è più nella tenuta in curva che nella velocità di punta, ed è questa seconda dimensione che il circuito premia di più";
-        } else if (!circuitFavoursTop && lastTopRatio > 0.5) {
-          why = "perché il suo punto di forza è più nella velocità di punta che nella tenuta in curva, ed è quest'ultima che il circuito premia di più";
-        } else {
-          why = "perché su entrambe le dimensioni misurate appare più indietro rispetto agli altri team";
-        }
         sentences.push(
-          `${last.team_name} potrebbe invece trovarsi meno a suo agio su questo tipo di tracciato, ${why}.`,
+          `${last.team_name} risulta invece tra i meno forti su entrambe le dimensioni misurate (velocità di punta e tenuta in curva complessiva) nelle gare recenti.`,
         );
       }
     }
@@ -410,17 +403,6 @@ function positionPhrase(index: number, total: number): string {
   return "si trova in una posizione intermedia della classifica di affinità";
 }
 
-function circuitFavoursTopSpeed(circuit: CircuitProfile): boolean {
-  const cornerMean =
-    (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
-  return circuit.top_speed > cornerMean;
-}
-
-function circuitDimensionGap(circuit: CircuitProfile): number {
-  const cornerMean =
-    (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
-  return Math.abs(circuit.top_speed - cornerMean);
-}
 
 export function buildPerTeamExplanations(
   circuit: CircuitProfile,
@@ -434,9 +416,9 @@ export function buildPerTeamExplanations(
     for (const name of g) groupByTeam.set(name, g);
   }
 
-  const favoursTop = circuitFavoursTopSpeed(circuit);
-  const circuitHasClearChar = circuitDimensionGap(circuit) >= 0.15;
-
+  // OPZIONE Z: il punteggio NON dipende dal carattere del circuito, quindi
+  // la frase per-team descrive solo dove si concentra la forza recente del
+  // team (rettilineo vs curva) senza legarla causalmente al circuito.
   return ranked.map((t, i) => {
     const total = t.contributions.top_speed + t.contributions.cornering;
     const topPct = total > 0 ? Math.round((t.contributions.top_speed / total) * 100) : 50;
@@ -445,22 +427,11 @@ export function buildPerTeamExplanations(
 
     let strengthClause: string;
     if (topPct >= 60) {
-      strengthClause = `Il suo punto di forza qui è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
     } else if (cornerPct >= 60) {
-      strengthClause = `Il suo punto di forza qui è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
     } else {
-      strengthClause = `Velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
-    }
-
-    let circuitLink = "";
-    if (circuitHasClearChar) {
-      if (favoursTop) {
-        if (topPct >= 60) circuitLink = ", e questo circuito premia proprio i rettilinei: una combinazione favorevole";
-        else if (cornerPct >= 60) circuitLink = ", ma questo circuito premia di più i rettilinei: una combinazione meno favorevole";
-      } else {
-        if (cornerPct >= 60) circuitLink = ", e questo circuito premia proprio la guida in curva: una combinazione favorevole";
-        else if (topPct >= 60) circuitLink = ", ma questo circuito premia di più la guida in curva: una combinazione meno favorevole";
-      }
+      strengthClause = `Nelle gare recenti velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
     }
 
     let equivClause = "";
@@ -476,16 +447,16 @@ export function buildPerTeamExplanations(
         typeof t.corner_coverage === "number"
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
-      sourceClause = ` La tenuta in curva di questo team è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}: lettura più granulare ma con possibili imprecisioni di allineamento.`;
+      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva per tipo è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
     } else if (t.corner_source === "sector_typed_history") {
-      sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — la stima più solida quando non c'è la ricostruzione GPS.`;
+      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
     } else if (t.corner_source === "sector_typed") {
-      sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — una lettura più ricca della semplice media, pur restando una stima.`;
+      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
     } else if (t.corner_source === "sector_fallback") {
-      sourceClause = ` La tenuta in curva di questo team è stimata dai tempi di settore aggregati (non disponibile la ricostruzione per tipo di curva).`;
+      sourceClause = ` La tenuta in curva di questo team è disponibile solo dai tempi di settore aggregati (non è disponibile la ricostruzione per tipo di curva).`;
     }
 
-    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}${sourceClause}`;
+    const text = `${t.team_name} ${where}. ${strengthClause}.${equivClause}${sourceClause}`;
     return { team_name: t.team_name, text };
   });
 }
