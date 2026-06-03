@@ -360,9 +360,6 @@ export function GpPredictionResultView({
               const inGroup = gIdx != null;
               const lo = Math.max(0, t.affinity_score - t.uncertainty);
               const hi = Math.min(1, t.affinity_score + t.uncertainty);
-              const total = t.contributions.top_speed + t.contributions.cornering;
-              const topPct = total > 0 ? (t.contributions.top_speed / total) * 100 : 50;
-              const cornerPct = 100 - topPct;
               return (
                 <div
                   key={t.team_name}
@@ -401,26 +398,17 @@ export function GpPredictionResultView({
                       style={{ left: `calc(${t.affinity_score * 100}% - 1px)` }}
                     />
                   </div>
-                  {/* Composizione del punteggio (NON un primato rispetto al campo) */}
+                  {/* Basis of the score (NOT a composition split): the score is 100% sector pace. */}
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
-                    <span title="Quanto la componente di velocità massima rilevata (trap) contribuisce al punteggio di questo team. Non è la posizione del team rispetto agli altri in rettilineo.">
-                      Velocità massima rilevata:&nbsp;
-                      <span className="text-foreground font-medium tabular-nums">
-                        {Math.round(topPct)}%
-                      </span>
-                    </span>
-                    <span title="Quanto la componente di tenuta in curva contribuisce al punteggio di questo team. Non è la posizione del team rispetto agli altri in curva.">
-                      Curve:&nbsp;
-                      <span className="text-foreground font-medium tabular-nums">
-                        {Math.round(cornerPct)}%
-                      </span>
-                    </span>
                     <span
-                      className="text-[10px] normal-case opacity-70"
-                      data-testid={`composition-note-${t.team_name}`}
-                      title="Composizione interna del punteggio del team: dice da quale componente proviene di più, non se il team sia primo del campo su quella componente."
+                      data-testid={`score-basis-${t.team_name}`}
+                      title="Il punteggio è la tenuta media nei tempi di settore (s1, s2, s3) delle gare recenti. La velocità massima rilevata (trap) è mostrata nei dettagli tecnici come contesto, ma non entra nel punteggio."
                     >
-                      (composizione del punteggio, non confronto col campo)
+                      Punteggio basato sulla{" "}
+                      <span className="text-foreground font-medium">
+                        tenuta nei tempi di settore
+                      </span>{" "}
+                      delle gare recenti
                     </span>
                     {t.corner_source === "location_geometry" && (
                       <span
