@@ -117,17 +117,45 @@ const OPENF1_LOCATION_TO_GP_NAME: Record<string, string> = {
  * "unknown circuit" that should fall back to the upcoming GP layout
  * (which would mismatch the historical session's actual track).
  */
+/**
+ * Country-only keys that are AMBIGUOUS because the country hosts MORE
+ * than one GP in the 2026 calendar. We refuse to resolve these via the
+ * countryName fallback: a country-only signal cannot disambiguate
+ * Miami vs COTA vs Las Vegas, or Monza vs Imola. Returning null here
+ * forces an honest degradation (sector_fallback, no layout) rather
+ * than silently picking the WRONG circuit profile.
+ *
+ * City/circuit keys (miami, austin, cota, monza, imola, ...) stay in
+ * OPENF1_LOCATION_TO_GP_NAME and are always safe via the `location` field.
+ */
+const AMBIGUOUS_COUNTRY_KEYS = new Set<string>([
+  "united states",
+  "usa",
+  "italy",
+  "italia",
+]);
+
 export function resolveCalendarGpName(
   location?: string | null,
   countryName?: string | null,
 ): string | null {
-  const tryKey = (s?: string | null): string | null => {
+  const normalize = (s?: string | null): string | null => {
     if (!s) return null;
     const k = s.trim().toLowerCase();
-    if (!k) return null;
-    return OPENF1_LOCATION_TO_GP_NAME[k] ?? null;
+    return k || null;
   };
-  return tryKey(location) ?? tryKey(countryName);
+
+  const locKey = normalize(location);
+  if (locKey) {
+    const hit = OPENF1_LOCATION_TO_GP_NAME[locKey];
+    if (hit) return hit;
+  }
+
+  const countryKey = normalize(countryName);
+  if (countryKey && !AMBIGUOUS_COUNTRY_KEYS.has(countryKey)) {
+    return OPENF1_LOCATION_TO_GP_NAME[countryKey] ?? null;
+  }
+  return null;
 }
 
 const BASE_URL =
