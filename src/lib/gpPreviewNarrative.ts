@@ -14,6 +14,43 @@ import type { GpPrediction } from "./gpPrediction";
 /** Threshold used purely for prose coloring. */
 const HIGH_TRAIT = 0.7;
 
+/**
+ * Minimum spread max−min across the three per-type corner values (slow/medium/
+ * fast) required to TREAT the per-type estimate as actually differentiating.
+ * Below this threshold the three numbers are nearly identical and pretending
+ * they represent a true per-type strength is misleading: the UI shows a single
+ * aggregate value, the narrative avoids per-type claims.
+ *
+ * Calibration note: 0.05 on a 0..1 index corresponds to about 5% of the
+ * normalized span — sectors that disagree by less than this are noise-level on
+ * the data we have (e.g. Ferrari 0.64/0.64/0.63, spread 0.002 ≪ 0.05).
+ */
+export const CORNER_TYPE_SPREAD_MIN = 0.05;
+
+export interface CornerTypeValues {
+  slow: number;
+  medium: number;
+  fast: number;
+}
+
+export function cornerTypeSpread(v: CornerTypeValues): number {
+  return (
+    Math.max(v.slow, v.medium, v.fast) - Math.min(v.slow, v.medium, v.fast)
+  );
+}
+
+export function cornerTypeMean(v: CornerTypeValues): number {
+  return (v.slow + v.medium + v.fast) / 3;
+}
+
+export function isCornerTypeDifferentiating(
+  v: CornerTypeValues | null | undefined,
+): boolean {
+  if (!v) return false;
+  return cornerTypeSpread(v) >= CORNER_TYPE_SPREAD_MIN;
+}
+
+
 export interface RaceDiagnosticLite {
   name: string;
   date_end: string;
