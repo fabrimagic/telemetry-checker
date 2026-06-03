@@ -346,28 +346,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     // ----- compute `now` strictly BEFORE the start of N's Qualifying -----
     const qualiOfN = qualiByMeeting.get(target.meeting_key);
     if (!qualiOfN || !qualiOfN.date_start) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_quali_session",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_session"));
       continue;
     }
     const qualiStart = new Date(qualiOfN.date_start).getTime();
     if (!Number.isFinite(qualiStart)) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_quali_session",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_session"));
       continue;
     }
     const now = new Date(qualiStart - margin);
@@ -377,41 +361,17 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     try {
       profilesResult = await compute({ now, signal });
     } catch {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "insufficient_upstream_data",
-      });
+      per_race.push(skippedRace(gpName, "insufficient_upstream_data"));
       continue;
     }
     if (!profilesResult.profiles || profilesResult.profiles.length === 0) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "insufficient_upstream_data",
-      });
+      per_race.push(skippedRace(gpName, "insufficient_upstream_data"));
       continue;
     }
 
     const circuit = circuitProfiles[gpName];
     if (!circuit) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_circuit_profile",
-      });
+      per_race.push(skippedRace(gpName, "no_circuit_profile"));
       continue;
     }
 
@@ -419,15 +379,7 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       racesConsidered: profilesResult.races_considered,
     });
     if (!prediction.ranked || prediction.ranked.length === 0) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "prediction_empty",
-      });
+      per_race.push(skippedRace(gpName, "prediction_empty"));
       continue;
     }
     const predOrder = prediction.ranked.map((t) => t.team_name);
@@ -440,28 +392,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       qLaps = (await getLaps(qualiOfN.session_key)) ?? [];
       qDrivers = (await getDrv(qualiOfN.session_key)) ?? [];
     } catch {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_quali_data",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_data"));
       continue;
     }
     const truthOrder = computeQualifyingOrderByTeam(qLaps, qDrivers);
     if (truthOrder.length < 2) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: truthOrder.length,
-        skipped_reason: "no_quali_data",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_data", truthOrder.length));
       continue;
     }
 
