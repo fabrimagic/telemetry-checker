@@ -130,7 +130,7 @@ export function buildGpPreviewNarrative(
     );
   }
 
-  // ----- 3. TEAM FAVORITI E PERCHÉ (basato sulla persistenza, non sul circuito) -----
+  // ----- 3. TEAM FAVORITI E PERCHÉ (basato sulla persistenza sui settori) -----
   {
     const ranked = prediction.ranked;
     const leader = ranked[0];
@@ -141,46 +141,26 @@ export function buildGpPreviewNarrative(
     const topNames = leaderGroup ?? [leader.team_name];
     const topTeams = ranked.filter((t) => topNames.includes(t.team_name));
 
-    // Aggregate dominant dimension across top teams. In persistence mode
-    // these "contributions" describe WHERE the team's recent strength sits
-    // (velocità di punta vs tenuta in curva COMPLESSIVA), NOT a circuit-
-    // specific weighting.
-    let sumTop = 0;
-    let sumCorner = 0;
-    for (const t of topTeams) {
-      sumTop += t.contributions.top_speed;
-      sumCorner += t.contributions.cornering;
-    }
-    const totalC = sumTop + sumCorner;
-    const topRatio = totalC > 0 ? sumTop / totalC : 0.5;
-    const cornerRatio = 1 - topRatio;
-
-    let because: string;
-    if (topRatio >= DOMINANT_TOP_RATIO) {
-      because = `composto ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap) e ${ratioPhrase(cornerRatio)} dalla tenuta in curva, sui dati delle gare recenti`;
-    } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
-      because = `composto ${ratioPhrase(cornerRatio)} dalla tenuta in curva e ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap), sui dati delle gare recenti`;
-    } else {
-      because = "composto in misura simile da velocità massima rilevata (trap) e tenuta in curva sui dati delle gare recenti, senza una componente nettamente dominante";
-    }
+    const because =
+      "il loro punteggio riflette la tenuta media nei tempi di settore (s1, s2 e s3) delle gare recenti, non un giudizio sul match con questo circuito";
 
     if (topTeams.length > 1) {
       sentences.push(
         `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato è ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro — ${because}.`,
       );
       sentences.push(
         "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio è ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: ${because}.`,
       );
     }
   }
 
-  // ----- 4. CHI POTREBBE FATICARE (sulla persistenza, non sul match con il circuito) -----
+  // ----- 4. CHI POTREBBE FATICARE (sulla persistenza sui settori) -----
   {
     const ranked = prediction.ranked;
     if (ranked.length >= 3) {
@@ -190,7 +170,7 @@ export function buildGpPreviewNarrative(
       );
       if (!leaderGroup || !leaderGroup.includes(last.team_name)) {
         sentences.push(
-          `${last.team_name} risulta invece tra i meno forti su entrambe le dimensioni misurate (velocità di punta e tenuta in curva complessiva) nelle gare recenti.`,
+          `${last.team_name} risulta invece tra i meno forti nei tempi di settore delle gare recenti.`,
         );
       }
     }
