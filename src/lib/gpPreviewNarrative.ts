@@ -427,9 +427,9 @@ export function buildPerTeamExplanations(
     for (const name of g) groupByTeam.set(name, g);
   }
 
-  const favoursTop = circuitFavoursTopSpeed(circuit);
-  const circuitHasClearChar = circuitDimensionGap(circuit) >= 0.15;
-
+  // OPZIONE Z: il punteggio NON dipende dal carattere del circuito, quindi
+  // la frase per-team descrive solo dove si concentra la forza recente del
+  // team (rettilineo vs curva) senza legarla causalmente al circuito.
   return ranked.map((t, i) => {
     const total = t.contributions.top_speed + t.contributions.cornering;
     const topPct = total > 0 ? Math.round((t.contributions.top_speed / total) * 100) : 50;
@@ -438,22 +438,11 @@ export function buildPerTeamExplanations(
 
     let strengthClause: string;
     if (topPct >= 60) {
-      strengthClause = `Il suo punto di forza qui è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
     } else if (cornerPct >= 60) {
-      strengthClause = `Il suo punto di forza qui è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
     } else {
-      strengthClause = `Velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
-    }
-
-    let circuitLink = "";
-    if (circuitHasClearChar) {
-      if (favoursTop) {
-        if (topPct >= 60) circuitLink = ", e questo circuito premia proprio i rettilinei: una combinazione favorevole";
-        else if (cornerPct >= 60) circuitLink = ", ma questo circuito premia di più i rettilinei: una combinazione meno favorevole";
-      } else {
-        if (cornerPct >= 60) circuitLink = ", e questo circuito premia proprio la guida in curva: una combinazione favorevole";
-        else if (topPct >= 60) circuitLink = ", ma questo circuito premia di più la guida in curva: una combinazione meno favorevole";
-      }
+      strengthClause = `Nelle gare recenti velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
     }
 
     let equivClause = "";
@@ -469,16 +458,16 @@ export function buildPerTeamExplanations(
         typeof t.corner_coverage === "number"
           ? ` (copertura dei dati GPS circa ${Math.round(t.corner_coverage * 100)}%)`
           : "";
-      sourceClause = ` La tenuta in curva di questo team è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}: lettura più granulare ma con possibili imprecisioni di allineamento.`;
+      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva per tipo è ricostruita dalla geometria del tracciato e dalla posizione GPS in qualifica${covPct}.`;
     } else if (t.corner_source === "sector_typed_history") {
-      sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — la stima più solida quando non c'è la ricostruzione GPS.`;
+      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) dalla prestazione nei settori delle gare precedenti, classificati per carattere — è una lettura più granulare ma, per ora, descrittiva.`;
     } else if (t.corner_source === "sector_typed") {
-      sourceClause = ` La tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — una lettura più ricca della semplice media, pur restando una stima.`;
+      sourceClause = ` Come contesto (non usato nel punteggio attuale): la tenuta in curva è stimata per tipo (lente/medie/veloci) a partire dalla prestazione nei diversi settori del circuito — descrittiva, non predittiva.`;
     } else if (t.corner_source === "sector_fallback") {
-      sourceClause = ` La tenuta in curva di questo team è stimata dai tempi di settore aggregati (non disponibile la ricostruzione per tipo di curva).`;
+      sourceClause = ` La tenuta in curva di questo team è disponibile solo come media aggregata dei tempi di settore (non è disponibile la ricostruzione per tipo di curva).`;
     }
 
-    const text = `${t.team_name} ${where}. ${strengthClause}${circuitLink}.${equivClause}${sourceClause}`;
+    const text = `${t.team_name} ${where}. ${strengthClause}.${equivClause}${sourceClause}`;
     return { team_name: t.team_name, text };
   });
 }
