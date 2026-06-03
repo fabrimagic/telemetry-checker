@@ -108,16 +108,15 @@ export function buildGpPreviewNarrative(
   }
 
   // ----- 2. COSA RAPPRESENTA IL PUNTEGGIO (didattica) -----
-  // OPZIONE Z: il punteggio è la PERSISTENZA pura (forza recente complessiva
-  // della vettura), NON una stima del match circuito↔vettura. Il carattere
-  // del circuito resta descritto sopra come contesto, ma non entra nel
-  // punteggio: il backtest ha mostrato che il modello circuito-specifico
-  // peggiora le predizioni con i dati 2026 attuali.
+  // OPZIONE Z + sectors_only: il punteggio è la PERSISTENZA pura calcolata
+  // sui SOLI tempi di settore (mean(s1,s2,s3)). La trap speed è esclusa
+  // perché dipende dal carico aerodinamico più che dalla performance pura
+  // e il backtest ha mostrato che includerla peggiora la previsione.
   sentences.push(
-    "Il punteggio di affinità è un indice da 0 a 1 che riflette la forza recente complessiva di ciascuna vettura — velocità di punta e tenuta in curva aggregata sui tre settori — misurata nelle gare già disputate. Non incorpora il carattere specifico di questo circuito: l'analisi per tipo di curva, disponibile più sotto come contesto, non è ancora usata per la previsione perché con i dati 2026 attuali non ha dimostrato di migliorarla. È quindi una lettura della forza recente, non una previsione del risultato.",
+    "Il punteggio di affinità è un indice da 0 a 1 che riflette la tenuta nei tempi di settore espressa da ciascuna vettura nelle gare già disputate (media di s1, s2 e s3). È una lettura della forza recente in curva — dove si fanno la maggior parte dei decimi — non una previsione del risultato di gara. Il carattere specifico di questo circuito è descritto sopra come contesto, ma non entra nel punteggio.",
   );
   sentences.push(
-    "L'indice di velocità riflette la velocità massima rilevata a fine rettilineo (trap speed): è quanto la vettura è andata veloce in quel punto, soprattutto in qualifica dove si spinge al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova. Va letta come \"velocità massima raggiunta\", non come misura della potenza del motore: dipende anche dal carico aerodinamico scelto dal team, quindi un valore alto può riflettere una scelta di poca ala. In gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
+    "La velocità massima rilevata a fine rettilineo (trap speed) compare nei dettagli tecnici come contesto, ma NON è usata nel punteggio: dipende anche dal livello di carico aerodinamico scelto dal team — un valore alto può riflettere un'ala più scarica, non necessariamente più cavalli — e il backtest ha confermato che includerla nel punteggio peggiora la previsione rispetto al fondarsi sui soli tempi di settore. Per leggerla onestamente va trattata come \"velocità raggiunta in quel punto\", non come misura della potenza del motore.",
   );
 
   // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
