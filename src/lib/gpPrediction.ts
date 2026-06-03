@@ -105,6 +105,16 @@ export interface TeamGpAffinity {
    * "stima approssimata" badge when low.
    */
   sector_corner_map_confidence?: "high" | "medium" | "low";
+  /**
+   * Unified per-type values (slow/medium/fast) for UI/narrative, regardless of
+   * branch. Populated when the underlying source actually has three numbers:
+   *  - location_geometry / sector_typed_history → mirrors car.corner_type_strength
+   *  - sector_typed                              → mirrors corner_type_estimate
+   *                                                when all three are non-null
+   *  - sector_fallback                           → undefined
+   * DESCRIPTIVE only — never enters the score.
+   */
+  corner_type_values?: { slow: number; medium: number; fast: number } | null;
 }
 
 
