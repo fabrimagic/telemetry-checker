@@ -39,7 +39,7 @@ function car(
 }
 
 describe("gpPrediction", () => {
-  it("top-speed-dominant circuit rewards the team with highest top_speed_index", () => {
+  it("top-speed-dominant circuit rewards the team with highest top_speed_index (legacy circuit-specific engine)", () => {
     const c = circuit({
       top_speed: 1.0,
       slow_corner_traction: 0.1,
@@ -50,7 +50,9 @@ describe("gpPrediction", () => {
       car("Fast", 0.95, [0.3, 0.3, 0.3]),
       car("Cornering", 0.2, [0.95, 0.95, 0.95]),
     ];
-    const out = predictGpAffinity(c, cars);
+    // sectors_only production would put Cornering first; the assertion
+    // exercises the DORMANT circuit-specific engine explicitly.
+    const out = predictGpAffinity(c, cars, { useCircuitSpecificModel: true });
     expect(out.ranked[0].team_name).toBe("Fast");
   });
 
