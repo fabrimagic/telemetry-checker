@@ -640,6 +640,49 @@ export async function computeCarProfiles(
       for (const [t, n] of agg.lapsByTeam.entries()) {
         lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
       }
+
+      // ----- Opzione A: stima per-tipo dai SETTORI STORICI -----
+      // Use the sector_corner_map of THIS past circuit (origin) to attribute
+      // the team's per-sector strength to corner types. Without an origin
+      // map (gpName unresolved or no map for that circuit) this race simply
+      // does NOT contribute to the historic-sector estimate — no fabrication.
+      const originGpName = resolveCalendarGpName(
+        session.location,
+        session.country_name,
+      );
+      const originMap = originGpName
+        ? CIRCUIT_PROFILES[originGpName]?.sector_corner_map
+        : undefined;
+      if (originMap) {
+        const teamsForEstimate = new Set<string>([
+          ...agg.s1.keys(),
+          ...agg.s2.keys(),
+          ...agg.s3.keys(),
+        ]);
+        for (const team of teamsForEstimate) {
+          const v1 = agg.s1.get(team);
+          const v2 = agg.s2.get(team);
+          const v3 = agg.s3.get(team);
+          for (const k of ["slow", "medium", "fast"] as const) {
+            let num = 0;
+            let den = 0;
+            if (v1 != null) { num += originMap.s1[k] * v1; den += originMap.s1[k]; }
+            if (v2 != null) { num += originMap.s2[k] * v2; den += originMap.s2[k]; }
+            if (v3 != null) { num += originMap.s3[k] * v3; den += originMap.s3[k]; }
+            if (den > 0) {
+              const contrib = num / den;
+              accCornerFromSectorsSum[k].set(
+                team,
+                (accCornerFromSectorsSum[k].get(team) ?? 0) + contrib * w,
+              );
+              accCornerFromSectorsW[k].set(
+                team,
+                (accCornerFromSectorsW[k].get(team) ?? 0) + w,
+              );
+            }
+          }
+        }
+      }
     } else if (raceFetchFailed && !qualiAvailable) {
       // Both sources unusable AND race fetch errored → fetch_failed.
       status = "fetch_failed";
