@@ -586,7 +586,8 @@ export default function GpPreview() {
           // sector_fallback (real degradation, no fake layout).
           const loc = (qualiSession as { location?: string }).location;
           const country = (qualiSession as { country_name?: string }).country_name;
-          const gpName = resolveCalendarGpName(loc, country);
+          const ckey = (qualiSession as { circuit_key?: number }).circuit_key;
+          const gpName = resolveCalendarGpName(loc, country, ckey);
           if (!gpName) return null;
           const dateStart = qualiSession.date_start ?? qualiSession.date_end ?? "";
           const dateEnd = qualiSession.date_end ?? qualiSession.date_start ?? "";

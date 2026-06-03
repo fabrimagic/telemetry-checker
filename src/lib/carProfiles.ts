@@ -649,6 +649,7 @@ export async function computeCarProfiles(
       const originGpName = resolveCalendarGpName(
         session.location,
         session.country_name,
+        session.circuit_key,
       );
       const originMap = originGpName
         ? CIRCUIT_PROFILES[originGpName]?.sector_corner_map

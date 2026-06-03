@@ -1,3 +1,5 @@
+import { CIRCUIT_KEY_TO_GP_NAME } from "./circuitProfiles";
+
 /**
  * Maps each 2026 calendar GP to a circuit GeoJSON id from the
  * bacinger/f1-circuits dataset on GitHub. Used by NextCircuitCard
@@ -138,7 +140,14 @@ const AMBIGUOUS_COUNTRY_KEYS = new Set<string>([
 export function resolveCalendarGpName(
   location?: string | null,
   countryName?: string | null,
+  circuitKey?: number | null,
 ): string | null {
+  // PRIMARY: stable numeric circuit_key from OpenF1 (no ambiguity).
+  if (circuitKey != null && Number.isFinite(circuitKey)) {
+    const byKey = CIRCUIT_KEY_TO_GP_NAME[circuitKey];
+    if (byKey) return byKey;
+  }
+
   const normalize = (s?: string | null): string | null => {
     if (!s) return null;
     const k = s.trim().toLowerCase();
