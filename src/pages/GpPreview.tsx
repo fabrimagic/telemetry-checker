@@ -20,6 +20,8 @@ import {
   buildGpPreviewNarrative,
   buildPerTeamExplanations,
   
+  isCornerTypeDifferentiating,
+  cornerTypeMean,
 } from "@/lib/gpPreviewNarrative";
 import { analyzeCornersForSession } from "@/lib/cornerAnalysis";
 import { resolveCalendarGpName } from "@/lib/circuitGeometry";
