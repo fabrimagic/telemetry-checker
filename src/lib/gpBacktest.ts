@@ -102,6 +102,8 @@ export interface BacktestAggregate {
   rho_baseline_mean: number | null;
   rho_baseline_topsec_mean: number | null;
   rho_baseline_sectors_mean: number | null;
+  /** MONITORING ONLY (Role B): mean rho for the circuit-specific model. */
+  rho_circuit_specific_mean: number | null;
   /**
    * rho_model_mean − rho_baseline_mean, where rho_baseline_mean is the
    * PRODUCTION baseline (sectors_only). Positive means the circuit-
@@ -114,10 +116,19 @@ export interface BacktestAggregate {
    * Promotion criterion: > 0 (validated, +0.209 on the 4-race sample).
    */
   delta_sectors_vs_topsec: number | null;
+  /**
+   * MONITORING METRIC for Role B (per-type corner distinction):
+   * rho_circuit_specific_mean − rho_baseline_sectors_mean. Today expected
+   * ≤ 0 (per-type distinction does not yet beat sectors-only). The day
+   * it becomes ≥ 0 stably on multiple races, the per-type distinction is
+   * a candidate for promotion into the production score.
+   */
+  delta_circuit_vs_sectors: number | null;
   top3_model_rate: number | null;
   top3_baseline_rate: number | null;
   top3_baseline_topsec_rate: number | null;
   top3_baseline_sectors_rate: number | null;
+  top3_circuit_specific_rate: number | null;
 }
 
 export interface BacktestResult {
