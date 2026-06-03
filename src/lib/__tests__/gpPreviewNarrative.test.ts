@@ -433,13 +433,15 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
 });
 
 describe("buildGpPreviewNarrative — qualifying-source transparency", () => {
-  it("didactic block states top speed reflects primarily the qualifying potential", () => {
+  it("didactic block describes top speed as trap speed and warns it depends also on aero load, not only on engine power", () => {
     const c = circuit();
     const cars = [car("A", 0.6, [0.5, 0.5, 0.5]), car("B", 0.3, [0.4, 0.4, 0.4])];
     const pred = predictGpAffinity(c, cars);
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
-    expect(all).toMatch(/potenziale espresso in qualifica/i);
+    expect(all).toMatch(/trap speed|velocità massima rilevata/i);
+    expect(all).toMatch(/carico aerodinamico/i);
+    expect(all).toMatch(/non come misura della potenza/i);
     expect(all).toMatch(/in gara la velocità di punta è invece compressa/i);
   });
 
