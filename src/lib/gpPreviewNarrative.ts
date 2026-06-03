@@ -117,7 +117,7 @@ export function buildGpPreviewNarrative(
     "Il punteggio di affinità è un indice da 0 a 1 che riflette la forza recente complessiva di ciascuna vettura — velocità di punta e tenuta in curva aggregata sui tre settori — misurata nelle gare già disputate. Non incorpora il carattere specifico di questo circuito: l'analisi per tipo di curva, disponibile più sotto come contesto, non è ancora usata per la previsione perché con i dati 2026 attuali non ha dimostrato di migliorarla. È quindi una lettura della forza recente, non una previsione del risultato.",
   );
   sentences.push(
-    "La velocità di punta riflette soprattutto il potenziale espresso in qualifica, quando le vetture spingono al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova; in gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
+    "L'indice di velocità riflette la velocità massima rilevata a fine rettilineo (trap speed): è quanto la vettura è andata veloce in quel punto, soprattutto in qualifica dove si spinge al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova. Va letta come \"velocità massima raggiunta\", non come misura della potenza del motore: dipende anche dal carico aerodinamico scelto dal team, quindi un valore alto può riflettere una scelta di poca ala. In gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
   );
 
   // ----- 2b. COME LEGGERE LE BANDE DI INCERTEZZA -----
@@ -158,25 +158,25 @@ export function buildGpPreviewNarrative(
 
     let because: string;
     if (topRatio >= DOMINANT_TOP_RATIO) {
-      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva, sui dati delle gare recenti`;
+      because = `composto ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap) e ${ratioPhrase(cornerRatio)} dalla tenuta in curva, sui dati delle gare recenti`;
     } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
-      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta, sui dati delle gare recenti`;
+      because = `composto ${ratioPhrase(cornerRatio)} dalla tenuta in curva e ${ratioPhrase(topRatio)} dalla componente di velocità massima rilevata (trap), sui dati delle gare recenti`;
     } else {
-      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva sui dati delle gare recenti, senza una vera dimensione dominante";
+      because = "composto in misura simile da velocità massima rilevata (trap) e tenuta in curva sui dati delle gare recenti, senza una componente nettamente dominante";
     }
 
     if (topTeams.length > 1) {
       sentences.push(
         `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato è ${because}.`,
       );
       sentences.push(
         "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio deriva ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio è ${because}.`,
       );
     }
   }
@@ -427,11 +427,11 @@ export function buildPerTeamExplanations(
 
     let strengthClause: string;
     if (topPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}% del punteggio), più che dalla tenuta in curva (circa il ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
     } else if (cornerPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla tenuta in curva (circa il ${cornerPct}% del punteggio), più che dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
     } else {
-      strengthClause = `Nelle gare recenti velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
+      strengthClause = `Nelle gare recenti velocità massima rilevata (trap) e tenuta in curva contribuiscono in misura simile al punteggio (circa ${topPct}% e ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
     }
 
     let equivClause = "";

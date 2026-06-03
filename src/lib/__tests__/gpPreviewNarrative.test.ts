@@ -256,8 +256,8 @@ describe("buildGpPreviewNarrative — extended affinity explanation (Part C)", (
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
     expect(all).toMatch(/Fast/);
-    // The leader's top-speed contribution should dominate.
-    expect(all).toMatch(/grazie alla velocità di punta/i);
+    // The leader's top-speed contribution should dominate — phrased as composition.
+    expect(all).toMatch(/velocità massima rilevata/i);
     // One of the fraction phrases should appear.
     expect(all).toMatch(/(tre quarti|due terzi|larghissima parte)/i);
   });
@@ -320,13 +320,16 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     }
   });
 
-  it("top-speed-dominant contributions ⇒ mentions 'velocità in rettilineo' as strength", () => {
+  it("top-speed-dominant contributions ⇒ describes composition with 'velocità massima rilevata' (no primato claim)", () => {
     const circ = c({ top_speed: 1.0, slow_corner_traction: 0.1, medium_corner: 0.1, fast_corner: 0.1 });
     const cars = [car("Fast", 0.95, [0.2, 0.2, 0.2]), car("Slow", 0.2, [0.5, 0.5, 0.5])];
     const pred = predictGpAffinity(circ, cars);
     const out = buildPerTeamExplanations(circ, pred);
     const fastText = out.find((e: { team_name: string; text: string }) => e.team_name === "Fast")!.text;
-    expect(fastText).toMatch(/velocità in rettilineo/i);
+    expect(fastText).toMatch(/velocità massima rilevata/i);
+    expect(fastText).toMatch(/composizione interna/i);
+    expect(fastText).not.toMatch(/punto di forza/i);
+    expect(fastText).not.toMatch(/più forte in rettilineo/i);
   });
 
   it("corner-dominant contributions ⇒ mentions 'tenuta in curva' as strength", () => {
@@ -430,13 +433,15 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
 });
 
 describe("buildGpPreviewNarrative — qualifying-source transparency", () => {
-  it("didactic block states top speed reflects primarily the qualifying potential", () => {
+  it("didactic block describes top speed as trap speed and warns it depends also on aero load, not only on engine power", () => {
     const c = circuit();
     const cars = [car("A", 0.6, [0.5, 0.5, 0.5]), car("B", 0.3, [0.4, 0.4, 0.4])];
     const pred = predictGpAffinity(c, cars);
     const lines = buildGpPreviewNarrative(c, pred);
     const all = lines.join(" ");
-    expect(all).toMatch(/potenziale espresso in qualifica/i);
+    expect(all).toMatch(/trap speed|velocità massima rilevata/i);
+    expect(all).toMatch(/carico aerodinamico/i);
+    expect(all).toMatch(/non come misura della potenza/i);
     expect(all).toMatch(/in gara la velocità di punta è invece compressa/i);
   });
 
