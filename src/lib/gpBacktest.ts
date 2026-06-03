@@ -59,15 +59,16 @@ export interface BacktestPerRace {
   gpName: string;
   rho_model: number | null;
   /**
-   * Persistence baseline using the CURRENT production formula
-   * (top_speed_index + mean(s1,s2,s3))/2. Kept under the legacy
-   * name `rho_baseline` for back-compat with existing consumers/tests;
-   * equals `rho_baseline_topsec`.
+   * Persistence baseline using the CURRENT PRODUCTION formula
+   * ({@link PRODUCTION_PERSISTENCE_MODE}, today = "sectors_only" →
+   * mean(s1,s2,s3)). Kept under the legacy name `rho_baseline` for
+   * back-compat with existing consumers/tests; equals
+   * `rho_baseline_sectors`.
    */
   rho_baseline: number | null;
-  /** Persistence with both trap + sectors. Same value as rho_baseline. */
+  /** MONITORING ONLY: previous persistence formula (trap + sectors). */
   rho_baseline_topsec: number | null;
-  /** EXPERIMENTAL persistence using sectors only (no trap speed). */
+  /** Production persistence: sectors only (no trap speed). */
   rho_baseline_sectors: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
@@ -91,14 +92,16 @@ export interface BacktestAggregate {
   rho_baseline_mean: number | null;
   rho_baseline_topsec_mean: number | null;
   rho_baseline_sectors_mean: number | null;
-  /** rho_model_mean − rho_baseline_mean. null if either is null. */
+  /**
+   * rho_model_mean − rho_baseline_mean, where rho_baseline_mean is the
+   * PRODUCTION baseline (sectors_only). Positive means the circuit-
+   * specific model beats production; negative means production wins.
+   */
   delta_mean: number | null;
   /**
-   * KEY METRIC for the Opzione 1 validation:
+   * MONITORING METRIC for the Opzione 1 validation:
    * rho_baseline_sectors_mean − rho_baseline_topsec_mean.
-   * If > 0 → dropping the trap speed improves prediction → candidate to
-   * become the new production persistence formula. If ≈ 0 or < 0 → trap
-   * speed, however counter-intuitive, is not hurting prediction.
+   * Promotion criterion: > 0 (validated, +0.209 on the 4-race sample).
    */
   delta_sectors_vs_topsec: number | null;
   top3_model_rate: number | null;
