@@ -818,6 +818,28 @@ export async function computeCarProfiles(
   const normS2 = normalizeHigherIsBetter(rawS2);
   const normS3 = normalizeHigherIsBetter(rawS3);
 
+  // Sector-history per-type raw averages, then cross-team normalization
+  // so the resulting index is in [0,1] with 1 = best in field (same
+  // contract as location_geometry/sector_strength).
+  const rawSectorTyped: Record<"slow" | "medium" | "fast", Map<string, number>> = {
+    slow: new Map(),
+    medium: new Map(),
+    fast: new Map(),
+  };
+  for (const t of teams) {
+    for (const k of ["slow", "medium", "fast"] as const) {
+      const s = accCornerFromSectorsSum[k].get(t);
+      const wt = accCornerFromSectorsW[k].get(t);
+      if (s == null || !wt || wt <= 0) continue;
+      rawSectorTyped[k].set(t, s / wt);
+    }
+  }
+  const normSectorTyped = {
+    slow: normalizeHigherIsBetter(rawSectorTyped.slow),
+    medium: normalizeHigherIsBetter(rawSectorTyped.medium),
+    fast: normalizeHigherIsBetter(rawSectorTyped.fast),
+  };
+
   const profiles: CarProfile[] = [];
   for (const team of teams) {
     const sampleRaces = racesByTeam.get(team) ?? 0;
