@@ -1,3 +1,5 @@
+import { CIRCUIT_KEY_TO_GP_NAME } from "./circuitProfiles";
+
 /**
  * Maps each 2026 calendar GP to a circuit GeoJSON id from the
  * bacinger/f1-circuits dataset on GitHub. Used by NextCircuitCard
