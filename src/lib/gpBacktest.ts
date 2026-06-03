@@ -34,6 +34,7 @@ import {
 } from "./carProfiles";
 import {
   predictGpAffinity as defaultPredictGpAffinity,
+  computePersistenceScore,
   type GpPrediction,
 } from "./gpPrediction";
 import {
