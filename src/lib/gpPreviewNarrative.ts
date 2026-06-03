@@ -131,7 +131,7 @@ export function buildGpPreviewNarrative(
     );
   }
 
-  // ----- 3. TEAM FAVORITI E PERCHÉ (esteso) -----
+  // ----- 3. TEAM FAVORITI E PERCHÉ (basato sulla persistenza, non sul circuito) -----
   {
     const ranked = prediction.ranked;
     const leader = ranked[0];
@@ -142,7 +142,10 @@ export function buildGpPreviewNarrative(
     const topNames = leaderGroup ?? [leader.team_name];
     const topTeams = ranked.filter((t) => topNames.includes(t.team_name));
 
-    // Aggregate dominant dimension across top teams.
+    // Aggregate dominant dimension across top teams. In persistence mode
+    // these "contributions" describe WHERE the team's recent strength sits
+    // (velocità di punta vs tenuta in curva COMPLESSIVA), NOT a circuit-
+    // specific weighting.
     let sumTop = 0;
     let sumCorner = 0;
     for (const t of topTeams) {
@@ -155,30 +158,30 @@ export function buildGpPreviewNarrative(
 
     let because: string;
     if (topRatio >= DOMINANT_TOP_RATIO) {
-      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva`;
+      because = `${ratioPhrase(topRatio)} grazie alla velocità di punta e ${ratioPhrase(cornerRatio)} grazie alla tenuta in curva, sui dati delle gare recenti`;
     } else if (cornerRatio >= DOMINANT_CORNER_RATIO) {
-      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta`;
+      because = `${ratioPhrase(cornerRatio)} grazie alla tenuta in curva e ${ratioPhrase(topRatio)} grazie alla velocità di punta, sui dati delle gare recenti`;
     } else {
-      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva, senza una vera dimensione dominante";
+      because = "grazie a un buon compromesso fra velocità di punta e tenuta in curva sui dati delle gare recenti, senza una vera dimensione dominante";
     }
 
     if (topTeams.length > 1) {
       sentences.push(
         `Sui dati delle ultime gare, ${joinNames(
           topTeams.map((t) => t.team_name),
-        )} risultano sostanzialmente equivalenti in cima alla classifica di affinità: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
+        )} risultano sostanzialmente equivalenti in cima alla classifica di forza recente: i loro punteggi cadono nella stessa banda di incertezza ed è quindi arbitrario ordinarli fra loro. Il loro punteggio combinato deriva ${because}.`,
       );
       sentences.push(
         "Più team finiscono nello stesso gruppo di equivalenza quando i dati disponibili non sono abbastanza precisi da separarli: presentarli appaiati è più onesto che assegnare un favorito unico.",
       );
     } else {
       sentences.push(
-        `Sui dati delle ultime gare, ${leader.team_name} sembra il team più in linea con questo tracciato: il suo punteggio deriva ${because}.`,
+        `Sui dati delle ultime gare, ${leader.team_name} risulta tra i team più forti del campo: il suo punteggio deriva ${because}.`,
       );
     }
   }
 
-  // ----- 4. CHI POTREBBE FATICARE (collegato al perché) -----
+  // ----- 4. CHI POTREBBE FATICARE (sulla persistenza, non sul match con il circuito) -----
   {
     const ranked = prediction.ranked;
     if (ranked.length >= 3) {
@@ -187,23 +190,8 @@ export function buildGpPreviewNarrative(
         g.includes(ranked[0].team_name),
       );
       if (!leaderGroup || !leaderGroup.includes(last.team_name)) {
-        const total =
-          last.contributions.top_speed + last.contributions.cornering;
-        const lastTopRatio = total > 0 ? last.contributions.top_speed / total : 0.5;
-        // Identify which trait the circuit rewards most to explain the mismatch.
-        const cornerMean =
-          (circuit.slow_corner_traction + circuit.medium_corner + circuit.fast_corner) / 3;
-        const circuitFavoursTop = circuit.top_speed >= cornerMean;
-        let why: string;
-        if (circuitFavoursTop && lastTopRatio < 0.5) {
-          why = "perché il suo punto di forza è più nella tenuta in curva che nella velocità di punta, ed è questa seconda dimensione che il circuito premia di più";
-        } else if (!circuitFavoursTop && lastTopRatio > 0.5) {
-          why = "perché il suo punto di forza è più nella velocità di punta che nella tenuta in curva, ed è quest'ultima che il circuito premia di più";
-        } else {
-          why = "perché su entrambe le dimensioni misurate appare più indietro rispetto agli altri team";
-        }
         sentences.push(
-          `${last.team_name} potrebbe invece trovarsi meno a suo agio su questo tipo di tracciato, ${why}.`,
+          `${last.team_name} risulta invece tra i meno forti su entrambe le dimensioni misurate (velocità di punta e tenuta in curva complessiva) nelle gare recenti.`,
         );
       }
     }
