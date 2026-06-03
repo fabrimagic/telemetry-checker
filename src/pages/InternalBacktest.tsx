@@ -103,21 +103,21 @@ export default function InternalBacktest() {
               <Stat label="Gare validate" value={String(result.aggregate.races_validated)} />
               <Stat label="ρ modello (media)" value={fmt(result.aggregate.rho_model_mean)} />
               <Stat
-                label="ρ baseline trap+settori"
+                label="ρ baseline trap+settori (monitoring)"
                 value={fmt(result.aggregate.rho_baseline_topsec_mean)}
               />
               <Stat
-                label="ρ baseline solo-settori"
+                label="ρ baseline solo-settori (PRODUZIONE)"
                 value={fmt(result.aggregate.rho_baseline_sectors_mean)}
+                highlight
               />
               <Stat
-                label="Δ (modello − trap+settori)"
+                label="Δ (modello − produzione)"
                 value={fmt(result.aggregate.delta_mean)}
               />
               <Stat
                 label="Δ (solo-settori − trap+settori)"
                 value={fmt(result.aggregate.delta_sectors_vs_topsec)}
-                highlight
               />
               <Stat label="Top-3 modello" value={fmtPct(result.aggregate.top3_model_rate)} />
               <Stat
@@ -125,16 +125,17 @@ export default function InternalBacktest() {
                 value={fmtPct(result.aggregate.top3_baseline_topsec_rate)}
               />
               <Stat
-                label="Top-3 solo-settori"
+                label="Top-3 solo-settori (PRODUZIONE)"
                 value={fmtPct(result.aggregate.top3_baseline_sectors_rate)}
               />
             </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-              Lettura: il numero CHIAVE è <strong>Δ (solo-settori − trap+settori)</strong>.
-              Se &gt; 0, togliere la velocità di punta migliora la predizione → l'Opzione 1
-              (persistenza solo-settori) è candidata per la produzione. Se ≈ 0 o &lt; 0,
-              la trap — per quanto controintuitiva — non sta peggiorando la predizione,
-              e ne riparliamo. Con poche gare validate (N piccolo) questi numeri sono
+              La baseline che rappresenta la <strong>produzione</strong> è ora{" "}
+              <strong>solo-settori</strong> (promossa dall'Opzione 1, Δ ≈ +0.209
+              sui dati validati). Il numero di monitoring{" "}
+              <strong>Δ (solo-settori − trap+settori)</strong> resta visibile per
+              tenere d'occhio una eventuale regressione del nuovo formula vs la
+              vecchia. Con poche gare validate (N piccolo) questi numeri sono
               <strong> indicativi</strong>, non conclusivi.
             </p>
           </section>
