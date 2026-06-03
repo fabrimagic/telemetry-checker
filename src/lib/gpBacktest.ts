@@ -424,6 +424,21 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       "sectors_only",
     );
 
+    // Role B (monitoring) — circuit-specific model that USES the per-type
+    // distinction. Same predict() function, just the dormant flag flipped on.
+    // Does NOT change production (the default predict() call above stays
+    // sectors_only).
+    const predictionCircuit: GpPrediction = predict(
+      circuit,
+      profilesResult.profiles,
+      {
+        racesConsidered: profilesResult.races_considered,
+        useCircuitSpecificModel: true,
+      },
+    );
+    const predOrderCircuit =
+      predictionCircuit.ranked?.map((t) => t.team_name) ?? [];
+
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
     let qDrivers: Driver[] = [];
@@ -443,9 +458,13 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     const rho_model = spearman(predOrder, truthOrder);
     const rho_baseline_topsec = spearman(baselineOrderTopSec, truthOrder);
     const rho_baseline_sectors = spearman(baselineOrderSectors, truthOrder);
+    const rho_circuit_specific =
+      predOrderCircuit.length > 0 ? spearman(predOrderCircuit, truthOrder) : null;
     const top3_model = topKHit(predOrder, truthOrder, 3);
     const top3_baseline_topsec = topKHit(baselineOrderTopSec, truthOrder, 3);
     const top3_baseline_sectors = topKHit(baselineOrderSectors, truthOrder, 3);
+    const top3_circuit_specific =
+      predOrderCircuit.length > 0 ? topKHit(predOrderCircuit, truthOrder, 3) : null;
     const n_teams = predOrder.filter((t) => truthOrder.includes(t)).length;
 
     per_race.push({
@@ -455,10 +474,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       rho_baseline: rho_baseline_sectors,
       rho_baseline_topsec,
       rho_baseline_sectors,
+      rho_circuit_specific,
       top3_model,
       top3_baseline: top3_baseline_sectors,
       top3_baseline_topsec,
       top3_baseline_sectors,
+      top3_circuit_specific,
       n_teams,
     });
   }
