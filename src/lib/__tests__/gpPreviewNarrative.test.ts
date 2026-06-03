@@ -320,13 +320,16 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     }
   });
 
-  it("top-speed-dominant contributions ⇒ mentions 'velocità in rettilineo' as strength", () => {
+  it("top-speed-dominant contributions ⇒ describes composition with 'velocità massima rilevata' (no primato claim)", () => {
     const circ = c({ top_speed: 1.0, slow_corner_traction: 0.1, medium_corner: 0.1, fast_corner: 0.1 });
     const cars = [car("Fast", 0.95, [0.2, 0.2, 0.2]), car("Slow", 0.2, [0.5, 0.5, 0.5])];
     const pred = predictGpAffinity(circ, cars);
     const out = buildPerTeamExplanations(circ, pred);
     const fastText = out.find((e: { team_name: string; text: string }) => e.team_name === "Fast")!.text;
-    expect(fastText).toMatch(/velocità in rettilineo/i);
+    expect(fastText).toMatch(/velocità massima rilevata/i);
+    expect(fastText).toMatch(/composizione interna/i);
+    expect(fastText).not.toMatch(/punto di forza/i);
+    expect(fastText).not.toMatch(/più forte in rettilineo/i);
   });
 
   it("corner-dominant contributions ⇒ mentions 'tenuta in curva' as strength", () => {
