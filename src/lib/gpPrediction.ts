@@ -120,6 +120,13 @@ export interface GpPrediction {
 export interface GpPredictionMeta {
   /** Number of races the system actually considered (e.g. last 4). */
   racesConsidered?: number;
+  /**
+   * OPZIONE Z — override of {@link USE_CIRCUIT_SPECIFIC_MODEL}. When omitted
+   * the module-level flag is used (currently false: pure persistence). Set
+   * to `true` in tests / future experiments to exercise the dormant
+   * circuit-specific engine.
+   */
+  useCircuitSpecificModel?: boolean;
 }
 
 
