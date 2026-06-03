@@ -36,6 +36,7 @@ import {
   predictGpAffinity as defaultPredictGpAffinity,
   computePersistenceScore,
   type GpPrediction,
+  type PersistenceMode,
 } from "./gpPrediction";
 import {
   getRaceSessionsByYear as defaultGetRaceSessions,
