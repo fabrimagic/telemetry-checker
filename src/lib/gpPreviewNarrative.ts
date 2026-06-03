@@ -108,8 +108,13 @@ export function buildGpPreviewNarrative(
   }
 
   // ----- 2. COSA RAPPRESENTA IL PUNTEGGIO (didattica) -----
+  // OPZIONE Z: il punteggio è la PERSISTENZA pura (forza recente complessiva
+  // della vettura), NON una stima del match circuito↔vettura. Il carattere
+  // del circuito resta descritto sopra come contesto, ma non entra nel
+  // punteggio: il backtest ha mostrato che il modello circuito-specifico
+  // peggiora le predizioni con i dati 2026 attuali.
   sentences.push(
-    "Il punteggio di affinità è un indice da 0 a 1 che stima quanto le caratteristiche misurate di ogni vettura — velocità di punta e tenuta in curva aggregata sui tre settori — si sposano con ciò che questo circuito richiede. Non è una previsione del risultato della gara, ma una lettura tecnica del match circuito-vettura sui dati raccolti finora.",
+    "Il punteggio di affinità è un indice da 0 a 1 che riflette la forza recente complessiva di ciascuna vettura — velocità di punta e tenuta in curva aggregata sui tre settori — misurata nelle gare già disputate. Non incorpora il carattere specifico di questo circuito: l'analisi per tipo di curva, disponibile più sotto come contesto, non è ancora usata per la previsione perché con i dati 2026 attuali non ha dimostrato di migliorarla. È quindi una lettura della forza recente, non una previsione del risultato.",
   );
   sentences.push(
     "La velocità di punta riflette soprattutto il potenziale espresso in qualifica, quando le vetture spingono al massimo con motore party-mode, ERS scarico, carburante minimo e gomma nuova; in gara la velocità di punta è invece compressa dalla gestione di gomme, motore ed energia e racconta meno del vero potenziale.",
