@@ -427,11 +427,11 @@ export function buildPerTeamExplanations(
 
     let strengthClause: string;
     if (topPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la velocità in rettilineo (circa il ${topPct}% del punteggio), mentre la tenuta in curva incide meno (circa il ${cornerPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}% del punteggio), più che dalla tenuta in curva (circa il ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
     } else if (cornerPct >= 60) {
-      strengthClause = `Nelle gare recenti il suo punto di forza è soprattutto la tenuta in curva (circa il ${cornerPct}% del punteggio), mentre la velocità in rettilineo conta meno (circa il ${topPct}%)`;
+      strengthClause = `Nelle gare recenti il suo punteggio deriva soprattutto dalla tenuta in curva (circa il ${cornerPct}% del punteggio), più che dalla componente di velocità massima rilevata a fine rettilineo (circa il ${topPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
     } else {
-      strengthClause = `Nelle gare recenti velocità in rettilineo e tenuta in curva contribuiscono in egual misura al punteggio (circa ${topPct}% e ${cornerPct}%)`;
+      strengthClause = `Nelle gare recenti velocità massima rilevata (trap) e tenuta in curva contribuiscono in misura simile al punteggio (circa ${topPct}% e ${cornerPct}%) — è la composizione interna del suo punteggio, non un confronto con gli altri team`;
     }
 
     let equivClause = "";
