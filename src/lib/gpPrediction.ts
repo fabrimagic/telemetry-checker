@@ -388,9 +388,31 @@ export function predictGpAffinity(
       cornerSource = "sector_fallback";
     }
 
-    const cTop = wTop * topIdx;
-    const cCorner = wCorner * cornerIdx;
-    const score = clamp01(cTop + cCorner);
+    // ----- SCORE -----
+    // Default (OPZIONE Z): pure persistence — same formula used as the
+    // backtest baseline (see computePersistenceScore + computeBaselineOrder
+    // in gpBacktest). The circuit-specific weighted sum is computed but
+    // kept dormant; the corner_source/contributions data above remains
+    // populated for the UI's DESCRIPTIVE context (badges, tech details,
+    // narrative) but does NOT drive the ranking unless the flag is on.
+    const useCircuitSpecific =
+      meta?.useCircuitSpecificModel ?? USE_CIRCUIT_SPECIFIC_MODEL;
+    const cTopCircuit = wTop * topIdx;
+    const cCornerCircuit = wCorner * cornerIdx;
+    const persistence = clamp01(computePersistenceScore(car));
+    const score = useCircuitSpecific
+      ? clamp01(cTopCircuit + cCornerCircuit)
+      : persistence;
+    // Contributions: when persistence is the active engine, expose the
+    // ADDITIVE persistence breakdown (top_speed_index/2 vs sectorMean/2)
+    // so the UI ratio "% rettilineo vs curva" still describes WHERE the
+    // team's overall strength sits, without implying any circuit-specific
+    // weighting. When the dormant circuit-specific engine is active, expose
+    // the legacy weighted contributions that sum to that score.
+    const sectorMean =
+      (car.sector_strength.s1 + car.sector_strength.s2 + car.sector_strength.s3) / 3;
+    const cTop = useCircuitSpecific ? cTopCircuit : topIdx / 2;
+    const cCorner = useCircuitSpecific ? cCornerCircuit : sectorMean / 2;
 
     const carBand = teamBandFromSample(car.effective_sample_races);
     const circuitBand = CONFIDENCE_BAND[circuit.confidence];
