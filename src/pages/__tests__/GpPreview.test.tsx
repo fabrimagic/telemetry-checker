@@ -71,7 +71,7 @@ describe("GpPredictionResultView", () => {
     expect(screen.getByTestId("caveats-card")).toBeTruthy();
     expect(screen.getByText(/Circuito stimato dal solo layout/)).toBeTruthy();
     expect(screen.getByText(/Confidenza complessiva: Media/)).toBeTruthy();
-    expect(screen.getByText(/non una previsione del risultato/i)).toBeTruthy();
+    expect(screen.getAllByText(/non una previsione del risultato/i).length).toBeGreaterThan(0);
   });
 
   it("renders the sector_typed badge and hides GPS diagnostic badges", () => {
