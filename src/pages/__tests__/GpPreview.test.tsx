@@ -81,6 +81,8 @@ describe("GpPredictionResultView", () => {
     expect(screen.getByTestId("composition-note-Alpha")).toBeTruthy();
     expect(screen.getAllByText(/composizione del punteggio/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Velocità massima rilevata/i).length).toBeGreaterThan(0);
+  });
+
 
   it("renders the sector_typed badge and hides GPS diagnostic badges", () => {
     const pred: GpPrediction = {
