@@ -128,6 +128,29 @@ describe("computeBaselineOrder", () => {
     ];
     expect(computeBaselineOrder(profiles)).toEqual(["Fast", "Mid", "Slow"]);
   });
+
+  it("sectors_only mode ignores top_speed_index → McLaren-like climbs the order", async () => {
+    const { computePersistenceScore } = await import("../gpPrediction");
+    const profiles = [
+      // top low, sectors high (McLaren-like)
+      profile("McL", 0.36, [0.85, 0.80, 0.82]),
+      // top high, sectors low (Audi-like)
+      profile("Aud", 0.99, [0.40, 0.42, 0.41]),
+      profile("Mid", 0.5, [0.5, 0.5, 0.5]),
+    ];
+    const topsec = computeBaselineOrder(profiles, "top_and_sectors");
+    const sectors = computeBaselineOrder(profiles, "sectors_only");
+    // top_and_sectors: Audi ahead of McLaren.
+    expect(topsec.indexOf("Aud")).toBeLessThan(topsec.indexOf("McL"));
+    // sectors_only: McLaren ahead of Audi.
+    expect(sectors.indexOf("McL")).toBeLessThan(sectors.indexOf("Aud"));
+    // Coherence: order matches computePersistenceScore(.,"sectors_only") sorted desc.
+    const expected = [...profiles]
+      .map((p) => ({ t: p.team_name, s: computePersistenceScore(p, "sectors_only") }))
+      .sort((a, b) => b.s - a.s || a.t.localeCompare(b.t))
+      .map((x) => x.t);
+    expect(sectors).toEqual(expected);
+  });
 });
 
 describe("computeQualifyingOrderByTeam", () => {
@@ -383,3 +406,54 @@ describe("runBacktest — robustness", () => {
     expect(out2.total_races).toBe(1);
   });
 });
+
+describe("runBacktest — 3-way comparison (Opzione 1)", () => {
+  it("produces rho_baseline_topsec, rho_baseline_sectors and delta_sectors_vs_topsec", async () => {
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+    ];
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+      mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
+    ];
+    // Quali truth: McL (80) < Mid (81) < Aud (82) → McL, Mid, Aud.
+    const lapsBySession = new Map<number, Lap[]>([
+      [22, [mkLap(1, 80), mkLap(3, 81), mkLap(2, 82)]],
+    ]);
+    const driversBySession = new Map<number, Driver[]>([
+      [22, [mkDriver(1, "McL"), mkDriver(2, "Aud"), mkDriver(3, "Mid")]],
+    ]);
+    const deps = makeDeps({
+      races, qualis, lapsBySession, driversBySession,
+      computeImpl: async () => ({
+        profiles: [
+          profile("McL", 0.36, [0.85, 0.80, 0.82]),
+          profile("Aud", 0.99, [0.40, 0.42, 0.41]),
+          profile("Mid", 0.5, [0.6, 0.6, 0.6]),
+        ],
+        races_used: [],
+        aborted: false,
+        races_diagnostics: [],
+        races_considered: 1,
+        total_past_races: 1,
+      }),
+    });
+    const out = await runBacktest({ deps });
+    expect(out.aggregate.races_validated).toBe(1);
+    const r = out.per_race[0];
+    expect(r.rho_baseline_topsec).not.toBeNull();
+    expect(r.rho_baseline_sectors).not.toBeNull();
+    expect(r.rho_baseline).toBe(r.rho_baseline_topsec);
+    // sectors_only score: McL≈0.823, Mid=0.6, Aud≈0.41 → matches truth perfectly.
+    expect(r.rho_baseline_sectors).toBeCloseTo(1, 6);
+    expect(r.top3_baseline_sectors).toBe(true);
+    expect(out.aggregate.delta_sectors_vs_topsec).toBeCloseTo(
+      (out.aggregate.rho_baseline_sectors_mean ?? 0) -
+        (out.aggregate.rho_baseline_topsec_mean ?? 0),
+      6,
+    );
+    expect(out.aggregate.rho_baseline_topsec_mean).toBe(out.aggregate.rho_baseline_mean);
+  });
+});
+

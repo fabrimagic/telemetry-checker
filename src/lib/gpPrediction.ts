@@ -160,17 +160,42 @@ const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = {
 export const USE_CIRCUIT_SPECIFIC_MODEL = false;
 
 /**
+ * Persistence score modes.
+ *
+ *  - "top_and_sectors" (DEFAULT, current production): mean of top_speed_index
+ *    and the average sector strength. This is the formula in production and
+ *    also what the backtest baseline currently uses.
+ *  - "sectors_only" (EXPERIMENTAL): mean(s1,s2,s3) only — drops the trap
+ *    speed entirely. Motivation: top_speed_index is a normalized TRAP speed,
+ *    which depends on the aero setup the team chose, not on raw performance.
+ *    A high-downforce favorite (e.g. McLaren at Monaco) gets penalized
+ *    because its trap speed is naturally low; a low-downforce car with a
+ *    weak engine gets rewarded. We want to MEASURE (via backtest) whether
+ *    removing the trap component improves predictive power before changing
+ *    the production default.
+ */
+export type PersistenceMode = "top_and_sectors" | "sectors_only";
+
+/**
  * Persistence score — the SAME formula used as the baseline in gpBacktest
  * (see `computeBaselineOrder`). MUST stay in lock-step with the baseline so
  * that what the user sees in production coincides with what the backtest
  * validated as the winning policy. Higher = stronger overall.
+ *
+ * The optional `mode` argument is for the validation infrastructure
+ * (gpBacktest 3-way comparison). The default is INVARIANT vs the previous
+ * single-argument signature — no production behavior changes here.
  */
-export function computePersistenceScore(car: {
-  top_speed_index: number;
-  sector_strength: { s1: number; s2: number; s3: number };
-}): number {
+export function computePersistenceScore(
+  car: {
+    top_speed_index: number;
+    sector_strength: { s1: number; s2: number; s3: number };
+  },
+  mode: PersistenceMode = "top_and_sectors",
+): number {
   const sectorMean =
     (car.sector_strength.s1 + car.sector_strength.s2 + car.sector_strength.s3) / 3;
+  if (mode === "sectors_only") return sectorMean;
   return (car.top_speed_index + sectorMean) / 2;
 }
 

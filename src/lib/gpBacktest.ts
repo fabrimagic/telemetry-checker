@@ -36,6 +36,7 @@ import {
   predictGpAffinity as defaultPredictGpAffinity,
   computePersistenceScore,
   type GpPrediction,
+  type PersistenceMode,
 } from "./gpPrediction";
 import {
   getRaceSessionsByYear as defaultGetRaceSessions,
@@ -56,10 +57,22 @@ export const DEFAULT_PRE_WEEKEND_MARGIN_MS = 60_000;
 export interface BacktestPerRace {
   gpName: string;
   rho_model: number | null;
+  /**
+   * Persistence baseline using the CURRENT production formula
+   * (top_speed_index + mean(s1,s2,s3))/2. Kept under the legacy
+   * name `rho_baseline` for back-compat with existing consumers/tests;
+   * equals `rho_baseline_topsec`.
+   */
   rho_baseline: number | null;
+  /** Persistence with both trap + sectors. Same value as rho_baseline. */
+  rho_baseline_topsec: number | null;
+  /** EXPERIMENTAL persistence using sectors only (no trap speed). */
+  rho_baseline_sectors: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
+  top3_baseline_topsec: boolean | null;
+  top3_baseline_sectors: boolean | null;
   /** Intersection size between predicted set and quali set. */
   n_teams: number;
   /** Set when the race could not be validated. */
@@ -75,10 +88,22 @@ export interface BacktestAggregate {
   races_validated: number;
   rho_model_mean: number | null;
   rho_baseline_mean: number | null;
+  rho_baseline_topsec_mean: number | null;
+  rho_baseline_sectors_mean: number | null;
   /** rho_model_mean − rho_baseline_mean. null if either is null. */
   delta_mean: number | null;
+  /**
+   * KEY METRIC for the Opzione 1 validation:
+   * rho_baseline_sectors_mean − rho_baseline_topsec_mean.
+   * If > 0 → dropping the trap speed improves prediction → candidate to
+   * become the new production persistence formula. If ≈ 0 or < 0 → trap
+   * speed, however counter-intuitive, is not hurting prediction.
+   */
+  delta_sectors_vs_topsec: number | null;
   top3_model_rate: number | null;
   top3_baseline_rate: number | null;
+  top3_baseline_topsec_rate: number | null;
+  top3_baseline_sectors_rate: number | null;
 }
 
 export interface BacktestResult {
@@ -152,20 +177,32 @@ export function topKHit(
 
 /**
  * Persistence baseline: orders teams by an OVERALL strength index that does
- * NOT use any circuit-specific information. Score = mean of top_speed_index
- * and mean(s1,s2,s3). Higher = stronger. Deterministic tie-break on team
- * name to keep tests stable.
+ * NOT use any circuit-specific information. The `mode` argument selects the
+ * persistence variant:
+ *   - "top_and_sectors" (default, current production formula),
+ *   - "sectors_only"    (experimental — drops trap speed).
+ * Deterministic tie-break on team name to keep tests stable.
  */
-export function computeBaselineOrder(profiles: readonly CarProfile[]): string[] {
+export function computeBaselineOrder(
+  profiles: readonly CarProfile[],
+  mode: PersistenceMode = "top_and_sectors",
+): string[] {
   // Reuse the SAME helper exported from gpPrediction so the production
   // ranking (OPZIONE Z: pure persistence) and the backtest baseline stay
   // bit-for-bit identical. Tie-break on team name keeps tests stable.
   const scored = profiles.map((p) => ({
     team: p.team_name,
-    score: computePersistenceScore(p),
+    score: computePersistenceScore(p, mode),
   }));
   scored.sort((a, b) => b.score - a.score || a.team.localeCompare(b.team));
   return scored.map((x) => x.team);
+}
+
+/** Convenience: sectors-only baseline. Equivalent to computeBaselineOrder(p, "sectors_only"). */
+export function computeBaselineOrderSectorsOnly(
+  profiles: readonly CarProfile[],
+): string[] {
+  return computeBaselineOrder(profiles, "sectors_only");
 }
 
 /**
@@ -208,6 +245,26 @@ function rateOrNull(xs: (boolean | null)[]): number | null {
   return f.filter(Boolean).length / f.length;
 }
 
+function skippedRace(
+  gpName: string,
+  reason: BacktestPerRace["skipped_reason"],
+  n_teams = 0,
+): BacktestPerRace {
+  return {
+    gpName,
+    rho_model: null,
+    rho_baseline: null,
+    rho_baseline_topsec: null,
+    rho_baseline_sectors: null,
+    top3_model: null,
+    top3_baseline: null,
+    top3_baseline_topsec: null,
+    top3_baseline_sectors: null,
+    n_teams,
+    skipped_reason: reason,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // runBacktest
 // ---------------------------------------------------------------------------
@@ -244,9 +301,14 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
         races_validated: 0,
         rho_model_mean: null,
         rho_baseline_mean: null,
+        rho_baseline_topsec_mean: null,
+        rho_baseline_sectors_mean: null,
         delta_mean: null,
+        delta_sectors_vs_topsec: null,
         top3_model_rate: null,
         top3_baseline_rate: null,
+        top3_baseline_topsec_rate: null,
+        top3_baseline_sectors_rate: null,
       },
       total_races: 0,
       notes: ["Errore nel recupero del calendario"],
@@ -284,28 +346,12 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     // ----- compute `now` strictly BEFORE the start of N's Qualifying -----
     const qualiOfN = qualiByMeeting.get(target.meeting_key);
     if (!qualiOfN || !qualiOfN.date_start) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_quali_session",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_session"));
       continue;
     }
     const qualiStart = new Date(qualiOfN.date_start).getTime();
     if (!Number.isFinite(qualiStart)) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_quali_session",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_session"));
       continue;
     }
     const now = new Date(qualiStart - margin);
@@ -315,41 +361,17 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     try {
       profilesResult = await compute({ now, signal });
     } catch {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "insufficient_upstream_data",
-      });
+      per_race.push(skippedRace(gpName, "insufficient_upstream_data"));
       continue;
     }
     if (!profilesResult.profiles || profilesResult.profiles.length === 0) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "insufficient_upstream_data",
-      });
+      per_race.push(skippedRace(gpName, "insufficient_upstream_data"));
       continue;
     }
 
     const circuit = circuitProfiles[gpName];
     if (!circuit) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_circuit_profile",
-      });
+      per_race.push(skippedRace(gpName, "no_circuit_profile"));
       continue;
     }
 
@@ -357,19 +379,18 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       racesConsidered: profilesResult.races_considered,
     });
     if (!prediction.ranked || prediction.ranked.length === 0) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "prediction_empty",
-      });
+      per_race.push(skippedRace(gpName, "prediction_empty"));
       continue;
     }
     const predOrder = prediction.ranked.map((t) => t.team_name);
-    const baselineOrder = computeBaselineOrder(profilesResult.profiles);
+    const baselineOrderTopSec = computeBaselineOrder(
+      profilesResult.profiles,
+      "top_and_sectors",
+    );
+    const baselineOrderSectors = computeBaselineOrder(
+      profilesResult.profiles,
+      "sectors_only",
+    );
 
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
@@ -378,43 +399,33 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       qLaps = (await getLaps(qualiOfN.session_key)) ?? [];
       qDrivers = (await getDrv(qualiOfN.session_key)) ?? [];
     } catch {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: 0,
-        skipped_reason: "no_quali_data",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_data"));
       continue;
     }
     const truthOrder = computeQualifyingOrderByTeam(qLaps, qDrivers);
     if (truthOrder.length < 2) {
-      per_race.push({
-        gpName,
-        rho_model: null,
-        rho_baseline: null,
-        top3_model: null,
-        top3_baseline: null,
-        n_teams: truthOrder.length,
-        skipped_reason: "no_quali_data",
-      });
+      per_race.push(skippedRace(gpName, "no_quali_data", truthOrder.length));
       continue;
     }
 
     const rho_model = spearman(predOrder, truthOrder);
-    const rho_baseline = spearman(baselineOrder, truthOrder);
+    const rho_baseline_topsec = spearman(baselineOrderTopSec, truthOrder);
+    const rho_baseline_sectors = spearman(baselineOrderSectors, truthOrder);
     const top3_model = topKHit(predOrder, truthOrder, 3);
-    const top3_baseline = topKHit(baselineOrder, truthOrder, 3);
+    const top3_baseline_topsec = topKHit(baselineOrderTopSec, truthOrder, 3);
+    const top3_baseline_sectors = topKHit(baselineOrderSectors, truthOrder, 3);
     const n_teams = predOrder.filter((t) => truthOrder.includes(t)).length;
 
     per_race.push({
       gpName,
       rho_model,
-      rho_baseline,
+      rho_baseline: rho_baseline_topsec,
+      rho_baseline_topsec,
+      rho_baseline_sectors,
       top3_model,
-      top3_baseline,
+      top3_baseline: top3_baseline_topsec,
+      top3_baseline_topsec,
+      top3_baseline_sectors,
       n_teams,
     });
   }
@@ -424,21 +435,35 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
   const rhoModelMean = meanOrNull(
     validated.map((r) => r.rho_model).filter((x): x is number => x != null),
   );
-  const rhoBaseMean = meanOrNull(
-    validated.map((r) => r.rho_baseline).filter((x): x is number => x != null),
+  const rhoBaseTopSecMean = meanOrNull(
+    validated.map((r) => r.rho_baseline_topsec).filter((x): x is number => x != null),
+  );
+  const rhoBaseSectorsMean = meanOrNull(
+    validated.map((r) => r.rho_baseline_sectors).filter((x): x is number => x != null),
   );
   const delta =
-    rhoModelMean != null && rhoBaseMean != null ? rhoModelMean - rhoBaseMean : null;
+    rhoModelMean != null && rhoBaseTopSecMean != null
+      ? rhoModelMean - rhoBaseTopSecMean
+      : null;
+  const deltaSectorsVsTopSec =
+    rhoBaseSectorsMean != null && rhoBaseTopSecMean != null
+      ? rhoBaseSectorsMean - rhoBaseTopSecMean
+      : null;
 
   return {
     per_race,
     aggregate: {
       races_validated: validated.length,
       rho_model_mean: rhoModelMean,
-      rho_baseline_mean: rhoBaseMean,
+      rho_baseline_mean: rhoBaseTopSecMean,
+      rho_baseline_topsec_mean: rhoBaseTopSecMean,
+      rho_baseline_sectors_mean: rhoBaseSectorsMean,
       delta_mean: delta,
+      delta_sectors_vs_topsec: deltaSectorsVsTopSec,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
-      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline)),
+      top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
+      top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
+      top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
     },
     total_races: total,
     notes,
