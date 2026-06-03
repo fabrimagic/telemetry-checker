@@ -162,19 +162,37 @@ export const USE_CIRCUIT_SPECIFIC_MODEL = false;
 /**
  * Persistence score modes.
  *
- *  - "top_and_sectors" (DEFAULT, current production): mean of top_speed_index
- *    and the average sector strength. This is the formula in production and
- *    also what the backtest baseline currently uses.
- *  - "sectors_only" (EXPERIMENTAL): mean(s1,s2,s3) only — drops the trap
- *    speed entirely. Motivation: top_speed_index is a normalized TRAP speed,
- *    which depends on the aero setup the team chose, not on raw performance.
- *    A high-downforce favorite (e.g. McLaren at Monaco) gets penalized
- *    because its trap speed is naturally low; a low-downforce car with a
- *    weak engine gets rewarded. We want to MEASURE (via backtest) whether
- *    removing the trap component improves predictive power before changing
- *    the production default.
+ *  - "top_and_sectors" — historical formula, mean of top_speed_index and the
+ *    average sector strength. Kept as a HELPER variant for monitoring /
+ *    A-B comparison (the backtest still reports its rho beside the
+ *    production one).
+ *  - "sectors_only"    — mean(s1,s2,s3). DROPS the trap speed entirely.
+ *    Motivation: top_speed_index is a normalized TRAP speed which depends
+ *    on the aero setup chosen by the team, not on raw performance. A
+ *    high-downforce favorite (e.g. McLaren) is penalized because its trap
+ *    speed is naturally low; a low-downforce car with a weak engine
+ *    (e.g. Audi) is rewarded. The 3-way backtest showed this variant
+ *    predicts much better (Δ ≈ +0.209; ρ 0.841 vs 0.632; top-3 100% vs 25%).
+ *
+ * The helper's DEFAULT stays "top_and_sectors" for back-compat with any
+ * external consumer. PRODUCTION picks the active mode explicitly via
+ * {@link PRODUCTION_PERSISTENCE_MODE}.
  */
 export type PersistenceMode = "top_and_sectors" | "sectors_only";
+
+/**
+ * Mode used by the production engine in {@link predictGpAffinity} and by
+ * the backtest baseline that REPRESENTS production. Single source of
+ * truth — change here to swap formulas.
+ *
+ * Currently "sectors_only": validated by the 3-way backtest as a strict
+ * improvement over "top_and_sectors". The trap speed is excluded from the
+ * SCORE because it is misleading (depends on aero load, not pure
+ * performance) and removing it improves predictive accuracy. The trap
+ * value remains available in CarProfile as descriptive context (shown in
+ * "Dettagli tecnici"), it just doesn't drive the ranking.
+ */
+export const PRODUCTION_PERSISTENCE_MODE: PersistenceMode = "sectors_only";
 
 /**
  * Persistence score — the SAME formula used as the baseline in gpBacktest
