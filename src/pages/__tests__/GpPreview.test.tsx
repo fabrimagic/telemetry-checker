@@ -154,6 +154,8 @@ describe("GpPredictionResultView", () => {
     render(<GpPredictionResultView circuit={circuit} prediction={pred} />);
     expect(screen.getByTestId("map-confidence-low-Lowc")).toBeTruthy();
     expect(screen.queryByTestId("map-confidence-low-Highc")).toBeNull();
+  });
+
   it("renders the sector_typed_history badge and per-type values in tech details", () => {
     const pred: GpPrediction = {
       ranked: [
@@ -188,11 +190,8 @@ describe("GpPredictionResultView", () => {
     );
     const badge = screen.getByTestId("corner-source-Hist");
     expect(badge.textContent).toMatch(/storico settori/i);
-    // no GPS / sector_typed wording
     expect(badge.textContent).not.toMatch(/GPS|geometria/i);
   });
-
-});
 
   it("renders Technical Details expandable section per team, closed by default", () => {
     const pred: GpPrediction = {
