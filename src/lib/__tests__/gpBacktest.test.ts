@@ -417,9 +417,9 @@ describe("runBacktest — 3-way comparison (Opzione 1)", () => {
       mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
       mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
     ];
-    // Quali truth: McL (80) < Aud (81) < Mid (82) → McL, Aud, Mid.
+    // Quali truth: McL (80) < Mid (81) < Aud (82) → McL, Mid, Aud.
     const lapsBySession = new Map<number, Lap[]>([
-      [22, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+      [22, [mkLap(1, 80), mkLap(3, 81), mkLap(2, 82)]],
     ]);
     const driversBySession = new Map<number, Driver[]>([
       [22, [mkDriver(1, "McL"), mkDriver(2, "Aud"), mkDriver(3, "Mid")]],
