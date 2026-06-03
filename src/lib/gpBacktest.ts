@@ -35,6 +35,7 @@ import {
 import {
   predictGpAffinity as defaultPredictGpAffinity,
   computePersistenceScore,
+  PRODUCTION_PERSISTENCE_MODE,
   type GpPrediction,
   type PersistenceMode,
 } from "./gpPrediction";
