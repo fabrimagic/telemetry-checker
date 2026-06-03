@@ -343,6 +343,56 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
   },
 };
 
+/**
+ * Stable circuit identifiers from OpenF1 (verified via /meetings?year=2026 and
+ * historical /meetings for dormant tracks). Maps `circuit_key` → the exact
+ * `gpName` key used in CIRCUIT_PROFILES. This is the PRIMARY resolution path
+ * for OpenF1 sessions; legacy location/country fallback is only used when
+ * `circuit_key` is missing.
+ *
+ * Why circuit_key: location strings are inconsistent across the dataset
+ * (e.g. "Miami Gardens" vs "Miami") and country_name is ambiguous for
+ * multi-GP countries (USA: Miami/COTA/Las Vegas; Italy: Monza/Imola).
+ * `circuit_key` is a stable integer per circuit — no ambiguity.
+ *
+ * Includes dormant circuits (Bahrain=63, Jeddah=149) so they auto-resolve
+ * if they re-enter the calendar.
+ */
+export const CIRCUIT_KEY_TO_GP_NAME: Record<number, string> = {
+  10: "Gran Premio d'Australia",
+  49: "Gran Premio della Cina",
+  46: "Gran Premio del Giappone",
+  151: "Gran Premio di Miami",
+  23: "Gran Premio del Canada",
+  22: "Gran Premio di Monaco",
+  15: "Gran Premio di Barcellona-Catalunya",
+  19: "Gran Premio d'Austria",
+  2: "Gran Premio di Gran Bretagna",
+  7: "Gran Premio del Belgio",
+  4: "Gran Premio d'Ungheria",
+  55: "Gran Premio d'Olanda",
+  39: "Gran Premio d'Italia",
+  153: "Gran Premio di Spagna",
+  144: "Gran Premio dell'Azerbaijan",
+  61: "Gran Premio di Singapore",
+  9: "Gran Premio degli Stati Uniti",
+  65: "Gran Premio del Messico",
+  14: "Gran Premio del Brasile",
+  152: "Gran Premio di Las Vegas",
+  150: "Gran Premio del Qatar",
+  70: "Gran Premio di Abu Dhabi",
+  // Dormant (not in 2026 calendar) — included for forward-compat.
+  63: "Gran Premio del Bahrain",
+  149: "Gran Premio dell'Arabia Saudita",
+};
+
+/** Resolve a calendar gpName directly from OpenF1's `circuit_key`. */
+export function resolveGpNameByCircuitKey(circuitKey?: number | null): string | null {
+  if (circuitKey == null || !Number.isFinite(circuitKey)) return null;
+  return CIRCUIT_KEY_TO_GP_NAME[circuitKey] ?? null;
+}
+
+
 /** Direct lookup by gpName. Returns null when unmapped. */
 export function getCircuitProfile(gpName: string): CircuitProfile | null {
   return CIRCUIT_PROFILES[gpName] ?? null;
