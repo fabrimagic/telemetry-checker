@@ -91,15 +91,14 @@ describe("gpPrediction", () => {
     expect(out.ranked.find((t) => t.team_name === "B")!.affinity_score).toBeCloseTo(0, 6);
   });
 
-  it("low-confidence car has larger uncertainty than a high-confidence one", () => {
+  it("smaller effective sample yields larger uncertainty than a larger one", () => {
     const c = circuit();
-    const out = predictGpAffinity(c, [
-      car("High", 0.5, [0.5, 0.5, 0.5], "high"),
-      car("Low", 0.5, [0.5, 0.5, 0.5], "low"),
-    ]);
-    const hi = out.ranked.find((t) => t.team_name === "High")!;
-    const lo = out.ranked.find((t) => t.team_name === "Low")!;
-    expect(lo.uncertainty).toBeGreaterThan(hi.uncertainty);
+    const hiSample = { ...car("Big", 0.5, [0.5, 0.5, 0.5]), effective_sample_races: 8 };
+    const loSample = { ...car("Small", 0.5, [0.5, 0.5, 0.5]), effective_sample_races: 3 };
+    const out = predictGpAffinity(c, [hiSample, loSample]);
+    const big = out.ranked.find((t) => t.team_name === "Big")!;
+    const small = out.ranked.find((t) => t.team_name === "Small")!;
+    expect(small.uncertainty).toBeGreaterThan(big.uncertainty);
   });
 
   it("high overtaking_difficulty downgrades global_confidence and adds a note", () => {
