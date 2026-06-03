@@ -318,25 +318,27 @@ export function GpPredictionResultView({
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-lg">Affinità tecnica stimata per team</CardTitle>
+            <CardTitle className="text-lg">Forza recente stimata per team</CardTitle>
             <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
               Confidenza complessiva: {confidenceLabelIt(prediction.global_confidence)}
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground pt-1 space-y-2 leading-relaxed">
             <p>
-              Il punteggio va da 0 a 1 ed è una <span className="font-medium">stima</span>,
-              non una misura esatta: per questo accanto a ogni numero compare un piccolo
-              margine (ad esempio &ldquo;0,72 ± 0,05&rdquo;), che rappresenta quanto la stima
-              potrebbe variare avendo a disposizione più dati.
+              Il punteggio (0–1) riflette la <span className="font-medium">forza recente
+              complessiva</span> di ciascuna vettura — velocità di punta e tenuta in curva
+              aggregate dalle gare già disputate. Non incorpora il carattere specifico di
+              questo circuito: l'analisi per tipo di curva è mostrata sotto come
+              <span className="font-medium"> contesto descrittivo</span>, ma non viene usata
+              per la previsione perché, con i dati 2026 attuali, non ha ancora dimostrato
+              di migliorarla.
             </p>
             <p>
-              Quando i margini di due team si sovrappongono, la loro differenza è troppo
-              piccola per essere considerata affidabile — un po&apos; come due pesi così
-              vicini che la bilancia non riesce a distinguerli con sicurezza. In quei
-              casi è più corretto considerarli <span className="font-medium">alla pari</span>{" "}
-              invece di metterli in ordine: è ciò che segnala il badge
-              &ldquo;Equivalenti entro l&apos;incertezza&rdquo; qui sotto.
+              Accanto a ogni numero compare un piccolo margine di incertezza (ad esempio
+              &ldquo;0,72 ± 0,05&rdquo;): quando i margini di due team si sovrappongono, la
+              loro differenza è troppo piccola per essere considerata affidabile — è più
+              corretto considerarli <span className="font-medium">alla pari</span>, come
+              segnala il badge &ldquo;Equivalenti entro l&apos;incertezza&rdquo;.
             </p>
           </div>
 
