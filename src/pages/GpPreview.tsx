@@ -328,13 +328,16 @@ export function GpPredictionResultView({
           </div>
           <div className="text-xs text-muted-foreground pt-1 space-y-2 leading-relaxed">
             <p>
-              Il punteggio (0–1) riflette la <span className="font-medium">forza recente
-              complessiva</span> di ciascuna vettura — velocità di punta e tenuta in curva
-              aggregate dalle gare già disputate. Non incorpora il carattere specifico di
-              questo circuito: l'analisi per tipo di curva è mostrata sotto come
-              <span className="font-medium"> contesto descrittivo</span>, ma non viene usata
-              per la previsione perché, con i dati 2026 attuali, non ha ancora dimostrato
-              di migliorarla.
+              Il punteggio (0–1) riflette la <span className="font-medium">tenuta nei
+              tempi di settore</span> espressa da ciascuna vettura nelle gare già
+              disputate (media di s1, s2 e s3). La velocità massima rilevata a fine
+              rettilineo (trap) è mostrata sotto come <span className="font-medium">
+              contesto, ma non entra nel punteggio</span>: dipende dal carico
+              aerodinamico scelto dal team più che dalla performance pura, e il
+              backtest ha confermato che includerla peggiora la previsione.
+              Nemmeno il carattere specifico del circuito entra nel punteggio:
+              l'analisi per tipo di curva è mostrata come contesto descrittivo,
+              non come componente predittiva.
             </p>
             <p>
               Accanto a ogni numero compare un piccolo margine di incertezza (ad esempio
