@@ -324,6 +324,7 @@ export function GpPredictionResultView({
     racesConsidered?: number;
     racesWithData?: number;
     diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
+    domain?: DomainReliability;
   };
   profiles?: CarProfile[];
 }) {
