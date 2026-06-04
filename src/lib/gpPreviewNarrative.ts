@@ -127,6 +127,20 @@ export function buildGpPreviewNarrative(
     sentences.push(`${lead}${extras.length > 0 ? ", " + extras.join(" ") : ""}.`);
   }
 
+  // ----- 1b. AVVISO "FUORI DOMINIO" (informativo, non modifica il punteggio) -----
+  if (dataContext?.domain?.status === "out_of_domain") {
+    const d = dataContext.domain;
+    if (
+      typeof d.target_speed === "number" &&
+      typeof d.min === "number" &&
+      typeof d.max === "number"
+    ) {
+      sentences.push(
+        `Attenzione: ${circuit.gpName} è molto più lento di tutti i circuiti corsi finora quest'anno (${d.target_speed.toFixed(0)} km/h di velocità media in qualifica, contro ${d.min.toFixed(0)}–${d.max.toFixed(0)} dei circuiti già disputati). La previsione è quindi un'estrapolazione fuori dai dati disponibili e va presa con particolare cautela: nessun circuito di carattere simile è ancora stato corso nel 2026.`,
+      );
+    }
+  }
+
   // ----- Edge: nessun team -----
   if (prediction.ranked.length === 0) {
     sentences.push("Dati insufficienti per un'analisi dei team su questo circuito.");
