@@ -26,6 +26,10 @@ import {
 import { analyzeCornersForSession } from "@/lib/cornerAnalysis";
 import { resolveCalendarGpName } from "@/lib/circuitGeometry";
 import type { SessionInfo } from "@/lib/openf1";
+import {
+  computeDomainReliability,
+  type DomainReliability,
+} from "@/lib/circuitDomain";
 
 
 // ----- Helpers -----
@@ -320,6 +324,7 @@ export function GpPredictionResultView({
     racesConsidered?: number;
     racesWithData?: number;
     diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
+    domain?: DomainReliability;
   };
   profiles?: CarProfile[];
 }) {
@@ -353,8 +358,46 @@ export function GpPredictionResultView({
   }, [perTeam]);
 
 
+  const domain = dataContext?.domain;
+  const showDomainBanner =
+    domain?.status === "out_of_domain" &&
+    typeof domain.target_speed === "number" &&
+    typeof domain.min === "number" &&
+    typeof domain.max === "number";
+
   return (
     <div className="space-y-6">
+      {showDomainBanner && domain && (
+        <Card
+          data-testid="domain-warning-card"
+          className="border-amber-500/40 bg-amber-500/5"
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-amber-300">
+              <AlertTriangle className="h-4 w-4" />
+              Previsione fuori dal dominio dei dati
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-foreground/90 leading-relaxed">
+            <p>
+              <span className="font-medium">{circuit.gpName}</span> è molto più{" "}
+              {(domain.target_speed ?? 0) < (domain.min ?? 0) ? "lento" : "veloce"}{" "}
+              di tutti i circuiti corsi finora quest'anno (
+              <span className="tabular-nums">
+                {domain.target_speed!.toFixed(0)} km/h
+              </span>{" "}
+              di velocità media in qualifica, contro{" "}
+              <span className="tabular-nums">
+                {domain.min!.toFixed(0)}–{domain.max!.toFixed(0)}
+              </span>{" "}
+              dei circuiti già disputati). La previsione è quindi
+              un'<span className="font-medium">estrapolazione</span> fuori dai dati
+              disponibili e va presa con particolare cautela: nessun circuito di
+              carattere simile è ancora stato corso nel 2026.
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {narrative.length > 0 && (
         <Card data-testid="narrative-card" className="border-[hsl(var(--f1-red))]/40">
           <CardHeader className="pb-3">
@@ -595,6 +638,7 @@ export default function GpPreview() {
     racesConsidered?: number;
     racesWithData?: number;
     diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
+    domain?: DomainReliability;
   } | undefined>(undefined);
   const [aborted, setAborted] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -665,6 +709,7 @@ export default function GpPreview() {
         racesConsidered: res.races_considered,
         racesWithData,
         diagnostics: res.races_diagnostics,
+        domain: computeDomainReliability(circuit, res.races_used),
       });
 
     } catch (e: any) {

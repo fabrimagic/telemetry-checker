@@ -10,6 +10,7 @@
 
 import type { CircuitProfile } from "./circuitProfiles";
 import type { GpPrediction } from "./gpPrediction";
+import type { DomainReliability } from "./circuitDomain";
 
 /** Threshold used purely for prose coloring. */
 const HIGH_TRAIT = 0.7;
@@ -64,6 +65,12 @@ export interface NarrativeDataContext {
   racesConsidered?: number;
   racesWithData?: number;
   diagnostics?: RaceDiagnosticLite[];
+  /**
+   * Domain-distance reliability of applying production scoring (validated
+   * on already-run circuits) to the upcoming GP. When "out_of_domain" the
+   * narrative emits an extra honest sentence; otherwise it stays silent.
+   */
+  domain?: DomainReliability;
 }
 
 function confidenceItalian(c: "high" | "medium" | "low"): string {
@@ -118,6 +125,22 @@ export function buildGpPreviewNarrative(
       extras.push("e sorpassi difficili, dove la qualifica pesa molto");
 
     sentences.push(`${lead}${extras.length > 0 ? ", " + extras.join(" ") : ""}.`);
+  }
+
+  // ----- 1b. AVVISO "FUORI DOMINIO" (informativo, non modifica il punteggio) -----
+  if (dataContext?.domain?.status === "out_of_domain") {
+    const d = dataContext.domain;
+    if (
+      typeof d.target_speed === "number" &&
+      typeof d.min === "number" &&
+      typeof d.max === "number"
+    ) {
+      const slower = d.target_speed < d.min;
+      const direction = slower ? "lento" : "veloce";
+      sentences.push(
+        `Attenzione: ${circuit.gpName} è molto più ${direction} di tutti i circuiti corsi finora quest'anno (${d.target_speed.toFixed(0)} km/h di velocità media in qualifica, contro ${d.min.toFixed(0)}–${d.max.toFixed(0)} dei circuiti già disputati). La previsione è quindi un'estrapolazione fuori dai dati disponibili e va presa con particolare cautela: nessun circuito di carattere simile è ancora stato corso nel 2026.`,
+      );
+    }
   }
 
   // ----- Edge: nessun team -----

@@ -205,7 +205,7 @@ function makeDeps(overrides: {
         total_past_races: 1,
       } as ComputeCarProfilesResult;
     }),
-    predictGpAffinity: vi.fn((c: CircuitProfile, p: CarProfile[]): GpPrediction => {
+    predictGpAffinity: vi.fn((c: CircuitProfile, p: CarProfile[], _meta?: { useCircuitSpecificModel?: boolean }): GpPrediction => {
       if (overrides.predictImpl) return overrides.predictImpl(c, p);
       const ranked = [...p]
         .sort((a, b) => b.top_speed_index - a.top_speed_index)
