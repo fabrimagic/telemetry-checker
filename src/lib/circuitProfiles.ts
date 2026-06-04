@@ -50,6 +50,16 @@ export interface CircuitProfile {
    * Solo significativa quando sector_corner_map è presente.
    */
   sector_corner_map_confidence?: "high" | "medium" | "low";
+  /**
+   * Velocità media di un giro in qualifica (km/h), stagione 2025. Misura
+   * oggettiva del CARATTERE del circuito (rettilineato vs tortuoso) usata
+   * dal modulo {@link ./circuitDomain} per valutare quanto il target sia
+   * "fuori dal dominio" dei circuiti già corsi nell'anno. Additiva,
+   * retrocompatibile: assenza ⇒ il calcolo di affidabilità restituisce
+   * "unknown" e NON viene mostrato alcun avviso. Non entra mai nel
+   * punteggio né nella banda di incertezza.
+   */
+  quali_speed_kmh?: number;
 }
 
 export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
