@@ -68,6 +68,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.70, slow_corner_traction: 0.45, medium_corner: 0.70, fast_corner: 0.80,
     tyre_deg: 0.45, overtaking_difficulty: 0.55,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 253.0,
     sector_corner_map: {
       s1: { slow: 0.2, medium: 0.4, fast: 0.4 },
       s2: { slow: 0.2, medium: 0.3, fast: 0.5 },
@@ -80,6 +81,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.70, slow_corner_traction: 0.65, medium_corner: 0.70, fast_corner: 0.55,
     tyre_deg: 0.70, overtaking_difficulty: 0.35,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 216.5,
     sector_corner_map: {
       s1: { slow: 0.5, medium: 0.3, fast: 0.2 },
       s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
@@ -92,6 +94,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.55, slow_corner_traction: 0.40, medium_corner: 0.85, fast_corner: 1.00,
     tyre_deg: 0.75, overtaking_difficulty: 0.65,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 240.3,
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.3, fast: 0.6 },
       s2: { slow: 0.5, medium: 0.3, fast: 0.2 },
@@ -104,6 +107,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.70, slow_corner_traction: 0.65, medium_corner: 0.60, fast_corner: 0.40,
     tyre_deg: 0.55, overtaking_difficulty: 0.45,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 226.0,
     sector_corner_map: {
       s1: { slow: 0.3, medium: 0.4, fast: 0.3 },
       s2: { slow: 0.4, medium: 0.3, fast: 0.3 },
@@ -116,6 +120,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.80, slow_corner_traction: 0.85, medium_corner: 0.35, fast_corner: 0.25,
     tyre_deg: 0.40, overtaking_difficulty: 0.30,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 221.4,
     // Circuit Gilles Villeneuve — stop-and-go: hairpin Senna e L'Épingle lentissimi,
     // chicane in 2ª marcia, Wall of Champions; carattere curvo prevalentemente lento,
     // intervallato da lunghi rettilinei (top speed alto). Fonti settore-per-settore solide.
@@ -131,6 +136,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.20, slow_corner_traction: 1.00, medium_corner: 0.60, fast_corner: 0.15,
     tyre_deg: 0.20, overtaking_difficulty: 1.00,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 171.7,
     sector_corner_map: {
       s1: { slow: 0.7, medium: 0.3, fast: 0.0 },
       s2: { slow: 0.6, medium: 0.2, fast: 0.2 },
@@ -143,6 +149,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.45, slow_corner_traction: 0.50, medium_corner: 0.80, fast_corner: 0.90,
     tyre_deg: 0.80, overtaking_difficulty: 0.65,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 234.3,
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.4, fast: 0.5 },
       s2: { slow: 0.2, medium: 0.4, fast: 0.4 },
@@ -155,6 +162,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.80, slow_corner_traction: 0.75, medium_corner: 0.45, fast_corner: 0.50,
     tyre_deg: 0.55, overtaking_difficulty: 0.30,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 243.0,
     sector_corner_map: {
       s1: { slow: 0.2, medium: 0.3, fast: 0.5 },
       s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
@@ -167,6 +175,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.55, slow_corner_traction: 0.40, medium_corner: 0.75, fast_corner: 1.00,
     tyre_deg: 0.80, overtaking_difficulty: 0.40,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 249.8,
     sector_corner_map: {
       s1: { slow: 0.3, medium: 0.2, fast: 0.5 },
       s2: { slow: 0.0, medium: 0.2, fast: 0.8 },
@@ -179,6 +188,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.90, slow_corner_traction: 0.40, medium_corner: 0.55, fast_corner: 0.90,
     tyre_deg: 0.55, overtaking_difficulty: 0.30,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 250.7,
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.3, fast: 0.6 },
       s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
@@ -191,6 +201,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.25, slow_corner_traction: 0.80, medium_corner: 0.85, fast_corner: 0.35,
     tyre_deg: 0.55, overtaking_difficulty: 0.85,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 209.3,
     sector_corner_map: {
       s1: { slow: 0.5, medium: 0.4, fast: 0.1 },
       s2: { slow: 0.5, medium: 0.4, fast: 0.1 },
@@ -203,6 +214,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.35, slow_corner_traction: 0.55, medium_corner: 0.75, fast_corner: 0.85,
     tyre_deg: 0.60, overtaking_difficulty: 0.85,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 223.3,
     sector_corner_map: {
       s1: { slow: 0.2, medium: 0.4, fast: 0.4 },
       s2: { slow: 0.2, medium: 0.4, fast: 0.4 },
@@ -215,6 +227,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 1.00, slow_corner_traction: 0.45, medium_corner: 0.25, fast_corner: 0.30,
     tyre_deg: 0.40, overtaking_difficulty: 0.20,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 264.7,
     sector_corner_map: {
       s1: { slow: 0.2, medium: 0.3, fast: 0.5 },
       s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
@@ -233,6 +246,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.95, slow_corner_traction: 0.80, medium_corner: 0.35, fast_corner: 0.30,
     tyre_deg: 0.35, overtaking_difficulty: 0.30,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 213.7,
     sector_corner_map: {
       s1: { slow: 0.5, medium: 0.2, fast: 0.3 },
       s2: { slow: 0.7, medium: 0.3, fast: 0.0 },
@@ -245,6 +259,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.30, slow_corner_traction: 0.90, medium_corner: 0.75, fast_corner: 0.20,
     tyre_deg: 0.55, overtaking_difficulty: 0.85,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 199.5,
     sector_corner_map: {
       s1: { slow: 0.4, medium: 0.4, fast: 0.2 },
       s2: { slow: 0.6, medium: 0.3, fast: 0.1 },
@@ -257,6 +272,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.60, slow_corner_traction: 0.55, medium_corner: 0.75, fast_corner: 0.85,
     tyre_deg: 0.75, overtaking_difficulty: 0.40,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 214.5,
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.3, fast: 0.6 },
       s2: { slow: 0.5, medium: 0.2, fast: 0.3 },
@@ -269,6 +285,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.85, slow_corner_traction: 0.65, medium_corner: 0.50, fast_corner: 0.45,
     tyre_deg: 0.35, overtaking_difficulty: 0.45,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 205.0,
     sector_corner_map: {
       s1: { slow: 0.4, medium: 0.3, fast: 0.3 },
       s2: { slow: 0.1, medium: 0.4, fast: 0.5 },
@@ -281,6 +298,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.70, slow_corner_traction: 0.55, medium_corner: 0.75, fast_corner: 0.70,
     tyre_deg: 0.65, overtaking_difficulty: 0.35,
     confidence: "high", source: "historical",
+    quali_speed_kmh: 223.2,
     sector_corner_map: {
       s1: { slow: 0.2, medium: 0.4, fast: 0.4 },
       s2: { slow: 0.3, medium: 0.4, fast: 0.3 },
@@ -293,6 +311,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.95, slow_corner_traction: 0.60, medium_corner: 0.40, fast_corner: 0.25,
     tyre_deg: 0.35, overtaking_difficulty: 0.35,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 206.8,
     sector_corner_map: {
       s1: { slow: 0.5, medium: 0.2, fast: 0.3 },
       s2: { slow: 0.6, medium: 0.2, fast: 0.2 },
@@ -305,6 +324,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.50, slow_corner_traction: 0.35, medium_corner: 0.80, fast_corner: 0.95,
     tyre_deg: 0.90, overtaking_difficulty: 0.55,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 245.7,
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.3, fast: 0.6 },
       s2: { slow: 0.1, medium: 0.3, fast: 0.6 },
@@ -317,6 +337,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.65, slow_corner_traction: 0.50, medium_corner: 0.65, fast_corner: 0.60,
     tyre_deg: 0.50, overtaking_difficulty: 0.55,
     confidence: "medium", source: "historical",
+    quali_speed_kmh: 231.3,
     sector_corner_map: {
       s1: { slow: 0.2, medium: 0.4, fast: 0.4 },
       s2: { slow: 0.3, medium: 0.4, fast: 0.3 },
@@ -332,6 +353,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.80, slow_corner_traction: 0.80, medium_corner: 0.55, fast_corner: 0.35,
     tyre_deg: 0.90, overtaking_difficulty: 0.35,
     confidence: "medium", source: "historical", dormant: true,
+    quali_speed_kmh: 216.9,
     sector_corner_map: {
       s1: { slow: 0.4, medium: 0.3, fast: 0.3 },
       s2: { slow: 0.5, medium: 0.3, fast: 0.2 },
@@ -344,6 +366,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     top_speed: 0.90, slow_corner_traction: 0.30, medium_corner: 0.55, fast_corner: 0.95,
     tyre_deg: 0.45, overtaking_difficulty: 0.35,
     confidence: "medium", source: "historical", dormant: true,
+    quali_speed_kmh: 254.6,
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.3, fast: 0.6 },
       s2: { slow: 0.1, medium: 0.2, fast: 0.7 },
