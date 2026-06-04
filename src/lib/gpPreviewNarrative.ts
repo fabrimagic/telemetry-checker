@@ -65,6 +65,12 @@ export interface NarrativeDataContext {
   racesConsidered?: number;
   racesWithData?: number;
   diagnostics?: RaceDiagnosticLite[];
+  /**
+   * Domain-distance reliability of applying production scoring (validated
+   * on already-run circuits) to the upcoming GP. When "out_of_domain" the
+   * narrative emits an extra honest sentence; otherwise it stays silent.
+   */
+  domain?: DomainReliability;
 }
 
 function confidenceItalian(c: "high" | "medium" | "low"): string {
