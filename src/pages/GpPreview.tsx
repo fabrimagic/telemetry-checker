@@ -638,6 +638,7 @@ export default function GpPreview() {
     racesConsidered?: number;
     racesWithData?: number;
     diagnostics?: Array<{ name: string; date_end: string; status: "used" | "no_data" | "fetch_failed" }>;
+    domain?: DomainReliability;
   } | undefined>(undefined);
   const [aborted, setAborted] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
