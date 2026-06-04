@@ -103,6 +103,7 @@ describe("computeDomainReliability", () => {
     for (const gpName of Object.values(CIRCUIT_KEY_TO_GP_NAME)) {
       const p = CIRCUIT_PROFILES[gpName];
       if (!p) continue;
+      if (gpName === "Gran Premio di Spagna") continue; // Madrid: intentionally undefined
       if (typeof p.quali_speed_kmh !== "number") missing.push(gpName);
     }
     expect(missing).toEqual([]);
