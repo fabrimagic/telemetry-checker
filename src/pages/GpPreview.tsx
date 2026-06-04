@@ -709,6 +709,7 @@ export default function GpPreview() {
         racesConsidered: res.races_considered,
         racesWithData,
         diagnostics: res.races_diagnostics,
+        domain: computeDomainReliability(circuit, res.races_used),
       });
 
     } catch (e: any) {
