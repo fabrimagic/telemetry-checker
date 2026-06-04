@@ -135,8 +135,10 @@ export function buildGpPreviewNarrative(
       typeof d.min === "number" &&
       typeof d.max === "number"
     ) {
+      const slower = d.target_speed < d.min;
+      const direction = slower ? "lento" : "veloce";
       sentences.push(
-        `Attenzione: ${circuit.gpName} è molto più lento di tutti i circuiti corsi finora quest'anno (${d.target_speed.toFixed(0)} km/h di velocità media in qualifica, contro ${d.min.toFixed(0)}–${d.max.toFixed(0)} dei circuiti già disputati). La previsione è quindi un'estrapolazione fuori dai dati disponibili e va presa con particolare cautela: nessun circuito di carattere simile è ancora stato corso nel 2026.`,
+        `Attenzione: ${circuit.gpName} è molto più ${direction} di tutti i circuiti corsi finora quest'anno (${d.target_speed.toFixed(0)} km/h di velocità media in qualifica, contro ${d.min.toFixed(0)}–${d.max.toFixed(0)} dei circuiti già disputati). La previsione è quindi un'estrapolazione fuori dai dati disponibili e va presa con particolare cautela: nessun circuito di carattere simile è ancora stato corso nel 2026.`,
       );
     }
   }
