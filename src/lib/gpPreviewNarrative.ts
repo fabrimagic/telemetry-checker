@@ -10,6 +10,7 @@
 
 import type { CircuitProfile } from "./circuitProfiles";
 import type { GpPrediction } from "./gpPrediction";
+import type { DomainReliability } from "./circuitDomain";
 
 /** Threshold used purely for prose coloring. */
 const HIGH_TRAIT = 0.7;
