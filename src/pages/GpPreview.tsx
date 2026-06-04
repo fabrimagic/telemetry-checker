@@ -26,6 +26,10 @@ import {
 import { analyzeCornersForSession } from "@/lib/cornerAnalysis";
 import { resolveCalendarGpName } from "@/lib/circuitGeometry";
 import type { SessionInfo } from "@/lib/openf1";
+import {
+  computeDomainReliability,
+  type DomainReliability,
+} from "@/lib/circuitDomain";
 
 
 // ----- Helpers -----
