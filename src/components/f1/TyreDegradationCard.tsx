@@ -291,13 +291,37 @@ function ManualSelectionSection({
   );
 }
 
-export function TyreDegradationCard({ results, longRuns }: Props) {
+export function TyreDegradationCard({ results, longRuns, manualSelectionDrivers }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [manualResults, setManualResults] = useState<Map<number, ManualResultEntry | null>>(
+    () => new Map(),
+  );
 
   const validations = useMemo(() => validateAllDegradationEstimates(results), [results]);
 
   const selected = selectedIdx != null ? results[selectedIdx] : null;
   const hasCorrected = results.some(r => isCorrected(r));
+
+  // A driver qualifies for manual fallback only when the automatic detector
+  // found no valid long runs for them (empty list or all isValidLongRun=false).
+  const eligibleManualDrivers = useMemo(() => {
+    if (!manualSelectionDrivers?.length) return [];
+    return manualSelectionDrivers.filter((d) => {
+      const driverRuns = (longRuns ?? []).filter((lr) => lr.driverNumber === d.driverNumber);
+      const hasValid = driverRuns.some((lr) => lr.isValidLongRun);
+      return !hasValid;
+    });
+  }, [manualSelectionDrivers, longRuns]);
+
+  const handleManualResult = (driverNumber: number) =>
+    (entry: ManualResultEntry | null) => {
+      setManualResults((prev) => {
+        const next = new Map(prev);
+        if (entry) next.set(driverNumber, entry);
+        else next.delete(driverNumber);
+        return next;
+      });
+    };
 
   // Build chart data with regression line
   const chartData = useMemo(() => {
@@ -312,7 +336,7 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
 
   if (!results.length) {
     return (
-      <div className="bg-card rounded-lg border border-border p-4">
+      <div className="bg-card rounded-lg border border-border p-4 space-y-3">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <TrendingDown className="h-3.5 w-3.5" />
           Tyre Degradation
@@ -320,9 +344,17 @@ export function TyreDegradationCard({ results, longRuns }: Props) {
         <p className="text-sm text-muted-foreground">
           Dati stint non disponibili o numero di giri validi insufficiente per calcolare il degrado.
         </p>
+        {eligibleManualDrivers.map((d) => (
+          <ManualSelectionSection
+            key={d.driverNumber}
+            driver={d}
+            onResult={handleManualResult(d.driverNumber)}
+          />
+        ))}
       </div>
     );
   }
+
 
   return (
     <div className="bg-card rounded-lg border border-border p-4 space-y-4">
