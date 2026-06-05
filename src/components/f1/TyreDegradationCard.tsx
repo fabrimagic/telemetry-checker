@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
-import { type DegradationResult } from "@/lib/tyreDegradation";
+import { calculateTyreDegradation, type DegradationResult } from "@/lib/tyreDegradation";
 import { type CorrectedDegradationResult } from "@/lib/correctedDegradation";
 import { validateAllDegradationEstimates, type DegradationValidationResult } from "@/lib/degradationValidation";
 import { type LongRunResult } from "@/lib/longRunDetector";
 import { isWetCompound, WET_COMPOUND_CAVEAT_IT } from "@/lib/wetCompoundCheck";
 import { degradationValidationLabel } from "@/lib/statusLabels";
+import type { Lap, StintData } from "@/lib/openf1";
 import { Watermark } from "./Watermark";
 import {
   Table,
@@ -26,7 +27,7 @@ import {
   Line,
   ComposedChart,
 } from "recharts";
-import { TrendingDown, Info } from "lucide-react";
+import { TrendingDown, Info, AlertTriangle } from "lucide-react";
 
 const compoundColors: Record<string, string> = {
   SOFT: "hsl(0, 85%, 55%)",
@@ -35,6 +36,8 @@ const compoundColors: Record<string, string> = {
   INTERMEDIATE: "hsl(140, 70%, 45%)",
   WET: "hsl(210, 80%, 50%)",
 };
+
+const MIN_MANUAL_LAPS = 5;
 
 function fmtTime(sec: number) {
   const m = Math.floor(sec / 60);
@@ -46,9 +49,246 @@ function isCorrected(r: DegradationResult): r is CorrectedDegradationResult {
   return "model_type" in r && "slope_raw" in r && "slope_corrected" in r;
 }
 
+export interface ManualSelectionDriver {
+  driverNumber: number;
+  acronym: string;
+  color: string;
+  laps: Lap[];
+  stints: StintData[];
+}
+
 interface Props {
   results: DegradationResult[];
   longRuns?: LongRunResult[];
+  /**
+   * Only used in Practice when the automatic detector finds no valid long
+   * runs for a driver. Lets the user manually select laps to be treated
+   * as a race-pace simulation. Results are clearly labeled as a manual,
+   * statistically-unvalidated selection.
+   */
+  manualSelectionDrivers?: ManualSelectionDriver[];
+}
+
+interface ManualResultEntry {
+  driverNumber: number;
+  acronym: string;
+  color: string;
+  stintNumber: number;
+  compound: string;
+  result: DegradationResult;
+  lapNumbers: number[];
+}
+
+function ManualSelectionSection({
+  driver,
+  onResult,
+}: {
+  driver: ManualSelectionDriver;
+  onResult: (entry: ManualResultEntry | null) => void;
+}) {
+  const stintsWithLaps = useMemo(() => {
+    return driver.stints
+      .map((s) => {
+        const stintLaps = driver.laps
+          .filter(
+            (l) =>
+              l.lap_number >= s.lap_start &&
+              l.lap_number <= s.lap_end &&
+              l.lap_duration != null &&
+              l.lap_duration > 0 &&
+              !l.is_pit_out_lap,
+          )
+          .sort((a, b) => a.lap_number - b.lap_number);
+        return { stint: s, laps: stintLaps };
+      })
+      .filter((x) => x.laps.length > 0);
+  }, [driver]);
+
+  const [stintNumber, setStintNumber] = useState<number | null>(
+    stintsWithLaps[0]?.stint.stint_number ?? null,
+  );
+  const [selectedLaps, setSelectedLaps] = useState<Set<number>>(new Set());
+  const [computed, setComputed] = useState<ManualResultEntry | null>(null);
+
+  const activeStint = stintsWithLaps.find((x) => x.stint.stint_number === stintNumber);
+
+  const toggleLap = (lapNum: number) => {
+    setSelectedLaps((prev) => {
+      const next = new Set(prev);
+      if (next.has(lapNum)) next.delete(lapNum);
+      else next.add(lapNum);
+      return next;
+    });
+    setComputed(null);
+    onResult(null);
+  };
+
+  const changeStint = (n: number) => {
+    setStintNumber(n);
+    setSelectedLaps(new Set());
+    setComputed(null);
+    onResult(null);
+  };
+
+  const handleCompute = () => {
+    if (!activeStint) return;
+    const picked = activeStint.laps
+      .filter((l) => selectedLaps.has(l.lap_number))
+      .sort((a, b) => a.lap_number - b.lap_number);
+    if (picked.length < MIN_MANUAL_LAPS) return;
+    const virtualStint: StintData = {
+      ...activeStint.stint,
+      lap_start: picked[0].lap_number,
+      lap_end: picked[picked.length - 1].lap_number,
+    };
+    // Build a contiguous lap list for the engine: it filters by stint bounds,
+    // so non-selected laps inside the range must be excluded by us beforehand.
+    // We achieve this by passing only the selected laps to the engine.
+    const degResults = calculateTyreDegradation(
+      driver.driverNumber,
+      driver.acronym,
+      driver.color,
+      picked,
+      [virtualStint],
+    );
+    if (!degResults.length) {
+      setComputed(null);
+      onResult(null);
+      return;
+    }
+    const entry: ManualResultEntry = {
+      driverNumber: driver.driverNumber,
+      acronym: driver.acronym,
+      color: driver.color,
+      stintNumber: activeStint.stint.stint_number,
+      compound: activeStint.stint.compound,
+      result: degResults[0],
+      lapNumbers: picked.map((l) => l.lap_number),
+    };
+    setComputed(entry);
+    onResult(entry);
+  };
+
+  if (!stintsWithLaps.length) return null;
+
+  const enoughLaps = selectedLaps.size >= MIN_MANUAL_LAPS;
+
+  return (
+    <div
+      className="border border-amber-500/40 bg-amber-500/5 rounded-md p-3 space-y-2"
+      data-testid={`manual-selection-${driver.driverNumber}`}
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <p className="text-[11px] font-medium text-amber-200">
+            {driver.acronym} — Nessuna simulazione passo gara rilevata automaticamente
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Puoi selezionare manualmente i giri da trattare come simulazione passo gara.
+            Il risultato sarà etichettato come selezione manuale, non come long run validato.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <label className="text-muted-foreground">Stint:</label>
+        <select
+          className="bg-background border border-border rounded px-1.5 py-0.5 text-[11px]"
+          value={stintNumber ?? ""}
+          onChange={(e) => changeStint(Number(e.target.value))}
+          aria-label="Seleziona stint"
+        >
+          {stintsWithLaps.map(({ stint }) => (
+            <option key={stint.stint_number} value={stint.stint_number}>
+              Stint {stint.stint_number} — {stint.compound} (giri {stint.lap_start}–{stint.lap_end})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {activeStint && (
+        <div className="flex flex-wrap gap-1">
+          {activeStint.laps.map((l) => {
+            const on = selectedLaps.has(l.lap_number);
+            return (
+              <button
+                key={l.lap_number}
+                type="button"
+                onClick={() => toggleLap(l.lap_number)}
+                aria-pressed={on}
+                aria-label={`Giro ${l.lap_number}`}
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                  on
+                    ? "bg-amber-500/30 border-amber-400 text-amber-100"
+                    : "bg-background border-border text-muted-foreground hover:border-amber-500/40"
+                }`}
+                title={`Giro ${l.lap_number} — ${l.lap_duration?.toFixed(3) ?? "—"}s`}
+              >
+                {l.lap_number}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleCompute}
+          disabled={!enoughLaps}
+          className="text-[11px] px-2 py-1 rounded bg-amber-500/30 border border-amber-400/50 text-amber-100 hover:bg-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Calcola sulla selezione ({selectedLaps.size})
+        </button>
+        {!enoughLaps && (
+          <span className="text-[10px] text-muted-foreground">
+            Servono almeno {MIN_MANUAL_LAPS} giri per il calcolo.
+          </span>
+        )}
+      </div>
+
+      {computed && (
+        <div className="border-t border-amber-500/30 pt-2 text-[11px] space-y-1" data-testid={`manual-result-${driver.driverNumber}`}>
+          <p className="text-amber-200 font-medium">
+            Selezione manuale — non validata statisticamente
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            Questi giri non sono stati riconosciuti come simulazione passo gara dai filtri
+            automatici. Interpretare con cautela: il fit può essere coerente o rumoroso.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div>
+              <div className="text-[9px] uppercase text-muted-foreground">Giri usati</div>
+              <div className="font-mono">{computed.result.lapsUsed}</div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase text-muted-foreground">Media</div>
+              <div className="font-mono">
+                {computed.result.points.length
+                  ? fmtTime(
+                      computed.result.points.reduce((a, p) => a + p.lapTime, 0) /
+                        computed.result.points.length,
+                    )
+                  : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase text-muted-foreground">Slope (s/giro)</div>
+              <div className="font-mono">
+                {computed.result.slopeSecPerLap > 0 ? "+" : ""}
+                {computed.result.slopeSecPerLap.toFixed(3)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase text-muted-foreground">R²</div>
+              <div className="font-mono">{computed.result.rSquared.toFixed(3)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function TyreDegradationCard({ results, longRuns }: Props) {
