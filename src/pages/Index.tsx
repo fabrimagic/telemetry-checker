@@ -1055,18 +1055,35 @@ export default function Index() {
 
               {/* ═══ GOMME ═══ */}
               <TabsContent value="tyres" className="mt-4 space-y-4">
-                {degradationResults.length > 0 ? (
-                  <TyreDegradationCard results={degradationResults} longRuns={sessionType.includes("Practice") ? longRunResults : undefined} />
-                ) : sessionType.includes("Practice") && selectedDriverNumbers.length > 0 && (
-                  <div className="bg-card rounded-lg border border-border p-4">
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <TrendingDown className="h-3.5 w-3.5" /> Degrado Gomme
-                    </h3>
-                    <p className="text-sm text-muted-foreground italic">
-                      Nessun long run statisticamente significativo rilevato in questa sessione di pratica.
-                    </p>
-                  </div>
-                )}
+                {(() => {
+                  const isPractice = sessionType.includes("Practice");
+                  const manualSelectionDrivers = isPractice
+                    ? selectedDriverNumbers
+                        .map((num) => {
+                          const state = driverStates.get(num);
+                          if (!state) return null;
+                          return {
+                            driverNumber: num,
+                            acronym: state.driver.name_acronym,
+                            color: getColor(num),
+                            laps: state.laps,
+                            stints: state.stints,
+                          };
+                        })
+                        .filter((d): d is NonNullable<typeof d> => d !== null)
+                    : undefined;
+                  const showCard =
+                    degradationResults.length > 0 ||
+                    (isPractice && !!manualSelectionDrivers && manualSelectionDrivers.length > 0);
+                  if (!showCard) return null;
+                  return (
+                    <TyreDegradationCard
+                      results={degradationResults}
+                      longRuns={isPractice ? longRunResults : undefined}
+                      manualSelectionDrivers={manualSelectionDrivers}
+                    />
+                  );
+                })()}
               </TabsContent>
 
               {/* ═══ TECNICA ═══ */}
