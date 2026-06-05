@@ -440,6 +440,20 @@ export function TyreDegradationCard({ results, longRuns, manualSelectionDrivers 
         </details>
       )}
 
+      {/* Manual selection fallback — only for drivers without any valid long run */}
+      {eligibleManualDrivers.length > 0 && (
+        <div className="space-y-2">
+          {eligibleManualDrivers.map((d) => (
+            <ManualSelectionSection
+              key={d.driverNumber}
+              driver={d}
+              onResult={handleManualResult(d.driverNumber)}
+            />
+          ))}
+        </div>
+      )}
+
+
       {/* Legend - Collapsible */}
       <details className="group">
         <summary className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-md px-3 py-2 w-full hover:bg-muted/60 transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
