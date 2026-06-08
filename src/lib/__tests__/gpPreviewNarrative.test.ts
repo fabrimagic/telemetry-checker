@@ -367,7 +367,7 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     expect(buildPerTeamExplanations(circ, pred)).toEqual([]);
   });
 
-  it("sector_typed branch ⇒ usa la variante 'stimata per tipo (lente/medie/veloci)' dai settori", () => {
+  it("sector_typed branch (differentiated) ⇒ usa la variante 'stimata per tipo (lente/medie/veloci)' dai settori", () => {
     const circ = c({
       top_speed: 0,
       slow_corner_traction: 1.0,
@@ -379,7 +379,8 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
         s3: { slow: 0.8, medium: 0.2, fast: 0.0 },
       },
     });
-    const cars = [car("Mc", 0.5, [0.7, 0.7, 0.7]), car("Rb", 0.4, [0.6, 0.6, 0.6])];
+    // s2 diverso da s1/s3 per generare spread ≥ 0.05 sulla stima fast-corner
+    const cars = [car("Mc", 0.5, [0.7, 0.4, 0.7]), car("Rb", 0.4, [0.6, 0.6, 0.6])];
     const pred = predictGpAffinity(circ, cars);
     expect(pred.ranked[0].corner_source).toBe("sector_typed");
     const out = buildPerTeamExplanations(circ, pred);
@@ -388,6 +389,32 @@ describe("buildPerTeamExplanations — accessible per-team prose", () => {
     expect(txt).toMatch(/lente\/medie\/veloci/i);
     // distinct from the sector_fallback wording
     expect(txt).not.toMatch(/settore aggregat/i);
+    // note telaio/motore present
+    expect(txt).toMatch(/telaio/i);
+  });
+
+  it("sector_typed branch (uniform) ⇒ usa la variante 'uniforme' quando i dati non distinguono i tipi", () => {
+    const circ = c({
+      top_speed: 0,
+      slow_corner_traction: 1.0,
+      medium_corner: 0.2,
+      fast_corner: 0.0,
+      sector_corner_map: {
+        s1: { slow: 0.7, medium: 0.3, fast: 0.0 },
+        s2: { slow: 0.6, medium: 0.2, fast: 0.2 },
+        s3: { slow: 0.8, medium: 0.2, fast: 0.0 },
+      },
+    });
+    const cars = [car("Mc", 0.5, [0.64, 0.64, 0.63]), car("Rb", 0.4, [0.6, 0.6, 0.6])];
+    const pred = predictGpAffinity(circ, cars);
+    expect(pred.ranked[0].corner_source).toBe("sector_typed");
+    const out = buildPerTeamExplanations(circ, pred);
+    const txt = out.find((e) => e.team_name === "Mc")!.text;
+    expect(txt).toMatch(/uniforme/i);
+    expect(txt).toMatch(/i dati non permettono di distinguere/i);
+    expect(txt).not.toMatch(/stimata per tipo/i);
+    // note telaio/motore present
+    expect(txt).toMatch(/telaio/i);
   });
 
   it("sector_fallback branch ⇒ mantiene la variante 'tempi di settore aggregati'", () => {
