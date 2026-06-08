@@ -888,6 +888,7 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
   const {
     integrated_context, narrative_insights, narrative_chapters, weather_impact, neutralisation_impact,
     traffic_analysis, pace_loss_results, confidence_factors, practice_compounds_used,
+    detected_penalties, driver_acronym,
   } = result;
 
   return (
