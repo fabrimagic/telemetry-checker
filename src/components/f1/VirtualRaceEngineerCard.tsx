@@ -888,6 +888,7 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
   const {
     integrated_context, narrative_insights, narrative_chapters, weather_impact, neutralisation_impact,
     traffic_analysis, pace_loss_results, confidence_factors, practice_compounds_used,
+    detected_penalties, driver_acronym,
   } = result;
 
   return (
@@ -938,6 +939,37 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
                 <p className="text-[9px] text-muted-foreground">vs {integrated_context.cumulative_deviation_context.winner_code ?? "P1"}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Penalty warning (informational — does NOT modify any calculation) */}
+        {detected_penalties && detected_penalties.length > 0 && (
+          <div
+            data-testid="penalty-warning"
+            className="rounded border border-amber-500/40 bg-amber-500/5 p-2 space-y-1.5"
+          >
+            <p className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5">
+              <span>⚠</span> Penalità rilevata per {driver_acronym}
+            </p>
+            <ul className="space-y-1">
+              {detected_penalties.map((p, i) => (
+                <li key={i} className="text-[10px] text-amber-200/90 leading-snug">
+                  <span className="font-medium">
+                    {p.penaltyType === "TIME_PENALTY"
+                      ? `Time penalty${p.seconds != null ? ` ${p.seconds}s` : ""}`
+                      : p.penaltyType === "DRIVE_THROUGH"
+                      ? "Drive-through"
+                      : p.penaltyType === "STOP_GO"
+                      ? "Stop & go"
+                      : "Penalità (dettaglio non parsificato)"}
+                  </span>
+                  <span className="text-muted-foreground"> — {p.rawMessage}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[9px] text-muted-foreground italic leading-snug">
+              L'analisi strategica NON tiene conto delle penalità: se scontata al pit stop, il tempo è già incluso (e gonfia) nel pit-loss osservato; se aggiunta a fine gara, non è riflessa nel passo ma altera il risultato finale. Interpretare di conseguenza.
+            </p>
           </div>
         )}
 
