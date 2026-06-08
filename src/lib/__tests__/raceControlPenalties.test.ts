@@ -77,8 +77,7 @@ describe("detectRaceControlPenalties", () => {
       detectRaceControlPenalties([
         // @ts-expect-error intentional malformed
         { date: "x" },
-        // @ts-expect-error intentional malformed
-        null,
+        (null as unknown) as RaceControlMessage,
         rc("CAR 16 5 SECOND TIME PENALTY"),
       ]),
     ).not.toThrow();
