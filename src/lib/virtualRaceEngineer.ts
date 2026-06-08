@@ -23,6 +23,7 @@ import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSens
 import { NarrativeCollector } from "./narrative/collector";
 import { renderNarrative } from "./narrative/renderer";
 import type { NarrativeChapter } from "./narrative/types";
+import { detectRaceControlPenalties, penaltiesForDriver, type DetectedPenalty } from "./raceControlPenalties";
 
 export type AnalysisMode = "RACE_ENGINEER" | "POST_RACE";
 
