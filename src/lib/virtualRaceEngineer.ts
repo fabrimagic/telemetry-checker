@@ -227,6 +227,12 @@ export interface VirtualRaceEngineerResult {
   degradation_validation_context?: DegradationValidationContext;
   soft_sensor_scoring_gate?: SoftSensorScoringGate;
   analysis_mode: AnalysisMode;
+  /**
+   * Penalties detected from race control messages for THIS driver.
+   * Informational only — strategic calculations (pace, pit-loss, counterfactuals,
+   * verdicts) do NOT account for penalties. See raceControlPenalties.ts.
+   */
+  detected_penalties: DetectedPenalty[];
 }
 
 /* ── Helpers ── */
