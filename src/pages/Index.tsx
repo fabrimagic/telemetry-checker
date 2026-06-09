@@ -329,6 +329,7 @@ export default function Index() {
               if (sessionAllLaps.length && sessionResults.length) {
                 cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
               }
+              setSessionAllLaps(sessionAllLaps);
             } catch { /* optional */ }
             setCumDevResult(cumDevForVre);
 
