@@ -33,6 +33,7 @@ import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Ga
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { DriverDashboardCockpit } from "@/components/f1/DriverDashboardCockpit";
 import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
+import { SectorVsWinnerGrid } from "@/components/f1/SectorVsWinnerGrid";
 import { RaceEventTimeline } from "@/components/f1/RaceEventTimeline";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
@@ -118,6 +119,7 @@ export default function Index() {
   const [diaryEvents, setDiaryEvents] = useState<DiaryEvent[]>([]);
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
+  const [sessionAllLaps, setSessionAllLaps] = useState<import("@/lib/openf1").Lap[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
   const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
@@ -328,6 +330,7 @@ export default function Index() {
               if (sessionAllLaps.length && sessionResults.length) {
                 cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
               }
+              setSessionAllLaps(sessionAllLaps);
             } catch { /* optional */ }
             setCumDevResult(cumDevForVre);
 
@@ -990,6 +993,21 @@ export default function Index() {
                   driverColor={getColor(singleDriverState.driver.driver_number)}
                 />
               )}
+
+              {selectedDriverNumbers.length === 1 && singleDriverState && (
+                <SectorVsWinnerGrid
+                  selectedDriverNumber={singleDriverState.driver.driver_number}
+                  selectedAcronym={singleDriverState.driver.name_acronym}
+                  selectedLaps={singleDriverState.laps}
+                  sessionAllLaps={sessionAllLaps}
+                  winnerDriverNumber={cumDevResult?.winner_driver_number ?? null}
+                  winnerAcronym={cumDevResult?.winner_driver_code ?? null}
+                  pitStops={pitStopsData}
+                  raceControlMessages={raceControlMessages}
+                  isRace={isRaceOrSprint}
+                />
+              )}
+
 
               {selectedDriverNumbers.length === 1 && singleDriverState && (
                 <DriverMiniChartsGrid

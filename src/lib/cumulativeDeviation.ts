@@ -27,8 +27,9 @@ export interface CumulativeDeviationResult {
 
 /**
  * Identify the session winner from results (P1, not DNF/DNS/DSQ).
+ * Exported so other features (e.g. sector-vs-winner card) reuse the same definition.
  */
-function getSessionWinner(results: SessionResult[]): number | null {
+export function getSessionWinner(results: SessionResult[]): number | null {
   if (!results.length) return null;
   const p1 = results.find((r) => r.position === 1 && !r.dnf && !r.dns && !r.dsq);
   return p1 ? p1.driver_number : null;
