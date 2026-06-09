@@ -1,7 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DriverMiniChartsGrid } from "../DriverMiniChartsGrid";
 import type { Lap, PositionData, IntervalData } from "@/lib/openf1";
+
+beforeAll(() => {
+  // jsdom doesn't ship ResizeObserver, which recharts' ResponsiveContainer needs.
+  // @ts-expect-error test polyfill
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
 
 function makeLap(lap_number: number, date: string): Lap {
   return {
