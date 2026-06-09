@@ -220,15 +220,6 @@ function pickValidatedDegradation(longRuns: LongRunResult[] | undefined): {
   return { slope: best.degradationSlope, sampleSize: totalLaps };
 }
 
-/* ──────────────────────────────────────────────────────────────────
- * Normalization (relative-to-best, preserves magnitudes)
- * ────────────────────────────────────────────────────────────────── */
-
-function scoreHigherBetter(v: number | null, ref: number | null): number | null {
-  if (v == null || ref == null || ref <= 0) return null;
-  const s = v / ref;
-  return Math.max(0, Math.min(1, s));
-}
 
 /* ──────────────────────────────────────────────────────────────────
  * Normalization with ZOOM (anti-collapse) + GUARDRAIL
