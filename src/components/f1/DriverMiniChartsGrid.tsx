@@ -204,6 +204,7 @@ export function DriverMiniChartsGrid({
   intervals,
   cumDev,
   isRace,
+  allDrivers,
 }: Props) {
   const cumDevData = useMemo(() => {
     if (!cumDev || cumDev.length === 0) return [];
