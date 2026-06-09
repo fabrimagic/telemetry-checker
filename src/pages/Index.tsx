@@ -30,6 +30,8 @@ import { DataIntegrityNotice } from "@/components/f1/DataIntegrityNotice";
 import { detectDataIntegrityIssues } from "@/lib/dataIntegrity";
 import { SessionReport } from "@/components/f1/SessionReport";
 import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Gauge, Target, Wrench, User, Swords, ArrowRight, ArrowLeft } from "lucide-react";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { DriverDashboardCockpit } from "@/components/f1/DriverDashboardCockpit";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
@@ -1000,235 +1002,301 @@ export default function Index() {
           })()}
 
           {driversLaps.length > 0 && loadingLaps.size === 0 && (
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="w-full justify-start flex-wrap h-auto min-h-10">
-                <TabsTrigger value="overview" className="text-xs gap-1">
-                  <Eye className="h-3.5 w-3.5" /> Panoramica
-                </TabsTrigger>
-                {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
-                  <TabsTrigger value="strategy" className="text-xs gap-1">
-                    <Target className="h-3.5 w-3.5" /> Virtual Race Engineer
-                  </TabsTrigger>
-                )}
-                <TabsTrigger value="tyres" className="text-xs gap-1">
-                  <Gauge className="h-3.5 w-3.5" /> Gomme
-                </TabsTrigger>
-                <TabsTrigger value="deep" className="text-xs gap-1">
-                  <Wrench className="h-3.5 w-3.5" /> Tecnica
-                </TabsTrigger>
-              </TabsList>
+            <div className="w-full space-y-5">
+              {/* ═══════════════════════════════════════════
+                  DASHBOARD DI SINTESI — "centro di controllo"
+                  Sempre visibile in cima.
+                  ═══════════════════════════════════════════ */}
+              {selectedDriverNumbers.length === 1 && singleDriverState && (
+                <DriverDashboardCockpit
+                  laps={singleDriverState.laps}
+                  pitStops={pitStopsData}
+                  driverNumber={singleDriverState.driver.driver_number}
+                  finalPosition={
+                    diaryPositions.length
+                      ? (() => {
+                          const driverPos = diaryPositions
+                            .filter((p) => p.driver_number === singleDriverState.driver.driver_number)
+                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                          return driverPos[0]?.position ?? null;
+                        })()
+                      : null
+                  }
+                  driverColor={getColor(singleDriverState.driver.driver_number)}
+                />
+              )}
 
-              {/* ═══ PANORAMICA ═══ */}
-              <TabsContent value="overview" className="mt-4 space-y-4">
-                {(stintsData.length > 0 || pitStopsData.length > 0 || overtakesData.length > 0 || (sessionWeather.length > 0 && selectedDriverNumbers.length === 1)) && (
-                  <ContentGrid columns={2}>
+              {selectedDriverNumbers.length === 1 && singleDriverRadar && (
+                <PerformanceRadarCard
+                  result={singleDriverRadar}
+                  notice={
+                    driverStates.size <= 1
+                      ? "Normalizzazione relativa al solo pilota caricato: aggiungi più piloti per un confronto sul campo della sessione."
+                      : undefined
+                  }
+                />
+              )}
+
+              {kdmResult && kdmResult.decision_points.length > 0 && (
+                <KeyDecisionMomentsCard result={kdmResult} />
+              )}
+
+              {/* ═══════════════════════════════════════════
+                  DRILL-DOWN A FISARMONICA
+                  4 sezioni, di default tutte collassate.
+                  ═══════════════════════════════════════════ */}
+              <Accordion type="multiple" className="w-full space-y-3">
+                {/* ── Passo & Gomme ── */}
+                <AccordionItem
+                  value="pace-tyres"
+                  className="border border-border/60 rounded-xl card-premium overflow-hidden !border-b"
+                >
+                  <AccordionTrigger className="px-4 sm:px-5 py-3.5 hover:no-underline group">
+                    <div className="flex items-center gap-3">
+                      <Gauge className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+                      <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                        Passo &amp; Gomme
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 sm:px-5 pb-5 space-y-4">
+                    <LapTimesChart
+                      drivers={driversLaps.map((dl) => ({
+                        driverNumber: dl.driver.driver_number,
+                        acronym: dl.driver.name_acronym,
+                        color: getColor(dl.driver.driver_number),
+                        laps: dl.laps,
+                        stints: dl.stints,
+                      }))}
+                      sessionWeather={sessionWeather}
+                      raceControlMessages={raceControlMessages}
+                      selectedLaps={driversLaps.map((dl) => ({
+                        driverNumber: dl.driver.driver_number,
+                        lapNumber: dl.selectedLap,
+                      }))}
+                      onSelectLap={handleSelectLap}
+                    />
+
                     {stintsData.length > 0 && <StintsCard stints={stintsData} />}
-                    {pitStopsData.length > 0 && isRaceOrSprint && (
-                      <PitStopsCard pitStops={pitStopsData} allDrivers={allDrivers} multiDriver={selectedDriverNumbers.length > 1} />
+
+                    {(() => {
+                      const isPractice = sessionType.includes("Practice");
+                      const manualSelectionDrivers = isPractice
+                        ? selectedDriverNumbers
+                            .map((num) => {
+                              const state = driverStates.get(num);
+                              if (!state) return null;
+                              return {
+                                driverNumber: num,
+                                acronym: state.driver.name_acronym,
+                                color: getColor(num),
+                                laps: state.laps,
+                                stints: state.stints,
+                              };
+                            })
+                            .filter((d): d is NonNullable<typeof d> => d !== null)
+                        : undefined;
+                      const showCard =
+                        degradationResults.length > 0 ||
+                        (isPractice && !!manualSelectionDrivers && manualSelectionDrivers.length > 0);
+                      if (!showCard) return null;
+                      return (
+                        <TyreDegradationCard
+                          results={degradationResults}
+                          longRuns={isPractice ? longRunResults : undefined}
+                          manualSelectionDrivers={manualSelectionDrivers}
+                        />
+                      );
+                    })()}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* ── Strategia ── */}
+                <AccordionItem
+                  value="strategy"
+                  className="border border-border/60 rounded-xl card-premium overflow-hidden !border-b"
+                >
+                  <AccordionTrigger className="px-4 sm:px-5 py-3.5 hover:no-underline group">
+                    <div className="flex items-center gap-3">
+                      <Target className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+                      <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                        Strategia
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 sm:px-5 pb-5 space-y-4">
+                    {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
+                      loadingVre ? (
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+                        </div>
+                      ) : vreResult ? (
+                        <VirtualRaceEngineerCard
+                          result={vreResult}
+                          analysisMode={vreAnalysisMode}
+                          viewMode={vreViewMode}
+                          laps={singleDriverState?.laps}
+                          positions={diaryPositions}
+                          allDrivers={allDrivers}
+                          driverAcronym={singleDriverState?.driver.name_acronym}
+                        />
+                      ) : null
                     )}
+
+                    {pitStopsData.length > 0 && isRaceOrSprint && (
+                      <PitStopsCard
+                        pitStops={pitStopsData}
+                        allDrivers={allDrivers}
+                        multiDriver={selectedDriverNumbers.length > 1}
+                      />
+                    )}
+
+                    {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
+                      loadingDiary ? (
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
+                        </div>
+                      ) : (
+                        <RaceDiaryCard
+                          events={diaryEvents}
+                          driverAcronym={singleDriverState.driver.name_acronym}
+                          driverColor={getColor(singleDriverState.driver.driver_number)}
+                        />
+                      )
+                    )}
+
                     {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
                       <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
                     )}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* ── Telemetria & Guida ── */}
+                <AccordionItem
+                  value="telemetry"
+                  className="border border-border/60 rounded-xl card-premium overflow-hidden !border-b"
+                >
+                  <AccordionTrigger className="px-4 sm:px-5 py-3.5 hover:no-underline group">
+                    <div className="flex items-center gap-3">
+                      <Wrench className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+                      <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                        Telemetria &amp; Guida
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 sm:px-5 pb-5 space-y-4">
+                    <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
+
+                    {hasLapsSelected && (
+                      <Button onClick={handleLoadTelemetry} disabled={loadingTelemetry} className="gap-2">
+                        {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        Carica Telemetria
+                      </Button>
+                    )}
+
+                    {loadingTelemetry && (
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Caricamento telemetria…
+                      </div>
+                    )}
+
+                    {chartDrivers.length > 0 && !loadingTelemetry && (
+                      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
+                        <section className="bg-card rounded-lg border border-border p-4 overflow-hidden min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telemetria</h2>
+                          </div>
+                          <TelemetryCharts
+                            drivers={chartDrivers}
+                            cursorTime={cursorTime}
+                            onCursorChange={setCursorTime}
+                            onCursorClick={setClickedTime}
+                            lapSoftSensor={selectedLapSoftSensor}
+                            zones={telemetryZones}
+                          />
+                          {raceAvg && raceAvg.per_lap.length > 0 && (
+                            <PerLapDrivingCharts
+                              avg={raceAvg}
+                              driverCumulativeDeviation={driverCumDev}
+                            />
+                          )}
+                        </section>
+                        <aside className="space-y-4 min-w-0">
+                          {mapDrivers.length > 0 && (
+                            <TrackMap
+                              drivers={mapDrivers}
+                              activeDate={activeDate}
+                              driverZones={singleDriverZones ? [singleDriverZones] : undefined}
+                              activeInfo={activeInfo}
+                              onClearPin={() => setClickedTime(null)}
+                            />
+                          )}
+                          {(() => {
+                            const analysisDrivers = [...driverStates.values()]
+                              .filter((s) => s.carData.length > 0 && s.locationData.length > 0)
+                              .map((s) => ({
+                                driverNumber: s.driver.driver_number,
+                                acronym: s.driver.name_acronym,
+                                color: getColor(s.driver.driver_number),
+                                carData: s.carData,
+                              }));
+                            if (!analysisDrivers.length) return null;
+                            const raceAvgCtx = (isSingleDriverRaceLike && singleDriverState && sessionKey)
+                              ? {
+                                  sessionKey,
+                                  driverNumber: singleDriverState.driver.driver_number,
+                                  laps: singleDriverState.laps,
+                                  trackStatusMap: classifyLapsTrackStatus(singleDriverState.laps, raceControlMessages),
+                                  fetchCarData: getCarData,
+                                  enabled: true,
+                                }
+                              : null;
+                            return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} onAvgChange={setRaceAvg} />;
+                          })()}
+                          {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
+                          {(() => {
+                            const driversForMiniSectors = [...driverStates.values()]
+                              .filter((s) => s.selectedLap != null)
+                              .map((s) => {
+                                const lap = s.laps.find((l) => l.lap_number === s.selectedLap);
+                                if (!lap) return null;
+                                return { driver: s.driver, lap, color: getColor(s.driver.driver_number) };
+                              })
+                              .filter((d): d is NonNullable<typeof d> => d != null);
+                            if (!driversForMiniSectors.length) return null;
+                            return <SectorMiniSectors drivers={driversForMiniSectors} />;
+                          })()}
+                        </aside>
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* ── Contesto ── */}
+                <AccordionItem
+                  value="context"
+                  className="border border-border/60 rounded-xl card-premium overflow-hidden !border-b"
+                >
+                  <AccordionTrigger className="px-4 sm:px-5 py-3.5 hover:no-underline group">
+                    <div className="flex items-center gap-3">
+                      <Info className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+                      <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                        Contesto
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 sm:px-5 pb-5 space-y-4">
                     {sessionWeather.length > 0 && selectedDriverNumbers.length === 1 && (
                       <WeatherCard weather={sessionWeather[sessionWeather.length - 1]} />
                     )}
-                  </ContentGrid>
-                )}
-
-                <LapTimesChart
-                  drivers={driversLaps.map((dl) => ({
-                    driverNumber: dl.driver.driver_number,
-                    acronym: dl.driver.name_acronym,
-                    color: getColor(dl.driver.driver_number),
-                    laps: dl.laps,
-                    stints: dl.stints,
-                  }))}
-                  sessionWeather={sessionWeather}
-                  raceControlMessages={raceControlMessages}
-                  selectedLaps={driversLaps.map((dl) => ({
-                    driverNumber: dl.driver.driver_number,
-                    lapNumber: dl.selectedLap,
-                  }))}
-                  onSelectLap={handleSelectLap}
-                />
-
-                {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
-                  loadingDiary ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
-                    </div>
-                  ) : (
-                    <RaceDiaryCard
-                      events={diaryEvents}
-                      driverAcronym={singleDriverState.driver.name_acronym}
-                      driverColor={getColor(singleDriverState.driver.driver_number)}
-                    />
-                  )
-                )}
-
-                {selectedDriverNumbers.length === 1 && singleDriverRadar && (
-                  <PerformanceRadarCard
-                    result={singleDriverRadar}
-                    notice={
-                      driverStates.size <= 1
-                        ? "Normalizzazione relativa al solo pilota caricato: aggiungi più piloti per un confronto sul campo della sessione."
-                        : undefined
-                    }
-                  />
-                )}
-              </TabsContent>
-
-              {/* ═══ VIRTUAL RACE ENGINEER ═══ */}
-              {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
-                <TabsContent value="strategy" className="mt-4 space-y-4">
-                  {loadingVre ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
-                    </div>
-                  ) : vreResult ? (
-                    <VirtualRaceEngineerCard
-                      result={vreResult}
-                      analysisMode={vreAnalysisMode}
-                      viewMode={vreViewMode}
-                      laps={singleDriverState?.laps}
-                      positions={diaryPositions}
-                      allDrivers={allDrivers}
-                      driverAcronym={singleDriverState?.driver.name_acronym}
-                    />
-                  ) : null}
-                  {kdmResult && kdmResult.decision_points.length > 0 && (
-                    <KeyDecisionMomentsCard result={kdmResult} />
-                  )}
-                </TabsContent>
-              )}
-
-              {/* ═══ GOMME ═══ */}
-              <TabsContent value="tyres" className="mt-4 space-y-4">
-                {(() => {
-                  const isPractice = sessionType.includes("Practice");
-                  const manualSelectionDrivers = isPractice
-                    ? selectedDriverNumbers
-                        .map((num) => {
-                          const state = driverStates.get(num);
-                          if (!state) return null;
-                          return {
-                            driverNumber: num,
-                            acronym: state.driver.name_acronym,
-                            color: getColor(num),
-                            laps: state.laps,
-                            stints: state.stints,
-                          };
-                        })
-                        .filter((d): d is NonNullable<typeof d> => d !== null)
-                    : undefined;
-                  const showCard =
-                    degradationResults.length > 0 ||
-                    (isPractice && !!manualSelectionDrivers && manualSelectionDrivers.length > 0);
-                  if (!showCard) return null;
-                  return (
-                    <TyreDegradationCard
-                      results={degradationResults}
-                      longRuns={isPractice ? longRunResults : undefined}
-                      manualSelectionDrivers={manualSelectionDrivers}
-                    />
-                  );
-                })()}
-              </TabsContent>
-
-              {/* ═══ TECNICA ═══ */}
-              <TabsContent value="deep" className="mt-4 space-y-4">
-                <LapTable driversLaps={driversLaps} onSelectLap={handleSelectLap} onFastest={handleFastest} />
-
-                {hasLapsSelected && (
-                  <Button onClick={handleLoadTelemetry} disabled={loadingTelemetry} className="gap-2">
-                    {loadingTelemetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                    Carica Telemetria
-                  </Button>
-                )}
-
-                {loadingTelemetry && (
-                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento telemetria…
-                  </div>
-                )}
-
-                {chartDrivers.length > 0 && !loadingTelemetry && (
-                  <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
-                    <section className="bg-card rounded-lg border border-border p-4 overflow-hidden min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telemetria</h2>
-                      </div>
-                      <TelemetryCharts
-                        drivers={chartDrivers}
-                        cursorTime={cursorTime}
-                        onCursorChange={setCursorTime}
-                        onCursorClick={setClickedTime}
-                        lapSoftSensor={selectedLapSoftSensor}
-                        zones={telemetryZones}
-                      />
-                      {raceAvg && raceAvg.per_lap.length > 0 && (
-                        <PerLapDrivingCharts
-                          avg={raceAvg}
-                          driverCumulativeDeviation={driverCumDev}
-                        />
-                      )}
-                    </section>
-                    <aside className="space-y-4 min-w-0">
-                      {mapDrivers.length > 0 && (
-                        <TrackMap
-                          drivers={mapDrivers}
-                          activeDate={activeDate}
-                          driverZones={singleDriverZones ? [singleDriverZones] : undefined}
-                          activeInfo={activeInfo}
-                          onClearPin={() => setClickedTime(null)}
-                        />
-                      )}
-                      {(() => {
-                        const analysisDrivers = [...driverStates.values()]
-                          .filter((s) => s.carData.length > 0 && s.locationData.length > 0)
-                          .map((s) => ({
-                            driverNumber: s.driver.driver_number,
-                            acronym: s.driver.name_acronym,
-                            color: getColor(s.driver.driver_number),
-                            carData: s.carData,
-                          }));
-                        if (!analysisDrivers.length) return null;
-                        const raceAvgCtx = (isSingleDriverRaceLike && singleDriverState && sessionKey)
-                          ? {
-                              sessionKey,
-                              driverNumber: singleDriverState.driver.driver_number,
-                              laps: singleDriverState.laps,
-                              trackStatusMap: classifyLapsTrackStatus(singleDriverState.laps, raceControlMessages),
-                              fetchCarData: getCarData,
-                              enabled: true,
-                            }
-                          : null;
-                        const driverCumDev = (isSingleDriverRaceLike && singleDriverState && cumDevResult)
-                          ? cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null
-                          : null;
-                        return <DrivingAnalysis drivers={analysisDrivers} raceAverageContext={raceAvgCtx} onAvgChange={setRaceAvg} />;
-                      })()}
-                      {weatherData && <WeatherCard weather={weatherData} />}
-                      {selectedLapSoftSensor && <SoftSensorsLapCard state={selectedLapSoftSensor} />}
-                      {lapPrecip && <LapPrecipOutlookCard outlook={lapPrecip} />}
-                      {(() => {
-                        const driversForMiniSectors = [...driverStates.values()]
-                          .filter((s) => s.selectedLap != null)
-                          .map((s) => {
-                            const lap = s.laps.find((l) => l.lap_number === s.selectedLap);
-                            if (!lap) return null;
-                            return { driver: s.driver, lap, color: getColor(s.driver.driver_number) };
-                          })
-                          .filter((d): d is NonNullable<typeof d> => d != null);
-                        if (!driversForMiniSectors.length) return null;
-                        return <SectorMiniSectors drivers={driversForMiniSectors} />;
-                      })()}
-                    </aside>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                    {weatherData && <WeatherCard weather={weatherData} />}
+                    {lapPrecip && <LapPrecipOutlookCard outlook={lapPrecip} />}
+                    {sessionKey && <SessionReport sessionKey={sessionKey} sessionType={sessionType} />}
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
           )}
         </>
       )}
