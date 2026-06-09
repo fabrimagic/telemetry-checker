@@ -41,12 +41,18 @@ export type RadarAxisKey = "trap" | "sector1" | "sector2" | "sector3" | "degrada
 export interface RadarAxisValue {
   /** Aggregated raw value (km/h for trap, seconds for sectors, s/lap for degradation). */
   raw: number | null;
-  /** Score 0..1 relative-to-best in the reference set; null when unavailable. */
+  /** Score 0..1 with ZOOM (anti-collapse): the worst of the set is not pinned to 0. Null when unavailable. */
   score: number | null;
   /** Number of clean laps used for aggregation (0 for degradation when n/a). */
   sampleSize: number;
   /** Human-readable note about availability / honesty caveats. */
   note?: string;
+  /**
+   * Guardrail flag: true when the real difference vs the reference set
+   * is below the per-axis relevance threshold (sostanzialmente pari).
+   * UI may render a grey/dashed vertex; narrative will say so explicitly.
+   */
+  negligible?: boolean;
 }
 
 export interface DriverRadar {
@@ -69,10 +75,17 @@ export interface RadarInputDriver {
   longRuns?: LongRunResult[];
 }
 
+export interface AxisRange {
+  min: number;
+  max: number;
+}
+
 export interface PerformanceRadarResult {
   drivers: DriverRadar[];
   /** Reference values: the best value per axis in the input set (or null when no data). */
   reference: Record<RadarAxisKey, number | null>;
+  /** Raw range (min/max) per axis across the reference set; null when no data. */
+  range: Record<RadarAxisKey, AxisRange | null>;
 }
 
 /* ──────────────────────────────────────────────────────────────────
