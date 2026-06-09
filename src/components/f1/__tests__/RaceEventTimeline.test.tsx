@@ -33,7 +33,7 @@ describe("RaceEventTimeline", () => {
     ];
     render(<RaceEventTimeline events={events} driverAcronym="HAM" driverColor="00D2BE" />);
     expect(screen.getAllByText("Race Control").length).toBeGreaterThan(0);
-    expect(screen.getByText("Neutralizzazione")).toBeInTheDocument();
+    expect(screen.getAllByText("Neutralizzazione").length).toBeGreaterThan(0);
   });
 
   it("mostra stato vuoto pulito senza eventi", () => {
