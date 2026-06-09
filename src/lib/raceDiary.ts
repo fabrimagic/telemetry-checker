@@ -612,9 +612,10 @@ export function buildRaceDiary(
   allDrivers: Driver[],
   laps: Lap[],
 ): DiaryEvent[] {
+  const driverAcr = allDrivers.find((d) => d.driver_number === driverNumber)?.name_acronym ?? null;
   const events: DiaryEvent[] = [
     ...getOvertakeEvents(driverNumber, overtakesDone, overtakesReceived, allDrivers),
-    ...getRaceControlEvents(driverNumber, raceControlMessages, laps),
+    ...getRaceControlEvents(driverNumber, raceControlMessages, laps, driverAcr),
     ...getPitEvents(driverNumber, pitStops, stints),
     ...getBattleEvents(driverNumber, intervals, positions, allDrivers, laps),
   ];
