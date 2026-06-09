@@ -5,8 +5,7 @@ import type { Lap, PositionData, IntervalData } from "@/lib/openf1";
 
 beforeAll(() => {
   // jsdom doesn't ship ResizeObserver, which recharts' ResponsiveContainer needs.
-  // @ts-expect-error test polyfill
-  globalThis.ResizeObserver = class {
+  (globalThis as any).ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
