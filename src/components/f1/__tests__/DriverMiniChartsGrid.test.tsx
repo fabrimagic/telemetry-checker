@@ -117,3 +117,65 @@ describe("DriverMiniChartsGrid", () => {
     expect(msgs.length).toBe(4);
   });
 });
+
+describe("resolveAheadDriverNumber", () => {
+  const drivers = [
+    { driver_number: 4, name_acronym: "NOR" },
+    { driver_number: 1, name_acronym: "VER" },
+    { driver_number: 16, name_acronym: "LEC" },
+    { driver_number: 99, name_acronym: "LEA" },
+  ] as Driver[];
+
+  it("(a) returns the driver in position P-1 at the same instant", () => {
+    const pos: PositionData[] = [
+      { date: "2024-01-01T12:00:00Z", driver_number: 4, position: 5, meeting_key: 1, session_key: 1 },
+      { date: "2024-01-01T12:00:00Z", driver_number: 1, position: 4, meeting_key: 1, session_key: 1 },
+      { date: "2024-01-01T12:00:00Z", driver_number: 16, position: 3, meeting_key: 1, session_key: 1 },
+    ];
+    expect(resolveAheadDriverNumber("2024-01-01T12:00:00Z", 4, pos)).toBe(1);
+  });
+
+  it("(b) reflects overtakes: ahead changes between two timestamps", () => {
+    const pos: PositionData[] = [
+      { date: "2024-01-01T12:00:00Z", driver_number: 4, position: 5, meeting_key: 1, session_key: 1 },
+      { date: "2024-01-01T12:00:00Z", driver_number: 1, position: 4, meeting_key: 1, session_key: 1 },
+      { date: "2024-01-01T12:05:00Z", driver_number: 16, position: 4, meeting_key: 1, session_key: 1 },
+      { date: "2024-01-01T12:05:00Z", driver_number: 1, position: 6, meeting_key: 1, session_key: 1 },
+    ];
+    expect(resolveAheadDriverNumber("2024-01-01T12:00:30Z", 4, pos)).toBe(1);
+    expect(resolveAheadDriverNumber("2024-01-01T12:05:30Z", 4, pos)).toBe(16);
+  });
+
+  it("(c) returns null when the selected driver is the leader (position 1)", () => {
+    const pos: PositionData[] = [
+      { date: "2024-01-01T12:00:00Z", driver_number: 4, position: 1, meeting_key: 1, session_key: 1 },
+      { date: "2024-01-01T12:00:00Z", driver_number: 1, position: 2, meeting_key: 1, session_key: 1 },
+    ];
+    expect(resolveAheadDriverNumber("2024-01-01T12:00:30Z", 4, pos)).toBeNull();
+  });
+
+  it("(d) returns null when no position is available for the selected driver", () => {
+    const pos: PositionData[] = [
+      { date: "2024-01-01T12:00:00Z", driver_number: 1, position: 1, meeting_key: 1, session_key: 1 },
+    ];
+    expect(resolveAheadDriverNumber("2024-01-01T12:00:30Z", 4, pos)).toBeNull();
+  });
+
+  it("integration: accepts allDrivers prop without crashing", () => {
+    render(
+      <DriverMiniChartsGrid
+        driverNumber={4}
+        driverColor="ff0000"
+        driverAcronym="NOR"
+        laps={baseLaps}
+        positions={positions}
+        intervals={intervals}
+        cumDev={cumDev}
+        isRace={true}
+        allDrivers={drivers}
+      />,
+    );
+    expect(screen.getByText(/Distacco da chi precede/i)).toBeTruthy();
+  });
+});
+
