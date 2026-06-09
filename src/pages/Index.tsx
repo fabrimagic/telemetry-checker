@@ -990,6 +990,18 @@ export default function Index() {
                 />
               )}
 
+              {selectedDriverNumbers.length === 1 && singleDriverState && (
+                <DriverMiniChartsGrid
+                  driverNumber={singleDriverState.driver.driver_number}
+                  driverColor={getColor(singleDriverState.driver.driver_number)}
+                  driverAcronym={singleDriverState.driver.name_acronym}
+                  laps={singleDriverState.laps}
+                  positions={diaryPositions}
+                  intervals={diaryIntervals}
+                  cumDev={driverCumDev}
+                  isRace={isRaceOrSprint}
+                />
+              )}
 
               {kdmResult && kdmResult.decision_points.length > 0 && (
                 <KeyDecisionMomentsCard result={kdmResult} />
