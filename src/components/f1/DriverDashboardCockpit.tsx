@@ -1,12 +1,11 @@
 import { Gauge, Flag, Wrench, Hash } from "lucide-react";
 import type { Lap, PitData } from "@/lib/openf1";
-import type { VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
 
 interface Props {
   laps: Lap[];
   pitStops: PitData[];
   driverNumber: number;
-  vreResult?: VirtualRaceEngineerResult | null;
+  finalPosition?: number | null;
   driverColor: string;
 }
 
