@@ -989,16 +989,6 @@ export default function Index() {
                 />
               )}
 
-              {selectedDriverNumbers.length === 1 && singleDriverRadar && (
-                <PerformanceRadarCard
-                  result={singleDriverRadar}
-                  notice={
-                    driverStates.size <= 1
-                      ? "Normalizzazione relativa al solo pilota caricato: aggiungi più piloti per un confronto sul campo della sessione."
-                      : undefined
-                  }
-                />
-              )}
 
               {kdmResult && kdmResult.decision_points.length > 0 && (
                 <KeyDecisionMomentsCard result={kdmResult} />
