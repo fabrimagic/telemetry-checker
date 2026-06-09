@@ -32,6 +32,7 @@ import { SessionReport } from "@/components/f1/SessionReport";
 import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Gauge, Target, Wrench, User, Swords, ArrowRight, ArrowLeft } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { DriverDashboardCockpit } from "@/components/f1/DriverDashboardCockpit";
+import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
