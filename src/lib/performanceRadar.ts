@@ -161,13 +161,22 @@ function shouldExcludeLap(
  * Per-axis aggregation
  * ────────────────────────────────────────────────────────────────── */
 
-/** Aggregate one sector across a driver's clean laps. Returns null on insufficient data. */
-function aggregateSector(
+/**
+ * Aggregate one sector across a driver's clean laps. Returns null on insufficient data.
+ *
+ * Backward-compatible: the previous shape `{ raw, sampleSize }` is preserved and an
+ * additional `std` field is added — sample standard deviation (n−1) computed on the
+ * SAME filtered series used for the median. Null when not computable.
+ *
+ * Exported so other features (e.g. the sector-vs-winner card) can reuse the exact
+ * same filtering philosophy (pit-out, neutralizations, MAD outliers).
+ */
+export function aggregateSector(
   laps: Lap[],
   pitInSet: Set<number>,
   trackStatusMap: Map<number, TrackStatus> | undefined,
   pickSector: (l: Lap) => number | null,
-): { raw: number | null; sampleSize: number } {
+): { raw: number | null; sampleSize: number; std: number | null } {
   const raw: number[] = [];
   for (const lap of laps) {
     if (shouldExcludeLap(lap, pitInSet, trackStatusMap)) continue;
@@ -175,11 +184,22 @@ function aggregateSector(
     if (v == null || !Number.isFinite(v) || v <= 0) continue;
     raw.push(v);
   }
-  if (raw.length < MIN_SECTOR_SAMPLES) return { raw: null, sampleSize: raw.length };
+  if (raw.length < MIN_SECTOR_SAMPLES) return { raw: null, sampleSize: raw.length, std: null };
   const filtered = madFilter(raw, SECTOR_MAD_MULTIPLIER, SECTOR_MAD_FLOOR_S);
-  if (filtered.length < MIN_SECTOR_SAMPLES) return { raw: null, sampleSize: filtered.length };
-  return { raw: median(filtered), sampleSize: filtered.length };
+  if (filtered.length < MIN_SECTOR_SAMPLES) return { raw: null, sampleSize: filtered.length, std: null };
+  return { raw: median(filtered), sampleSize: filtered.length, std: sampleStdDev(filtered) };
 }
+
+/** Sample standard deviation (n−1). Returns null when n < 2. */
+function sampleStdDev(values: number[]): number | null {
+  if (values.length < 2) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const sq = values.reduce((acc, v) => acc + (v - mean) * (v - mean), 0);
+  return Math.sqrt(sq / (values.length - 1));
+}
+
+/** Minimum clean samples required to expose a sector aggregate. Re-exported for callers. */
+export const MIN_SECTOR_CLEAN_SAMPLES = MIN_SECTOR_SAMPLES;
 
 function aggregateTrap(
   laps: Lap[],
