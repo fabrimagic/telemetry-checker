@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import type { Lap, PositionData, IntervalData } from "@/lib/openf1";
+import type { Lap, PositionData, IntervalData, Driver } from "@/lib/openf1";
 
 interface CumDevPoint {
   lap_number: number;
@@ -25,7 +25,59 @@ interface Props {
   intervals: IntervalData[];
   cumDev: CumDevPoint[] | null;
   isRace: boolean;
+  allDrivers?: Driver[];
 }
+
+// Max time tolerance (ms) for aligning a position snapshot to an interval sample
+// when no prior snapshot exists for that driver.
+const POSITION_ALIGN_TOLERANCE_MS = 60_000;
+
+/**
+ * Resolves which driver was in `position - 1` at the given timestamp.
+ * Uses the latest PositionData entry per driver with date <= refDate
+ * (with a small tolerance to allow a slightly-later snapshot when no earlier
+ * one exists). Returns null when no driver matches honestly.
+ */
+export function resolveAheadDriverNumber(
+  refDate: string,
+  selectedDriverNumber: number,
+  positions: PositionData[],
+): number | null {
+  if (!positions.length) return null;
+  const refTs = new Date(refDate).getTime();
+  if (!Number.isFinite(refTs)) return null;
+
+  // Latest known position per driver up to refTs (or closest later within tolerance).
+  const lastPos = new Map<number, { pos: number; dt: number }>();
+  for (const p of positions) {
+    if (typeof p.position !== "number") continue;
+    const t = new Date(p.date).getTime();
+    if (!Number.isFinite(t)) continue;
+    const dt = t - refTs;
+    if (dt > POSITION_ALIGN_TOLERANCE_MS) continue;
+    const cur = lastPos.get(p.driver_number);
+    // Prefer the latest snapshot at or before refTs; fall back to closest later one.
+    if (!cur) {
+      lastPos.set(p.driver_number, { pos: p.position, dt });
+    } else if (dt <= 0 && (cur.dt > 0 || dt > cur.dt)) {
+      lastPos.set(p.driver_number, { pos: p.position, dt });
+    } else if (dt > 0 && cur.dt > 0 && dt < cur.dt) {
+      lastPos.set(p.driver_number, { pos: p.position, dt });
+    }
+  }
+
+  const selected = lastPos.get(selectedDriverNumber);
+  if (!selected) return null;
+  if (selected.pos <= 1) return null; // leader → nobody ahead
+
+  const targetPos = selected.pos - 1;
+  for (const [num, v] of lastPos) {
+    if (num === selectedDriverNumber) continue;
+    if (v.pos === targetPos) return num;
+  }
+  return null;
+}
+
 
 /**
  * Maps each (sorted) sample date to a driver lap number using the driver's own laps
@@ -63,14 +115,13 @@ interface MiniPanelProps {
   title: string;
   icon: React.ReactNode;
   available: boolean;
-  data: Array<Record<string, number>>;
+  data: Array<Record<string, any>>;
   dataKey: string;
   color: string;
   yReversed?: boolean;
   yDomain?: [number | string, number | string];
-  tooltipFormatter: (v: number) => string;
+  tooltipFormatter: (v: number, payload?: Record<string, any>) => [string, string];
   emptyText: string;
-  yLabel: string;
 }
 
 function MiniPanel({
@@ -84,7 +135,6 @@ function MiniPanel({
   yDomain,
   tooltipFormatter,
   emptyText,
-  yLabel,
 }: MiniPanelProps) {
   return (
     <div className="bg-card rounded-lg border border-border p-3 flex flex-col aspect-square min-h-[200px] relative overflow-hidden">
@@ -122,7 +172,9 @@ function MiniPanel({
                   fontSize: 10,
                   padding: "4px 8px",
                 }}
-                formatter={(v: any) => [tooltipFormatter(Number(v)), yLabel]}
+                formatter={(v: any, _name: string, props: any) =>
+                  tooltipFormatter(Number(v), props?.payload)
+                }
                 labelFormatter={(l) => `Giro ${l}`}
               />
               <Line
@@ -142,6 +194,7 @@ function MiniPanel({
   );
 }
 
+
 export function DriverMiniChartsGrid({
   driverNumber,
   driverColor,
@@ -151,6 +204,7 @@ export function DriverMiniChartsGrid({
   intervals,
   cumDev,
   isRace,
+  allDrivers,
 }: Props) {
   const cumDevData = useMemo(() => {
     if (!cumDev || cumDev.length === 0) return [];
@@ -183,13 +237,48 @@ export function DriverMiniChartsGrid({
   const intervalAheadData = useMemo(() => {
     if (!isRace) return [];
     const m = mapByLap(intervals, driverNumber, laps);
-    const out: Array<{ lap: number; value: number }> = [];
+    const out: Array<{ lap: number; value: number; aheadAcronym: string | null; isLeader: boolean }> = [];
+    const drvByNum = new Map<number, Driver>();
+    for (const d of allDrivers ?? []) drvByNum.set(d.driver_number, d);
     for (const [lap, item] of m) {
       const v = typeof item.interval === "number" ? item.interval : null;
-      if (v != null && Number.isFinite(v)) out.push({ lap, value: v });
+      if (v == null || !Number.isFinite(v)) continue;
+      let aheadAcronym: string | null = null;
+      let isLeader = false;
+      if (positions.length) {
+        // Determine selected driver's position at sample time.
+        const refTs = new Date(item.date).getTime();
+        const lastPos = new Map<number, { pos: number; dt: number }>();
+        for (const p of positions) {
+          if (typeof p.position !== "number") continue;
+          const t = new Date(p.date).getTime();
+          if (!Number.isFinite(t)) continue;
+          const dt = t - refTs;
+          if (dt > POSITION_ALIGN_TOLERANCE_MS) continue;
+          const cur = lastPos.get(p.driver_number);
+          if (!cur) lastPos.set(p.driver_number, { pos: p.position, dt });
+          else if (dt <= 0 && (cur.dt > 0 || dt > cur.dt)) lastPos.set(p.driver_number, { pos: p.position, dt });
+          else if (dt > 0 && cur.dt > 0 && dt < cur.dt) lastPos.set(p.driver_number, { pos: p.position, dt });
+        }
+        const sel = lastPos.get(driverNumber);
+        if (sel) {
+          if (sel.pos <= 1) {
+            isLeader = true;
+          } else {
+            for (const [num, info] of lastPos) {
+              if (num === driverNumber) continue;
+              if (info.pos === sel.pos - 1) {
+                aheadAcronym = drvByNum.get(num)?.name_acronym ?? `#${num}`;
+                break;
+              }
+            }
+          }
+        }
+      }
+      out.push({ lap, value: v, aheadAcronym, isLeader });
     }
     return out.sort((a, b) => a.lap - b.lap);
-  }, [intervals, driverNumber, laps, isRace]);
+  }, [intervals, driverNumber, laps, isRace, positions, allDrivers]);
 
   const nonRaceMsg = "Dato disponibile solo in gara";
 
@@ -206,9 +295,8 @@ export function DriverMiniChartsGrid({
         data={cumDevData}
         dataKey="value"
         color={driverColor}
-        tooltipFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(3)}s`}
+        tooltipFormatter={(v) => [`${v > 0 ? "+" : ""}${v.toFixed(3)}s`, "Δ (s)"]}
         emptyText="Dato non disponibile per questa sessione"
-        yLabel="Δ (s)"
       />
       <MiniPanel
         title="Posizione"
@@ -219,9 +307,8 @@ export function DriverMiniChartsGrid({
         color={driverColor}
         yReversed
         yDomain={[1, 20]}
-        tooltipFormatter={(v) => `P${v}`}
+        tooltipFormatter={(v) => [`P${v}`, "Pos"]}
         emptyText={isRace ? "Dato non disponibile per questa sessione" : nonRaceMsg}
-        yLabel="Pos"
       />
       <MiniPanel
         title="Gap al leader"
@@ -230,9 +317,8 @@ export function DriverMiniChartsGrid({
         data={gapToLeaderData}
         dataKey="value"
         color={driverColor}
-        tooltipFormatter={(v) => `+${v.toFixed(3)}s`}
+        tooltipFormatter={(v) => [`+${v.toFixed(3)}s`, "Gap"]}
         emptyText={isRace ? "Dato non disponibile per questa sessione" : nonRaceMsg}
-        yLabel="Gap (s)"
       />
       <MiniPanel
         title="Distacco da chi precede"
@@ -241,10 +327,15 @@ export function DriverMiniChartsGrid({
         data={intervalAheadData}
         dataKey="value"
         color={driverColor}
-        tooltipFormatter={(v) => `+${v.toFixed(3)}s`}
+        tooltipFormatter={(v, payload) => {
+          if (payload?.isLeader) return ["in testa", "Distacco"];
+          const ahead = typeof payload?.aheadAcronym === "string" ? payload.aheadAcronym : null;
+          const valueStr = `+${v.toFixed(3)}s`;
+          return ahead ? [`${valueStr} da ${ahead}`, "Distacco"] : [valueStr, "Distacco"];
+        }}
         emptyText={isRace ? "Dato non disponibile per questa sessione" : nonRaceMsg}
-        yLabel="Δ ahead"
       />
     </div>
   );
 }
+
