@@ -914,41 +914,6 @@ export default function Index() {
     return cumDevResult.drivers.find((d) => d.driver_number === singleDriverState.driver.driver_number)?.laps ?? null;
   }, [isSingleDriverRaceLike, singleDriverState, cumDevResult]);
 
-  /**
-   * Performance radar (5 solid axes). For single-driver mode, normalize
-   * relative-to-best across the CURRENTLY LOADED drivers (the "campo"
-   * available in this session view). Degradation reuses longRunResults
-   * (validated long runs only).
-   */
-  const performanceRadarResult = useMemo(() => {
-    if (!singleDriverState) return null;
-    const loaded = [...driverStates.values()];
-    if (!loaded.length) return null;
-    const inputs = loaded.map((s) => {
-      const pitInLaps = s.stints.slice(0, -1).map((st) => st.lap_end);
-      const trackStatusMap = classifyLapsTrackStatus(s.laps, raceControlMessages);
-      const driverLongRuns = longRunResults.filter((lr) => lr.driverNumber === s.driver.driver_number);
-      return {
-        driverNumber: s.driver.driver_number,
-        acronym: s.driver.name_acronym,
-        color: getColor(s.driver.driver_number),
-        laps: s.laps,
-        pitInLaps,
-        trackStatusMap,
-        longRuns: driverLongRuns,
-      };
-    });
-    return computePerformanceRadar(inputs);
-  }, [singleDriverState, driverStates, raceControlMessages, longRunResults, getColor]);
-
-  const singleDriverRadar = useMemo(() => {
-    if (!performanceRadarResult || !singleDriverState) return null;
-    const target = performanceRadarResult.drivers.find(
-      (d) => d.driverNumber === singleDriverState.driver.driver_number,
-    );
-    if (!target) return null;
-    return { drivers: [target], reference: performanceRadarResult.reference, range: performanceRadarResult.range };
-  }, [performanceRadarResult, singleDriverState]);
 
   const workspaceContent = (
     <>
