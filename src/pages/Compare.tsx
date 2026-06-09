@@ -396,6 +396,13 @@ export default function Compare() {
             />
             <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
             <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            {h2hRadar && (
+              <PerformanceRadarCard
+                result={h2hRadar}
+                title="Radar prestazionale H2H"
+                notice="Normalizzazione relative-to-best limitata ai due piloti confrontati: gli assi descrivono il vantaggio relativo, non assoluto contro il campo."
+              />
+            )}
           </section>
 
           <section className="space-y-5">
