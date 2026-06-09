@@ -205,6 +205,48 @@ export default function Compare() {
     }
   }, [dual]);
 
+  /**
+   * H2H Performance Radar: 5 solid axes for both drivers, normalized
+   * relative-to-best ON THE TWO COMPARED DRIVERS (same reference set).
+   * Degradation reuses detectLongRuns on race laps; only validated runs
+   * feed the score (others render as "non disponibile").
+   */
+  const h2hRadar = useMemo(() => {
+    if (!dual.outA || !dual.outB || !driverObjA || !driverObjB) return null;
+    const teamColorA = `#${driverObjA.team_colour || "ffffff"}`;
+    const teamColorB = `#${driverObjB.team_colour || "ffffff"}`;
+    const buildInput = (out: NonNullable<typeof dual.outA>, driver: Driver, color: string) => {
+      const pitInLaps = out.stints.slice(0, -1).map((st) => st.lap_end);
+      const trackStatusMap = classifyLapsTrackStatus(out.laps, raceControlMessages);
+      const pitDataIn = out.stints.slice(0, -1).map((s) => ({ lap_number: s.lap_end } as any));
+      const longRuns = detectLongRuns(
+        driver.driver_number,
+        driver.name_acronym,
+        color,
+        out.laps,
+        out.stints,
+        pitDataIn,
+      );
+      return {
+        driverNumber: driver.driver_number,
+        acronym: driver.name_acronym,
+        color,
+        laps: out.laps,
+        pitInLaps,
+        trackStatusMap,
+        longRuns,
+      };
+    };
+    try {
+      return computePerformanceRadar([
+        buildInput(dual.outA, driverObjA, teamColorA),
+        buildInput(dual.outB, driverObjB, teamColorB),
+      ]);
+    } catch {
+      return null;
+    }
+  }, [dual, driverObjA, driverObjB, raceControlMessages]);
+
   const handleSwap = () => {
     setDriverA(driverB);
     setDriverB(driverA);
