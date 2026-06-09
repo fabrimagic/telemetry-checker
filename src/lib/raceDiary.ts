@@ -189,16 +189,43 @@ function classifyRaceControl(
   return { severity: "LOW", relevance: "LOW", tags };
 }
 
+/**
+ * Precise check that a Race Control message text refers to a specific driver.
+ * Avoids false positives from naive substring includes (e.g. "CAR 14" matching driver 4,
+ * "TURN 4", "14:32" timestamps, etc.). Matches only:
+ *  - "CAR <num>" as a delimited token (word-boundary on the number)
+ *  - "DRIVER <num>" as a delimited token
+ *  - The driver's broadcast acronym in parentheses "(ACR)"
+ */
+export function messageMentionsDriver(
+  text: string,
+  driverNumber: number,
+  driverAcronym?: string | null,
+): boolean {
+  if (!text) return false;
+  const upper = text.toUpperCase();
+  const num = String(driverNumber);
+  // \b doesn't behave well across all digit edges in some engines, use explicit
+  // boundaries: non-digit (or start/end) on both sides.
+  const numPattern = new RegExp(`(?:^|[^0-9])(?:CAR|DRIVER)\\s+${num}(?:$|[^0-9])`, "i");
+  if (numPattern.test(upper)) return true;
+  if (driverAcronym) {
+    const acr = driverAcronym.toUpperCase();
+    if (upper.includes(`(${acr})`)) return true;
+  }
+  return false;
+}
+
 export function getRaceControlEvents(
   driverNumber: number,
   messages: RaceControlMessage[],
   laps: Lap[],
+  driverAcronym?: string | null,
 ): DiaryEvent[] {
   return messages
     .filter((m) => {
       const text = (m.message || "").toUpperCase();
-      const num = String(driverNumber);
-      const mentionsDriver = text.includes(num) || text.includes(`CAR ${num}`);
+      const mentionsDriver = messageMentionsDriver(text, driverNumber, driverAcronym);
       const isTrackWide =
         (m.flag && ["RED", "SAFETY CAR", "VSC"].some((f) => (m.flag || "").toUpperCase().includes(f))) ||
         text.includes("SAFETY CAR") ||
@@ -209,9 +236,7 @@ export function getRaceControlEvents(
     .map((m) => {
       const classification = classifyRaceControl(m.message, m.flag);
       // Track-wide events have lower confidence for driver-specific impact
-      const mentionsDriver =
-        (m.message || "").toUpperCase().includes(String(driverNumber)) ||
-        (m.message || "").toUpperCase().includes(`CAR ${driverNumber}`);
+      const mentionsDriver = messageMentionsDriver(m.message || "", driverNumber, driverAcronym);
 
       return {
         type: "RACE_CONTROL" as const,
@@ -230,6 +255,7 @@ export function getRaceControlEvents(
       };
     });
 }
+
 
 // ── Pit Stop events ──────────────────────────────────────────
 
