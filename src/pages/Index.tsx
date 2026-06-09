@@ -1000,6 +1000,7 @@ export default function Index() {
                   intervals={diaryIntervals}
                   cumDev={driverCumDev}
                   isRace={isRaceOrSprint}
+                  allDrivers={allDrivers}
                 />
               )}
 
