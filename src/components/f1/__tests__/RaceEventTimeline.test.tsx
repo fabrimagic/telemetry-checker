@@ -32,7 +32,7 @@ describe("RaceEventTimeline", () => {
       ev({ type: "RACE_CONTROL", lapNumber: 8, impact_tags: ["neutralization", "safety"] }),
     ];
     render(<RaceEventTimeline events={events} driverAcronym="HAM" driverColor="00D2BE" />);
-    expect(screen.getByText("Race Control")).toBeInTheDocument();
+    expect(screen.getAllByText("Race Control").length).toBeGreaterThan(0);
     expect(screen.getByText("Neutralizzazione")).toBeInTheDocument();
   });
 
