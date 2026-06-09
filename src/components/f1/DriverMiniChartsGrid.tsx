@@ -38,7 +38,7 @@ const POSITION_ALIGN_TOLERANCE_MS = 60_000;
  * (with a small tolerance to allow a slightly-later snapshot when no earlier
  * one exists). Returns null when no driver matches honestly.
  */
-function resolveAheadDriverNumber(
+export function resolveAheadDriverNumber(
   refDate: string,
   selectedDriverNumber: number,
   positions: PositionData[],
