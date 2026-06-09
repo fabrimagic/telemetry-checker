@@ -1065,6 +1065,17 @@ export default function Index() {
                     />
                   )
                 )}
+
+                {selectedDriverNumbers.length === 1 && singleDriverRadar && (
+                  <PerformanceRadarCard
+                    result={singleDriverRadar}
+                    notice={
+                      driverStates.size <= 1
+                        ? "Normalizzazione relativa al solo pilota caricato: aggiungi più piloti per un confronto sul campo della sessione."
+                        : undefined
+                    }
+                  />
+                )}
               </TabsContent>
 
               {/* ═══ VIRTUAL RACE ENGINEER ═══ */}
