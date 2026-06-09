@@ -76,6 +76,8 @@ import type { RiskMode } from "@/lib/riskAppetite";
 import { computeKeyDecisionMoments, type KeyDecisionMomentsResult } from "@/lib/keyDecisionMoments";
 import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
 import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
+import { computePerformanceRadar } from "@/lib/performanceRadar";
+import { PerformanceRadarCard } from "@/components/f1/PerformanceRadarCard";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 import { FullGasFeedSection } from "@/components/landing/FullGasFeedSection";
 
