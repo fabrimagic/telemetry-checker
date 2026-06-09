@@ -32,6 +32,7 @@ import { SessionReport } from "@/components/f1/SessionReport";
 import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Gauge, Target, Wrench, User, Swords, ArrowRight, ArrowLeft } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { DriverDashboardCockpit } from "@/components/f1/DriverDashboardCockpit";
+import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
@@ -989,6 +990,18 @@ export default function Index() {
                 />
               )}
 
+              {selectedDriverNumbers.length === 1 && singleDriverState && (
+                <DriverMiniChartsGrid
+                  driverNumber={singleDriverState.driver.driver_number}
+                  driverColor={getColor(singleDriverState.driver.driver_number)}
+                  driverAcronym={singleDriverState.driver.name_acronym}
+                  laps={singleDriverState.laps}
+                  positions={diaryPositions}
+                  intervals={diaryIntervals}
+                  cumDev={driverCumDev}
+                  isRace={isRaceOrSprint}
+                />
+              )}
 
               {kdmResult && kdmResult.decision_points.length > 0 && (
                 <KeyDecisionMomentsCard result={kdmResult} />
