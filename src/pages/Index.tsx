@@ -33,6 +33,7 @@ import { Loader2, RotateCcw, TrendingDown, Info, ChevronDown, BarChart3, Eye, Ga
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { DriverDashboardCockpit } from "@/components/f1/DriverDashboardCockpit";
 import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
+import { SectorVsWinnerGrid } from "@/components/f1/SectorVsWinnerGrid";
 import { RaceEventTimeline } from "@/components/f1/RaceEventTimeline";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
