@@ -24,7 +24,7 @@ export function DriverDashboardCockpit({
   laps,
   pitStops,
   driverNumber,
-  vreResult,
+  finalPosition,
   driverColor,
 }: Props) {
   const driverPits = pitStops.filter((p) => p.driver_number === driverNumber);
@@ -35,11 +35,7 @@ export function DriverDashboardCockpit({
   const totalLaps = laps.length;
   const nPits = driverPits.length;
 
-  // Position from VRE final result if available; otherwise from last lap's position field if present.
-  const finalPos =
-    vreResult?.actual_strategy?.final_position ??
-    (laps[laps.length - 1] as any)?.position ??
-    null;
+  const finalPos = finalPosition ?? null;
 
   const kpis: { label: string; value: string; sub?: string; icon: any }[] = [
     {
