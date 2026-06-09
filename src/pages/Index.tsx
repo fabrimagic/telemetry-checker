@@ -947,7 +947,7 @@ export default function Index() {
       (d) => d.driverNumber === singleDriverState.driver.driver_number,
     );
     if (!target) return null;
-    return { drivers: [target], reference: performanceRadarResult.reference };
+    return { drivers: [target], reference: performanceRadarResult.reference, range: performanceRadarResult.range };
   }, [performanceRadarResult, singleDriverState]);
 
   const workspaceContent = (

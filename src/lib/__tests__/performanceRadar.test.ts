@@ -86,11 +86,14 @@ describe("performanceRadar — axes & filters", () => {
     expect(s1).toBeLessThan(26); // outlier 200 and SC 40 are filtered
     // The reference equals the best aggregate (=same value here, only 1 driver).
     expect(out.reference.sector1).toBeCloseTo(s1, 5);
-    expect(out.drivers[0].axes.sector1.score).toBeCloseTo(1, 5);
+    // With a single driver the span is zero → score collapses to the neutral 0.5
+    // and the axis is flagged negligible (no field to amplify against).
+    expect(out.drivers[0].axes.sector1.score).toBeCloseTo(0.5, 5);
+    expect(out.drivers[0].axes.sector1.negligible).toBe(true);
   });
 
-  it("(b) normalization is relative-to-best (not min-max): worst score = best/v", () => {
-    // Two drivers: A is clearly faster in sector1 than B.
+  it("(b) ZOOM normalization amplifies real gaps but anti-collapses the worst", () => {
+    // Two drivers: A is clearly faster in sector1 than B (1s gap > guardrail).
     const A = makeDriver(
       1, "AAA", "#f00",
       Array.from({ length: 6 }, (_, i) => lap(i + 1, 25.0, 30, 28, 330)),
@@ -104,14 +107,61 @@ describe("performanceRadar — axes & filters", () => {
     const out = computePerformanceRadar([A, B]);
     const a = out.drivers.find((d) => d.acronym === "AAA")!;
     const b = out.drivers.find((d) => d.acronym === "BBB")!;
-    // sector1: A best → 1.0; B = 25/26 ≈ 0.9615
+    // best of the set → 1.0; worst is anti-collapsed at ~1/3 with margin 0.5
     expect(a.axes.sector1.score).toBeCloseTo(1, 5);
-    expect(b.axes.sector1.score).toBeCloseTo(25 / 26, 4);
-    // trap (higher-is-better): A=330 best → 1.0; B=320/330
+    expect(b.axes.sector1.score).toBeCloseTo(1 / 3, 3);
+    expect(b.axes.sector1.score!).toBeGreaterThan(0.25);
+    // trap: same anti-collapse symmetry
     expect(a.axes.trap.score).toBeCloseTo(1, 5);
-    expect(b.axes.trap.score).toBeCloseTo(320 / 330, 4);
-    // NOT min-max: with min-max, worst would have been 0 — here it's ~0.96
-    expect(b.axes.sector1.score!).toBeGreaterThan(0.5);
+    expect(b.axes.trap.score).toBeCloseTo(1 / 3, 3);
+    // 1.0s sector gap and 10 km/h trap gap are well above guardrail thresholds.
+    expect(a.axes.sector1.negligible).toBe(false);
+    expect(b.axes.trap.negligible).toBe(false);
+    // Range exposed for UI.
+    expect(out.range.sector1).toEqual({ min: 25.0, max: 26.0 });
+    expect(out.range.trap).toEqual({ min: 320, max: 330 });
+  });
+
+  it("(b2) ZOOM keeps very close values distinguishable, GUARDRAIL flags them negligible", () => {
+    // 36.082 vs 36.086 — 4 ms gap, below the 0.05s sector guardrail.
+    const A = makeDriver(
+      1, "AAA", "#f00",
+      Array.from({ length: 6 }, (_, i) => lap(i + 1, 36.082, 30, 28, 320)),
+    );
+    const B = makeDriver(
+      2, "BBB", "#0f0",
+      Array.from({ length: 6 }, (_, i) => lap(i + 1, 36.086, 30, 28, 320)),
+    );
+    const out = computePerformanceRadar([A, B]);
+    const a = out.drivers[0];
+    const b = out.drivers[1];
+    // Distinguishable thanks to zoom: best=1.0, worst≈1/3 (not both ~1.0).
+    expect(a.axes.sector1.score).toBeCloseTo(1, 5);
+    expect(b.axes.sector1.score).toBeCloseTo(1 / 3, 3);
+    expect(Math.abs((a.axes.sector1.score ?? 0) - (b.axes.sector1.score ?? 0))).toBeGreaterThan(0.3);
+    // But the guardrail honestly flags both axes as negligible (Δ < 0.05s).
+    expect(a.axes.sector1.negligible).toBe(true);
+    expect(b.axes.sector1.negligible).toBe(true);
+    const narrative = buildH2HAxisNarrative(a, b);
+    expect(narrative.sector1.toLowerCase()).toContain("pari");
+  });
+
+  it("(d) span ≈ 0 (equal values) → score ~0.5 for all + negligible", () => {
+    const A = makeDriver(
+      1, "AAA", "#f00",
+      Array.from({ length: 6 }, (_, i) => lap(i + 1, 25.0, 30, 28, 320)),
+    );
+    const B = makeDriver(
+      2, "BBB", "#0f0",
+      Array.from({ length: 6 }, (_, i) => lap(i + 1, 25.0, 30, 28, 320)),
+    );
+    const out = computePerformanceRadar([A, B]);
+    out.drivers.forEach((d) => {
+      expect(d.axes.sector1.score).toBeCloseTo(0.5, 5);
+      expect(d.axes.trap.score).toBeCloseTo(0.5, 5);
+      expect(d.axes.sector1.negligible).toBe(true);
+      expect(d.axes.trap.negligible).toBe(true);
+    });
   });
 
   it("(c) degradation axis is 'non disponibile' (null) when no validated long run", () => {

@@ -41,12 +41,18 @@ export type RadarAxisKey = "trap" | "sector1" | "sector2" | "sector3" | "degrada
 export interface RadarAxisValue {
   /** Aggregated raw value (km/h for trap, seconds for sectors, s/lap for degradation). */
   raw: number | null;
-  /** Score 0..1 relative-to-best in the reference set; null when unavailable. */
+  /** Score 0..1 with ZOOM (anti-collapse): the worst of the set is not pinned to 0. Null when unavailable. */
   score: number | null;
   /** Number of clean laps used for aggregation (0 for degradation when n/a). */
   sampleSize: number;
   /** Human-readable note about availability / honesty caveats. */
   note?: string;
+  /**
+   * Guardrail flag: true when the real difference vs the reference set
+   * is below the per-axis relevance threshold (sostanzialmente pari).
+   * UI may render a grey/dashed vertex; narrative will say so explicitly.
+   */
+  negligible?: boolean;
 }
 
 export interface DriverRadar {
@@ -69,10 +75,17 @@ export interface RadarInputDriver {
   longRuns?: LongRunResult[];
 }
 
+export interface AxisRange {
+  min: number;
+  max: number;
+}
+
 export interface PerformanceRadarResult {
   drivers: DriverRadar[];
   /** Reference values: the best value per axis in the input set (or null when no data). */
   reference: Record<RadarAxisKey, number | null>;
+  /** Raw range (min/max) per axis across the reference set; null when no data. */
+  range: Record<RadarAxisKey, AxisRange | null>;
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -207,20 +220,52 @@ function pickValidatedDegradation(longRuns: LongRunResult[] | undefined): {
   return { slope: best.degradationSlope, sampleSize: totalLaps };
 }
 
+
 /* ──────────────────────────────────────────────────────────────────
- * Normalization (relative-to-best, preserves magnitudes)
+ * Normalization with ZOOM (anti-collapse) + GUARDRAIL
+ *
+ * Pure relative-to-best collapses pentagons (two close drivers both
+ * land at ~1.0 on every axis). Instead we:
+ *   - compute the RAW range (min, max) of the reference set per axis
+ *   - stretch the worst end with a `margin * span` cushion so the
+ *     worst-of-set score is NOT 0 (stays ~0.33 with margin = 0.5)
+ *   - clamp to [0, 1]
+ *   - when span ≈ 0 (all equal) → score = 0.5 and the axis is flagged
+ *     negligible (no real difference to amplify)
+ * The GUARDRAIL flag is set when the real difference vs the reference
+ * set is below an axis-specific relevance threshold (e.g. <0.05s on a
+ * sector). It does not change the score; it is exposed for UI (grey/
+ * dashed vertex) and the per-axis narrative.
  * ────────────────────────────────────────────────────────────────── */
 
-function scoreHigherBetter(v: number | null, ref: number | null): number | null {
-  if (v == null || ref == null || ref <= 0) return null;
-  const s = v / ref;
-  return Math.max(0, Math.min(1, s));
+/** Cushion factor applied below the min (higher-is-better) or above the max (lower-is-better). */
+const ZOOM_MARGIN = 0.5;
+/** Span considered effectively zero (raw units differ per axis; the check is `span/scale <= EPS`). */
+const ZERO_SPAN_EPS = 1e-9;
+
+/** Negligibility thresholds in RAW units (the same units as `RadarAxisValue.raw`). */
+const NEGLIGIBLE_SECTOR_S = 0.05;
+const NEGLIGIBLE_TRAP_KMH = 2;
+const NEGLIGIBLE_DEG_S = 0.005;
+
+function zoomHigherBetter(v: number | null, range: AxisRange | null): number | null {
+  if (v == null || range == null) return null;
+  const span = range.max - range.min;
+  if (span <= ZERO_SPAN_EPS) return 0.5;
+  const lo = range.min - ZOOM_MARGIN * span;
+  const denom = range.max - lo;
+  if (denom <= 0) return 0.5;
+  return Math.max(0, Math.min(1, (v - lo) / denom));
 }
 
-function scoreLowerBetter(v: number | null, ref: number | null): number | null {
-  if (v == null || ref == null || v <= 0) return null;
-  const s = ref / v;
-  return Math.max(0, Math.min(1, s));
+function zoomLowerBetter(v: number | null, range: AxisRange | null): number | null {
+  if (v == null || range == null || v <= 0) return null;
+  const span = range.max - range.min;
+  if (span <= ZERO_SPAN_EPS) return 0.5;
+  const hi = range.max + ZOOM_MARGIN * span;
+  const denom = hi - range.min;
+  if (denom <= 0) return 0.5;
+  return Math.max(0, Math.min(1, (hi - v) / denom));
 }
 
 /** Degradation score: 1.0 at slope <= 0, 0.0 at slope >= MAX_DEG_SLOPE, linear in between. */
@@ -231,14 +276,36 @@ function scoreDegradation(slope: number | null): number | null {
   return 1 - (slope - MIN_DEG_SLOPE) / (MAX_DEG_SLOPE - MIN_DEG_SLOPE);
 }
 
+/**
+ * Compute the per-axis negligibility flag for a given driver.
+ *   - When the reference set has exactly 2 drivers: compare directly (|a-b| < threshold).
+ *   - When the reference set has >=3 drivers: compare driver's value to the field MEAN.
+ *   - When the reference set has 1 driver: nothing to compare → negligible = true
+ *     (no real differentiation possible; matches the score=0.5 fallback).
+ *   - When data is missing: negligible = undefined.
+ */
+function computeNegligible(
+  v: number | null,
+  others: number[],
+  threshold: number,
+): boolean | undefined {
+  if (v == null) return undefined;
+  if (others.length === 0) return true; // only this driver in the set
+  if (others.length === 1) {
+    return Math.abs(v - others[0]) < threshold;
+  }
+  const mean = others.reduce((a, b) => a + b, 0) / others.length;
+  return Math.abs(v - mean) < threshold;
+}
+
 /* ──────────────────────────────────────────────────────────────────
  * Public API
  * ────────────────────────────────────────────────────────────────── */
 
 /**
- * Build per-axis aggregates for each driver, then normalize relative-to-best
- * within the provided set (used both for single-driver mode — passing the
- * whole session field — and for H2H — passing just the two drivers).
+ * Build per-axis aggregates for each driver, then normalize via ZOOM
+ * (anti-collapse) within the provided set, and flag axes whose real
+ * difference is under the relevance threshold (GUARDRAIL).
  */
 export function computePerformanceRadar(
   drivers: RadarInputDriver[],
@@ -258,57 +325,88 @@ export function computePerformanceRadar(
     };
   });
 
-  // Reference (best per axis) across input set.
   const trapVals = perDriver.map((p) => p.trap.raw).filter((v): v is number => v != null);
   const s1Vals = perDriver.map((p) => p.s1.raw).filter((v): v is number => v != null);
   const s2Vals = perDriver.map((p) => p.s2.raw).filter((v): v is number => v != null);
   const s3Vals = perDriver.map((p) => p.s3.raw).filter((v): v is number => v != null);
+  const degVals = perDriver.map((p) => p.deg.slope).filter((v): v is number => v != null);
+
+  const rangeOf = (vals: number[]): AxisRange | null =>
+    vals.length ? { min: Math.min(...vals), max: Math.max(...vals) } : null;
+
+  const range: Record<RadarAxisKey, AxisRange | null> = {
+    trap: rangeOf(trapVals),
+    sector1: rangeOf(s1Vals),
+    sector2: rangeOf(s2Vals),
+    sector3: rangeOf(s3Vals),
+    degradation: rangeOf(degVals),
+  };
+
+  // Reference (best per axis) across input set, preserved for callers/UI.
   const reference: Record<RadarAxisKey, number | null> = {
     trap: trapVals.length ? Math.max(...trapVals) : null,
     sector1: s1Vals.length ? Math.min(...s1Vals) : null,
     sector2: s2Vals.length ? Math.min(...s2Vals) : null,
     sector3: s3Vals.length ? Math.min(...s3Vals) : null,
-    degradation: null, // degradation uses an absolute scale, not relative
+    degradation: null, // degradation score stays on an absolute scale
   };
 
   const out: DriverRadar[] = perDriver.map((p) => {
     const degSlope = p.deg.slope;
-    const degScore = scoreDegradation(degSlope);
+    const others = (vals: number[], self: number | null): number[] =>
+      self == null ? vals : vals.filter((v) => v !== self).concat(
+        // include duplicates safely (filter !== removes only equal values; restore other duplicates)
+        [],
+      );
+    // Compute negligible per axis. We compare self vs the rest of the set.
+    const restTrap = trapVals.filter((_, i) => perDriver[i].trap.raw !== p.trap.raw || perDriver[i] !== p);
+    const restS1 = s1Vals.filter((_, i) => perDriver[i].s1.raw !== p.s1.raw || perDriver[i] !== p);
+    const restS2 = s2Vals.filter((_, i) => perDriver[i].s2.raw !== p.s2.raw || perDriver[i] !== p);
+    const restS3 = s3Vals.filter((_, i) => perDriver[i].s3.raw !== p.s3.raw || perDriver[i] !== p);
+    const restDeg = degVals.filter((_, i) => perDriver[i].deg.slope !== degSlope || perDriver[i] !== p);
+
     const axes: Record<RadarAxisKey, RadarAxisValue> = {
       trap: {
         raw: p.trap.raw,
-        score: scoreHigherBetter(p.trap.raw, reference.trap),
+        score: zoomHigherBetter(p.trap.raw, range.trap),
         sampleSize: p.trap.sampleSize,
+        negligible: computeNegligible(p.trap.raw, restTrap, NEGLIGIBLE_TRAP_KMH),
         note: "Velocità massima rilevata (trap): dipende anche dall'assetto aerodinamico scelto per il GP, non solo dalla potenza.",
       },
       sector1: {
         raw: p.s1.raw,
-        score: scoreLowerBetter(p.s1.raw, reference.sector1),
+        score: zoomLowerBetter(p.s1.raw, range.sector1),
         sampleSize: p.s1.sampleSize,
+        negligible: computeNegligible(p.s1.raw, restS1, NEGLIGIBLE_SECTOR_S),
         note: "Settore 1 geografico del circuito (non un \"tipo di curva\").",
       },
       sector2: {
         raw: p.s2.raw,
-        score: scoreLowerBetter(p.s2.raw, reference.sector2),
+        score: zoomLowerBetter(p.s2.raw, range.sector2),
         sampleSize: p.s2.sampleSize,
+        negligible: computeNegligible(p.s2.raw, restS2, NEGLIGIBLE_SECTOR_S),
         note: "Settore 2 geografico del circuito (non un \"tipo di curva\").",
       },
       sector3: {
         raw: p.s3.raw,
-        score: scoreLowerBetter(p.s3.raw, reference.sector3),
+        score: zoomLowerBetter(p.s3.raw, range.sector3),
         sampleSize: p.s3.sampleSize,
+        negligible: computeNegligible(p.s3.raw, restS3, NEGLIGIBLE_SECTOR_S),
         note: "Settore 3 geografico del circuito (non un \"tipo di curva\").",
       },
       degradation: {
         raw: degSlope,
-        score: degScore,
+        score: scoreDegradation(degSlope),
         sampleSize: p.deg.sampleSize,
+        negligible: computeNegligible(degSlope, restDeg, NEGLIGIBLE_DEG_S),
         note:
           degSlope == null
             ? "Degrado non stimabile con affidabilità in questa sessione (long run non validato)."
             : `Degrado validato ${degSlope.toFixed(3)} s/giro su ${p.deg.sampleSize} giri.`,
       },
     };
+    // silence unused helper
+    void others;
     return {
       driverNumber: p.driverNumber,
       acronym: p.acronym,
@@ -317,7 +415,7 @@ export function computePerformanceRadar(
     };
   });
 
-  return { drivers: out, reference };
+  return { drivers: out, reference, range };
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -335,6 +433,8 @@ export const AXIS_LABELS: Record<RadarAxisKey, string> = {
 /** Per-axis narrative for a single driver (used in single-driver analysis). */
 export function buildAxisNarrative(driver: DriverRadar): Record<RadarAxisKey, string> {
   const a = driver.axes;
+  const negTag = (v: RadarAxisValue): string =>
+    v.negligible ? " Differenza in media: sostanzialmente in linea con il campo (entro il rumore)." : "";
   const sectorLine = (key: RadarAxisKey, n: 1 | 2 | 3): string => {
     const v = a[key];
     if (v.raw == null || v.score == null) {
@@ -342,20 +442,20 @@ export function buildAxisNarrative(driver: DriverRadar): Record<RadarAxisKey, st
     }
     const pct = Math.round(v.score * 100);
     const tone = v.score >= 0.99 ? "il migliore" : v.score >= 0.97 ? "vicino al migliore" : v.score >= 0.93 ? "competitivo" : "in deficit";
-    return `Settore ${n}: ${v.raw.toFixed(3)}s (${pct}% del migliore — ${tone} nel settore geografico ${n}).`;
+    return `Settore ${n}: ${v.raw.toFixed(3)}s (${pct}% — ${tone} nel settore geografico ${n}).${negTag(v)}`;
   };
   return {
     trap:
       a.trap.raw == null || a.trap.score == null
         ? "Velocità massima rilevata: dati insufficienti."
-        : `Velocità massima rilevata ${a.trap.raw.toFixed(1)} km/h (${Math.round(a.trap.score * 100)}% del migliore). Riflette anche la scelta di ala per questo GP, non solo la potenza.`,
+        : `Velocità massima rilevata ${a.trap.raw.toFixed(1)} km/h (${Math.round(a.trap.score * 100)}%). Riflette anche la scelta di ala per questo GP, non solo la potenza.${negTag(a.trap)}`,
     sector1: sectorLine("sector1", 1),
     sector2: sectorLine("sector2", 2),
     sector3: sectorLine("sector3", 3),
     degradation:
       a.degradation.raw == null
         ? "Degrado gomme: non stimabile con affidabilità in questa sessione (nessun long run validato)."
-        : `Degrado gomme ${a.degradation.raw.toFixed(3)} s/giro su ${a.degradation.sampleSize} giri validati (punteggio ${Math.round((a.degradation.score ?? 0) * 100)}%, scala 0→${MAX_DEG_SLOPE.toFixed(2)} s/giro).`,
+        : `Degrado gomme ${a.degradation.raw.toFixed(3)} s/giro su ${a.degradation.sampleSize} giri validati (punteggio ${Math.round((a.degradation.score ?? 0) * 100)}%, scala 0→${MAX_DEG_SLOPE.toFixed(2)} s/giro).${negTag(a.degradation)}`,
   };
 }
 
@@ -380,22 +480,24 @@ export function buildH2HAxisNarrative(
       out[key] = `${AXIS_LABELS[key]}: ${b.acronym} senza dati; ${a.acronym} riferimento.`;
       return;
     }
+    const negligible = !!(va.negligible || vb.negligible);
+    const pari = negligible ? " Differenza sostanzialmente pari (entro il rumore della misura)." : "";
     if (key === "trap") {
       const diff = va.raw - vb.raw;
       const leader = diff > 0 ? a.acronym : b.acronym;
-      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(1)} km/h vs ${b.acronym} ${vb.raw.toFixed(1)} km/h. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(1)} km/h). Dipende anche dalla scelta di ala.`;
+      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(1)} km/h vs ${b.acronym} ${vb.raw.toFixed(1)} km/h. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(1)} km/h). Dipende anche dalla scelta di ala.${pari}`;
       return;
     }
     if (key === "degradation") {
       const diff = va.raw - vb.raw;
       const leader = diff < 0 ? a.acronym : b.acronym;
-      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)} s/giro vs ${b.acronym} ${vb.raw.toFixed(3)} s/giro. Migliore (meno degrado): ${leader}.`;
+      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)} s/giro vs ${b.acronym} ${vb.raw.toFixed(3)} s/giro. Migliore (meno degrado): ${leader}.${pari}`;
       return;
     }
     // sector: lower is better
     const diff = va.raw - vb.raw;
     const leader = diff < 0 ? a.acronym : b.acronym;
-    out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)}s vs ${b.acronym} ${vb.raw.toFixed(3)}s. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(3)}s).`;
+    out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)}s vs ${b.acronym} ${vb.raw.toFixed(3)}s. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(3)}s).${pari}`;
   });
   return out;
 }
