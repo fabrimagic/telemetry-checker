@@ -115,14 +115,13 @@ interface MiniPanelProps {
   title: string;
   icon: React.ReactNode;
   available: boolean;
-  data: Array<Record<string, number>>;
+  data: Array<Record<string, any>>;
   dataKey: string;
   color: string;
   yReversed?: boolean;
   yDomain?: [number | string, number | string];
-  tooltipFormatter: (v: number) => string;
+  tooltipFormatter: (v: number, payload?: Record<string, any>) => [string, string];
   emptyText: string;
-  yLabel: string;
 }
 
 function MiniPanel({
@@ -136,7 +135,6 @@ function MiniPanel({
   yDomain,
   tooltipFormatter,
   emptyText,
-  yLabel,
 }: MiniPanelProps) {
   return (
     <div className="bg-card rounded-lg border border-border p-3 flex flex-col aspect-square min-h-[200px] relative overflow-hidden">
@@ -174,7 +172,9 @@ function MiniPanel({
                   fontSize: 10,
                   padding: "4px 8px",
                 }}
-                formatter={(v: any) => [tooltipFormatter(Number(v)), yLabel]}
+                formatter={(v: any, _name: string, props: any) =>
+                  tooltipFormatter(Number(v), props?.payload)
+                }
                 labelFormatter={(l) => `Giro ${l}`}
               />
               <Line
@@ -193,6 +193,7 @@ function MiniPanel({
     </div>
   );
 }
+
 
 export function DriverMiniChartsGrid({
   driverNumber,
