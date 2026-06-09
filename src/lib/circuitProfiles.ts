@@ -153,7 +153,7 @@ export const CIRCUIT_PROFILES: Record<string, CircuitProfile> = {
     sector_corner_map: {
       s1: { slow: 0.1, medium: 0.4, fast: 0.5 },
       s2: { slow: 0.2, medium: 0.4, fast: 0.4 },
-      s3: { slow: 0.7, medium: 0.3, fast: 0.0 },
+      s3: { slow: 0.1, medium: 0.3, fast: 0.6 },
     },
     sector_corner_map_confidence: "high",
   },
