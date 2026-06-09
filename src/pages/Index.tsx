@@ -995,6 +995,21 @@ export default function Index() {
               )}
 
               {selectedDriverNumbers.length === 1 && singleDriverState && (
+                <SectorVsWinnerGrid
+                  selectedDriverNumber={singleDriverState.driver.driver_number}
+                  selectedAcronym={singleDriverState.driver.name_acronym}
+                  selectedLaps={singleDriverState.laps}
+                  sessionAllLaps={sessionAllLaps}
+                  winnerDriverNumber={cumDevResult?.winner_driver_number ?? null}
+                  winnerAcronym={cumDevResult?.winner_driver_code ?? null}
+                  pitStops={pitStopsData}
+                  raceControlMessages={raceControlMessages}
+                  isRace={isRaceOrSprint}
+                />
+              )}
+
+
+              {selectedDriverNumbers.length === 1 && singleDriverState && (
                 <DriverMiniChartsGrid
                   driverNumber={singleDriverState.driver.driver_number}
                   driverColor={getColor(singleDriverState.driver.driver_number)}
