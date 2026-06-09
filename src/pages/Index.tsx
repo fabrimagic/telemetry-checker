@@ -1005,17 +1005,14 @@ export default function Index() {
                 />
               )}
 
-              {selectedDriverNumbers.length === 1 && singleDriverState && (
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && (
                 <RaceEventTimeline
-                  events={diaryEvents.filter(
-                    (e) => (e.details as any)?.driver_number === singleDriverState.driver.driver_number ||
-                           (e.details as any)?.subject_driver === singleDriverState.driver.driver_number ||
-                           true
-                  )}
+                  events={diaryEvents}
                   driverAcronym={singleDriverState.driver.name_acronym}
                   driverColor={getColor(singleDriverState.driver.driver_number)}
                 />
               )}
+
 
 
               {kdmResult && kdmResult.decision_points.length > 0 && (
