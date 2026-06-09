@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import type { Lap, PositionData, IntervalData } from "@/lib/openf1";
+import type { Lap, PositionData, IntervalData, Driver } from "@/lib/openf1";
 
 interface CumDevPoint {
   lap_number: number;
@@ -25,7 +25,59 @@ interface Props {
   intervals: IntervalData[];
   cumDev: CumDevPoint[] | null;
   isRace: boolean;
+  allDrivers?: Driver[];
 }
+
+// Max time tolerance (ms) for aligning a position snapshot to an interval sample
+// when no prior snapshot exists for that driver.
+const POSITION_ALIGN_TOLERANCE_MS = 60_000;
+
+/**
+ * Resolves which driver was in `position - 1` at the given timestamp.
+ * Uses the latest PositionData entry per driver with date <= refDate
+ * (with a small tolerance to allow a slightly-later snapshot when no earlier
+ * one exists). Returns null when no driver matches honestly.
+ */
+function resolveAheadDriverNumber(
+  refDate: string,
+  selectedDriverNumber: number,
+  positions: PositionData[],
+): number | null {
+  if (!positions.length) return null;
+  const refTs = new Date(refDate).getTime();
+  if (!Number.isFinite(refTs)) return null;
+
+  // Latest known position per driver up to refTs (or closest later within tolerance).
+  const lastPos = new Map<number, { pos: number; dt: number }>();
+  for (const p of positions) {
+    if (typeof p.position !== "number") continue;
+    const t = new Date(p.date).getTime();
+    if (!Number.isFinite(t)) continue;
+    const dt = t - refTs;
+    if (dt > POSITION_ALIGN_TOLERANCE_MS) continue;
+    const cur = lastPos.get(p.driver_number);
+    // Prefer the latest snapshot at or before refTs; fall back to closest later one.
+    if (!cur) {
+      lastPos.set(p.driver_number, { pos: p.position, dt });
+    } else if (dt <= 0 && (cur.dt > 0 || dt > cur.dt)) {
+      lastPos.set(p.driver_number, { pos: p.position, dt });
+    } else if (dt > 0 && cur.dt > 0 && dt < cur.dt) {
+      lastPos.set(p.driver_number, { pos: p.position, dt });
+    }
+  }
+
+  const selected = lastPos.get(selectedDriverNumber);
+  if (!selected) return null;
+  if (selected.pos <= 1) return null; // leader → nobody ahead
+
+  const targetPos = selected.pos - 1;
+  for (const [num, v] of lastPos) {
+    if (num === selectedDriverNumber) continue;
+    if (v.pos === targetPos) return num;
+  }
+  return null;
+}
+
 
 /**
  * Maps each (sorted) sample date to a driver lap number using the driver's own laps
