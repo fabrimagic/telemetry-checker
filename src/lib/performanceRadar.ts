@@ -433,6 +433,8 @@ export const AXIS_LABELS: Record<RadarAxisKey, string> = {
 /** Per-axis narrative for a single driver (used in single-driver analysis). */
 export function buildAxisNarrative(driver: DriverRadar): Record<RadarAxisKey, string> {
   const a = driver.axes;
+  const negTag = (v: RadarAxisValue): string =>
+    v.negligible ? " Differenza in media: sostanzialmente in linea con il campo (entro il rumore)." : "";
   const sectorLine = (key: RadarAxisKey, n: 1 | 2 | 3): string => {
     const v = a[key];
     if (v.raw == null || v.score == null) {
@@ -440,20 +442,20 @@ export function buildAxisNarrative(driver: DriverRadar): Record<RadarAxisKey, st
     }
     const pct = Math.round(v.score * 100);
     const tone = v.score >= 0.99 ? "il migliore" : v.score >= 0.97 ? "vicino al migliore" : v.score >= 0.93 ? "competitivo" : "in deficit";
-    return `Settore ${n}: ${v.raw.toFixed(3)}s (${pct}% del migliore — ${tone} nel settore geografico ${n}).`;
+    return `Settore ${n}: ${v.raw.toFixed(3)}s (${pct}% — ${tone} nel settore geografico ${n}).${negTag(v)}`;
   };
   return {
     trap:
       a.trap.raw == null || a.trap.score == null
         ? "Velocità massima rilevata: dati insufficienti."
-        : `Velocità massima rilevata ${a.trap.raw.toFixed(1)} km/h (${Math.round(a.trap.score * 100)}% del migliore). Riflette anche la scelta di ala per questo GP, non solo la potenza.`,
+        : `Velocità massima rilevata ${a.trap.raw.toFixed(1)} km/h (${Math.round(a.trap.score * 100)}%). Riflette anche la scelta di ala per questo GP, non solo la potenza.${negTag(a.trap)}`,
     sector1: sectorLine("sector1", 1),
     sector2: sectorLine("sector2", 2),
     sector3: sectorLine("sector3", 3),
     degradation:
       a.degradation.raw == null
         ? "Degrado gomme: non stimabile con affidabilità in questa sessione (nessun long run validato)."
-        : `Degrado gomme ${a.degradation.raw.toFixed(3)} s/giro su ${a.degradation.sampleSize} giri validati (punteggio ${Math.round((a.degradation.score ?? 0) * 100)}%, scala 0→${MAX_DEG_SLOPE.toFixed(2)} s/giro).`,
+        : `Degrado gomme ${a.degradation.raw.toFixed(3)} s/giro su ${a.degradation.sampleSize} giri validati (punteggio ${Math.round((a.degradation.score ?? 0) * 100)}%, scala 0→${MAX_DEG_SLOPE.toFixed(2)} s/giro).${negTag(a.degradation)}`,
   };
 }
 
@@ -478,22 +480,24 @@ export function buildH2HAxisNarrative(
       out[key] = `${AXIS_LABELS[key]}: ${b.acronym} senza dati; ${a.acronym} riferimento.`;
       return;
     }
+    const negligible = !!(va.negligible || vb.negligible);
+    const pari = negligible ? " Differenza sostanzialmente pari (entro il rumore della misura)." : "";
     if (key === "trap") {
       const diff = va.raw - vb.raw;
       const leader = diff > 0 ? a.acronym : b.acronym;
-      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(1)} km/h vs ${b.acronym} ${vb.raw.toFixed(1)} km/h. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(1)} km/h). Dipende anche dalla scelta di ala.`;
+      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(1)} km/h vs ${b.acronym} ${vb.raw.toFixed(1)} km/h. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(1)} km/h). Dipende anche dalla scelta di ala.${pari}`;
       return;
     }
     if (key === "degradation") {
       const diff = va.raw - vb.raw;
       const leader = diff < 0 ? a.acronym : b.acronym;
-      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)} s/giro vs ${b.acronym} ${vb.raw.toFixed(3)} s/giro. Migliore (meno degrado): ${leader}.`;
+      out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)} s/giro vs ${b.acronym} ${vb.raw.toFixed(3)} s/giro. Migliore (meno degrado): ${leader}.${pari}`;
       return;
     }
     // sector: lower is better
     const diff = va.raw - vb.raw;
     const leader = diff < 0 ? a.acronym : b.acronym;
-    out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)}s vs ${b.acronym} ${vb.raw.toFixed(3)}s. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(3)}s).`;
+    out[key] = `${AXIS_LABELS[key]}: ${a.acronym} ${va.raw.toFixed(3)}s vs ${b.acronym} ${vb.raw.toFixed(3)}s. Migliore: ${leader} (Δ ${Math.abs(diff).toFixed(3)}s).${pari}`;
   });
   return out;
 }
