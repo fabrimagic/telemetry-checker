@@ -26,6 +26,10 @@ import {
 import { loadVreForDriver, type VreLoaderOutput } from "@/lib/vreLoader";
 import { computeHeadToHead, type ComparisonResult } from "@/lib/headToHeadComparison";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
+import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
+import { detectLongRuns } from "@/lib/longRunDetector";
+import { computePerformanceRadar } from "@/lib/performanceRadar";
+import { PerformanceRadarCard } from "@/components/f1/PerformanceRadarCard";
 
 interface DualState {
   outA: VreLoaderOutput | null;
