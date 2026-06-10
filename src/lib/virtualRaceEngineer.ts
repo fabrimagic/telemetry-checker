@@ -694,8 +694,16 @@ export function computeVirtualRaceEngineer(
 
   // Enrich with practice compound models (only add compounds not already from race)
   const practiceCompoundsUsed: string[] = [];
+  // Slope di degrado minimo plausibile (s/giro) perche' un modello derivato dalle
+  // prove libere sia usabile come estrapolazione di uno stint di gara. I long-run
+  // di Practice sono corti e contaminati dal warmup gomma (i primi giri a gomma
+  // fredda sembrano "in miglioramento"), quindi la regressione lineare puo'
+  // produrre uno slope NEGATIVO o quasi-nullo — implausibile come degrado di gara.
+  // Esteso su un intero stint, un tale modello rende il compound apparentemente
+  // imbattibile e genera un delta strategico assurdo (poi tagliato dal cap).
+  const MIN_PRACTICE_DEG_SLOPE = 0.04; // s/giro
   for (const pm of practiceModels) {
-    if (!compoundModels.has(pm.compound) && pm.rSquared > 0.3) {
+    if (!compoundModels.has(pm.compound) && pm.rSquared > 0.3 && pm.slope >= MIN_PRACTICE_DEG_SLOPE) {
       // Adjust practice intercept to race pace: use median race lap time as baseline
       const raceModels = [...compoundModels.values()].filter(m => m.source === "race");
       let paceOffset = 0;
