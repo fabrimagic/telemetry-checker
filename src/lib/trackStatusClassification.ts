@@ -138,6 +138,7 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
       text.includes("GREEN LIGHT") ||
       text.includes("TRACK CLEAR") ||
       text.includes("VSC ENDING") ||
+      text.includes("VIRTUAL SAFETY CAR ENDING") ||
       text.includes("SAFETY CAR IN THIS LAP") ||
       text.includes("RESTART");
 
