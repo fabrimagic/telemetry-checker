@@ -145,6 +145,9 @@ export default function Documentation() {
               <TocLink href="#overtakes">Sorpassi</TocLink>
               <TocLink href="#race-diary">Diario di Gara</TocLink>
               <TocLink href="#cumulative-deviation">Deviazione Cumulativa</TocLink>
+              <TocLink href="#sector-vs-winner">Confronto Settori vs Vincitore</TocLink>
+              <TocLink href="#mini-charts">Mini-grafici (Posizione, Gap, Intervallo)</TocLink>
+              <TocLink href="#event-timeline">Timeline Eventi del Pilota</TocLink>
               <TocLink href="#tyre-degradation-card">Degrado Gomme</TocLink>
               <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
               <TocLink href="#soft-sensors">Soft Sensors (Termico / Stress / Grip)</TocLink>
