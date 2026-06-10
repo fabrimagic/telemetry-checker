@@ -9,7 +9,8 @@
  * filtered series (added inside aggregateSector, retro-compatibly).
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { Lap, PitData, RaceControlMessage } from "@/lib/openf1";
 import { aggregateSector, MIN_SECTOR_CLEAN_SAMPLES } from "@/lib/performanceRadar";
