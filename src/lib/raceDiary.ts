@@ -235,11 +235,10 @@ export function getRaceControlEvents(
     .filter((m) => {
       const text = (m.message || "").toUpperCase();
       const mentionsDriver = messageMentionsDriver(text, driverNumber, driverAcronym);
-      const isTrackWide =
-        (m.flag && ["RED", "SAFETY CAR", "VSC"].some((f) => (m.flag || "").toUpperCase().includes(f))) ||
-        text.includes("SAFETY CAR") ||
-        text.includes("VIRTUAL SAFETY CAR") ||
-        text.includes("RED FLAG");
+      // Track-wide only for *real* deployments (SC/VSC/RED). Mentions in
+      // penalty/procedure messages (e.g. "SAFETY CAR INFRINGEMENT") do not
+      // make the message track-wide.
+      const isTrackWide = isNeutralizationDeployment(text, m.flag);
       return mentionsDriver || isTrackWide;
     })
     .map((m) => {
