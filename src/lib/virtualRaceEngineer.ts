@@ -244,11 +244,35 @@ function median(arr: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-function estimatePitLoss(pitStops: PitData[]): number {
+export function estimatePitLoss(pitStops: PitData[]): number {
   if (!pitStops.length) return 22; // default F1 pit loss ~22s
-  const durations = pitStops.map(p => p.lane_duration).filter(d => d > 0);
+  // Esclude i transiti in pit-lane sotto Safety Car / procedure di fine gara:
+  // hanno stop_duration null e non sono pit stop strategici. Includerli abbassa
+  // artificialmente la mediana del pit loss (misurato: 18.9s invece di ~23.4s reali).
+  const realStops = pitStops.filter(p => p.stop_duration != null);
+  const source = realStops.length > 0 ? realStops : pitStops;
+  const durations = source.map(p => p.lane_duration).filter(d => d > 0);
   if (!durations.length) return 22;
   return median(durations);
+}
+
+/**
+ * Ultimo giro VERDE effettivo. Quando i giri finali di una gara sono corsi in
+ * regime di SC/VSC/RED (es. SC uscita nel finale), quei giri neutralizzati hanno
+ * tempi da transito in pit-lane e non sono giri di corsa reali: vanno esclusi da
+ * totalLaps / lunghezza stint / cliff penalty.
+ */
+export function computeEffectiveLastLap(
+  maxLapNumber: number,
+  trackStatus: Map<number, TrackStatus>,
+): number {
+  let last = maxLapNumber;
+  while (last > 1) {
+    const st = trackStatus.get(last);
+    if (st != null && st !== "GREEN") last--;
+    else break;
+  }
+  return last;
 }
 
 function cleanLapsForStint(
@@ -494,7 +518,9 @@ export function computeVirtualRaceEngineer(
   }
 
   const pitLoss = estimatePitLoss(pitStops);
-  const totalLaps = maxLapNumber;
+  // Trim della coda neutralizzata di fine gara (vedi computeEffectiveLastLap):
+  // evita che i giri sotto SC/VSC/RED finali gonfino lunghezza stint e degrado.
+  const totalLaps = computeEffectiveLastLap(maxLapNumber, trackStatusMapRaw);
 
   // Representative track temperature at race start (used by the first-stint
   // tyre warmup model). Falls back to undefined if no valid sample exists,
