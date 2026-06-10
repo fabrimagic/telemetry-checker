@@ -906,6 +906,12 @@ export function computeVirtualRaceEngineer(
 
         totalCost += baseLap + degLap + warmupPenalty;
       }
+      // Start traction/launch penalty: applied ONCE to the first stint. Harder
+      // starting compounds lose time off the line / lap 1 (distinct from thermal
+      // warmup), amplified on cold tracks. SOFT = reference (0).
+      if (isFirstStint) {
+        totalCost += computeStartTractionPenalty(sb.compound, trackTempAtStart);
+      }
       // Cliff risk for this stint
       totalCost += cliffPenalty(stintLength, sb.compound);
     }
