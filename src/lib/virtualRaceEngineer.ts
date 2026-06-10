@@ -976,6 +976,9 @@ export function computeVirtualRaceEngineer(
         const degClamped = Math.min(degRaw, MAX_DEG_LOSS_PER_LAP);
         total += model.intercept + degClamped + warmupPenalty;
       }
+      if (isFirstStint) {
+        total += computeStartTractionPenalty(sb.compound, trackTempAtStart);
+      }
     }
     // Use neutralisation-aware pit loss for each pit lap
     for (const pl of pitLapsArr) {
