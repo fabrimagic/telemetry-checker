@@ -141,10 +141,11 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
       text.includes("SAFETY CAR IN THIS LAP") ||
       text.includes("RESTART");
 
-    // RED FLAG
-    if (flag === "RED" || text.includes("RED FLAG")) {
+    // RED FLAG — deployment only (not penalty mentions like "RED FLAG INFRINGEMENT")
+    if (isRedFlagDeployment(text, flag)) {
       detected = "RED";
     }
+
     // SAFETY CAR — deployment only (not penalty mentions like "SAFETY CAR INFRINGEMENT")
     else if (!isClearPhrase && isSafetyCarDeployment(text, flag)) {
       detected = "SC";
