@@ -518,7 +518,9 @@ export function computeVirtualRaceEngineer(
   }
 
   const pitLoss = estimatePitLoss(pitStops);
-  const totalLaps = maxLapNumber;
+  // Trim della coda neutralizzata di fine gara (vedi computeEffectiveLastLap):
+  // evita che i giri sotto SC/VSC/RED finali gonfino lunghezza stint e degrado.
+  const totalLaps = computeEffectiveLastLap(maxLapNumber, trackStatusMapRaw);
 
   // Representative track temperature at race start (used by the first-stint
   // tyre warmup model). Falls back to undefined if no valid sample exists,
