@@ -929,7 +929,10 @@ export function computeVirtualRaceEngineer(
           ? computeTyreWarmupPenalty(sb.compound, tyreLife) * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempAtStart)
           : computeTyreWarmupPenalty(sb.compound, tyreLife);
 
-        total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
+        const MAX_DEG_LOSS_PER_LAP = 3.5;
+        const degRaw = model.slope * tyreLife;
+        const degClamped = Math.min(degRaw, MAX_DEG_LOSS_PER_LAP);
+        total += model.intercept + degClamped + warmupPenalty;
       }
     }
     // Use neutralisation-aware pit loss for each pit lap
