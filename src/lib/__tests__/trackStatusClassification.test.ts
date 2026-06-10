@@ -4,8 +4,10 @@ import {
   isSafetyCarDeployment,
   isVirtualSafetyCarDeployment,
   isNeutralizationDeployment,
+  isRedFlagDeployment,
   isPenaltyOrProcedureContext,
 } from "../trackStatusClassification";
+
 import type { RaceControlMessage, Lap } from "../openf1";
 
 function rc(message: string, extra: Partial<RaceControlMessage> = {}): RaceControlMessage {
