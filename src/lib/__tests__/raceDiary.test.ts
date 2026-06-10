@@ -63,7 +63,7 @@ describe("getRaceControlEvents — filtro pilota + track-wide", () => {
   it("include eventi track-wide per tutti, con confidence MEDIUM se non menziona il pilota", () => {
     const msgs = [
       rc("VIRTUAL SAFETY CAR DEPLOYED"),
-      rc("RED FLAG"),
+      rc("RED FLAG - RACE SUSPENDED"),
     ];
     const ev = getRaceControlEvents(4, msgs, laps, "NOR");
     expect(ev).toHaveLength(2);

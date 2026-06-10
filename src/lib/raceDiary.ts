@@ -158,21 +158,12 @@ function classifyRaceControl(
   const upperFlag = (flag || "").toUpperCase();
   const tags: ImpactTag[] = ["race_control"];
 
-  // Safety Car / Red Flag → high severity, neutralization (real deployments only)
-  if (
-    upperFlag.includes("RED") ||
-    upper.includes("RED FLAG")
-  ) {
+  // Safety Car / VSC / Red Flag → high severity, neutralization (real deployments only)
+  if (isNeutralizationDeployment(upper, upperFlag)) {
     tags.push("neutralization", "safety");
     return { severity: "HIGH", relevance: "HIGH", tags };
   }
-  if (
-    isSafetyCarDeployment(upper, upperFlag) ||
-    isVirtualSafetyCarDeployment(upper, upperFlag)
-  ) {
-    tags.push("neutralization", "safety");
-    return { severity: "HIGH", relevance: "HIGH", tags };
-  }
+
 
   // Penalties / investigations (incl. mentions like "SAFETY CAR INFRINGEMENT")
   if (

@@ -73,17 +73,33 @@ export function isVirtualSafetyCarDeployment(text: string, flag: string | undefi
 }
 
 /**
+ * Real Red Flag *deployment* — not a mention (e.g. "RED FLAG INFRINGEMENT").
+ * Trusts the structured flag when set; otherwise requires an explicit
+ * suspension/deployment phrase. Penalty/procedure contexts are excluded.
+ */
+export function isRedFlagDeployment(text: string, flag: string | undefined | null): boolean {
+  const upperFlag = (flag || "").toUpperCase();
+  const upper = (text || "").toUpperCase();
+  if (upperFlag === "RED") return true;
+  if (isPenaltyOrProcedureContext(upper)) return false;
+  return (
+    /\bRED\s+FLAG\b[^A-Z0-9]*(?:-\s*)?(?:RACE|SESSION)?\s*SUSPENDED\b/.test(upper) ||
+    /\bRED\s+FLAG\s+DEPLOYED\b/.test(upper) ||
+    /\b(?:RACE|SESSION)\s+SUSPENDED\b/.test(upper)
+  );
+}
+
+/**
  * True for any real track-wide neutralization deployment (SC / VSC / RED).
  * Used by consumers (e.g. race diary) to flag messages as track-wide.
  */
 export function isNeutralizationDeployment(text: string, flag: string | undefined | null): boolean {
-  const upperFlag = (flag || "").toUpperCase();
-  const upper = (text || "").toUpperCase();
-  if (upperFlag === "RED" || upper.includes("RED FLAG")) return true;
-  if (isSafetyCarDeployment(upper, upperFlag)) return true;
-  if (isVirtualSafetyCarDeployment(upper, upperFlag)) return true;
+  if (isRedFlagDeployment(text, flag)) return true;
+  if (isSafetyCarDeployment(text, flag)) return true;
+  if (isVirtualSafetyCarDeployment(text, flag)) return true;
   return false;
 }
+
 
 /**
  * Parse race_control messages into status intervals.
@@ -125,10 +141,11 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
       text.includes("SAFETY CAR IN THIS LAP") ||
       text.includes("RESTART");
 
-    // RED FLAG
-    if (flag === "RED" || text.includes("RED FLAG")) {
+    // RED FLAG — deployment only (not penalty mentions like "RED FLAG INFRINGEMENT")
+    if (isRedFlagDeployment(text, flag)) {
       detected = "RED";
     }
+
     // SAFETY CAR — deployment only (not penalty mentions like "SAFETY CAR INFRINGEMENT")
     else if (!isClearPhrase && isSafetyCarDeployment(text, flag)) {
       detected = "SC";

@@ -4,8 +4,10 @@ import {
   isSafetyCarDeployment,
   isVirtualSafetyCarDeployment,
   isNeutralizationDeployment,
+  isRedFlagDeployment,
   isPenaltyOrProcedureContext,
 } from "../trackStatusClassification";
+
 import type { RaceControlMessage, Lap } from "../openf1";
 
 function rc(message: string, extra: Partial<RaceControlMessage> = {}): RaceControlMessage {
@@ -87,9 +89,28 @@ describe("isVirtualSafetyCarDeployment", () => {
   });
 });
 
+describe("isRedFlagDeployment", () => {
+  it("flag === 'RED' → true (anche senza testo)", () => {
+    expect(isRedFlagDeployment("", "RED")).toBe(true);
+  });
+  it("frasi di sospensione → true", () => {
+    expect(isRedFlagDeployment("RED FLAG - RACE SUSPENDED", null)).toBe(true);
+    expect(isRedFlagDeployment("RACE SUSPENDED", null)).toBe(true);
+    expect(isRedFlagDeployment("SESSION SUSPENDED", null)).toBe(true);
+    expect(isRedFlagDeployment("RED FLAG DEPLOYED", null)).toBe(true);
+  });
+  it("'RED FLAG' nudo (senza sospensione/deployment) → false", () => {
+    expect(isRedFlagDeployment("RED FLAG", null)).toBe(false);
+  });
+  it("penalità 'RED FLAG INFRINGEMENT' → false", () => {
+    expect(isRedFlagDeployment("RED FLAG INFRINGEMENT - CAR 4 - PENALTY", null)).toBe(false);
+    expect(isRedFlagDeployment("RED FLAG - UNDER INVESTIGATION", null)).toBe(false);
+  });
+});
+
 describe("isNeutralizationDeployment", () => {
   it("RED FLAG / SC / VSC reali → true", () => {
-    expect(isNeutralizationDeployment("RED FLAG", null)).toBe(true);
+    expect(isNeutralizationDeployment("RED FLAG - RACE SUSPENDED", null)).toBe(true);
     expect(isNeutralizationDeployment("", "RED")).toBe(true);
     expect(isNeutralizationDeployment("SAFETY CAR DEPLOYED", null)).toBe(true);
     expect(isNeutralizationDeployment("VIRTUAL SAFETY CAR DEPLOYED", null)).toBe(true);
@@ -97,8 +118,10 @@ describe("isNeutralizationDeployment", () => {
 
   it("penalità non è neutralization", () => {
     expect(isNeutralizationDeployment("SAFETY CAR INFRINGEMENT - CAR 4 - 5 SECOND PENALTY", null)).toBe(false);
+    expect(isNeutralizationDeployment("RED FLAG INFRINGEMENT - CAR 4 - PENALTY", null)).toBe(false);
   });
 });
+
 
 describe("classifyLapsTrackStatus — penalità non esclude giri", () => {
   it("messaggio 'SAFETY CAR INFRINGEMENT' NON marca i giri come SC", () => {
@@ -129,12 +152,28 @@ describe("classifyLapsTrackStatus — penalità non esclude giri", () => {
     expect(map.get(1)).toBe("VSC");
   });
 
-  it("RED FLAG invariato", () => {
+  it("RED FLAG vera (flag === 'RED') → RED", () => {
     const msgs = [rc("RED FLAG", { date: "2024-01-01T00:01:00Z", flag: "RED" })];
     const laps = [lap(1, "2024-01-01T00:01:30Z")];
     const map = classifyLapsTrackStatus(laps, msgs);
     expect(map.get(1)).toBe("RED");
   });
+
+  it("'RED FLAG - RACE SUSPENDED' (testo) → RED", () => {
+    const msgs = [rc("RED FLAG - RACE SUSPENDED", { date: "2024-01-01T00:01:00Z" })];
+    const laps = [lap(1, "2024-01-01T00:01:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBe("RED");
+  });
+
+  it("'RED FLAG INFRINGEMENT' (penalità) NON marca i giri come RED", () => {
+    const msgs = [rc("RED FLAG INFRINGEMENT - CAR 4 - PENALTY", { date: "2024-01-01T00:01:00Z" })];
+    const laps = [lap(1, "2024-01-01T00:00:30Z"), lap(2, "2024-01-01T00:02:00Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBeUndefined();
+    expect(map.get(2)).toBeUndefined();
+  });
+
 
   it("'SAFETY CAR IN THIS LAP' → CLEAR (non SC)", () => {
     const msgs = [
