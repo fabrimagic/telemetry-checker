@@ -1020,6 +1020,15 @@ export function computeVirtualRaceEngineer(
       }
     }
 
+    // Clamp di plausibilita': un guadagno strategico realistico su una gara
+    // intera e' nell'ordine di ~2.5x il pit loss (rimpiazzare un timing di pit
+    // sub-ottimale), non centinaia di secondi. Delta superiori indicano
+    // estrapolazione di modelli di degrado contaminati, non una strategia reale.
+    const MAX_PLAUSIBLE_DELTA = pitLoss * 2.5;
+    if (bestDelta > MAX_PLAUSIBLE_DELTA) {
+      bestDelta = MAX_PLAUSIBLE_DELTA;
+    }
+
     // Build recommended windows
     for (let i = 0; i < bestPitLaps.length; i++) {
       const idealLap = bestPitLaps[i];
