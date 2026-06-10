@@ -26,6 +26,66 @@ const STATUS_PRIORITY: Record<TrackStatus, number> = {
 };
 
 /**
+ * Patterns that indicate the message is a penalty / stewards-procedure
+ * mention rather than a real deployment. E.g. "SAFETY CAR INFRINGEMENT".
+ * Kept here to be shared with raceDiary (track-wide detection).
+ */
+const PENALTY_OR_PROCEDURE_PATTERNS: RegExp[] = [
+  /\bINFRINGEMENT\b/,
+  /\bPENALTY\b/,
+  /\bINVESTIGATION\b/,
+  /\bNOTED\b/,
+  /\bNO\s+FURTHER\s+ACTION\b/,
+  /\bREVIEWED\b/,
+];
+
+export function isPenaltyOrProcedureContext(text: string): boolean {
+  if (!text) return false;
+  const upper = text.toUpperCase();
+  return PENALTY_OR_PROCEDURE_PATTERNS.some((re) => re.test(upper));
+}
+
+/**
+ * Real Safety Car *deployment* — not just a mention of the words.
+ * Trusts the structured flag when set; otherwise requires an explicit
+ * deployment phrase. Penalty/procedure contexts are excluded.
+ */
+export function isSafetyCarDeployment(text: string, flag: string | undefined | null): boolean {
+  const upperFlag = (flag || "").toUpperCase();
+  const upper = (text || "").toUpperCase();
+  if (isPenaltyOrProcedureContext(upper)) return false;
+  if (upper.includes("VIRTUAL") || upper.includes("VSC")) return false;
+  if (upperFlag === "SAFETY CAR") return true;
+  // Explicit deployment phrases, e.g. "SAFETY CAR DEPLOYED" / "SAFETY CAR (SC) DEPLOYED"
+  return /\bSAFETY\s+CAR\b[^A-Z0-9]*(?:\([^)]*\)\s*)?DEPLOYED\b/.test(upper);
+}
+
+/**
+ * Real Virtual Safety Car *deployment* — not a mention.
+ */
+export function isVirtualSafetyCarDeployment(text: string, flag: string | undefined | null): boolean {
+  const upperFlag = (flag || "").toUpperCase();
+  const upper = (text || "").toUpperCase();
+  if (isPenaltyOrProcedureContext(upper)) return false;
+  if (upperFlag === "VSC") return true;
+  return /\bVIRTUAL\s+SAFETY\s+CAR\s+DEPLOYED\b/.test(upper)
+    || /\bVSC\s+DEPLOYED\b/.test(upper);
+}
+
+/**
+ * True for any real track-wide neutralization deployment (SC / VSC / RED).
+ * Used by consumers (e.g. race diary) to flag messages as track-wide.
+ */
+export function isNeutralizationDeployment(text: string, flag: string | undefined | null): boolean {
+  const upperFlag = (flag || "").toUpperCase();
+  const upper = (text || "").toUpperCase();
+  if (upperFlag === "RED" || upper.includes("RED FLAG")) return true;
+  if (isSafetyCarDeployment(upper, upperFlag)) return true;
+  if (isVirtualSafetyCarDeployment(upper, upperFlag)) return true;
+  return false;
+}
+
+/**
  * Parse race_control messages into status intervals.
  */
 function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] {
@@ -46,7 +106,6 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
 
     const flag = (msg.flag || "").toUpperCase();
     const text = (msg.message || "").toUpperCase();
-    const category = (msg.category || "").toUpperCase();
 
     // Track-wide scope only (skip sector-specific yellows for simplicity)
     // But include them if no scope or scope is "Track"
@@ -55,25 +114,27 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
     // Detect status from flag field and message text
     let detected: TrackStatus | "CLEAR" | null = null;
 
+    // GREEN / CLEAR end-of-neutralization phrases take precedence over
+    // mention-based SC/VSC matches (e.g. "SAFETY CAR IN THIS LAP").
+    const isClearPhrase =
+      flag === "GREEN" ||
+      flag === "CLEAR" ||
+      text.includes("GREEN LIGHT") ||
+      text.includes("TRACK CLEAR") ||
+      text.includes("VSC ENDING") ||
+      text.includes("SAFETY CAR IN THIS LAP") ||
+      text.includes("RESTART");
+
     // RED FLAG
     if (flag === "RED" || text.includes("RED FLAG")) {
       detected = "RED";
     }
-    // SAFETY CAR (not virtual)
-    else if (
-      (flag === "SAFETY CAR" || text.includes("SAFETY CAR")) &&
-      !text.includes("VIRTUAL") &&
-      !text.includes("VSC")
-    ) {
+    // SAFETY CAR — deployment only (not penalty mentions like "SAFETY CAR INFRINGEMENT")
+    else if (!isClearPhrase && isSafetyCarDeployment(text, flag)) {
       detected = "SC";
     }
-    // VSC
-    else if (
-      flag === "VSC" ||
-      text.includes("VIRTUAL SAFETY CAR") ||
-      text.includes("VSC DEPLOYED") ||
-      text.includes("VSC ")
-    ) {
+    // VSC — deployment only
+    else if (!isClearPhrase && isVirtualSafetyCarDeployment(text, flag)) {
       detected = "VSC";
     }
     // DOUBLE YELLOW (track-wide only — sector/driver scope is not race-wide)
@@ -91,17 +152,10 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
       detected = "YELLOW";
     }
     // GREEN / CLEAR
-    else if (
-      flag === "GREEN" ||
-      flag === "CLEAR" ||
-      text.includes("GREEN LIGHT") ||
-      text.includes("TRACK CLEAR") ||
-      text.includes("VSC ENDING") ||
-      text.includes("SAFETY CAR IN THIS LAP") ||
-      text.includes("RESTART")
-    ) {
+    else if (isClearPhrase) {
       detected = "CLEAR";
     }
+
 
     if (detected === "CLEAR") {
       closeInterval(t);
