@@ -145,6 +145,9 @@ export default function Documentation() {
               <TocLink href="#overtakes">Sorpassi</TocLink>
               <TocLink href="#race-diary">Diario di Gara</TocLink>
               <TocLink href="#cumulative-deviation">Deviazione Cumulativa</TocLink>
+              <TocLink href="#sector-vs-winner">Confronto Settori vs Vincitore</TocLink>
+              <TocLink href="#mini-charts">Mini-grafici (Posizione, Gap, Intervallo)</TocLink>
+              <TocLink href="#event-timeline">Timeline Eventi del Pilota</TocLink>
               <TocLink href="#tyre-degradation-card">Degrado Gomme</TocLink>
               <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
               <TocLink href="#soft-sensors">Soft Sensors (Termico / Stress / Grip)</TocLink>
@@ -424,6 +427,59 @@ export default function Documentation() {
             Per definizione il vincitore ha sempre deviazione zero.
           </p>
         </DocSection>
+
+        <DocSection id="sector-vs-winner" title="Confronto Settori vs Vincitore" icon={<Map className="h-4 w-4" />}>
+          <p>
+            Tre riquadri compatti (S1 / S2 / S3) confrontano il tempo <strong className="text-foreground">mediano</strong>{" "}
+            del pilota selezionato in ciascun settore con quello del <strong className="text-foreground">vincitore</strong> della gara.
+            Per ogni settore vedi una <strong className="text-foreground">barra del delta</strong> (verde se più veloce, rossa se più lento)
+            e una <strong className="text-foreground">fascia di consistenza</strong> (±1σ) che indica quanto i giri del pilota sono regolari tra loro.
+          </p>
+          <p>
+            Sotto i tre riquadri trovi una <strong className="text-foreground">legenda espandibile</strong>
+            (&laquo;Cosa mostra il grafico&raquo;) che spiega in linguaggio semplice il significato di barra, fascia e mediana.
+          </p>
+          <p className="text-xs italic">
+            È disponibile solo per Gara e Sprint. Il confronto esclude giri sotto Safety Car / VSC / bandiera rossa e gli outlier;
+            se i giri puliti sono pochi (&lt; 5), il riquadro viene mostrato sbiadito per segnalare la minore affidabilità del dato.
+          </p>
+        </DocSection>
+
+        <DocSection id="mini-charts" title="Mini-grafici (Posizione, Gap, Intervallo)" icon={<BarChart3 className="h-4 w-4" />}>
+          <p>
+            Una griglia di mini-grafici sotto la sezione cockpit riassume la dinamica di gara del pilota giro per giro:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Posizione in pista</strong> — andamento della posizione classifica.</li>
+            <li><strong className="text-foreground">Gap dal leader</strong> — distacco progressivo dal leader della gara.</li>
+            <li>
+              <strong className="text-foreground">Intervallo dal pilota davanti</strong> — distacco dal pilota immediatamente
+              davanti in quel momento. Passando il mouse su un punto, il tooltip mostra anche{" "}
+              <strong className="text-foreground">chi era quel pilota</strong> (acronimo). Se il pilota davanti cambia tra un giro
+              e l'altro (es. dopo un sorpasso), il tooltip riflette il pilota corretto in ciascun punto. Se il pilota è leader,
+              non viene mostrato alcun nome.
+            </li>
+          </ul>
+          <p className="text-xs italic">È disponibile solo per Gara e Sprint.</p>
+        </DocSection>
+
+        <DocSection id="event-timeline" title="Timeline Eventi del Pilota" icon={<Activity className="h-4 w-4" />}>
+          <p>
+            Una <strong className="text-foreground">timeline orizzontale</strong> mostra gli eventi del pilota selezionato
+            distribuiti lungo i giri della gara: pit stop, sorpassi (effettuati e subiti), neutralizzazioni
+            (Safety Car / VSC / bandiera rossa), penalità e altri messaggi di Race Control che riguardano direttamente il pilota.
+          </p>
+          <p>
+            Ogni tipo di evento ha un'icona e un colore dedicati; eventi vicini nello stesso giro sono raggruppati per evitare sovrapposizioni.
+            Passando il mouse su un'icona compare un tooltip con la descrizione e il giro. Una legenda riporta le categorie mostrate.
+          </p>
+          <p className="text-xs italic">
+            La timeline riusa gli stessi eventi del <em>Diario di Gara</em>: nessun dato viene inventato, è una vista alternativa sintetica.
+            È disponibile solo per Gara e Sprint.
+          </p>
+        </DocSection>
+
+
 
         <DocSection id="tyre-degradation-card" title="Degrado Gomme" icon={<TrendingDown className="h-4 w-4" />}>
           <p>
