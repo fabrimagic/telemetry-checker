@@ -855,7 +855,12 @@ export function computeVirtualRaceEngineer(
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
         const baseLap = model.intercept;
-        const degLap = model.slope * tyreLife * lapDegradationMult(lap);
+        // Clamp della perdita di degrado per-giro: le gomme reali plateauano,
+        // non degradano linearmente all'infinito. Evita che slope ripidi
+        // (spesso contaminati da battaglie/traffico) gonfino stint lunghi.
+        const MAX_DEG_LOSS_PER_LAP = 3.5; // s/giro sopra il passo base
+        const rawDegLap = model.slope * tyreLife * lapDegradationMult(lap);
+        const degLap = Math.min(rawDegLap, MAX_DEG_LOSS_PER_LAP);
         // Tyre warmup penalty: temporary time loss in first laps after pit.
         // First stint uses a reduced "start warmup" (formation lap pre-heats
         // the tyres but cold tracks/Hard still cost time).
