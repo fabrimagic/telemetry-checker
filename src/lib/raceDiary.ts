@@ -8,6 +8,12 @@ import type {
   Driver,
   Lap,
 } from "./openf1";
+import {
+  isNeutralizationDeployment,
+  isSafetyCarDeployment,
+  isVirtualSafetyCarDeployment,
+  isPenaltyOrProcedureContext,
+} from "./trackStatusClassification";
 
 // ── Severity / Relevance / Confidence ────────────────────────
 
