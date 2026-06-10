@@ -132,9 +132,18 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
 
     // GREEN / CLEAR end-of-neutralization phrases take precedence over
     // mention-based SC/VSC matches (e.g. "SAFETY CAR IN THIS LAP").
+    //
+    // A bare CLEAR flag must be TRACK-wide to count as end-of-neutralization.
+    // "CLEAR IN TRACK SECTOR N" messages carry scope "Sector" and only mean a
+    // single sector is clear — they must NOT close a Safety Car / VSC. The
+    // legitimate full-course clear arrives as flag GREEN or text "TRACK CLEAR"
+    // (both unconditional below), so this restriction is safe.
+    const isClearFlagTrackWide =
+      flag === "CLEAR" && scope !== "SECTOR" && scope !== "DRIVER";
+
     const isClearPhrase =
       flag === "GREEN" ||
-      flag === "CLEAR" ||
+      isClearFlagTrackWide ||
       text.includes("GREEN LIGHT") ||
       text.includes("TRACK CLEAR") ||
       text.includes("VSC ENDING") ||

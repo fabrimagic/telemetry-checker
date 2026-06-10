@@ -205,3 +205,45 @@ describe("classifyLapsTrackStatus — penalità non esclude giri", () => {
     expect(map.get(2)).toBeUndefined();
   });
 });
+
+describe("CLEAR scope-aware — non chiude la SC su clear settoriali", () => {
+  it("'CLEAR IN TRACK SECTOR N' (scope Sector) NON chiude la SC", () => {
+    const msgs = [
+      rc("SAFETY CAR DEPLOYED", { date: "2024-01-01T00:01:00Z", flag: "SAFETY CAR" }),
+      rc("CLEAR IN TRACK SECTOR 5", { date: "2024-01-01T00:02:00Z", flag: "CLEAR", scope: "Sector", sector: 5 }),
+    ];
+    const laps = [lap(1, "2024-01-01T00:02:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBe("SC");
+  });
+
+  it("'TRACK CLEAR' (scope Track) chiude ancora la SC", () => {
+    const msgs = [
+      rc("SAFETY CAR DEPLOYED", { date: "2024-01-01T00:01:00Z", flag: "SAFETY CAR" }),
+      rc("TRACK CLEAR", { date: "2024-01-01T00:02:00Z", flag: "CLEAR", scope: "Track" }),
+    ];
+    const laps = [lap(1, "2024-01-01T00:02:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBeUndefined();
+  });
+
+  it("flag GREEN chiude ancora la SC", () => {
+    const msgs = [
+      rc("SAFETY CAR DEPLOYED", { date: "2024-01-01T00:01:00Z", flag: "SAFETY CAR" }),
+      rc("GREEN LIGHT", { date: "2024-01-01T00:02:00Z", flag: "GREEN", scope: "Track" }),
+    ];
+    const laps = [lap(1, "2024-01-01T00:02:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBeUndefined();
+  });
+
+  it("CLEAR settoriale non chiude nemmeno la VSC", () => {
+    const msgs = [
+      rc("VIRTUAL SAFETY CAR DEPLOYED", { date: "2024-01-01T00:01:00Z" }),
+      rc("CLEAR IN TRACK SECTOR 3", { date: "2024-01-01T00:02:00Z", flag: "CLEAR", scope: "Sector", sector: 3 }),
+    ];
+    const laps = [lap(1, "2024-01-01T00:02:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBe("VSC");
+  });
+});
