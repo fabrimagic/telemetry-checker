@@ -125,161 +125,6 @@ exports[`VRE narrative baseline (pre-refactor snapshot) > scenario A — normal 
 
 exports[`VRE narrative baseline (pre-refactor snapshot) > scenario B — Safety Car around the pit window 1`] = `
 {
-  "alternatives": [],
-  "narrative_insights": [
-    "📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.",
-    "Stint 1 (SOFT): divergenza significativa tra degrado grezzo (0.050 s/giro) e corretto (0.169 s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.",
-    "Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.",
-    "Neutralizzazione sfruttata in pieno: circa 8.4s guadagnati sul pit loss (conseguenza di neutralizzazione)",
-    "La strategia raccomandata include 3.5s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.",
-    "La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.",
-    "Warmup più lungo del previsto nello stint 2 (thermal WARMING_UP fino al giro 6 vs 4 previsti)",
-    "Stress gomma elevato a partire dal giro 9 (stint 1, SOFT)",
-    "Grip pista: transizione da in miglioramento a stabile al giro 10",
-    "Grip pista: transizione da stable a mixed al giro 15",
-    "Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.",
-  ],
-  "ok": true,
-  "recommended": {
-    "cons": [
-      "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-      "Warmup gomme moderato: 3.5s totali nella fase di riscaldamento",
-      "Mescola Hard: warmup lento riduce efficacia undercut",
-    ],
-    "description": "Pit al giro 15 con sequenza SOFT → HARD",
-    "pros": [
-      "Strategia robusta — poco sensibile a variazioni",
-      "Pit ben sincronizzato: aria libera al rientro",
-    ],
-    "reason": "Strategia reale già vicina all'ottimale",
-  },
-}
-`;
-
-exports[`VRE narrative baseline (pre-refactor snapshot) > scenario C — invalid degradation (negative slope on stint 1) 1`] = `
-{
-  "alternatives": [
-    {
-      "cons": [
-        "Maggiore degrado sulle gomme vecchie",
-        "Rischio di perdere tempo nel traffico",
-        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-        "Warmup gomme moderato: 3.8s totali nella fase di riscaldamento",
-        "Mescola Hard: warmup lento riduce efficacia undercut",
-        "Finestra pit fragile — il giro esatto è critico",
-      ],
-      "description": "Pit al giro 18 invece di 15",
-      "name": "Overcut / estensione stint",
-      "pros": [
-        "Stint più corto su gomme fresche",
-        "Potenziale track position",
-        "Timing pit indovinato: nessun traffico al rientro",
-        "Strategia robusta — poco sensibile a variazioni",
-      ],
-    },
-    {
-      "cons": [
-        "Strategia meno convenzionale",
-        "Rischio di passo non competitivo all'inizio",
-        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-        "Costo termico contenuto ma presente: 2.8s di warmup",
-        "Mescola Hard: warmup lento riduce efficacia undercut",
-        "Finestra pit fragile — il giro esatto è critico",
-      ],
-      "description": "Ordine mescole invertito: HARD → MEDIUM",
-      "name": "Strategia compound invertiti",
-      "pros": [
-        "Diversa gestione del degrado",
-        "Potenziale vantaggio nel finale",
-        "Rientro in aria pulita dopo il pit",
-        "Strategia robusta — poco sensibile a variazioni",
-      ],
-    },
-    {
-      "cons": [
-        "Pit stop aggiuntivo",
-        "Maggiore esposizione al traffico",
-        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-        "Penalità warmup importante: 5.4s lasciati sul rateo di riscaldamento",
-        "Mescola Hard: warmup lento riduce efficacia undercut",
-        "Finestra pit fragile — il giro esatto è critico",
-      ],
-      "description": "Pit ai giri 9, 15 (MEDIUM → HARD → MEDIUM)",
-      "name": "2-stop",
-      "pros": [
-        "Stint più corti = meno degrado",
-        "Vantaggio se pit loss ridotto (SC)",
-        "Pit ben sincronizzato: aria libera al rientro",
-      ],
-    },
-    {
-      "cons": [
-        "Pit stop aggiuntivo",
-        "Maggiore esposizione al traffico",
-        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-        "Warmup gomme oneroso: 7.0s totali persi nel riscaldamento",
-        "Mescola Hard: warmup lento riduce efficacia undercut",
-        "Finestra pit fragile — il giro esatto è critico",
-      ],
-      "description": "Pit ai giri 9, 15 (MEDIUM → HARD → HARD)",
-      "name": "2-stop",
-      "pros": [
-        "Stint più corti = meno degrado",
-        "Vantaggio se pit loss ridotto (SC)",
-        "Timing pit indovinato: nessun traffico al rientro",
-      ],
-    },
-    {
-      "cons": [
-        "Stint successivo più lungo",
-        "Rischio di perdere posizione se undercut non riuscito",
-        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-        "Riscaldamento gomme nella media: 3.8s totali",
-        "Mescola Hard: warmup lento riduce efficacia undercut",
-        "Finestra pit fragile — il giro esatto è critico",
-      ],
-      "description": "Pit al giro 12 invece di 15",
-      "name": "Undercut anticipato",
-      "pros": [
-        "Riduce esposizione al degrado",
-        "Potenziale vantaggio in aria pulita",
-        "Pit ben sincronizzato: aria libera al rientro",
-        "Strategia robusta — poco sensibile a variazioni",
-      ],
-    },
-  ],
-  "narrative_insights": [
-    "📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.",
-    "Stint 1 (MEDIUM): divergenza significativa tra degrado grezzo (-0.100 s/giro) e corretto (0.019 s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.",
-    "Stint 2 (HARD): divergenza significativa tra degrado grezzo (0.030 s/giro) e corretto (0.149 s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.",
-    "La strategia raccomandata include 2.8s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.",
-    "Differenza warmup tra strategie: 4.2s (2-stop: 7.0s vs Strategia compound invertiti: 2.8s). Strategie con meno soste o mescole morbide sono favorite dal warmup.",
-    "La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.",
-    "Stress gomma elevato a partire dal giro 24 (stint 2, HARD)",
-    "Grip pista: transizione da in miglioramento a stabile al giro 10",
-    "Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.",
-  ],
-  "ok": true,
-  "recommended": {
-    "cons": [
-      "Finestra pit fragile — il giro esatto è critico",
-      "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-      "Warmup gomme moderato: 2.8s totali nella fase di riscaldamento",
-      "Mescola Hard: warmup lento riduce efficacia undercut",
-    ],
-    "description": "Pit al giro 10 con sequenza HARD → MEDIUM",
-    "pros": [
-      "Strategia robusta — poco sensibile a variazioni",
-      "Pit ben sincronizzato: aria libera al rientro",
-      "Impatto traffico minimo nella simulazione",
-    ],
-    "reason": "Compound ottimale stimato: HARD → MEDIUM con pit spostato di 5 giri",
-  },
-}
-`;
-
-exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal race, 1 pit, dry, no SC 1`] = `
-{
   "alternatives": [
     {
       "cons": [
@@ -288,6 +133,7 @@ exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal ra
         "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
         "Riscaldamento gomme nella media: 4.4s totali",
         "Mescola Hard: warmup lento riduce efficacia undercut",
+        "Strategia fragile — sensibile a variazioni di degrado/traffico",
         "Finestra pit fragile — il giro esatto è critico",
       ],
       "description": "Pit ai giri 9, 15 (SOFT → HARD → SOFT)",
@@ -296,7 +142,6 @@ exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal ra
         "Stint più corti = meno degrado",
         "Vantaggio se pit loss ridotto (SC)",
         "Pit ben sincronizzato: aria libera al rientro",
-        "Strategia robusta — poco sensibile a variazioni",
       ],
     },
     {
@@ -306,6 +151,7 @@ exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal ra
         "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
         "Warmup gomme oneroso: 6.7s totali persi nel riscaldamento",
         "Mescola Hard: warmup lento riduce efficacia undercut",
+        "Strategia fragile — sensibile a variazioni di degrado/traffico",
         "Finestra pit fragile — il giro esatto è critico",
       ],
       "description": "Pit ai giri 9, 15 (SOFT → HARD → HARD)",
@@ -318,28 +164,11 @@ exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal ra
     },
     {
       "cons": [
-        "Maggiore degrado sulle gomme vecchie",
-        "Rischio di perdere tempo nel traffico",
-        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-        "Warmup gomme moderato: 3.5s totali nella fase di riscaldamento",
-        "Mescola Hard: warmup lento riduce efficacia undercut",
-        "Finestra pit fragile — il giro esatto è critico",
-      ],
-      "description": "Pit al giro 18 invece di 15",
-      "name": "Overcut / estensione stint",
-      "pros": [
-        "Stint più corto su gomme fresche",
-        "Potenziale track position",
-        "Timing pit indovinato: nessun traffico al rientro",
-        "Strategia robusta — poco sensibile a variazioni",
-      ],
-    },
-    {
-      "cons": [
         "Strategia meno convenzionale",
         "Rischio di passo non competitivo all'inizio",
         "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
         "Mescola Hard: warmup lento riduce efficacia undercut",
+        "Strategia fragile — sensibile a variazioni di degrado/traffico",
         "Finestra pit fragile — il giro esatto è critico",
       ],
       "description": "Ordine mescole invertito: HARD → SOFT",
@@ -352,12 +181,32 @@ exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal ra
     },
     {
       "cons": [
+        "Maggiore degrado sulle gomme vecchie",
+        "Rischio di perdere tempo nel traffico",
+        "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
+        "Warmup gomme moderato: 3.5s totali nella fase di riscaldamento",
+        "Mescola Hard: warmup lento riduce efficacia undercut",
+        "Finestra pit fragile — il giro esatto è critico",
+        "Pit in green (giro 18): +8.4s di pit loss rispetto alla strategia reale sotto neutralizzazione",
+      ],
+      "description": "Pit al giro 18 invece di 15",
+      "name": "Overcut / estensione stint",
+      "pros": [
+        "Stint più corto su gomme fresche",
+        "Potenziale track position",
+        "Timing pit indovinato: nessun traffico al rientro",
+        "Strategia robusta — poco sensibile a variazioni",
+      ],
+    },
+    {
+      "cons": [
         "Stint successivo più lungo",
         "Rischio di perdere posizione se undercut non riuscito",
         "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
         "Riscaldamento gomme nella media: 3.5s totali",
         "Mescola Hard: warmup lento riduce efficacia undercut",
         "Finestra pit fragile — il giro esatto è critico",
+        "Pit in green (giro 12): +8.4s di pit loss rispetto alla strategia reale sotto neutralizzazione",
       ],
       "description": "Pit al giro 12 invece di 15",
       "name": "Undercut anticipato",
@@ -373,68 +222,41 @@ exports[`VRE narrative baseline (pre-refactor snapshot) scenario A — normal ra
     "📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.",
     "Stint 1 (SOFT): divergenza significativa tra degrado grezzo (0.050 s/giro) e corretto (0.169 s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.",
     "Stint 2 (HARD): divergenza significativa tra degrado grezzo (0.030 s/giro) e corretto (0.149 s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.",
+    "Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.",
+    "Neutralizzazione sfruttata in pieno: circa 8.4s guadagnati sul pit loss (conseguenza di neutralizzazione)",
     "La strategia raccomandata include 2.0s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.",
     "Differenza warmup tra strategie: 4.7s (2-stop: 6.7s vs Strategia compound invertiti: 2.0s). Strategie con meno soste o mescole morbide sono favorite dal warmup.",
     "La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.",
     "Stress gomma elevato a partire dal giro 9 (stint 1, SOFT)",
     "Grip pista: transizione da in miglioramento a stabile al giro 10",
-    "Strategia raccomandata aggiornata: "Strategia compound invertiti" promossa dal ranking multi-criterio (BALANCED). Score risk-adjusted: 9.3 vs 7.5 della precedente raccomandata. robustezza: +0.3s; sensibilità: -0.2s; soft sensors: -0.26s",
-    "Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.",
-  ],
-  "ok": true,
-  "recommended": {
-    "cons": [
-      "Strategia meno convenzionale",
-      "Rischio di passo non competitivo all'inizio",
-      "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
-      "Mescola Hard: warmup lento riduce efficacia undercut",
-      "Finestra pit fragile — il giro esatto è critico",
-    ],
-    "description": "Ordine mescole invertito: HARD → SOFT",
-    "pros": [
-      "Diversa gestione del degrado",
-      "Potenziale vantaggio nel finale",
-      "Rientro in aria pulita dopo il pit",
-    ],
-    "reason": "Promossa da scoring multi-criterio: Strategia compound invertiti",
-  },
-}
-`;
-
-exports[`VRE narrative baseline (pre-refactor snapshot) scenario B — Safety Car around the pit window 1`] = `
-{
-  "alternatives": [],
-  "narrative_insights": [
-    "📊 Modalità Post-Race Analysis (ex-post): le strategie utilizzano la timeline completa della gara, inclusi tutti gli eventi reali.",
-    "Stint 1 (SOFT): divergenza significativa tra degrado grezzo (0.050 s/giro) e corretto (0.169 s/giro). La correzione per effetti non-tyre è ampia — confidenza ridotta sulla stima.",
-    "Il pit stop durante Safety Car ha ridotto il pit loss effettivo, vantaggio strategico significativo.",
-    "Neutralizzazione sfruttata in pieno: circa 8.4s guadagnati sul pit loss (conseguenza di neutralizzazione)",
-    "La strategia raccomandata include 3.5s di tempo perso per riscaldamento gomme (tyre warmup). Strategie con più soste o gomme Hard subiscono una penalità termica maggiore.",
-    "La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.",
-    "Warmup più lungo del previsto nello stint 2 (thermal WARMING_UP fino al giro 6 vs 4 previsti)",
-    "Stress gomma elevato a partire dal giro 9 (stint 1, SOFT)",
-    "Grip pista: transizione da in miglioramento a stabile al giro 10",
     "Grip pista: transizione da stable a mixed al giro 15",
+    "Strategia raccomandata aggiornata: "Overcut / estensione stint" promossa dal ranking multi-criterio (BALANCED). Score risk-adjusted: 8.1 vs 3.8 della precedente raccomandata. fragilità: -0.5s; sensibilità: -0.7s; soft sensors: -0.26s",
     "Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.",
   ],
   "ok": true,
   "recommended": {
     "cons": [
+      "Maggiore degrado sulle gomme vecchie",
+      "Rischio di perdere tempo nel traffico",
       "Previsione traffico a bassa confidenza — dati posizione/intervalli insufficienti",
       "Warmup gomme moderato: 3.5s totali nella fase di riscaldamento",
       "Mescola Hard: warmup lento riduce efficacia undercut",
+      "Finestra pit fragile — il giro esatto è critico",
+      "Pit in green (giro 18): +8.4s di pit loss rispetto alla strategia reale sotto neutralizzazione",
     ],
-    "description": "Pit al giro 15 con sequenza SOFT → HARD",
+    "description": "Pit al giro 18 invece di 15",
     "pros": [
+      "Stint più corto su gomme fresche",
+      "Potenziale track position",
+      "Timing pit indovinato: nessun traffico al rientro",
       "Strategia robusta — poco sensibile a variazioni",
-      "Pit ben sincronizzato: aria libera al rientro",
     ],
-    "reason": "Strategia reale già vicina all'ottimale",
+    "reason": "Promossa da scoring multi-criterio: Overcut / estensione stint",
   },
 }
 `;
 
-exports[`VRE narrative baseline (pre-refactor snapshot) scenario C — invalid degradation (negative slope on stint 1) 1`] = `
+exports[`VRE narrative baseline (pre-refactor snapshot) > scenario C — invalid degradation (negative slope on stint 1) 1`] = `
 {
   "alternatives": [
     {
