@@ -185,4 +185,23 @@ describe("classifyLapsTrackStatus — penalità non esclude giri", () => {
     // dopo "IN THIS LAP" il giro 1 NON è più SC
     expect(map.get(1)).toBeUndefined();
   });
+
+  it("'VIRTUAL SAFETY CAR ENDING' (forma estesa) chiude il regime VSC", () => {
+    const msgs = [
+      rc("VIRTUAL SAFETY CAR DEPLOYED", { date: "2024-01-01T00:01:00Z" }),
+      rc("VIRTUAL SAFETY CAR ENDING", { date: "2024-01-01T00:03:00Z" }),
+    ];
+    const laps = [lap(1, "2024-01-01T00:01:30Z"), lap(2, "2024-01-01T00:03:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBe("VSC");
+    expect(map.get(2)).toBeUndefined();
+  });
+
+  it("'VSC INFRINGEMENT' (penalita) NON marca i giri come VSC", () => {
+    const msgs = [rc("VSC INFRINGEMENT - CAR 4 - 5 SECOND PENALTY", { date: "2024-01-01T00:01:00Z" })];
+    const laps = [lap(1, "2024-01-01T00:00:30Z"), lap(2, "2024-01-01T00:02:00Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBeUndefined();
+    expect(map.get(2)).toBeUndefined();
+  });
 });
