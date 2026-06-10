@@ -205,52 +205,6 @@ function SectorCard({
   );
 }
 
-export function SectorVsWinnerGrid(props: SectorVsWinnerGridProps) {
-  const {
-    selectedDriverNumber, selectedAcronym, selectedLaps,
-    sessionAllLaps, winnerDriverNumber, winnerAcronym,
-    pitStops, raceControlMessages, isRace,
-  } = props;
-
-  const winnerLaps = useMemo(
-    () => winnerDriverNumber != null
-      ? sessionAllLaps.filter((l) => l.driver_number === winnerDriverNumber)
-      : [],
-    [sessionAllLaps, winnerDriverNumber],
-  );
-
-  const selectedPitInSet = useMemo(
-    () => new Set(pitStops.filter((p) => p.driver_number === selectedDriverNumber).map((p) => p.lap_number)),
-    [pitStops, selectedDriverNumber],
-  );
-  const winnerPitInSet = useMemo(
-    () => new Set(winnerDriverNumber != null
-      ? pitStops.filter((p) => p.driver_number === winnerDriverNumber).map((p) => p.lap_number)
-      : []),
-    [pitStops, winnerDriverNumber],
-  );
-
-  const driverTrackStatusMap = useMemo(
-    () => classifyLapsTrackStatus(selectedLaps, raceControlMessages),
-    [selectedLaps, raceControlMessages],
-  );
-  const winnerTrackStatusMap = useMemo(
-    () => classifyLapsTrackStatus(winnerLaps, raceControlMessages),
-    [winnerLaps, raceControlMessages],
-  );
-
-  const perSector = useMemo(() => {
-    return ([1, 2, 3] as SectorIdx[]).map((idx) => {
-      const driver = aggregateSector(selectedLaps, selectedPitInSet, driverTrackStatusMap, pickSector(idx));
-      const winner = aggregateSector(winnerLaps, winnerPitInSet, winnerTrackStatusMap, pickSector(idx));
-      return {
-        idx,
-        driver: { median: driver.raw, std: driver.std, sampleSize: driver.sampleSize },
-        winner: { median: winner.raw, std: winner.std, sampleSize: winner.sampleSize },
-      };
-    });
-  }, [selectedLaps, winnerLaps, selectedPitInSet, winnerPitInSet, driverTrackStatusMap, winnerTrackStatusMap]);
-
 function SectorLegend() {
   return (
     <div className="mt-3 rounded-md border border-border bg-card/60 p-4 text-sm text-muted-foreground">
