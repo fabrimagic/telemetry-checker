@@ -795,7 +795,9 @@ export function computeVirtualRaceEngineer(
     const threshold = CLIFF_THRESHOLDS[key] ?? CLIFF_THRESHOLD_DEFAULT;
     if (stintLength <= threshold) return 0;
     const excessLaps = stintLength - threshold;
-    return excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
+    const CLIFF_PENALTY_MAX = 25; // tetto (s): oltre il cliff il pilota rallenta o si ferma, non perde tempo all'infinito
+    const raw = excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
+    return Math.min(raw, CLIFF_PENALTY_MAX);
   }
 
   // Driver position lookup for traffic estimation
