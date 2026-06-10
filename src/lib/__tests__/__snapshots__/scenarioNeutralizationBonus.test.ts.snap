@@ -44,71 +44,7 @@ exports[`simulateStrategyCost — scenario neutralization/opportunity bonus > RE
       "HARD",
       "SOFT",
     ],
-    "estimated_delta_vs_actual": 1.5,
-    "name": "Strategia compound invertiti",
-    "pit_laps": [
-      15,
-    ],
-  },
-  {
-    "compounds": [
-      "SOFT",
-      "HARD",
-    ],
-    "estimated_delta_vs_actual": -8.9,
-    "name": "Undercut anticipato",
-    "pit_laps": [
-      12,
-    ],
-  },
-]
-`;
-
-exports[`simulateStrategyCost — scenario neutralization/opportunity bonus REAL_CONTEXT baseline is unchanged (no bonus path triggered) 1`] = `
-[
-  {
-    "compounds": [
-      "SOFT",
-      "HARD",
-      "SOFT",
-    ],
-    "estimated_delta_vs_actual": 9.6,
-    "name": "2-stop",
-    "pit_laps": [
-      9,
-      15,
-    ],
-  },
-  {
-    "compounds": [
-      "SOFT",
-      "HARD",
-      "HARD",
-    ],
-    "estimated_delta_vs_actual": -32.5,
-    "name": "2-stop",
-    "pit_laps": [
-      9,
-      15,
-    ],
-  },
-  {
-    "compounds": [
-      "SOFT",
-      "HARD",
-    ],
-    "estimated_delta_vs_actual": 5.2,
-    "name": "Overcut / estensione stint",
-    "pit_laps": [
-      18,
-    ],
-  },
-  {
-    "compounds": [
-      "HARD",
-      "SOFT",
-    ],
-    "estimated_delta_vs_actual": 1.5,
+    "estimated_delta_vs_actual": -1.2,
     "name": "Strategia compound invertiti",
     "pit_laps": [
       15,

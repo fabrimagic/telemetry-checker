@@ -16,7 +16,7 @@ import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, NEUTRALIZATION_PIT_LOSS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
-import { computeTyreWarmupPenalty, computeStintWarmupCost, computeStartWarmupTempFactor, START_WARMUP_FRACTION } from "./tyreWarmup";
+import { computeTyreWarmupPenalty, computeStintWarmupCost, computeStartWarmupTempFactor, computeStartTractionPenalty, START_WARMUP_FRACTION } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { classifyStrategyIntent, type IntentClassification } from "./strategyIntent";
 import { computeSoftSensors, computeSoftSensorsTimeline, computeStrategySoftSensorAdjustment, computeWarmupInterpretation, computeDegradationValidationContext, extractSoftSensorNarrativeInsights, validateSoftSensorScoringGate, computeSoftSensorScoringDelta, type SoftSensorsContext, type SoftSensorsTimeline, type StrategySoftSensorAdjustment, type WarmupInterpretation, type DegradationValidationContext, type SoftSensorScoringGate } from "./softSensors";
@@ -906,6 +906,12 @@ export function computeVirtualRaceEngineer(
 
         totalCost += baseLap + degLap + warmupPenalty;
       }
+      // Start traction/launch penalty: applied ONCE to the first stint. Harder
+      // starting compounds lose time off the line / lap 1 (distinct from thermal
+      // warmup), amplified on cold tracks. SOFT = reference (0).
+      if (isFirstStint) {
+        totalCost += computeStartTractionPenalty(sb.compound, trackTempAtStart);
+      }
       // Cliff risk for this stint
       totalCost += cliffPenalty(stintLength, sb.compound);
     }
@@ -969,6 +975,9 @@ export function computeVirtualRaceEngineer(
         const degRaw = model.slope * tyreLife;
         const degClamped = Math.min(degRaw, MAX_DEG_LOSS_PER_LAP);
         total += model.intercept + degClamped + warmupPenalty;
+      }
+      if (isFirstStint) {
+        total += computeStartTractionPenalty(sb.compound, trackTempAtStart);
       }
     }
     // Use neutralisation-aware pit loss for each pit lap
