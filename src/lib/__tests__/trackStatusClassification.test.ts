@@ -152,12 +152,28 @@ describe("classifyLapsTrackStatus — penalità non esclude giri", () => {
     expect(map.get(1)).toBe("VSC");
   });
 
-  it("RED FLAG invariato", () => {
+  it("RED FLAG vera (flag === 'RED') → RED", () => {
     const msgs = [rc("RED FLAG", { date: "2024-01-01T00:01:00Z", flag: "RED" })];
     const laps = [lap(1, "2024-01-01T00:01:30Z")];
     const map = classifyLapsTrackStatus(laps, msgs);
     expect(map.get(1)).toBe("RED");
   });
+
+  it("'RED FLAG - RACE SUSPENDED' (testo) → RED", () => {
+    const msgs = [rc("RED FLAG - RACE SUSPENDED", { date: "2024-01-01T00:01:00Z" })];
+    const laps = [lap(1, "2024-01-01T00:01:30Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBe("RED");
+  });
+
+  it("'RED FLAG INFRINGEMENT' (penalità) NON marca i giri come RED", () => {
+    const msgs = [rc("RED FLAG INFRINGEMENT - CAR 4 - PENALTY", { date: "2024-01-01T00:01:00Z" })];
+    const laps = [lap(1, "2024-01-01T00:00:30Z"), lap(2, "2024-01-01T00:02:00Z")];
+    const map = classifyLapsTrackStatus(laps, msgs);
+    expect(map.get(1)).toBeUndefined();
+    expect(map.get(2)).toBeUndefined();
+  });
+
 
   it("'SAFETY CAR IN THIS LAP' → CLEAR (non SC)", () => {
     const msgs = [
