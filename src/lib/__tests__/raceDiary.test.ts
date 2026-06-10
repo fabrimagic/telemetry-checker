@@ -83,3 +83,36 @@ describe("getRaceControlEvents — filtro pilota + track-wide", () => {
     expect(ev).toHaveLength(0);
   });
 });
+
+describe("getRaceControlEvents — distinzione neutralizzazione vs penalità", () => {
+  it("'SAFETY CAR INFRINGEMENT - CAR 4 - 5 SECOND PENALTY' NON è track-wide né neutralization", () => {
+    const msgs = [rc("SAFETY CAR INFRINGEMENT - CAR 7 - 5 SECOND PENALTY")];
+    // pilota 4: il messaggio non lo cita e non è track-wide → escluso
+    const ev = getRaceControlEvents(4, msgs, laps, "NOR");
+    expect(ev).toHaveLength(0);
+  });
+
+  it("penalità 'SAFETY CAR INFRINGEMENT' per il pilota stesso → NO neutralization tag", () => {
+    const msgs = [rc("SAFETY CAR INFRINGEMENT - CAR 4 - 5 SECOND PENALTY")];
+    const ev = getRaceControlEvents(4, msgs, laps, "NOR");
+    expect(ev).toHaveLength(1);
+    expect(ev[0].impact_tags).not.toContain("neutralization");
+    expect(ev[0].impact_tags).not.toContain("safety");
+  });
+
+  it("'SAFETY CAR DEPLOYED' reale → neutralization + safety tag", () => {
+    const msgs = [rc("SAFETY CAR DEPLOYED")];
+    const ev = getRaceControlEvents(4, msgs, laps, "NOR");
+    expect(ev).toHaveLength(1);
+    expect(ev[0].impact_tags).toContain("neutralization");
+    expect(ev[0].impact_tags).toContain("safety");
+  });
+
+  it("flag strutturato 'SAFETY CAR' → neutralization", () => {
+    const msgs = [rc("SAFETY CAR", { flag: "SAFETY CAR" })];
+    const ev = getRaceControlEvents(4, msgs, laps, "NOR");
+    expect(ev).toHaveLength(1);
+    expect(ev[0].impact_tags).toContain("neutralization");
+  });
+});
+
