@@ -113,6 +113,38 @@ export function computeStartWarmupCost(compound: string, trackTempC?: number): n
 }
 
 /**
+ * Start traction / launch penalty by compound (seconds), applied ONCE to the
+ * first stint of a strategy (the standing start). Softer compounds give better
+ * launch grip and warm into window faster off the line, so SOFT is the
+ * reference (0 penalty). Harder starting compounds lose time at the getaway and
+ * through the opening lap — an effect DISTINCT from the multi-lap thermal
+ * warmup and not otherwise captured by the pure-pace simulation.
+ *
+ * Scope & honesty note: this is a deliberately MODERATE pure-time penalty
+ * (~1-4s after the cold-track factor), reflecting launch + opening-lap pace,
+ * NOT the full positional value of a good start (holding/gaining places, which
+ * the model treats separately via position_score_adjustment). It nudges the
+ * pace delta toward the realistic cost of starting on a harder compound; it is
+ * intentionally not large enough to, by itself, flip a strategy ranking on the
+ * basis of an implausible multi-second standing-start gap.
+ *
+ * Scaled by the SAME cold-track factor as warmup (computeStartWarmupTempFactor):
+ * the colder the track, the larger the launch disadvantage of a harder compound.
+ */
+export const START_TRACTION_PENALTY: Record<string, number> = {
+  SOFT: 0.0,
+  MEDIUM: 1.5,
+  HARD: 3.0,
+};
+
+export function computeStartTractionPenalty(compound: string, trackTempC?: number): number {
+  const base = START_TRACTION_PENALTY[(compound ?? "").toUpperCase()] ?? 0;
+  if (base === 0) return 0;
+  return base * computeStartWarmupTempFactor(trackTempC);
+}
+
+
+/**
  * Compute total warmup time lost for an entire stint.
  *
  * @param compound - Tyre compound
