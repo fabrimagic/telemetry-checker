@@ -205,6 +205,30 @@ function SectorCard({
   );
 }
 
+function SectorLegend() {
+  return (
+    <div className="mt-3 rounded-md border border-border bg-card/60 p-4 text-sm text-muted-foreground">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/80">
+        Cosa mostra il grafico
+      </h4>
+      <ul className="space-y-2 text-xs leading-relaxed">
+        <li>
+          <span className="font-medium text-foreground">Barra centrale</span> — indica quanto il pilota è più veloce o più lento del vincitore della gara in quel settore. Lo zero è il vincitore; a destra = più lento, a sinistra = più veloce.
+        </li>
+        <li>
+          <span className="font-medium text-foreground">Fascia azzurra</span> — mostra la costanza: una fascia stretta significa giri molto simili tra loro, una fascia larga significa prestazioni più variabili.
+        </li>
+        <li>
+          I tempi mostrati sono la <strong className="text-foreground">mediana</strong>, non la media. La <strong className="text-foreground">mediana</strong> è il valore centrale dei giri (metà più veloci, metà più lenti) e, a differenza della media, non viene falsata da un singolo giro anomalo — per esempio un giro rallentato dal traffico o da un errore. Per questo descrive meglio il passo abituale del pilota.
+        </li>
+        <li>
+          Il confronto esclude i giri sotto Safety Car / neutralizzazione e i giri anomali. Se i giri validi sono pochi, il grafico è mostrato più sbiadito: significa che il dato è meno affidabile.
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 export function SectorVsWinnerGrid(props: SectorVsWinnerGridProps) {
   const {
     selectedDriverNumber, selectedAcronym, selectedLaps,
@@ -252,26 +276,29 @@ export function SectorVsWinnerGrid(props: SectorVsWinnerGridProps) {
   }, [selectedLaps, winnerLaps, selectedPitInSet, winnerPitInSet, driverTrackStatusMap, winnerTrackStatusMap]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      {perSector.map(({ idx, driver, winner }) => {
-        const winnerAvailable =
-          isRace &&
-          winnerDriverNumber != null &&
-          winner.median != null &&
-          winner.sampleSize >= MIN_SECTOR_CLEAN_SAMPLES;
-        return (
-          <SectorCard
-            key={idx}
-            idx={idx}
-            isRace={isRace}
-            winnerAvailable={winnerAvailable}
-            winnerAcronym={winnerAcronym}
-            selectedAcronym={selectedAcronym}
-            driver={driver}
-            winner={winner}
-          />
-        );
-      })}
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {perSector.map(({ idx, driver, winner }) => {
+          const winnerAvailable =
+            isRace &&
+            winnerDriverNumber != null &&
+            winner.median != null &&
+            winner.sampleSize >= MIN_SECTOR_CLEAN_SAMPLES;
+          return (
+            <SectorCard
+              key={idx}
+              idx={idx}
+              isRace={isRace}
+              winnerAvailable={winnerAvailable}
+              winnerAcronym={winnerAcronym}
+              selectedAcronym={selectedAcronym}
+              driver={driver}
+              winner={winner}
+            />
+          );
+        })}
+      </div>
+      <SectorLegend />
     </div>
   );
 }
