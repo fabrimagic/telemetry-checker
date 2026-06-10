@@ -795,7 +795,9 @@ export function computeVirtualRaceEngineer(
     const threshold = CLIFF_THRESHOLDS[key] ?? CLIFF_THRESHOLD_DEFAULT;
     if (stintLength <= threshold) return 0;
     const excessLaps = stintLength - threshold;
-    return excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
+    const CLIFF_PENALTY_MAX = 25; // tetto (s): oltre il cliff il pilota rallenta o si ferma, non perde tempo all'infinito
+    const raw = excessLaps * excessLaps * riskBase.cliff_penalty * plCliffMult; // pace loss cliff multiplier
+    return Math.min(raw, CLIFF_PENALTY_MAX);
   }
 
   // Driver position lookup for traffic estimation
@@ -855,7 +857,12 @@ export function computeVirtualRaceEngineer(
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
         const baseLap = model.intercept;
-        const degLap = model.slope * tyreLife * lapDegradationMult(lap);
+        // Clamp della perdita di degrado per-giro: le gomme reali plateauano,
+        // non degradano linearmente all'infinito. Evita che slope ripidi
+        // (spesso contaminati da battaglie/traffico) gonfino stint lunghi.
+        const MAX_DEG_LOSS_PER_LAP = 3.5; // s/giro sopra il passo base
+        const rawDegLap = model.slope * tyreLife * lapDegradationMult(lap);
+        const degLap = Math.min(rawDegLap, MAX_DEG_LOSS_PER_LAP);
         // Tyre warmup penalty: temporary time loss in first laps after pit.
         // First stint uses a reduced "start warmup" (formation lap pre-heats
         // the tyres but cold tracks/Hard still cost time).
@@ -924,7 +931,10 @@ export function computeVirtualRaceEngineer(
           ? computeTyreWarmupPenalty(sb.compound, tyreLife) * START_WARMUP_FRACTION * computeStartWarmupTempFactor(trackTempAtStart)
           : computeTyreWarmupPenalty(sb.compound, tyreLife);
 
-        total += predictLapTime(model.slope, model.intercept, tyreLife) + warmupPenalty;
+        const MAX_DEG_LOSS_PER_LAP = 3.5;
+        const degRaw = model.slope * tyreLife;
+        const degClamped = Math.min(degRaw, MAX_DEG_LOSS_PER_LAP);
+        total += model.intercept + degClamped + warmupPenalty;
       }
     }
     // Use neutralisation-aware pit loss for each pit lap
@@ -1008,6 +1018,15 @@ export function computeVirtualRaceEngineer(
           }
         }
       }
+    }
+
+    // Clamp di plausibilita': un guadagno strategico realistico su una gara
+    // intera e' nell'ordine di ~2.5x il pit loss (rimpiazzare un timing di pit
+    // sub-ottimale), non centinaia di secondi. Delta superiori indicano
+    // estrapolazione di modelli di degrado contaminati, non una strategia reale.
+    const MAX_PLAUSIBLE_DELTA = pitLoss * 2.5;
+    if (bestDelta > MAX_PLAUSIBLE_DELTA) {
+      bestDelta = MAX_PLAUSIBLE_DELTA;
     }
 
     // Build recommended windows
