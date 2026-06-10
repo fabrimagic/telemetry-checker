@@ -8,6 +8,12 @@ import type {
   Driver,
   Lap,
 } from "./openf1";
+import {
+  isNeutralizationDeployment,
+  isSafetyCarDeployment,
+  isVirtualSafetyCarDeployment,
+  isPenaltyOrProcedureContext,
+} from "./trackStatusClassification";
 
 // ── Severity / Relevance / Confidence ────────────────────────
 
@@ -152,7 +158,7 @@ function classifyRaceControl(
   const upperFlag = (flag || "").toUpperCase();
   const tags: ImpactTag[] = ["race_control"];
 
-  // Safety Car / Red Flag → high severity, neutralization
+  // Safety Car / Red Flag → high severity, neutralization (real deployments only)
   if (
     upperFlag.includes("RED") ||
     upper.includes("RED FLAG")
@@ -161,17 +167,20 @@ function classifyRaceControl(
     return { severity: "HIGH", relevance: "HIGH", tags };
   }
   if (
-    upperFlag.includes("SAFETY CAR") ||
-    upper.includes("SAFETY CAR") ||
-    upperFlag.includes("VSC") ||
-    upper.includes("VIRTUAL SAFETY CAR")
+    isSafetyCarDeployment(upper, upperFlag) ||
+    isVirtualSafetyCarDeployment(upper, upperFlag)
   ) {
     tags.push("neutralization", "safety");
     return { severity: "HIGH", relevance: "HIGH", tags };
   }
 
-  // Penalties / investigations
-  if (upper.includes("PENALTY") || upper.includes("INVESTIGATION") || upper.includes("NOTED")) {
+  // Penalties / investigations (incl. mentions like "SAFETY CAR INFRINGEMENT")
+  if (
+    isPenaltyOrProcedureContext(upper) ||
+    upper.includes("PENALTY") ||
+    upper.includes("INVESTIGATION") ||
+    upper.includes("NOTED")
+  ) {
     return { severity: "MEDIUM", relevance: "MEDIUM", tags };
   }
 
@@ -226,11 +235,10 @@ export function getRaceControlEvents(
     .filter((m) => {
       const text = (m.message || "").toUpperCase();
       const mentionsDriver = messageMentionsDriver(text, driverNumber, driverAcronym);
-      const isTrackWide =
-        (m.flag && ["RED", "SAFETY CAR", "VSC"].some((f) => (m.flag || "").toUpperCase().includes(f))) ||
-        text.includes("SAFETY CAR") ||
-        text.includes("VIRTUAL SAFETY CAR") ||
-        text.includes("RED FLAG");
+      // Track-wide only for *real* deployments (SC/VSC/RED). Mentions in
+      // penalty/procedure messages (e.g. "SAFETY CAR INFRINGEMENT") do not
+      // make the message track-wide.
+      const isTrackWide = isNeutralizationDeployment(text, m.flag);
       return mentionsDriver || isTrackWide;
     })
     .map((m) => {
