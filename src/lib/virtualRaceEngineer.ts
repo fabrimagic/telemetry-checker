@@ -1411,7 +1411,10 @@ export function computeVirtualRaceEngineer(
   // ── 4d. Enrich alternatives with advanced analysis ──
   const driverAvgPace = (() => {
     const validLaps = laps.filter(l => l.lap_duration != null && l.lap_duration > 0 && !l.is_pit_out_lap);
-    if (validLaps.length === 0) return null;
+    if (validLaps.length === 0) {
+      console.warn("[VRE] returning null:", "no valid laps for driver average pace");
+      return null;
+    }
     return validLaps.reduce((s, l) => s + l.lap_duration!, 0) / validLaps.length;
   })();
 
