@@ -617,7 +617,7 @@ function StrategyTimeline({ actual, recommended, riskMode }: { actual: ActualStr
               style={{ width: `${width}%`, backgroundColor: bg, color: isDark ? "#1a1a1a" : "#fff" }}
               title={`${s.compound} L${s.lap_start}–${s.lap_end}`}
             >
-              {width > 8 && <span>{s.compound.substring(0, 3)}</span>}
+              {width > 8 && <span>{(s.compound ?? "").substring(0, 3)}</span>}
             </div>
           );
         })}
@@ -701,7 +701,7 @@ function AlternativeCompoundStrip({
             style={{ width: `${width}%`, backgroundColor: bg, color: isDark ? "#1a1a1a" : "#fff" }}
             title={`${s.compound} L${s.lap_start}–${s.lap_end}`}
           >
-            {width > 8 && <span>{s.compound.substring(0, 3)}</span>}
+            {width > 8 && <span>{(s.compound ?? "").substring(0, 3)}</span>}
           </div>
         );
       })}
