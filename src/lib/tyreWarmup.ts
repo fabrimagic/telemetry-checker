@@ -51,7 +51,7 @@ export const TYRE_WARMUP_CONFIG: Record<string, TyreWarmupConfig> = {
  * @returns penalty in seconds, or 0 if no penalty applies
  */
 export function computeTyreWarmupPenalty(compound: string, lapAfterPit: number): number {
-  const normalized = compound.toUpperCase();
+  const normalized = (compound ?? "").toUpperCase();
   const config = TYRE_WARMUP_CONFIG[normalized];
   if (!config) return 0;
   if (lapAfterPit < 0 || lapAfterPit >= config.laps_affected) return 0;
@@ -101,7 +101,7 @@ export function computeStartWarmupTempFactor(trackTempC?: number): number {
  * = sum(per-lap full warmup penalty) × START_WARMUP_FRACTION × tempFactor
  */
 export function computeStartWarmupCost(compound: string, trackTempC?: number): number {
-  const normalized = compound.toUpperCase();
+  const normalized = (compound ?? "").toUpperCase();
   const config = TYRE_WARMUP_CONFIG[normalized];
   if (!config) return 0;
 
@@ -162,7 +162,7 @@ export function computeStintWarmupCost(
     return computeStartWarmupCost(compound, trackTempC);
   }
 
-  const normalized = compound.toUpperCase();
+  const normalized = (compound ?? "").toUpperCase();
   const config = TYRE_WARMUP_CONFIG[normalized];
   if (!config) return 0;
 

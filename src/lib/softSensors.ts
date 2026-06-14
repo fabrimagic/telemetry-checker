@@ -263,7 +263,7 @@ export function estimateTyreThermalState(
     return { label: "UNKNOWN", score: null, confidence: "LOW", reasons: ["Nessuno stint attivo disponibile"] };
   }
 
-  const compound = currentStint.compound.toUpperCase();
+  const compound = (currentStint.compound ?? "").toUpperCase();
   const warmupConfig = TYRE_WARMUP_CONFIG[compound];
   const tyreAge = currentLap - currentStint.lap_start;
   const reasons: string[] = [];
@@ -759,7 +759,7 @@ export function computeWarmupInterpretation(
   const notes: string[] = [];
 
   for (const stint of stints) {
-    const compound = stint.compound.toUpperCase();
+    const compound = (stint.compound ?? "").toUpperCase();
     const warmupConfig = TYRE_WARMUP_CONFIG[compound];
     const expectedLaps = warmupConfig?.laps_affected ?? 3;
     const observedLaps = observedByStint.get(stint.stint_number) ?? 0;
@@ -949,7 +949,7 @@ function analyzeThermalConsistency(stintLaps: SoftSensorsLapState[], stint: Stin
   let support = 0.5; // neutral baseline
   let contamination = 0;
 
-  const warmupConfig = TYRE_WARMUP_CONFIG[stint.compound.toUpperCase()];
+  const warmupConfig = TYRE_WARMUP_CONFIG[(stint.compound ?? "").toUpperCase()];
   const expectedWarmup = warmupConfig?.laps_affected ?? 3;
 
   // Count warmup laps (COLD/WARMING_UP at start)
@@ -1325,7 +1325,7 @@ export function computeStrategySoftSensorAdjustment(
         let thermalAdj = 0;
 
         // We simulate using the strategy's compound, not the observed one
-        const warmupConfig = TYRE_WARMUP_CONFIG[sb.compound.toUpperCase()];
+        const warmupConfig = TYRE_WARMUP_CONFIG[(sb.compound ?? "").toUpperCase()];
         const simLapsAffected = warmupConfig?.laps_affected ?? 3;
 
         if (thermalLabel === "COLD" && tyreLife < simLapsAffected) {
