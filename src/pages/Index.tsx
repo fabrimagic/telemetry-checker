@@ -1041,7 +1041,7 @@ export default function Index() {
                   DRILL-DOWN A FISARMONICA
                   4 sezioni, di default tutte collassate.
                   ═══════════════════════════════════════════ */}
-              <Accordion type="multiple" defaultValue={["strategy"]} className="w-full space-y-3">
+              <Accordion type="multiple" className="w-full space-y-3">
                 {/* ── Passo & Gomme ── */}
                 <AccordionItem
                   value="pace-tyres"
@@ -1127,18 +1127,15 @@ export default function Index() {
                           <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                         </div>
                       ) : vreResult ? (
-                        <>
-                          {setupCard}
-                          <VirtualRaceEngineerCard
-                            result={vreResult}
-                            analysisMode={vreAnalysisMode}
-                            viewMode={vreViewMode}
-                            laps={singleDriverState?.laps}
-                            positions={diaryPositions}
-                            allDrivers={allDrivers}
-                            driverAcronym={singleDriverState?.driver.name_acronym}
-                          />
-                        </>
+                        <VirtualRaceEngineerCard
+                          result={vreResult}
+                          analysisMode={vreAnalysisMode}
+                          viewMode={vreViewMode}
+                          laps={singleDriverState?.laps}
+                          positions={diaryPositions}
+                          allDrivers={allDrivers}
+                          driverAcronym={singleDriverState?.driver.name_acronym}
+                        />
                       ) : null
                     )}
 

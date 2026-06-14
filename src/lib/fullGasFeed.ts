@@ -34,36 +34,16 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 const EXCERPT_MAX_CHARS = 180;
 const ITEMS_LIMIT = 3;
 
-// fullgas.blog does not expose CORS headers, so the feed must be fetched
-// through a public CORS proxy when called from the browser. We try a couple
-// of fallbacks so that a single proxy outage does not hide the section.
-const FEED_PROXIES: Array<(url: string) => string> = [
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url) => `https://r.jina.ai/${url}`,
-];
-
 export async function fetchFullGasFeed(): Promise<FullGasFeedResult> {
   const cached = readCache<SerializedResult>(CACHE_KEY, CACHE_TTL_MS);
   if (cached) return deserialize(cached);
 
-  let lastErr: unknown = null;
-  for (const buildUrl of FEED_PROXIES) {
-    try {
-      const res = await fetch(buildUrl(FEED_URL), { method: "GET" });
-      if (!res.ok) {
-        lastErr = new Error(`Feed fetch failed: ${res.status}`);
-        continue;
-      }
-      const xmlText = await res.text();
-      const parsed = parseFullGasFeed(xmlText);
-      writeCache<SerializedResult>(CACHE_KEY, serialize(parsed));
-      return parsed;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr ?? new Error("Feed fetch failed");
+  const res = await fetch(FEED_URL, { method: "GET" });
+  if (!res.ok) throw new Error(`Feed fetch failed: ${res.status}`);
+  const xmlText = await res.text();
+  const parsed = parseFullGasFeed(xmlText);
+  writeCache<SerializedResult>(CACHE_KEY, serialize(parsed));
+  return parsed;
 }
 
 function serialize(r: FullGasFeedResult): SerializedResult {
