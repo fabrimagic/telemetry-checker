@@ -732,7 +732,8 @@ export function computeVirtualRaceEngineer(
 
   // F1 regulation: at least 2 different compounds must be used during a dry race
   function hasMinTwoCompounds(compounds: string[]): boolean {
-    return new Set(compounds).size >= 2;
+    const valid = compounds.filter(c => c && c !== "UNKNOWN");
+    return new Set(valid).size >= 2;
   }
 
   const scenarioDef = SCENARIO_DEFINITIONS[effectiveScenarioId];
@@ -1002,7 +1003,7 @@ export function computeVirtualRaceEngineer(
     return total;
   }
 
-  const actualCompounds = stints.map(s => s.compound);
+  const actualCompounds = stints.map(s => s.compound ?? "UNKNOWN");
   const actualPitLaps = pitStops.map(p => p.lap_number);
   const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
@@ -1332,7 +1333,7 @@ export function computeVirtualRaceEngineer(
       const text = `Warmup elevato: ${altWarmupTotal.toFixed(1)}s persi per riscaldamento gomme`;
       narrativeCollector.add({ id: `warmup_high_alt${altIdx}`, category: "warmup", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { warmup_total: altWarmupTotal }, prerendered_text: text });
     }
-    const hasHard = alt.compounds.some(c => c.toUpperCase() === "HARD");
+    const hasHard = alt.compounds.some(c => (c ?? "").toUpperCase() === "HARD");
     if (hasHard && altWarmupTotal > 1.5) {
       const text = "Mescola Hard: warmup lento riduce efficacia undercut";
       narrativeCollector.add({ id: `warmup_hard_undercut_alt${altIdx}`, category: "warmup", priority: "supporting", target: "alternative", target_index: altIdx, side: "con", data: { warmup_total: altWarmupTotal, has_hard: true }, prerendered_text: text });
@@ -1678,7 +1679,7 @@ export function computeVirtualRaceEngineer(
       const text = `Warmup elevato: ${recWarmupForPC.toFixed(1)}s persi per riscaldamento gomme`;
       narrativeCollector.add({ id: "warmup_high_rec", category: "warmup", priority: "supporting", target: "recommended", side: "con", data: { warmup_total: recWarmupForPC }, prerendered_text: text });
     }
-    const recHasHardPC = bestCompounds.some(c => c.toUpperCase() === "HARD");
+    const recHasHardPC = bestCompounds.some(c => (c ?? "").toUpperCase() === "HARD");
     if (recHasHardPC && recWarmupForPC > 1.5) {
       const text = "Mescola Hard: warmup lento riduce efficacia undercut";
       narrativeCollector.add({ id: "warmup_hard_rec", category: "warmup", priority: "supporting", target: "recommended", side: "con", data: { warmup_total: recWarmupForPC, has_hard: true }, prerendered_text: text });
@@ -2068,7 +2069,7 @@ export function computeVirtualRaceEngineer(
     }
 
     // Hard compound warmup penalty warning
-    const recHasHard = bestCompounds.some(c => c.toUpperCase() === "HARD");
+    const recHasHard = bestCompounds.some(c => (c ?? "").toUpperCase() === "HARD");
     if (recHasHard && recWarmup > 1.5) {
       const text = `La strategia raccomandata include gomme Hard: il warmup lento (+1.4s base) rende l'undercut meno efficace e penalizza stint corti su questa mescola.`;
       narrativeCollector.add({ id: "warmup_rec_hard", category: "warmup", priority: "supporting", target: "global", data: { rec_warmup: recWarmup, has_hard: true }, prerendered_text: text });
