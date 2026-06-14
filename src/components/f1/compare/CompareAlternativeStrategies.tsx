@@ -57,7 +57,7 @@ function fmtSec(v: number | null | undefined): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(2)}s`;
 }
 
-function compoundChip(c: string): JSX.Element {
+function compoundChip(c: string | null | undefined): JSX.Element {
   const map: Record<string, string> = {
     SOFT: "bg-red-500/20 text-red-300 border-red-500/40",
     MEDIUM: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
@@ -65,10 +65,11 @@ function compoundChip(c: string): JSX.Element {
     INTERMEDIATE: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
     WET: "bg-blue-500/20 text-blue-300 border-blue-500/40",
   };
-  const cls = map[c.toUpperCase()] ?? "bg-muted text-muted-foreground border-border";
+  const safe = c ?? "";
+  const cls = map[safe.toUpperCase()] ?? "bg-muted text-muted-foreground border-border";
   return (
     <span className={cn("inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider", cls)}>
-      {c.charAt(0)}
+      {safe.charAt(0) || "?"}
     </span>
   );
 }
