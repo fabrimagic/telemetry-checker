@@ -121,6 +121,7 @@ export default function Index() {
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [sessionAllLaps, setSessionAllLaps] = useState<import("@/lib/openf1").Lap[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
+  const [vreError, setVreError] = useState<string | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
   const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
   const [raceAvg, setRaceAvg] = useState<import("@/lib/raceDrivingAverages").RaceDrivingAverages | null>(null);
@@ -253,6 +254,7 @@ export default function Index() {
 
           // Build Virtual Race Engineer (with practice compound models)
           setLoadingVre(true);
+          setVreError(null);
           try {
             const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber, { forceFresh: true }).catch(() => []);
 
@@ -383,7 +385,11 @@ export default function Index() {
             } else {
               setKdmResult(null);
             }
-          } catch { /* optional */ }
+          } catch (e) {
+            console.error("[VRE] compute failed:", e);
+            setVreError(String(e));
+            setVreResult(null);
+          }
           setLoadingVre(false);
         }
       } catch (e: any) {
@@ -414,7 +420,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
+    setVreResult(null); setVreError(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
   }, []);
 
   // Select lap for a driver
@@ -529,7 +535,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
+    setVreResult(null); setVreError(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -764,20 +770,30 @@ export default function Index() {
   }) => {
     const args = vreArgsRef.current;
     if (!args) return;
+    setVreError(null);
     const rm = overrides.riskMode ?? vreRiskMode;
     const sc = overrides.scenario ?? vreScenario;
     const sl = overrides.scenarioLap !== undefined ? overrides.scenarioLap : vreScenarioLap;
     const sd = overrides.scenarioDuration !== undefined ? overrides.scenarioDuration : vreScenarioDuration;
     const am = overrides.analysisMode ?? vreAnalysisMode;
     const cd = overrides.customDeg !== undefined ? overrides.customDeg : vreCustomDeg;
-    const newVre = computeVirtualRaceEngineer(
-      args.driverNumber, args.driverAcronym, args.sessionKey,
-      args.laps, args.stints, args.pits,
-      args.weather, args.raceControl,
-      args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
-      args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
-    );
-    setVreResult(newVre);
+    let newVre: VirtualRaceEngineerResult | null = null;
+    try {
+      newVre = computeVirtualRaceEngineer(
+        args.driverNumber, args.driverAcronym, args.sessionKey,
+        args.laps, args.stints, args.pits,
+        args.weather, args.raceControl,
+        args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
+        args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
+      );
+      setVreResult(newVre);
+    } catch (e) {
+      console.error("[VRE] compute failed:", e);
+      setVreError(String(e));
+      setVreResult(null);
+      setKdmResult(null);
+      return;
+    }
     if (newVre) {
       try {
         const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
@@ -795,6 +811,8 @@ export default function Index() {
         });
         setKdmResult(kdm);
       } catch { setKdmResult(null); }
+    } else {
+      setKdmResult(null);
     }
   }, [vreRiskMode, vreScenario, vreScenarioLap, vreScenarioDuration, vreAnalysisMode, vreCustomDeg]);
 
@@ -1041,7 +1059,7 @@ export default function Index() {
                   DRILL-DOWN A FISARMONICA
                   4 sezioni, di default tutte collassate.
                   ═══════════════════════════════════════════ */}
-              <Accordion type="multiple" className="w-full space-y-3">
+              <Accordion type="multiple" defaultValue={["strategy"]} className="w-full space-y-3">
                 {/* ── Passo & Gomme ── */}
                 <AccordionItem
                   value="pace-tyres"
@@ -1136,7 +1154,21 @@ export default function Index() {
                           allDrivers={allDrivers}
                           driverAcronym={singleDriverState?.driver.name_acronym}
                         />
-                      ) : null
+                      ) : (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+                          <div className="flex items-start gap-2">
+                            <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-amber-200">
+                                Virtual Race Engineer non disponibile
+                              </h3>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {vreError || "VRE non disponibile per questa sessione (dati stint/giri insufficienti o compound singolo)."}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
                     )}
 
                     {pitStopsData.length > 0 && isRaceOrSprint && (

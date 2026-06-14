@@ -494,7 +494,10 @@ export function computeVirtualRaceEngineer(
   lapWorkEstimates?: LapWorkEstimate[],
   totalEstimatedWork?: number,
 ): VirtualRaceEngineerResult | null {
-  if (!stints.length || !laps.length) return null;
+  if (!stints.length || !laps.length) {
+    console.warn("[VRE] returning null:", "missing stints or laps");
+    return null;
+  }
 
   // Narrative collector — accumulates structured events for migrated categories.
   // Declared early because alt.* migrations (categories: traffic, neutralization,
@@ -877,7 +880,10 @@ export function computeVirtualRaceEngineer(
 
   // Full cost function: simulates total adjusted race time
   function simulateStrategyCost(pitLapsArr: number[], compoundsArr: string[]): number | null {
-    if (!hasMinTwoCompounds(compoundsArr)) return null;
+    if (!hasMinTwoCompounds(compoundsArr)) {
+      console.warn("[VRE] returning null:", "simulateStrategyCost requires at least two compounds");
+      return null;
+    }
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
 
     let totalCost = 0;
@@ -885,7 +891,10 @@ export function computeVirtualRaceEngineer(
     for (let si = 0; si < stintBounds.length; si++) {
       const sb = stintBounds[si];
       const model = compoundModels.get(sb.compound);
-      if (!model) return null;
+      if (!model) {
+        console.warn("[VRE] returning null:", `simulateStrategyCost missing model for ${sb.compound}`);
+        return null;
+      }
       const stintLength = sb.end - sb.start + 1;
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
@@ -957,13 +966,19 @@ export function computeVirtualRaceEngineer(
 
   // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
   function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[], forActualStrategy: boolean = false): number | null {
-    if (!hasMinTwoCompounds(compoundsArr)) return null;
+    if (!hasMinTwoCompounds(compoundsArr)) {
+      console.warn("[VRE] returning null:", "simulateTimeRaw requires at least two compounds");
+      return null;
+    }
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
     for (let si = 0; si < stintBounds.length; si++) {
       const sb = stintBounds[si];
       const model = compoundModels.get(sb.compound);
-      if (!model) return null;
+      if (!model) {
+        console.warn("[VRE] returning null:", `simulateTimeRaw missing model for ${sb.compound}`);
+        return null;
+      }
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
@@ -1396,7 +1411,10 @@ export function computeVirtualRaceEngineer(
   // ── 4d. Enrich alternatives with advanced analysis ──
   const driverAvgPace = (() => {
     const validLaps = laps.filter(l => l.lap_duration != null && l.lap_duration > 0 && !l.is_pit_out_lap);
-    if (validLaps.length === 0) return null;
+    if (validLaps.length === 0) {
+      console.warn("[VRE] returning null:", "no valid laps for driver average pace");
+      return null;
+    }
     return validLaps.reduce((s, l) => s + l.lap_duration!, 0) / validLaps.length;
   })();
 
