@@ -1152,7 +1152,21 @@ export default function Index() {
                           allDrivers={allDrivers}
                           driverAcronym={singleDriverState?.driver.name_acronym}
                         />
-                      ) : null
+                      ) : (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+                          <div className="flex items-start gap-2">
+                            <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-amber-200">
+                                Virtual Race Engineer non disponibile
+                              </h3>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {vreError || "VRE non disponibile per questa sessione (dati stint/giri insufficienti o compound singolo)."}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
                     )}
 
                     {pitStopsData.length > 0 && isRaceOrSprint && (
