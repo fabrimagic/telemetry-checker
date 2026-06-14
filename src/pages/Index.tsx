@@ -1127,15 +1127,18 @@ export default function Index() {
                           <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                         </div>
                       ) : vreResult ? (
-                        <VirtualRaceEngineerCard
-                          result={vreResult}
-                          analysisMode={vreAnalysisMode}
-                          viewMode={vreViewMode}
-                          laps={singleDriverState?.laps}
-                          positions={diaryPositions}
-                          allDrivers={allDrivers}
-                          driverAcronym={singleDriverState?.driver.name_acronym}
-                        />
+                        <>
+                          {setupCard}
+                          <VirtualRaceEngineerCard
+                            result={vreResult}
+                            analysisMode={vreAnalysisMode}
+                            viewMode={vreViewMode}
+                            laps={singleDriverState?.laps}
+                            positions={diaryPositions}
+                            allDrivers={allDrivers}
+                            driverAcronym={singleDriverState?.driver.name_acronym}
+                          />
+                        </>
                       ) : null
                     )}
 
