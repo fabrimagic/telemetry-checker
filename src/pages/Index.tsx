@@ -535,7 +535,7 @@ export default function Index() {
     setDiaryIntervals([]);
     setDiaryPositions([]);
     setDiaryEvents([]);
-    setVreResult(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
+    setVreResult(null); setVreError(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
     setRaceControlMessages([]);
     setError(null);
     setCursorTime(null);
@@ -770,20 +770,30 @@ export default function Index() {
   }) => {
     const args = vreArgsRef.current;
     if (!args) return;
+    setVreError(null);
     const rm = overrides.riskMode ?? vreRiskMode;
     const sc = overrides.scenario ?? vreScenario;
     const sl = overrides.scenarioLap !== undefined ? overrides.scenarioLap : vreScenarioLap;
     const sd = overrides.scenarioDuration !== undefined ? overrides.scenarioDuration : vreScenarioDuration;
     const am = overrides.analysisMode ?? vreAnalysisMode;
     const cd = overrides.customDeg !== undefined ? overrides.customDeg : vreCustomDeg;
-    const newVre = computeVirtualRaceEngineer(
-      args.driverNumber, args.driverAcronym, args.sessionKey,
-      args.laps, args.stints, args.pits,
-      args.weather, args.raceControl,
-      args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
-      args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
-    );
-    setVreResult(newVre);
+    let newVre: VirtualRaceEngineerResult | null = null;
+    try {
+      newVre = computeVirtualRaceEngineer(
+        args.driverNumber, args.driverAcronym, args.sessionKey,
+        args.laps, args.stints, args.pits,
+        args.weather, args.raceControl,
+        args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
+        args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
+      );
+      setVreResult(newVre);
+    } catch (e) {
+      console.error("[VRE] compute failed:", e);
+      setVreError(String(e));
+      setVreResult(null);
+      setKdmResult(null);
+      return;
+    }
     if (newVre) {
       try {
         const weatherMapForKdm = classifyLapsWeather(args.laps, args.weather);
