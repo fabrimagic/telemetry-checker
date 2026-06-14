@@ -1041,7 +1041,7 @@ export default function Index() {
                   DRILL-DOWN A FISARMONICA
                   4 sezioni, di default tutte collassate.
                   ═══════════════════════════════════════════ */}
-              <Accordion type="multiple" className="w-full space-y-3">
+              <Accordion type="multiple" defaultValue={["strategy"]} className="w-full space-y-3">
                 {/* ── Passo & Gomme ── */}
                 <AccordionItem
                   value="pace-tyres"
