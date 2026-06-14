@@ -80,7 +80,7 @@ export function CompareTimeline({ comparison, driverA, driverB }: Props) {
                   backgroundColor: compoundColor(s.compound),
                 }}
               >
-                {width > 6 ? s.compound.charAt(0) : ""}
+                {width > 6 ? (s.compound ?? "").charAt(0) : ""}
               </div>
             );
           })}
