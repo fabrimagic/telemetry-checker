@@ -121,6 +121,7 @@ export default function Index() {
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [sessionAllLaps, setSessionAllLaps] = useState<import("@/lib/openf1").Lap[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
+  const [vreError, setVreError] = useState<string | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
   const [kdmResult, setKdmResult] = useState<KeyDecisionMomentsResult | null>(null);
   const [raceAvg, setRaceAvg] = useState<import("@/lib/raceDrivingAverages").RaceDrivingAverages | null>(null);
@@ -253,6 +254,7 @@ export default function Index() {
 
           // Build Virtual Race Engineer (with practice compound models)
           setLoadingVre(true);
+          setVreError(null);
           try {
             const pitsForVre = pitStopsData.length ? pitStopsData.filter(p => p.driver_number === driverNumber) : await getPitStops(sessionKey, driverNumber, { forceFresh: true }).catch(() => []);
 
@@ -383,7 +385,11 @@ export default function Index() {
             } else {
               setKdmResult(null);
             }
-          } catch { /* optional */ }
+          } catch (e) {
+            console.error("[VRE] compute failed:", e);
+            setVreError(String(e));
+            setVreResult(null);
+          }
           setLoadingVre(false);
         }
       } catch (e: any) {
@@ -414,7 +420,7 @@ export default function Index() {
     setOvertakesData([]);
     setOvertakesReceivedData([]);
     setDiaryEvents([]);
-    setVreResult(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
+    setVreResult(null); setVreError(null); setCumDevResult(null); vreArgsRef.current = null; setVreRiskMode("BALANCED"); setVreScenario("REAL_CONTEXT"); setVreScenarioLap(null); setVreScenarioDuration(null); setVreAnalysisMode("RACE_ENGINEER"); setVreViewMode("ENGINEER");
   }, []);
 
   // Select lap for a driver
