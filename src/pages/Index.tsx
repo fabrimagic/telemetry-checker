@@ -83,6 +83,7 @@ import { KeyDecisionMomentsCard } from "@/components/f1/KeyDecisionMomentsCard";
 import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 import { FullGasFeedSection } from "@/components/landing/FullGasFeedSection";
+import { BuyMeCoffeePopup } from "@/components/landing/BuyMeCoffeePopup";
 
 interface DriverState {
   driver: Driver;
