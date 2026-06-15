@@ -1484,6 +1484,7 @@ export default function Index() {
       </main>
 
       {!sessionKey && <FullGasFeedSection />}
+      {!sessionKey && <BuyMeCoffeePopup />}
       <footer className="border-t border-border px-6 py-4 mt-8">
         <p className="text-center text-xs text-muted-foreground">
           Questo è un progetto sviluppato da Fabrizio Monaco
