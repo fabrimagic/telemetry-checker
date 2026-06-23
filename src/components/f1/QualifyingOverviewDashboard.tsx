@@ -1119,6 +1119,142 @@ export function QualifyingOverviewDashboard({
                   onCursor={setCursorDistance}
                   showXAxis={true}
                 />
+
+                {/* Delta-time per distance */}
+                <div className="relative pt-2">
+                  <div className="flex items-baseline justify-between mb-1 px-2">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Delta-time per posizione in pista (negativo = {youAcr} avanti)
+                    </span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <LineChart
+                      data={deltaTimeData}
+                      margin={{ top: 6, right: 12, left: 0, bottom: 18 }}
+                      onMouseMove={(s: any) => {
+                        const d = s?.activePayload?.[0]?.payload?.distance;
+                        if (typeof d === "number") setCursorDistance(d);
+                      }}
+                      onMouseLeave={() => setCursorDistance(null)}
+                    >
+                      <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.4} vertical={false} />
+                      <XAxis
+                        dataKey="distance"
+                        type="number"
+                        domain={["dataMin", "dataMax"]}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v) => `${Math.round(v as number)}`}
+                        label={{
+                          value: "Distanza (m)",
+                          position: "insideBottom",
+                          offset: -4,
+                          style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" },
+                        }}
+                      />
+                      <YAxis
+                        width={48}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v) => `${(v as number).toFixed(2)}s`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "hsl(var(--background))",
+                          border: "1px solid hsl(var(--border))",
+                          fontSize: 11,
+                        }}
+                        labelFormatter={(v) => `${Math.round(v as number)} m`}
+                        formatter={(val: any) => {
+                          if (val == null || !Number.isFinite(val)) return ["—", "Δt"];
+                          const v = Number(val);
+                          const leader = v < 0 ? youAcr : v > 0 ? refAcr : "—";
+                          const sign = v >= 0 ? "+" : "−";
+                          return [`${sign}${Math.abs(v).toFixed(3)}s · ${leader} avanti`, "Δt"];
+                        }}
+                      />
+                      <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                      {cursorDistance != null && (
+                        <ReferenceLine x={cursorDistance} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
+                      )}
+                      <Line
+                        type="monotone"
+                        dataKey="dt"
+                        name="Δt"
+                        stroke={youColorHex}
+                        strokeWidth={1.5}
+                        dot={false}
+                        isAnimationActive={false}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5 mt-1">
+                    <Info className="h-3 w-3 flex-shrink-0 mt-px" />
+                    <span>
+                      Stima telemetrica del delta-time: per ogni posizione di pista si confronta il tempo trascorso dal via
+                      del giro per ciascun pilota. La distanza è stimata integrando la velocità (OpenF1 non fornisce un canale
+                      distanza diretto), quindi nelle zone a bassa velocità l'errore può aumentare. Confronto limitato alla
+                      distanza minima comune ai due giri; non è un dato ufficiale di cronometraggio.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Superclipping & Lift & Coast comparison */}
+                {teleState.status === "ready" && (
+                  <div className="pt-2">
+                    <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                      Stile di guida nei due giri
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { acr: youAcr, color: youColorHex, z: teleState.youZones },
+                        { acr: refAcr, color: refColorHex, z: teleState.refZones },
+                      ].map((it) => (
+                        <div key={it.acr} className="bg-muted/30 rounded-md p-2.5 space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: it.color }}
+                            />
+                            <span className="font-mono text-[11px] font-semibold" style={{ color: it.color }}>
+                              {it.acr}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Superclipping</div>
+                              <div className="font-mono tabular-nums">
+                                <span className="font-semibold">{it.z.superclipping.count}</span>
+                                <span className="text-muted-foreground"> ep. · </span>
+                                <span className="font-semibold">{it.z.superclipping.duration.toFixed(2)}s</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Lift &amp; Coast</div>
+                              <div className="font-mono tabular-nums">
+                                <span className="font-semibold">{it.z.liftcoast.count}</span>
+                                <span className="text-muted-foreground"> ep. · </span>
+                                <span className="font-semibold">{it.z.liftcoast.duration.toFixed(2)}s</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5 mt-2">
+                      <Info className="h-3 w-3 flex-shrink-0 mt-px" />
+                      <span>
+                        <strong>Superclipping</strong>: calo degli RPM con freno premuto al 100%.{" "}
+                        <strong>Lift &amp; Coast</strong>: fase di rilascio con gas e freno entrambi a zero. Sono indicatori di
+                        stile di guida derivati dalla telemetria, non misure dirette, e dipendono dalla densità di
+                        campionamento OpenF1.
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5">
                   <Info className="h-3 w-3 flex-shrink-0 mt-px" />
                   <span>
