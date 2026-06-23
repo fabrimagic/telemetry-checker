@@ -44,14 +44,15 @@ function syntheticLapData(baseIso: string): CarData[] {
     ...partial,
   });
   return [
-    sample(0, { speed: 200, throttle: 100, brake: 0 }),
-    sample(100, { speed: 195, throttle: 100, brake: 0 }), // superclip
-    sample(200, { speed: 200, throttle: 100, brake: 0 }),
-    sample(300, { speed: 210, throttle: 95, brake: 0 }),
-    sample(400, { speed: 210, throttle: 0, brake: 0 }), // lift&coast start
-    sample(500, { speed: 208, throttle: 0, brake: 0 }), // lift&coast continues
-    sample(600, { speed: 206, throttle: 0, brake: 50 }), // ends
+    sample(0, { speed: 200, throttle: 100, brake: 0, rpm: 12000 }),
+    sample(100, { speed: 195, throttle: 0, brake: 100, rpm: 11500 }), // superclip start (brake=100, rpm↓)
+    sample(200, { speed: 190, throttle: 0, brake: 100, rpm: 11000 }), // superclip continues
+    sample(300, { speed: 210, throttle: 95, brake: 0, rpm: 12500 }),
+    sample(400, { speed: 210, throttle: 0, brake: 0, rpm: 12000 }), // lift&coast start
+    sample(500, { speed: 208, throttle: 0, brake: 0, rpm: 11800 }), // lift&coast continues
+    sample(600, { speed: 206, throttle: 0, brake: 50, rpm: 11500 }), // ends
   ];
+
 }
 
 describe("pickComparableLaps", () => {
