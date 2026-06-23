@@ -1139,79 +1139,83 @@ export default function Index() {
                   </AccordionContent>
                 </AccordionItem>
 
-                {/* ── Strategia ── */}
-                <AccordionItem
-                  value="strategy"
-                  className="border border-border/60 rounded-xl card-premium overflow-hidden !border-b"
-                >
-                  <AccordionTrigger className="px-4 sm:px-5 py-3.5 hover:no-underline group">
-                    <div className="flex items-center gap-3">
-                      <Target className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
-                      <span className="text-[11px] font-black uppercase tracking-[0.22em]">
-                        Strategia
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 sm:px-5 pb-5 space-y-4">
-                    {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
-                      loadingVre ? (
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                          <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
+                {sessionType !== "Practice" && (
+                  <>
+                    {/* ── Strategia ── */}
+                    <AccordionItem
+                      value="strategy"
+                      className="border border-border/60 rounded-xl card-premium overflow-hidden !border-b"
+                    >
+                      <AccordionTrigger className="px-4 sm:px-5 py-3.5 hover:no-underline group">
+                        <div className="flex items-center gap-3">
+                          <Target className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />
+                          <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                            Strategia
+                          </span>
                         </div>
-                      ) : vreResult ? (
-                        <VirtualRaceEngineerCard
-                          result={vreResult}
-                          analysisMode={vreAnalysisMode}
-                          viewMode={vreViewMode}
-                          laps={singleDriverState?.laps}
-                          positions={diaryPositions}
-                          allDrivers={allDrivers}
-                          driverAcronym={singleDriverState?.driver.name_acronym}
-                        />
-                      ) : (
-                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
-                          <div className="flex items-start gap-2">
-                            <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-amber-200">
-                                Virtual Race Engineer non disponibile
-                              </h3>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {vreError || "VRE non disponibile per questa sessione (dati stint/giri insufficienti o compound singolo)."}
-                              </p>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 sm:px-5 pb-5 space-y-4">
+                        {selectedDriverNumbers.length === 1 && isRaceOrSprint && (
+                          loadingVre ? (
+                            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                              <Loader2 className="h-4 w-4 animate-spin" /> Analisi strategica in corso…
                             </div>
-                          </div>
-                        </div>
-                      )
-                    )}
+                          ) : vreResult ? (
+                            <VirtualRaceEngineerCard
+                              result={vreResult}
+                              analysisMode={vreAnalysisMode}
+                              viewMode={vreViewMode}
+                              laps={singleDriverState?.laps}
+                              positions={diaryPositions}
+                              allDrivers={allDrivers}
+                              driverAcronym={singleDriverState?.driver.name_acronym}
+                            />
+                          ) : (
+                            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+                              <div className="flex items-start gap-2">
+                                <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-sm font-semibold text-amber-200">
+                                    Virtual Race Engineer non disponibile
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {vreError || "VRE non disponibile per questa sessione (dati stint/giri insufficienti o compound singolo)."}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        )}
 
-                    {pitStopsData.length > 0 && isRaceOrSprint && (
-                      <PitStopsCard
-                        pitStops={pitStopsData}
-                        allDrivers={allDrivers}
-                        multiDriver={selectedDriverNumbers.length > 1}
-                      />
-                    )}
+                        {pitStopsData.length > 0 && isRaceOrSprint && (
+                          <PitStopsCard
+                            pitStops={pitStopsData}
+                            allDrivers={allDrivers}
+                            multiDriver={selectedDriverNumbers.length > 1}
+                          />
+                        )}
 
-                    {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
-                      loadingDiary ? (
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                          <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
-                        </div>
-                      ) : (
-                        <RaceDiaryCard
-                          events={diaryEvents}
-                          driverAcronym={singleDriverState.driver.name_acronym}
-                          driverColor={getColor(singleDriverState.driver.driver_number)}
-                        />
-                      )
-                    )}
+                        {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
+                          loadingDiary ? (
+                            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                              <Loader2 className="h-4 w-4 animate-spin" /> Caricamento diario di gara…
+                            </div>
+                          ) : (
+                            <RaceDiaryCard
+                              events={diaryEvents}
+                              driverAcronym={singleDriverState.driver.name_acronym}
+                              driverColor={getColor(singleDriverState.driver.driver_number)}
+                            />
+                          )
+                        )}
 
-                    {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
-                      <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
+                        {overtakesData.length > 0 && selectedDriverNumbers.length === 1 && (
+                          <OvertakesCard overtakes={overtakesData} allDrivers={allDrivers} />
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </>
+                )}
 
                 {/* ── Telemetria & Guida ── */}
                 <AccordionItem
