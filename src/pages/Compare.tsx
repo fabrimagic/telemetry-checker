@@ -15,6 +15,12 @@ import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlt
 import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
 import { DataIntegrityNotice } from "@/components/f1/DataIntegrityNotice";
 import { detectDataIntegrityIssues } from "@/lib/dataIntegrity";
+import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
+import { SoftSensorsTimelineCard } from "@/components/f1/SoftSensorsTimelineCard";
+import { PitStopsChartCard } from "@/components/f1/PitStopsChartCard";
+import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from "@/components/ui/accordion";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import {
