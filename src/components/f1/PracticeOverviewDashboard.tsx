@@ -27,9 +27,10 @@ import {
   Gauge,
   Info,
 } from "lucide-react";
-import type { Lap, StintData, WeatherData } from "@/lib/openf1";
+import type { Driver, Lap, StintData, WeatherData } from "@/lib/openf1";
 import type { LongRunResult } from "@/lib/longRunDetector";
 import type { DegradationResult } from "@/lib/tyreDegradation";
+import { TelemetryCompareCard } from "./TelemetryCompareCard";
 
 interface Props {
   driverAcronym: string;
@@ -39,6 +40,12 @@ interface Props {
   longRuns: LongRunResult[];
   degradationResults: DegradationResult[];
   sessionWeather: WeatherData[];
+  // Optional props enabling the telemetry comparison card.
+  driver?: Driver;
+  sessionAllLaps?: Lap[];
+  allDrivers?: Driver[];
+  getColor?: (driverNumber: number) => string;
+  sessionKey?: number;
 }
 
 const COMPOUND_COLORS: Record<string, string> = {
