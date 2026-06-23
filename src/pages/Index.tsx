@@ -1045,7 +1045,7 @@ export default function Index() {
               )}
 
               {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5">
                   <SoftSensorsTimelineCard timeline={vreResult?.soft_sensors_timeline ?? null} />
                   <PitStopsChartCard
                     pitStops={pitStopsData.filter((p) => p.driver_number === singleDriverState.driver.driver_number)}
