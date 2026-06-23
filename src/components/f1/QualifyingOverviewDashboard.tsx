@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,8 +31,16 @@ import {
   Swords,
   Info,
   Gauge,
+  Activity,
 } from "lucide-react";
-import type { Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
+import { Button } from "@/components/ui/button";
+import { getCarData } from "@/lib/openf1";
+import type { CarData, Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
+import {
+  TelemetryCharts,
+  type DriverTelemetry,
+  type TelemetryPoint,
+} from "@/components/f1/TelemetryCharts";
 
 interface Props {
   driver: Driver;
@@ -43,7 +51,9 @@ interface Props {
   allDrivers: Driver[];
   sessionWeather: WeatherData[];
   getColor: (driverNumber: number) => string;
+  sessionKey: number;
 }
+
 
 // Micro-sector color codes — same semantics as SectorMiniSectors.tsx
 function segmentColor(value: number | null): string {
