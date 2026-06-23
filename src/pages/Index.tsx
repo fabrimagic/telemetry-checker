@@ -38,6 +38,7 @@ import { RaceEventTimeline } from "@/components/f1/RaceEventTimeline";
 import { SoftSensorsTimelineCard } from "@/components/f1/SoftSensorsTimelineCard";
 import { PitStopsChartCard } from "@/components/f1/PitStopsChartCard";
 import { PracticeOverviewDashboard } from "@/components/f1/PracticeOverviewDashboard";
+import { QualifyingOverviewDashboard } from "@/components/f1/QualifyingOverviewDashboard";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
@@ -73,6 +74,7 @@ import {
   type IntervalData,
   type PositionData,
   type SessionInfo,
+  type SessionResult,
 } from "@/lib/openf1";
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
@@ -124,6 +126,7 @@ export default function Index() {
   const [sessionWeather, setSessionWeather] = useState<WeatherData[]>([]);
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [sessionAllLaps, setSessionAllLaps] = useState<import("@/lib/openf1").Lap[]>([]);
+  const [sessionResults, setSessionResults] = useState<SessionResult[]>([]);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [vreError, setVreError] = useState<string | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
@@ -159,6 +162,8 @@ export default function Index() {
     setDriverStates(new Map());
     setSessionWeather([]);
     setRaceControlMessages([]);
+    setSessionAllLaps([]);
+    setSessionResults([]);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
@@ -167,6 +172,12 @@ export default function Index() {
       // Fetch session weather for lap classification (fire and forget)
       getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
       getRaceControl(key).then((rc) => setRaceControlMessages(rc)).catch(() => {});
+      // For Qualifying sessions, fetch all-driver laps + session result so the
+      // dedicated qualifying dashboard can render pole comparisons. Best-effort.
+      if (type.includes("Qualifying")) {
+        getAllLaps(key).then((al) => setSessionAllLaps(al)).catch(() => {});
+        getSessionResult(key).then((sr) => setSessionResults(sr)).catch(() => {});
+      }
       // Resolve circuit location/country for the per-lap precipitation outlook
       // card. Best-effort; failure simply leaves the card hidden.
       setCircuitKey(null);
@@ -1087,6 +1098,22 @@ export default function Index() {
                     sessionWeather={sessionWeather}
                   />
                 )}
+
+              {selectedDriverNumbers.length === 1 &&
+                sessionType.includes("Qualifying") &&
+                singleDriverState && (
+                  <QualifyingOverviewDashboard
+                    driver={singleDriverState.driver}
+                    driverColor={getColor(singleDriverState.driver.driver_number)}
+                    laps={singleDriverState.laps}
+                    sessionAllLaps={sessionAllLaps}
+                    sessionResults={sessionResults}
+                    allDrivers={allDrivers}
+                    sessionWeather={sessionWeather}
+                    getColor={getColor}
+                  />
+                )}
+
 
               {/* ═══════════════════════════════════════════
                   DRILL-DOWN A FISARMONICA
