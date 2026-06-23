@@ -1099,6 +1099,22 @@ export default function Index() {
                   />
                 )}
 
+              {selectedDriverNumbers.length === 1 &&
+                sessionType.includes("Qualifying") &&
+                singleDriverState && (
+                  <QualifyingOverviewDashboard
+                    driver={singleDriverState.driver}
+                    driverColor={getColor(singleDriverState.driver.driver_number)}
+                    laps={singleDriverState.laps}
+                    sessionAllLaps={sessionAllLaps}
+                    sessionResults={sessionResults}
+                    allDrivers={allDrivers}
+                    sessionWeather={sessionWeather}
+                    getColor={getColor}
+                  />
+                )}
+
+
               {/* ═══════════════════════════════════════════
                   DRILL-DOWN A FISARMONICA
                   4 sezioni, di default tutte collassate.
