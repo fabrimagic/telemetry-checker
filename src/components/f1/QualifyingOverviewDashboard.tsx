@@ -579,6 +579,26 @@ export function QualifyingOverviewDashboard({
     return va + (vb - va) * t;
   };
 
+  // Interpolate the lap TIME (seconds since lap start) at a given cumulative distance.
+  // Same linear-interpolation / binary-search scheme as interpolateAt, applied to the
+  // monotone-in-distance series of TelemetrySample.time.
+  const interpolateTimeAt = (samples: TelemetrySample[], distance: number): number | null => {
+    if (!samples.length) return null;
+    let lo = 0, hi = samples.length - 1;
+    if (distance <= samples[0].distance) return samples[0].time;
+    if (distance >= samples[hi].distance) return samples[hi].time;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (samples[mid].distance <= distance) lo = mid;
+      else hi = mid;
+    }
+    const a = samples[lo], b = samples[hi];
+    const span = b.distance - a.distance;
+    if (span <= 0) return a.time;
+    const t = (distance - a.distance) / span;
+    return a.time + (b.time - a.time) * t;
+  };
+
   // Build the distance-aligned dataset on a common grid (500 points, capped at min lap distance).
   const alignedData: AlignedPoint[] = useMemo(() => {
     if (teleState.status !== "ready") return [];
