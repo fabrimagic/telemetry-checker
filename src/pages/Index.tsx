@@ -74,7 +74,7 @@ import {
   type IntervalData,
   type PositionData,
   type SessionInfo,
-} from "@/lib/openf1";
+  type SessionResult,
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel, type AnalysisMode } from "@/lib/virtualRaceEngineer";
