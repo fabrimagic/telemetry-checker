@@ -13,10 +13,9 @@ export interface DrivingZoneStats {
   liftcoast: { count: number; duration: number; dates: string[] };
 }
 
-// Brake threshold for superclipping: episode requires the brake pedal fully
-// applied. We use brake === 100 as the primary criterion; CarData reports
-// throttle/brake on a 0–100 scale.
-const BRAKE_FULL = 100;
+// Throttle threshold for superclipping: episode requires the throttle pedal
+// fully applied. CarData reports throttle/brake on a 0–100 scale.
+const THROTTLE_FULL = 100;
 
 export function computeZones(carData: CarData[]): DrivingZoneStats {
   let superclipCount = 0;
@@ -36,19 +35,20 @@ export function computeZones(carData: CarData[]): DrivingZoneStats {
     const dt = new Date(curr.date).getTime() - new Date(prev.date).getTime();
     const safeDt = Number.isFinite(dt) && dt > 0 ? dt : 0;
 
-    // ---- Superclipping (new definition, stateful, episodic) ----
+    // ---- Superclipping (stateful, episodic) ----
     // An episode requires:
-    //   • brake pedal fully applied (brake === 100), AND
+    //   • throttle pedal fully applied (throttle === 100), AND
     //   • RPM dropping vs the previous sample (curr.rpm < prev.rpm)
     // The episode STARTS on the first sample matching both conditions, CONTINUES
     // while they keep matching, and TERMINATES on the first sample that breaks
     // either condition. The terminating sample is NOT accumulated, mirroring the
-    // pattern already used for lift & coast / the previous logic. Samples with
-    // non-finite rpm/brake are treated as terminating the current episode.
-    const brakeOk = Number.isFinite(curr.brake) && curr.brake === BRAKE_FULL;
+    // pattern already used for lift & coast. Samples with non-finite rpm/throttle
+    // are treated as terminating the current episode.
+    const throttleOk =
+      Number.isFinite(curr.throttle) && curr.throttle === THROTTLE_FULL;
     const rpmOk =
       Number.isFinite(curr.rpm) && Number.isFinite(prev.rpm) && curr.rpm < prev.rpm;
-    const superclipCondition = brakeOk && rpmOk;
+    const superclipCondition = throttleOk && rpmOk;
     if (!inSuperclip) {
       if (superclipCondition) {
         inSuperclip = true;
