@@ -18,120 +18,101 @@ function sample(i: number, partial: Partial<CarData>): CarData {
   } as CarData;
 }
 
-describe("computeZones — superclipping (stateful)", () => {
-  it("(a) base episode: throttle>95 + speed decreasing across N samples → one episode, duration = sum of dts", () => {
+describe("computeZones — superclipping (brake=100% + RPM dropping)", () => {
+  it("(a) base episode: brake=100 and rpm falling across samples", () => {
     const data = [
-      sample(0, { speed: 300, throttle: 100 }),
-      sample(1, { speed: 298, throttle: 100 }), // start
-      sample(2, { speed: 295, throttle: 100 }), // continue
-      sample(3, { speed: 292, throttle: 100 }), // continue
-      sample(4, { speed: 295, throttle: 100 }), // speed-up → ends here, not accumulated
+      sample(0, { rpm: 12000, brake: 0 }),
+      sample(1, { rpm: 11800, brake: 100 }), // start
+      sample(2, { rpm: 11500, brake: 100 }), // continue
+      sample(3, { rpm: 11200, brake: 100 }), // continue
+      sample(4, { rpm: 11400, brake: 100 }), // rpm rises → ends, not accumulated
     ];
     const z = computeZones(data);
     expect(z.superclipping.count).toBe(1);
-    // 3 accumulated samples × 0.1s
-    expect(z.superclipping.duration).toBeCloseTo(0.3, 5);
     expect(z.superclipping.dates).toHaveLength(3);
+    expect(z.superclipping.duration).toBeCloseTo(0.3, 5);
   });
 
-  it("(b) ends by brake: terminating brake sample not included", () => {
+  it("(b) ends when brake drops below 100", () => {
     const data = [
-      sample(0, { speed: 300, throttle: 100 }),
-      sample(1, { speed: 298, throttle: 100 }), // start
-      sample(2, { speed: 295, throttle: 100 }),
-      sample(3, { speed: 293, throttle: 80, brake: 100 }), // brake → ends
-      sample(4, { speed: 290, throttle: 0, brake: 100 }),
-    ];
-    const z = computeZones(data);
-    expect(z.superclipping.count).toBe(1);
-    expect(z.superclipping.dates).toHaveLength(2);
-    expect(z.superclipping.duration).toBeCloseTo(0.2, 5);
-  });
-
-  it("(c) ends by speed rising", () => {
-    const data = [
-      sample(0, { speed: 300, throttle: 100 }),
-      sample(1, { speed: 298, throttle: 100 }), // start
-      sample(2, { speed: 296, throttle: 100 }),
-      sample(3, { speed: 297, throttle: 100 }), // speed-up → ends
+      sample(0, { rpm: 12000, brake: 0 }),
+      sample(1, { rpm: 11800, brake: 100 }), // start
+      sample(2, { rpm: 11500, brake: 100 }),
+      sample(3, { rpm: 11300, brake: 80 }),  // brake released → ends
     ];
     const z = computeZones(data);
     expect(z.superclipping.count).toBe(1);
     expect(z.superclipping.dates).toHaveLength(2);
   });
 
-  it("(d) boundary: throttle exactly 95 does NOT start; 96 does", () => {
-    const at95 = computeZones([
-      sample(0, { speed: 300, throttle: 95 }),
-      sample(1, { speed: 298, throttle: 95 }),
-      sample(2, { speed: 296, throttle: 95 }),
+  it("(c) boundary: brake=99 does NOT start; brake=100 does", () => {
+    const at99 = computeZones([
+      sample(0, { rpm: 12000, brake: 99 }),
+      sample(1, { rpm: 11500, brake: 99 }),
+      sample(2, { rpm: 11000, brake: 99 }),
     ]);
-    expect(at95.superclipping.count).toBe(0);
+    expect(at99.superclipping.count).toBe(0);
 
-    const at96 = computeZones([
-      sample(0, { speed: 300, throttle: 96 }),
-      sample(1, { speed: 298, throttle: 96 }),
-      sample(2, { speed: 300, throttle: 96 }), // ends by speed-up
+    const at100 = computeZones([
+      sample(0, { rpm: 12000, brake: 100 }),
+      sample(1, { rpm: 11500, brake: 100 }),
     ]);
-    expect(at96.superclipping.count).toBe(1);
+    expect(at100.superclipping.count).toBe(1);
   });
 
-  it("(e) two distinct episodes separated by a recovery", () => {
+  it("(d) two distinct episodes separated by a recovery", () => {
     const data = [
-      sample(0, { speed: 300, throttle: 100 }),
-      sample(1, { speed: 298, throttle: 100 }), // start 1
-      sample(2, { speed: 296, throttle: 100 }),
-      sample(3, { speed: 300, throttle: 100 }), // speed-up → ends 1
-      sample(4, { speed: 305, throttle: 100 }),
-      sample(5, { speed: 303, throttle: 100 }), // start 2
-      sample(6, { speed: 301, throttle: 100 }),
-      sample(7, { speed: 305, throttle: 100 }), // speed-up → ends 2
+      sample(0, { rpm: 12000, brake: 0 }),
+      sample(1, { rpm: 11800, brake: 100 }), // start 1
+      sample(2, { rpm: 11500, brake: 100 }),
+      sample(3, { rpm: 11800, brake: 100 }), // rpm rises → ends 1
+      sample(4, { rpm: 12200, brake: 0 }),
+      sample(5, { rpm: 12000, brake: 100 }), // start 2
+      sample(6, { rpm: 11700, brake: 100 }),
+      sample(7, { rpm: 12000, brake: 50 }),  // ends 2
     ];
     const z = computeZones(data);
     expect(z.superclipping.count).toBe(2);
   });
 
-  it("(f) no superclipping when throttle low or speed always rising", () => {
-    const lowGas = computeZones([
-      sample(0, { speed: 200, throttle: 50 }),
-      sample(1, { speed: 195, throttle: 50 }),
-      sample(2, { speed: 190, throttle: 50 }),
+  it("(e) no superclipping when brake is off even with falling rpm", () => {
+    const z = computeZones([
+      sample(0, { rpm: 12000, brake: 0 }),
+      sample(1, { rpm: 11500, brake: 0 }),
+      sample(2, { rpm: 11000, brake: 0 }),
     ]);
-    expect(lowGas.superclipping.count).toBe(0);
-    expect(lowGas.superclipping.duration).toBe(0);
-    expect(lowGas.superclipping.dates).toEqual([]);
+    expect(z.superclipping.count).toBe(0);
+    expect(z.superclipping.duration).toBe(0);
+    expect(z.superclipping.dates).toEqual([]);
+  });
 
-    const rising = computeZones([
-      sample(0, { speed: 200, throttle: 100 }),
-      sample(1, { speed: 210, throttle: 100 }),
-      sample(2, { speed: 220, throttle: 100 }),
+  it("(f) no superclipping with brake=100 but rising rpm", () => {
+    const z = computeZones([
+      sample(0, { rpm: 10000, brake: 100 }),
+      sample(1, { rpm: 10500, brake: 100 }),
+      sample(2, { rpm: 11000, brake: 100 }),
     ]);
-    expect(rising.superclipping.count).toBe(0);
+    expect(z.superclipping.count).toBe(0);
   });
 
   it("(g) lift & coast remains unaffected by the new superclip logic", () => {
     const data = [
-      sample(0, { speed: 300, throttle: 100, brake: 0 }),
-      sample(1, { speed: 295, throttle: 0, brake: 0 }), // lift&coast start
-      sample(2, { speed: 290, throttle: 0, brake: 0 }),
-      sample(3, { speed: 285, throttle: 0, brake: 0 }),
-      sample(4, { speed: 282, throttle: 0, brake: 80 }), // ends
+      sample(0, { speed: 300, throttle: 100, brake: 0, rpm: 12000 }),
+      sample(1, { speed: 295, throttle: 0, brake: 0, rpm: 11500 }), // l&c start
+      sample(2, { speed: 290, throttle: 0, brake: 0, rpm: 11000 }),
+      sample(3, { speed: 285, throttle: 0, brake: 0, rpm: 10500 }),
+      sample(4, { speed: 282, throttle: 0, brake: 80, rpm: 10000 }), // ends
     ];
     const z = computeZones(data);
     expect(z.liftcoast.count).toBe(1);
     expect(z.liftcoast.duration).toBeGreaterThan(0);
   });
 
-  it("during an episode a momentary throttle dip does NOT end it (only brake or speed-rising do)", () => {
-    const data = [
-      sample(0, { speed: 300, throttle: 100 }),
-      sample(1, { speed: 298, throttle: 100 }), // start
-      sample(2, { speed: 296, throttle: 80 }),  // throttle dip but speed still falling, no brake
-      sample(3, { speed: 294, throttle: 100 }), // continues
-      sample(4, { speed: 296, throttle: 100 }), // speed-up → ends
-    ];
-    const z = computeZones(data);
-    expect(z.superclipping.count).toBe(1);
-    expect(z.superclipping.dates).toHaveLength(3);
+  it("(h) handles missing rpm gracefully (does not start the episode)", () => {
+    const z = computeZones([
+      sample(0, { brake: 100, rpm: NaN as unknown as number }),
+      sample(1, { brake: 100, rpm: NaN as unknown as number }),
+    ]);
+    expect(z.superclipping.count).toBe(0);
   });
 });
