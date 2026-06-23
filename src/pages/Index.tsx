@@ -38,6 +38,7 @@ import { RaceEventTimeline } from "@/components/f1/RaceEventTimeline";
 import { SoftSensorsTimelineCard } from "@/components/f1/SoftSensorsTimelineCard";
 import { PitStopsChartCard } from "@/components/f1/PitStopsChartCard";
 import { PracticeOverviewDashboard } from "@/components/f1/PracticeOverviewDashboard";
+import { QualifyingOverviewDashboard } from "@/components/f1/QualifyingOverviewDashboard";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
