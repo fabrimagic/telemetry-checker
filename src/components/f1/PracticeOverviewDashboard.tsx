@@ -751,14 +751,14 @@ export function PracticeOverviewDashboard({
         >
           <AccordionTrigger className="px-4 py-3 hover:no-underline">
             <SectionTitle icon={<Gauge className="h-4 w-4 text-[hsl(var(--f1-red-glow))]" />}>
-              Velocità di punta · trappola
+              Velocità di punta · Speed Trap
             </SectionTitle>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             {!topSpeed || speedSeries.length < 2 ? (
               <Placeholder>
                 {!topSpeed
-                  ? "Dato velocità trappola non disponibile."
+                  ? "Dato velocità Speed Trap non disponibile."
                   : "Dato insufficiente per la distribuzione."}
               </Placeholder>
             ) : (
