@@ -361,7 +361,7 @@ export function PracticeOverviewDashboard({
           icon={<Gauge className="h-3 w-3" />}
           label="Top speed"
           value={topSpeed ? `${Math.round(topSpeed.max)} km/h` : "—"}
-          sub={topSpeed ? `Media trappola: ${Math.round(topSpeed.avg)} km/h` : "—"}
+          sub={topSpeed ? `Media Speed Trap: ${Math.round(topSpeed.avg)} km/h` : "—"}
         />
       </div>
 
