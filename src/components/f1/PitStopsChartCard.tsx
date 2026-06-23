@@ -70,36 +70,36 @@ export function PitStopsChartCard({ pitStops }: Props) {
     });
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4" data-testid="pit-stops-chart-card">
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-        <Square className="h-3.5 w-3.5" />
+    <div className="bg-card rounded-lg border border-border p-3" data-testid="pit-stops-chart-card">
+      <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <Square className="h-3 w-3" />
         Pit Stop ({data.length})
       </h3>
 
-      <div style={{ width: "100%", height: 260 }}>
+      <div style={{ width: "100%", height: 180 }}>
         <ResponsiveContainer>
-          <BarChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 0 }} barGap={4}>
+          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 0 }} barGap={2}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
             <XAxis
               dataKey="lapLabel"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
               axisLine={{ stroke: "hsl(var(--border))" }}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11, fontFamily: "monospace" }}
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10, fontFamily: "monospace" }}
               axisLine={{ stroke: "hsl(var(--border))" }}
               tickLine={false}
               label={{
-                value: "Secondi",
+                value: "s",
                 angle: -90,
                 position: "insideLeft",
-                style: { fill: "hsl(var(--muted-foreground))", fontSize: 10 },
+                style: { fill: "hsl(var(--muted-foreground))", fontSize: 9 },
               }}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.3)" }} />
             <Legend
-              wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
+              wrapperStyle={{ fontSize: 10, color: "hsl(var(--muted-foreground))" }}
               iconType="square"
             />
             <Bar dataKey="lane_duration" name="Pit lane" fill={COLOR_LANE} radius={[2, 2, 0, 0]} />
@@ -116,9 +116,8 @@ export function PitStopsChartCard({ pitStops }: Props) {
         </ResponsiveContainer>
       </div>
 
-      <p className="mt-3 text-[10px] text-muted-foreground/80 italic leading-snug">
-        Valori dal cronometraggio ufficiale della sessione (OpenF1). La durata dello stop ai box può non essere
-        disponibile per tutti i pit stop: in tal caso viene indicata come non disponibile.
+      <p className="mt-2 text-[9px] text-muted-foreground/80 italic leading-snug">
+        Valori dal cronometraggio ufficiale (OpenF1). Lo stop può non essere disponibile.
       </p>
     </div>
   );
