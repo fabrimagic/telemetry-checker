@@ -863,21 +863,79 @@ export function QualifyingOverviewDashboard({
               <div className="text-[11px] text-muted-foreground">Caricamento telemetria…</div>
             ) : teleState.status === "error" ? (
               <Placeholder>{teleState.message}</Placeholder>
-            ) : telemetryDrivers.length === 0 ? (
-              <Placeholder>Telemetria non disponibile per questo giro.</Placeholder>
+            ) : alignedData.length === 0 ? (
+              <Placeholder>Telemetria non sufficiente per costruire l'asse distanza.</Placeholder>
             ) : (
               <>
-                <TelemetryCharts
-                  drivers={telemetryDrivers}
-                  cursorTime={cursorTime}
-                  onCursorChange={setCursorTime}
-                  onCursorClick={(t) => setCursorTime(t)}
+                <DistanceCompareChart
+                  label="Velocità (km/h)"
+                  data={alignedData}
+                  fieldYou="speed_you"
+                  fieldRef="speed_ref"
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={youAcr}
+                  refName={refAcr}
+                  height={180}
+                  unit=" km/h"
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={false}
+                />
+                <DistanceCompareChart
+                  label="Delta velocità (selezionato − riferimento)"
+                  data={alignedData}
+                  deltaFields={{ a: "speed_you", b: "speed_ref" }}
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={`${youAcr} − ${refAcr}`}
+                  refName=""
+                  height={120}
+                  unit=" km/h"
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={false}
+                />
+                <DistanceCompareChart
+                  label="Gas (%)"
+                  data={alignedData}
+                  fieldYou="throttle_you"
+                  fieldRef="throttle_ref"
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={youAcr}
+                  refName={refAcr}
+                  height={110}
+                  unit="%"
+                  yDomain={[0, 100]}
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={false}
+                />
+                <DistanceCompareChart
+                  label="Freno (%)"
+                  data={alignedData}
+                  fieldYou="brake_you"
+                  fieldRef="brake_ref"
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={youAcr}
+                  refName={refAcr}
+                  height={90}
+                  unit="%"
+                  yDomain={[0, 100]}
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={true}
                 />
                 <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5">
                   <Info className="h-3 w-3 flex-shrink-0 mt-px" />
                   <span>
-                    Asse tempo relativo al via del giro (in secondi). I due tracciati sono allineati sull'inizio
-                    del giro, non su un riferimento di distanza.
+                    I due tracciati sono allineati sulla <strong>distanza percorsa in pista</strong> (posizione lungo il giro),
+                    così da confrontare i piloti nello stesso punto del tracciato. La distanza è <strong>stimata</strong>{" "}
+                    integrando la velocità nel tempo (OpenF1 non fornisce un canale distanza diretto), quindi è soggetta a
+                    piccole imprecisioni dovute al campionamento. L'allineamento è limitato alla porzione di giro coperta
+                    da entrambi i tracciati.
                   </span>
                 </div>
               </>
