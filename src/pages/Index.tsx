@@ -35,6 +35,7 @@ import { DriverDashboardCockpit } from "@/components/f1/DriverDashboardCockpit";
 import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
 import { SectorVsWinnerGrid } from "@/components/f1/SectorVsWinnerGrid";
 import { RaceEventTimeline } from "@/components/f1/RaceEventTimeline";
+import { SoftSensorsTimelineCard } from "@/components/f1/SoftSensorsTimelineCard";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
@@ -1041,6 +1042,12 @@ export default function Index() {
                   allDrivers={allDrivers}
                 />
               )}
+
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
+                <SoftSensorsTimelineCard timeline={vreResult?.soft_sensors_timeline ?? null} />
+              )}
+
+
 
               {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && (
                 <RaceEventTimeline
