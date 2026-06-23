@@ -1070,6 +1070,24 @@ export default function Index() {
                 <KeyDecisionMomentsCard result={kdmResult} />
               )}
 
+              {selectedDriverNumbers.length === 1 &&
+                sessionType.includes("Practice") &&
+                singleDriverState && (
+                  <PracticeOverviewDashboard
+                    driverAcronym={singleDriverState.driver.name_acronym}
+                    driverColor={getColor(singleDriverState.driver.driver_number)}
+                    laps={singleDriverState.laps}
+                    stints={singleDriverState.stints}
+                    longRuns={longRunResults.filter(
+                      (lr) => lr.driverNumber === singleDriverState.driver.driver_number,
+                    )}
+                    degradationResults={degradationResults.filter(
+                      (dr) => dr.driverNumber === singleDriverState.driver.driver_number,
+                    )}
+                    sessionWeather={sessionWeather}
+                  />
+                )}
+
               {/* ═══════════════════════════════════════════
                   DRILL-DOWN A FISARMONICA
                   4 sezioni, di default tutte collassate.
