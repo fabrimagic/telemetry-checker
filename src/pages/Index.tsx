@@ -36,6 +36,7 @@ import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
 import { SectorVsWinnerGrid } from "@/components/f1/SectorVsWinnerGrid";
 import { RaceEventTimeline } from "@/components/f1/RaceEventTimeline";
 import { SoftSensorsTimelineCard } from "@/components/f1/SoftSensorsTimelineCard";
+import { PitStopsChartCard } from "@/components/f1/PitStopsChartCard";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import { ContentGrid } from "@/components/layout/ContentGrid";
