@@ -287,8 +287,104 @@ export function QualifyingOverviewDashboard({
     return minB - minA; // negative = improved
   }, [evolutionData]);
 
+  // ── Telemetry compare (Punto 3b — on-demand fetch) ──
+  type TeleState =
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; you: TelemetryPoint[]; ref: TelemetryPoint[] };
+  const [teleState, setTeleState] = useState<TeleState>({ status: "idle" });
+  const [cursorTime, setCursorTime] = useState<number | null>(null);
+
+  // Reset when the laps to compare change.
+  useEffect(() => {
+    setTeleState({ status: "idle" });
+    setCursorTime(null);
+  }, [bestLap?.date_start, referenceLap?.date_start, referenceDriverNumber]);
+
+  const mapToPoints = (car: CarData[]): TelemetryPoint[] => {
+    if (!car.length) return [];
+    const t0 = new Date(car[0].date).getTime();
+    return car
+      .map((c) => {
+        const ts = new Date(c.date).getTime();
+        if (!Number.isFinite(ts)) return null;
+        return {
+          time: (ts - t0) / 1000,
+          speed: c.speed,
+          throttle: c.throttle,
+          brake: c.brake,
+          rpm: c.rpm,
+          gear: c.n_gear,
+          date: c.date,
+        } as TelemetryPoint;
+      })
+      .filter((p): p is TelemetryPoint => p != null);
+  };
+
+  const loadTelemetry = async () => {
+    if (!bestLap || !referenceLap || !referenceDriver) return;
+    setTeleState({ status: "loading" });
+    try {
+      const ownStart = bestLap.date_start!;
+      const ownEnd = new Date(
+        new Date(ownStart).getTime() + (bestLap.lap_duration as number) * 1000,
+      ).toISOString();
+      const refStart = referenceLap.date_start!;
+      const refEnd = new Date(
+        new Date(refStart).getTime() + (referenceLap.lap_duration as number) * 1000,
+      ).toISOString();
+      // Sequential fetch to respect the openf1 client rate limiter.
+      const ownCar = await getCarData(
+        sessionKey,
+        driver.driver_number,
+        ownStart,
+        ownEnd,
+      );
+      const refCar = await getCarData(
+        sessionKey,
+        referenceDriver.driver_number,
+        refStart,
+        refEnd,
+      );
+      const you = mapToPoints(ownCar);
+      const ref = mapToPoints(refCar);
+      if (!you.length && !ref.length) {
+        setTeleState({ status: "error", message: "Telemetria non disponibile per questi giri." });
+        return;
+      }
+      setTeleState({ status: "ready", you, ref });
+    } catch {
+      setTeleState({ status: "error", message: "Errore nel caricamento della telemetria." });
+    }
+  };
+
+  const telemetryDrivers: DriverTelemetry[] = useMemo(() => {
+    if (teleState.status !== "ready" || !referenceDriver) return [];
+    const arr: DriverTelemetry[] = [];
+    if (teleState.you.length) {
+      arr.push({
+        driverNumber: driver.driver_number,
+        acronym: driver.name_acronym,
+        color: driverColor,
+        data: teleState.you,
+      });
+    }
+    if (teleState.ref.length) {
+      arr.push({
+        driverNumber: referenceDriver.driver_number,
+        acronym: referenceDriver.name_acronym,
+        color: getColor(referenceDriver.driver_number),
+        data: teleState.ref,
+      });
+    }
+    return arr;
+  }, [teleState, driver, driverColor, referenceDriver, getColor]);
+
   // ── Render ──
   const accent = `#${driverColor}`;
+
+
 
   return (
     <div className="space-y-4">
