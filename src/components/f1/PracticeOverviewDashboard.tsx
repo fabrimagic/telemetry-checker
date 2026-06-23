@@ -786,7 +786,7 @@ export function PracticeOverviewDashboard({
                         strokeDasharray="3 3"
                         label={{ value: "Media", fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
                       />
-                      <Bar dataKey="speed" fill={accentColor} fillOpacity={0.65} radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="speed" fill="#3b82f6" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
