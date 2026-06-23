@@ -226,7 +226,7 @@ function DistanceCompareChart({
             }}
           />
           {cursor != null && (
-            <ReferenceLineLazy x={cursor} />
+            <ReferenceLine x={cursor} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
           )}
           {deltaFields ? (
             <Line
