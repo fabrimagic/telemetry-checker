@@ -1187,7 +1187,7 @@ export default function Index() {
                   </AccordionContent>
                 </AccordionItem>
 
-                {sessionType !== "Practice" && (
+                {sessionType !== "Practice" && !sessionType.includes("Qualifying") && (
                   <>
                     {/* ── Strategia ── */}
                     <AccordionItem
