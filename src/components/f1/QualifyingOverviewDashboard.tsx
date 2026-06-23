@@ -627,6 +627,18 @@ export function QualifyingOverviewDashboard({
     return out;
   }, [teleState]);
 
+  // Delta-time per distance: time_you(d) − time_ref(d). Negative ⇒ selected driver ahead.
+  // Same distance grid as alignedData so the cursor stays coordinated across charts.
+  const deltaTimeData = useMemo(() => {
+    if (teleState.status !== "ready" || alignedData.length === 0) return [];
+    return alignedData.map((p) => {
+      const ty = interpolateTimeAt(teleState.you, p.distance);
+      const tr = interpolateTimeAt(teleState.ref, p.distance);
+      const dt = ty != null && tr != null ? ty - tr : null;
+      return { distance: p.distance, dt };
+    });
+  }, [teleState, alignedData]);
+
   const refColorHex = referenceDriver ? `#${getColor(referenceDriver.driver_number)}` : "#888";
   const youColorHex = `#${driverColor}`;
   const youAcr = driver.name_acronym;
