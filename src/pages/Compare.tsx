@@ -382,47 +382,186 @@ export default function Compare() {
         </>
       )}
 
-      {comparison && driverObjA && driverObjB && (
-        <div className="space-y-6">
-          <section className="space-y-5">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground px-2">
-                Strategia reale eseguita
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
-            <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            <CompareDriverContext
-              driverA={driverObjA}
-              driverB={driverObjB}
-              resultA={dual.outA?.vreResult ?? null}
-              resultB={dual.outB?.vreResult ?? null}
-            />
-            <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-            {h2hRadar && (
-              <PerformanceRadarCard
-                result={h2hRadar}
-                title="Radar prestazionale H2H"
-                notice="Normalizzazione relative-to-best limitata ai due piloti confrontati: gli assi descrivono il vantaggio relativo, non assoluto contro il campo."
-              />
-            )}
-          </section>
+      {comparison && driverObjA && driverObjB && (() => {
+        const renderDriverColumn = (
+          out: VreLoaderOutput | null,
+          driver: Driver,
+        ) => {
+          const color = `#${driver.team_colour || "ffffff"}`;
+          if (!out) {
+            return (
+              <div className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground text-center">
+                Dati non disponibili per questo pilota
+              </div>
+            );
+          }
+          const cumDev =
+            out.cumDevResult?.drivers.find((d) => d.driver_number === out.driverNumber)?.laps ?? null;
+          const pitsForDriver = out.pits.filter((p) => p.driver_number === out.driverNumber);
+          const hasMini = out.laps && out.laps.length > 0;
+          const hasSoft = !!out.vreResult?.soft_sensors_timeline;
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-1 border-b border-border">
+                <span
+                  className="inline-block w-3 h-3 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="font-mono font-bold text-sm">{driver.name_acronym}</span>
+              </div>
 
-          <section className="space-y-5">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--f1-red))] px-2">
-                Strategia alternativa (ex-ante · balanced)
-              </span>
-              <div className="h-px flex-1 bg-[hsl(var(--f1-red))]/30" />
+              {hasMini ? (
+                <DriverMiniChartsGrid
+                  driverNumber={out.driverNumber}
+                  driverColor={driver.team_colour || "ffffff"}
+                  driverAcronym={driver.name_acronym}
+                  laps={out.laps}
+                  positions={out.positions}
+                  intervals={out.intervals}
+                  isRace
+                  allDrivers={allDrivers}
+                  cumDev={cumDev}
+                />
+              ) : (
+                <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground text-center">
+                  Dati non disponibili per questo pilota
+                </div>
+              )}
+
+              {hasSoft ? (
+                <SoftSensorsTimelineCard timeline={out.vreResult?.soft_sensors_timeline ?? null} />
+              ) : (
+                <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground text-center">
+                  Dati non disponibili per questo pilota
+                </div>
+              )}
+
+              {pitsForDriver.length > 0 ? (
+                <PitStopsChartCard pitStops={pitsForDriver} />
+              ) : (
+                <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground text-center">
+                  Dati non disponibili per questo pilota
+                </div>
+              )}
             </div>
-            <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
-          </section>
-        </div>
-      )}
+          );
+        };
+
+        const SectionHeader = ({ label, accent = false }: { label: string; accent?: boolean }) => (
+          <div className="flex items-center gap-2">
+            <div className={`h-px flex-1 ${accent ? "bg-[hsl(var(--f1-red))]/30" : "bg-border"}`} />
+            <span
+              className={`text-[10px] font-mono uppercase tracking-widest px-2 ${
+                accent ? "text-[hsl(var(--f1-red))]" : "text-muted-foreground"
+              }`}
+            >
+              {label}
+            </span>
+            <div className={`h-px flex-1 ${accent ? "bg-[hsl(var(--f1-red))]/30" : "bg-border"}`} />
+          </div>
+        );
+
+        const SectionTitle = ({ title, subtitle }: { title: string; subtitle: string }) => (
+          <div className="space-y-1">
+            <h2 className="text-base font-bold tracking-tight">{title}</h2>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          </div>
+        );
+
+        return (
+          <div className="space-y-8">
+            {/* 1. Verdetto */}
+            <section className="space-y-4">
+              <SectionHeader label="Verdetto del confronto" />
+              <SectionTitle
+                title="Chi ha fatto meglio e perché"
+                subtitle="Sintesi del duello e racconto in linguaggio chiaro: il riepilogo essenziale del confronto."
+              />
+              <CompareHeader comparison={comparison} driverA={driverObjA} driverB={driverObjB} onSwap={handleSwap} />
+              <CompareNarrative comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+            </section>
+
+            {/* 2. Andamento in gara */}
+            <section className="space-y-4">
+              <SectionHeader label="Andamento in gara" />
+              <SectionTitle
+                title="Come si è sviluppato il duello"
+                subtitle="Timeline del gap giro dopo giro e contesto di gara dei due piloti."
+              />
+              <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+              <CompareDriverContext
+                driverA={driverObjA}
+                driverB={driverObjB}
+                resultA={dual.outA?.vreResult ?? null}
+                resultB={dual.outB?.vreResult ?? null}
+              />
+            </section>
+
+            {/* 3. Dashboard a confronto */}
+            <section className="space-y-4">
+              <SectionHeader label="Dashboard a confronto · grafici affiancati" />
+              <SectionTitle
+                title="Gli stessi grafici dei due piloti, fianco a fianco"
+                subtitle="Stesso tipo di grafico sulla stessa riga per A e B: confronto diretto e immediato."
+              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {renderDriverColumn(dual.outA, driverObjA)}
+                {renderDriverColumn(dual.outB, driverObjB)}
+              </div>
+            </section>
+
+            {/* 4. Metriche e prestazioni (collassabile) */}
+            <section className="space-y-4">
+              <SectionHeader label="Metriche e prestazioni" />
+              <Accordion type="single" collapsible defaultValue="" className="border border-border rounded-lg bg-card/40">
+                <AccordionItem value="metrics" className="border-b-0">
+                  <AccordionTrigger className="px-4 hover:no-underline">
+                    <div className="text-left">
+                      <div className="text-sm font-bold">Numeri di dettaglio e radar prestazionale</div>
+                      <div className="text-xs text-muted-foreground font-normal">
+                        Metriche quantitative e profilo prestazionale dei due piloti. Espandi per vedere i dettagli.
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    <div className="space-y-5">
+                      <CompareMetricsGrid comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+                      {h2hRadar && (
+                        <PerformanceRadarCard
+                          result={h2hRadar}
+                          title="Radar prestazionale H2H"
+                          notice="Normalizzazione relative-to-best limitata ai due piloti confrontati: gli assi descrivono il vantaggio relativo, non assoluto contro il campo."
+                        />
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </section>
+
+            {/* 5. Strategia alternativa (collassabile) */}
+            <section className="space-y-4">
+              <SectionHeader label="Strategia alternativa (ex-ante · balanced)" accent />
+              <Accordion type="single" collapsible defaultValue="" className="border border-[hsl(var(--f1-red))]/30 rounded-lg bg-card/40">
+                <AccordionItem value="alt" className="border-b-0">
+                  <AccordionTrigger className="px-4 hover:no-underline">
+                    <div className="text-left">
+                      <div className="text-sm font-bold">Cosa sarebbe successo con una strategia diversa</div>
+                      <div className="text-xs text-muted-foreground font-normal">
+                        Analisi what-if ex-ante: confronto rispetto a un piano strategico alternativo.
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    <CompareAlternativeStrategies comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </section>
+          </div>
+        );
+      })()}
+
 
       {!sessionKey && (
         <div className="text-sm text-muted-foreground border border-dashed border-border rounded-lg p-6 text-center">
