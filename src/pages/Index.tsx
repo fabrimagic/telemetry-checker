@@ -178,6 +178,11 @@ export default function Index() {
         getAllLaps(key).then((al) => setSessionAllLaps(al)).catch(() => {});
         getSessionResult(key).then((sr) => setSessionResults(sr)).catch(() => {});
       }
+      // For Practice sessions, fetch all-driver laps so the practice dashboard
+      // can render the telemetry comparison against any other driver's best lap.
+      if (type.includes("Practice")) {
+        getAllLaps(key).then((al) => setSessionAllLaps(al)).catch(() => {});
+      }
       // Resolve circuit location/country for the per-lap precipitation outlook
       // card. Best-effort; failure simply leaves the card hidden.
       setCircuitKey(null);
