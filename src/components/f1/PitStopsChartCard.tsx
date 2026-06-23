@@ -24,8 +24,8 @@ interface ChartRow {
   stopAvailable: boolean;
 }
 
-const COLOR_LANE = "hsl(var(--primary))";
-const COLOR_STOP = "hsl(var(--destructive))";
+const COLOR_LANE = "hsl(var(--chart-blue))";
+const COLOR_STOP = "hsl(var(--chart-orange))";
 const COLOR_NA = "hsl(var(--muted))";
 
 function fmt(v: number | null | undefined): string {
