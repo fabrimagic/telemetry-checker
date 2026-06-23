@@ -308,20 +308,6 @@ export function QualifyingOverviewDashboard({
     return minB - minA; // negative = improved
   }, [evolutionData]);
 
-  // ── Telemetry compare (Punto 3b — on-demand fetch) ──
-  type TeleState =
-    | { status: "idle" }
-    | { status: "loading" }
-    | { status: "error"; message: string }
-    | { status: "ready"; you: TelemetryPoint[]; ref: TelemetryPoint[] };
-  const [teleState, setTeleState] = useState<TeleState>({ status: "idle" });
-  const [cursorTime, setCursorTime] = useState<number | null>(null);
-
-  // Reset when the laps to compare change.
-  useEffect(() => {
-    setTeleState({ status: "idle" });
-    setCursorTime(null);
-  }, [bestLap?.date_start, referenceLap?.date_start, referenceDriverNumber]);
 
   // ── Telemetry compare (Punto 3b — on-demand fetch, distance-aligned) ──
   type TeleState =
