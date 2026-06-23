@@ -270,12 +270,6 @@ function DistanceCompareChart({
   );
 }
 
-// Tiny indirection so the import stays minimal at the top.
-function ReferenceLineLazy({ x }: { x: number }) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { ReferenceLine } = require("recharts");
-  return <ReferenceLine x={x} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />;
-}
 
 
 
