@@ -123,6 +123,161 @@ const Placeholder = ({ children = "Dati non disponibili" }: { children?: React.R
   <div className="text-xs text-muted-foreground italic">{children}</div>
 );
 
+// Self-contained distance-aligned compare chart for the qualifying telemetry section.
+// Renders two overlaid lines (you vs reference) on a shared distance axis (meters),
+// or — when deltaFields is provided — a single delta line (a − b).
+interface DistanceCompareChartProps {
+  label: string;
+  data: AlignedPoint[];
+  fieldYou?: keyof AlignedPoint;
+  fieldRef?: keyof AlignedPoint;
+  deltaFields?: { a: keyof AlignedPoint; b: keyof AlignedPoint };
+  youColor: string;
+  refColor: string;
+  youName: string;
+  refName: string;
+  height: number;
+  unit?: string;
+  yDomain?: [number, number];
+  cursor: number | null;
+  onCursor: (d: number | null) => void;
+  showXAxis: boolean;
+}
+
+function DistanceCompareChart({
+  label,
+  data,
+  fieldYou,
+  fieldRef,
+  deltaFields,
+  youColor,
+  refColor,
+  youName,
+  refName,
+  height,
+  unit = "",
+  yDomain,
+  cursor,
+  onCursor,
+  showXAxis,
+}: DistanceCompareChartProps) {
+  const series = deltaFields
+    ? data.map((p) => {
+        const a = p[deltaFields.a] as number | null;
+        const b = p[deltaFields.b] as number | null;
+        return { distance: p.distance, delta: a != null && b != null ? a - b : null };
+      })
+    : data;
+  return (
+    <div className="relative">
+      <span className="absolute top-0 left-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider z-10">
+        {label}
+      </span>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart
+          data={series}
+          margin={{ top: 18, right: 12, left: 0, bottom: showXAxis ? 18 : 0 }}
+          onMouseMove={(s: any) => {
+            const d = s?.activePayload?.[0]?.payload?.distance;
+            if (typeof d === "number") onCursor(d);
+          }}
+          onMouseLeave={() => onCursor(null)}
+        >
+          <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.4} vertical={false} />
+          <XAxis
+            dataKey="distance"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+            axisLine={false}
+            tickLine={false}
+            hide={!showXAxis}
+            tickFormatter={(v) => `${Math.round(v as number)}`}
+            label={
+              showXAxis
+                ? {
+                    value: "Distanza (m)",
+                    position: "insideBottom",
+                    offset: -4,
+                    style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" },
+                  }
+                : undefined
+            }
+          />
+          <YAxis
+            width={42}
+            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+            axisLine={false}
+            tickLine={false}
+            domain={yDomain ?? ["auto", "auto"]}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--background))",
+              border: "1px solid hsl(var(--border))",
+              fontSize: 11,
+            }}
+            labelFormatter={(v) => `${Math.round(v as number)} m`}
+            formatter={(val: any, name: any) => {
+              if (val == null || !Number.isFinite(val)) return ["—", name];
+              const v = Number(val);
+              return [`${v.toFixed(unit === "%" ? 0 : 1)}${unit}`, name];
+            }}
+          />
+          {cursor != null && (
+            <ReferenceLineLazy x={cursor} />
+          )}
+          {deltaFields ? (
+            <Line
+              type="monotone"
+              dataKey="delta"
+              name={youName}
+              stroke={youColor}
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+              connectNulls
+            />
+          ) : (
+            <>
+              <Line
+                type="monotone"
+                dataKey={fieldYou as string}
+                name={youName}
+                stroke={youColor}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey={fieldRef as string}
+                name={refName}
+                stroke={refColor}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+            </>
+          )}
+          {!deltaFields && <Legend wrapperStyle={{ fontSize: 10 }} />}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Tiny indirection so the import stays minimal at the top.
+function ReferenceLineLazy({ x }: { x: number }) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { ReferenceLine } = require("recharts");
+  return <ReferenceLine x={x} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />;
+}
+
+
+
 const StatCard = ({
   icon,
   label,
