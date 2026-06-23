@@ -542,7 +542,9 @@ export function QualifyingOverviewDashboard({
         setTeleState({ status: "error", message: "Telemetria non disponibile per questi giri." });
         return;
       }
-      setTeleState({ status: "ready", you, ref });
+      const youZones = computeZones(ownCar);
+      const refZones = computeZones(refCar);
+      setTeleState({ status: "ready", you, ref, youZones, refZones });
     } catch {
       setTeleState({ status: "error", message: "Errore nel caricamento della telemetria." });
     }
