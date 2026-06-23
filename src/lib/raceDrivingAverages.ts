@@ -13,9 +13,10 @@ export interface DrivingZoneStats {
   liftcoast: { count: number; duration: number; dates: string[] };
 }
 
-// Throttle threshold for superclipping: episode starts only when throttle is
-// STRICTLY above 95% (i.e. "oltre il 95%").
-const THROTTLE_SUPERCLIP_MIN = 95;
+// Brake threshold for superclipping: episode requires the brake pedal fully
+// applied. We use brake === 100 as the primary criterion; CarData reports
+// throttle/brake on a 0–100 scale.
+const BRAKE_FULL = 100;
 
 export function computeZones(carData: CarData[]): DrivingZoneStats {
   let superclipCount = 0;
@@ -35,29 +36,35 @@ export function computeZones(carData: CarData[]): DrivingZoneStats {
     const dt = new Date(curr.date).getTime() - new Date(prev.date).getTime();
     const safeDt = Number.isFinite(dt) && dt > 0 ? dt : 0;
 
-    // ---- Superclipping (stateful, episodic) ----
-    // Start: throttle > 95% AND speed decreasing. End: brake pressed OR speed rising again.
-    // Note: during an active episode the throttle is NOT required to stay > 95 — the
-    // definition explicitly anchors the end to brake-on or speed-rising, not to a
-    // momentary throttle dip. Only brake-on or speed-rising terminates the episode.
+    // ---- Superclipping (new definition, stateful, episodic) ----
+    // An episode requires:
+    //   • brake pedal fully applied (brake === 100), AND
+    //   • RPM dropping vs the previous sample (curr.rpm < prev.rpm)
+    // The episode STARTS on the first sample matching both conditions, CONTINUES
+    // while they keep matching, and TERMINATES on the first sample that breaks
+    // either condition. The terminating sample is NOT accumulated, mirroring the
+    // pattern already used for lift & coast / the previous logic. Samples with
+    // non-finite rpm/brake are treated as terminating the current episode.
+    const brakeOk = Number.isFinite(curr.brake) && curr.brake === BRAKE_FULL;
+    const rpmOk =
+      Number.isFinite(curr.rpm) && Number.isFinite(prev.rpm) && curr.rpm < prev.rpm;
+    const superclipCondition = brakeOk && rpmOk;
     if (!inSuperclip) {
-      if (curr.throttle > THROTTLE_SUPERCLIP_MIN && curr.speed < prev.speed && prev.speed > 0) {
+      if (superclipCondition) {
         inSuperclip = true;
         superclipCount++;
         superclipMs += safeDt;
         superclipDates.push(curr.date);
       }
     } else {
-      const endsByBrake = (curr.brake ?? 0) > 0;
-      const endsBySpeedUp = curr.speed > prev.speed;
-      if (endsByBrake || endsBySpeedUp) {
-        // Episode ends; the terminating sample is NOT accumulated.
+      if (!superclipCondition) {
         inSuperclip = false;
       } else {
         superclipMs += safeDt;
         superclipDates.push(curr.date);
       }
     }
+
 
     // ---- Lift & Coast (unchanged) ----
     // Starts when going from (throttle>90, brake=0) to (throttle=0, brake=0);
