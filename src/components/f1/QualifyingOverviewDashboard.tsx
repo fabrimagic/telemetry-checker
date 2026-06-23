@@ -37,6 +37,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getCarData } from "@/lib/openf1";
 import type { CarData, Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
+import { computeZones, type DrivingZoneStats } from "@/lib/raceDrivingAverages";
 
 // Telemetry sample enriched with cumulative distance estimated by integrating speed.
 interface TelemetrySample {
