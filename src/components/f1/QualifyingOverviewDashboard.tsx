@@ -36,11 +36,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { getCarData } from "@/lib/openf1";
 import type { CarData, Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
-import {
-  TelemetryCharts,
-  type DriverTelemetry,
-  type TelemetryPoint,
-} from "@/components/f1/TelemetryCharts";
+
+// Telemetry sample enriched with cumulative distance estimated by integrating speed.
+interface TelemetrySample {
+  time: number;       // seconds since start of lap
+  distance: number;   // meters since start of lap (estimated by ∫v dt)
+  speed: number | null;
+  throttle: number | null;
+  brake: number | null;
+  rpm: number | null;
+  gear: number | null;
+}
+
+// Aligned point on the common distance grid.
+interface AlignedPoint {
+  distance: number;
+  speed_you: number | null;
+  speed_ref: number | null;
+  throttle_you: number | null;
+  throttle_ref: number | null;
+  brake_you: number | null;
+  brake_ref: number | null;
+  rpm_you: number | null;
+  rpm_ref: number | null;
+  gear_you: number | null;
+  gear_ref: number | null;
+}
 
 interface Props {
   driver: Driver;
