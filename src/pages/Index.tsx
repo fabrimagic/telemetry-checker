@@ -172,6 +172,12 @@ export default function Index() {
       // Fetch session weather for lap classification (fire and forget)
       getWeatherForSession(key).then((w) => setSessionWeather(w)).catch(() => {});
       getRaceControl(key).then((rc) => setRaceControlMessages(rc)).catch(() => {});
+      // For Qualifying sessions, fetch all-driver laps + session result so the
+      // dedicated qualifying dashboard can render pole comparisons. Best-effort.
+      if (type.includes("Qualifying")) {
+        getAllLaps(key).then((al) => setSessionAllLaps(al)).catch(() => {});
+        getSessionResult(key).then((sr) => setSessionResults(sr)).catch(() => {});
+      }
       // Resolve circuit location/country for the per-lap precipitation outlook
       // card. Best-effort; failure simply leaves the card hidden.
       setCircuitKey(null);
