@@ -810,6 +810,19 @@ export function PracticeOverviewDashboard({
             )}
           </AccordionContent>
         </AccordionItem>
+        {/* Telemetry comparison — same card as the Qualifying dashboard */}
+        {driver && sessionAllLaps && allDrivers && getColor && typeof sessionKey === "number" && (
+          <TelemetryCompareCard
+            driver={driver}
+            driverColor={driverColor}
+            bestLap={bestLap}
+            sessionAllLaps={sessionAllLaps}
+            allDrivers={allDrivers}
+            getColor={getColor}
+            sessionKey={sessionKey}
+            accordionValue="telemetry"
+          />
+        )}
       </Accordion>
 
       <p className="text-[10px] text-muted-foreground leading-relaxed">
