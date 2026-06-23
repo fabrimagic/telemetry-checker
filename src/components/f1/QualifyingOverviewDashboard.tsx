@@ -719,6 +719,99 @@ export function QualifyingOverviewDashboard({
           </AccordionContent>
         </AccordionItem>
 
+        {/* PUNTO 3b — Confronto telemetria */}
+        <AccordionItem
+          value="telemetry"
+          className="border border-border/60 rounded-xl bg-card overflow-hidden !border-b"
+        >
+          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4" style={{ color: accent }} />
+              <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                Confronto telemetria miglior giro
+              </span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={loadTelemetry}
+                disabled={
+                  !bestLap ||
+                  !referenceLap ||
+                  !referenceDriver ||
+                  teleState.status === "loading"
+                }
+              >
+                {teleState.status === "loading"
+                  ? "Caricamento…"
+                  : teleState.status === "ready"
+                  ? "Ricarica telemetria"
+                  : "Carica confronto telemetria"}
+              </Button>
+              {referenceDriver && bestLap && referenceLap && (
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: `#${driverColor}` }}
+                    />
+                    <span className="font-mono">{driver.name_acronym}</span>
+                    <span>(selezionato)</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: `#${getColor(referenceDriver.driver_number)}` }}
+                    />
+                    <span className="font-mono">{referenceDriver.name_acronym}</span>
+                    <span>
+                      ({compareMode === "pole" ? "pole" : "riferimento"})
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {!bestLap ? (
+              <Placeholder>Miglior giro del pilota non disponibile.</Placeholder>
+            ) : !referenceLap || !referenceDriver ? (
+              <Placeholder>Giro di riferimento non disponibile.</Placeholder>
+            ) : teleState.status === "idle" ? (
+              <div className="text-[11px] text-muted-foreground">
+                La telemetria viene scaricata solo su richiesta per non sovraccaricare le API.
+                Premi il pulsante per caricare il confronto tra i due migliori giri.
+              </div>
+            ) : teleState.status === "loading" ? (
+              <div className="text-[11px] text-muted-foreground">Caricamento telemetria…</div>
+            ) : teleState.status === "error" ? (
+              <Placeholder>{teleState.message}</Placeholder>
+            ) : telemetryDrivers.length === 0 ? (
+              <Placeholder>Telemetria non disponibile per questo giro.</Placeholder>
+            ) : (
+              <>
+                <TelemetryCharts
+                  drivers={telemetryDrivers}
+                  cursorTime={cursorTime}
+                  onCursorChange={setCursorTime}
+                  onCursorClick={(t) => setCursorTime(t)}
+                />
+                <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5">
+                  <Info className="h-3 w-3 flex-shrink-0 mt-px" />
+                  <span>
+                    Asse tempo relativo al via del giro (in secondi). I due tracciati sono allineati sull'inizio
+                    del giro, non su un riferimento di distanza.
+                  </span>
+                </div>
+              </>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
+
         {/* PUNTO 4 — Track evolution */}
         <AccordionItem
           value="evolution"
