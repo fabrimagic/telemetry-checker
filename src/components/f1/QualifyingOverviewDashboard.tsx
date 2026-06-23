@@ -323,24 +323,59 @@ export function QualifyingOverviewDashboard({
     setCursorTime(null);
   }, [bestLap?.date_start, referenceLap?.date_start, referenceDriverNumber]);
 
-  const mapToPoints = (car: CarData[]): TelemetryPoint[] => {
+  // ── Telemetry compare (Punto 3b — on-demand fetch, distance-aligned) ──
+  type TeleState =
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; you: TelemetrySample[]; ref: TelemetrySample[] };
+  const [teleState, setTeleState] = useState<TeleState>({ status: "idle" });
+  const [cursorDistance, setCursorDistance] = useState<number | null>(null);
+
+  // Reset when the laps to compare change.
+  useEffect(() => {
+    setTeleState({ status: "idle" });
+    setCursorDistance(null);
+  }, [bestLap?.date_start, referenceLap?.date_start, referenceDriverNumber]);
+
+  // Map raw CarData[] → TelemetrySample[] with cumulative distance estimated by
+  // trapezoidal integration of speed (km/h → m/s). OpenF1 does not provide a
+  // direct distance channel: this is an estimate.
+  const mapToSamples = (car: CarData[]): TelemetrySample[] => {
     if (!car.length) return [];
     const t0 = new Date(car[0].date).getTime();
-    return car
-      .map((c) => {
-        const ts = new Date(c.date).getTime();
-        if (!Number.isFinite(ts)) return null;
-        return {
-          time: (ts - t0) / 1000,
-          speed: c.speed,
-          throttle: c.throttle,
-          brake: c.brake,
-          rpm: c.rpm,
-          gear: c.n_gear,
-          date: c.date,
-        } as TelemetryPoint;
-      })
-      .filter((p): p is TelemetryPoint => p != null);
+    let prevT: number | null = null;
+    let prevSpeedMs: number | null = null;
+    let distance = 0;
+    const out: TelemetrySample[] = [];
+    for (const c of car) {
+      const ts = new Date(c.date).getTime();
+      if (!Number.isFinite(ts)) continue;
+      const tSec = (ts - t0) / 1000;
+      const speed = typeof c.speed === "number" && Number.isFinite(c.speed) ? c.speed : null;
+      const speedMs = speed != null ? speed / 3.6 : null;
+
+      if (prevT != null) {
+        let dt = tSec - prevT;
+        if (!Number.isFinite(dt) || dt <= 0) dt = 0;
+        if (dt > 0 && speedMs != null) {
+          const vAvg = prevSpeedMs != null ? (prevSpeedMs + speedMs) / 2 : speedMs;
+          distance += vAvg * dt;
+        }
+      }
+      out.push({
+        time: tSec,
+        distance,
+        speed,
+        throttle: typeof c.throttle === "number" ? c.throttle : null,
+        brake: typeof c.brake === "number" ? c.brake : null,
+        rpm: typeof c.rpm === "number" ? c.rpm : null,
+        gear: typeof c.n_gear === "number" ? c.n_gear : null,
+      });
+      prevT = tSec;
+      if (speedMs != null) prevSpeedMs = speedMs;
+    }
+    return out;
   };
 
   const loadTelemetry = async () => {
@@ -356,21 +391,11 @@ export function QualifyingOverviewDashboard({
         new Date(refStart).getTime() + (referenceLap.lap_duration as number) * 1000,
       ).toISOString();
       // Sequential fetch to respect the openf1 client rate limiter.
-      const ownCar = await getCarData(
-        sessionKey,
-        driver.driver_number,
-        ownStart,
-        ownEnd,
-      );
-      const refCar = await getCarData(
-        sessionKey,
-        referenceDriver.driver_number,
-        refStart,
-        refEnd,
-      );
-      const you = mapToPoints(ownCar);
-      const ref = mapToPoints(refCar);
-      if (!you.length && !ref.length) {
+      const ownCar = await getCarData(sessionKey, driver.driver_number, ownStart, ownEnd);
+      const refCar = await getCarData(sessionKey, referenceDriver.driver_number, refStart, refEnd);
+      const you = mapToSamples(ownCar);
+      const ref = mapToSamples(refCar);
+      if (you.length < 2 || ref.length < 2) {
         setTeleState({ status: "error", message: "Telemetria non disponibile per questi giri." });
         return;
       }
@@ -380,27 +405,69 @@ export function QualifyingOverviewDashboard({
     }
   };
 
-  const telemetryDrivers: DriverTelemetry[] = useMemo(() => {
-    if (teleState.status !== "ready" || !referenceDriver) return [];
-    const arr: DriverTelemetry[] = [];
-    if (teleState.you.length) {
-      arr.push({
-        driverNumber: driver.driver_number,
-        acronym: driver.name_acronym,
-        color: driverColor,
-        data: teleState.you,
-      });
+  // Interpolate a single channel value at a given distance over a monotone-in-distance series.
+  const interpolateAt = (
+    samples: TelemetrySample[],
+    distance: number,
+    field: keyof Pick<TelemetrySample, "speed" | "throttle" | "brake" | "rpm" | "gear">,
+  ): number | null => {
+    if (!samples.length) return null;
+    // Binary search for the right bracket.
+    let lo = 0, hi = samples.length - 1;
+    if (distance <= samples[0].distance) return samples[0][field];
+    if (distance >= samples[hi].distance) return samples[hi][field];
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (samples[mid].distance <= distance) lo = mid;
+      else hi = mid;
     }
-    if (teleState.ref.length) {
-      arr.push({
-        driverNumber: referenceDriver.driver_number,
-        acronym: referenceDriver.name_acronym,
-        color: getColor(referenceDriver.driver_number),
-        data: teleState.ref,
-      });
+    const a = samples[lo], b = samples[hi];
+    const va = a[field], vb = b[field];
+    if (va == null && vb == null) return null;
+    if (va == null) return vb;
+    if (vb == null) return va;
+    const span = b.distance - a.distance;
+    if (span <= 0) return va;
+    const t = (distance - a.distance) / span;
+    // Gear is integer-like; snap to nearest to avoid fractional gears.
+    if (field === "gear") return t < 0.5 ? va : vb;
+    return va + (vb - va) * t;
+  };
+
+  // Build the distance-aligned dataset on a common grid (500 points, capped at min lap distance).
+  const alignedData: AlignedPoint[] = useMemo(() => {
+    if (teleState.status !== "ready") return [];
+    const youMax = teleState.you[teleState.you.length - 1].distance;
+    const refMax = teleState.ref[teleState.ref.length - 1].distance;
+    const maxD = Math.min(youMax, refMax);
+    if (!Number.isFinite(maxD) || maxD <= 0) return [];
+    const N = 500;
+    const out: AlignedPoint[] = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const d = (maxD * i) / (N - 1);
+      out[i] = {
+        distance: d,
+        speed_you: interpolateAt(teleState.you, d, "speed"),
+        speed_ref: interpolateAt(teleState.ref, d, "speed"),
+        throttle_you: interpolateAt(teleState.you, d, "throttle"),
+        throttle_ref: interpolateAt(teleState.ref, d, "throttle"),
+        brake_you: interpolateAt(teleState.you, d, "brake"),
+        brake_ref: interpolateAt(teleState.ref, d, "brake"),
+        rpm_you: interpolateAt(teleState.you, d, "rpm"),
+        rpm_ref: interpolateAt(teleState.ref, d, "rpm"),
+        gear_you: interpolateAt(teleState.you, d, "gear"),
+        gear_ref: interpolateAt(teleState.ref, d, "gear"),
+      };
     }
-    return arr;
-  }, [teleState, driver, driverColor, referenceDriver, getColor]);
+    return out;
+  }, [teleState]);
+
+  const refColorHex = referenceDriver ? `#${getColor(referenceDriver.driver_number)}` : "#888";
+  const youColorHex = `#${driverColor}`;
+  const youAcr = driver.name_acronym;
+  const refAcr = referenceDriver?.name_acronym ?? "REF";
+
+
 
   // ── Render ──
   const accent = `#${driverColor}`;
