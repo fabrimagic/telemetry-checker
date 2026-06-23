@@ -465,7 +465,13 @@ export function QualifyingOverviewDashboard({
     | { status: "idle" }
     | { status: "loading" }
     | { status: "error"; message: string }
-    | { status: "ready"; you: TelemetrySample[]; ref: TelemetrySample[] };
+    | {
+        status: "ready";
+        you: TelemetrySample[];
+        ref: TelemetrySample[];
+        youZones: DrivingZoneStats;
+        refZones: DrivingZoneStats;
+      };
   const [teleState, setTeleState] = useState<TeleState>({ status: "idle" });
   const [cursorDistance, setCursorDistance] = useState<number | null>(null);
 
