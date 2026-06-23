@@ -27,9 +27,10 @@ import {
   Gauge,
   Info,
 } from "lucide-react";
-import type { Lap, StintData, WeatherData } from "@/lib/openf1";
+import type { Driver, Lap, StintData, WeatherData } from "@/lib/openf1";
 import type { LongRunResult } from "@/lib/longRunDetector";
 import type { DegradationResult } from "@/lib/tyreDegradation";
+import { TelemetryCompareCard } from "./TelemetryCompareCard";
 
 interface Props {
   driverAcronym: string;
@@ -39,6 +40,12 @@ interface Props {
   longRuns: LongRunResult[];
   degradationResults: DegradationResult[];
   sessionWeather: WeatherData[];
+  // Optional props enabling the telemetry comparison card.
+  driver?: Driver;
+  sessionAllLaps?: Lap[];
+  allDrivers?: Driver[];
+  getColor?: (driverNumber: number) => string;
+  sessionKey?: number;
 }
 
 const COMPOUND_COLORS: Record<string, string> = {
@@ -116,6 +123,11 @@ export function PracticeOverviewDashboard({
   longRuns,
   degradationResults,
   sessionWeather,
+  driver,
+  sessionAllLaps,
+  allDrivers,
+  getColor,
+  sessionKey,
 }: Props) {
   // ── valid laps (exclude null and pit-out) ──
   const validLaps = useMemo(
@@ -798,6 +810,19 @@ export function PracticeOverviewDashboard({
             )}
           </AccordionContent>
         </AccordionItem>
+        {/* Telemetry comparison — same card as the Qualifying dashboard */}
+        {driver && sessionAllLaps && allDrivers && getColor && typeof sessionKey === "number" && (
+          <TelemetryCompareCard
+            driver={driver}
+            driverColor={driverColor}
+            bestLap={bestLap}
+            sessionAllLaps={sessionAllLaps}
+            allDrivers={allDrivers}
+            getColor={getColor}
+            sessionKey={sessionKey}
+            accordionValue="telemetry"
+          />
+        )}
       </Accordion>
 
       <p className="text-[10px] text-muted-foreground leading-relaxed">

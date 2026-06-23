@@ -1096,6 +1096,11 @@ export default function Index() {
                       (dr) => dr.driverNumber === singleDriverState.driver.driver_number,
                     )}
                     sessionWeather={sessionWeather}
+                    driver={singleDriverState.driver}
+                    sessionAllLaps={sessionAllLaps}
+                    allDrivers={allDrivers}
+                    getColor={getColor}
+                    sessionKey={sessionKey!}
                   />
                 )}
 
