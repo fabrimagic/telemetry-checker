@@ -123,6 +123,11 @@ export function PracticeOverviewDashboard({
   longRuns,
   degradationResults,
   sessionWeather,
+  driver,
+  sessionAllLaps,
+  allDrivers,
+  getColor,
+  sessionKey,
 }: Props) {
   // ── valid laps (exclude null and pit-out) ──
   const validLaps = useMemo(
