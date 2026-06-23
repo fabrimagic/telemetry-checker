@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,8 +31,16 @@ import {
   Swords,
   Info,
   Gauge,
+  Activity,
 } from "lucide-react";
-import type { Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
+import { Button } from "@/components/ui/button";
+import { getCarData } from "@/lib/openf1";
+import type { CarData, Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
+import {
+  TelemetryCharts,
+  type DriverTelemetry,
+  type TelemetryPoint,
+} from "@/components/f1/TelemetryCharts";
 
 interface Props {
   driver: Driver;
@@ -43,7 +51,9 @@ interface Props {
   allDrivers: Driver[];
   sessionWeather: WeatherData[];
   getColor: (driverNumber: number) => string;
+  sessionKey: number;
 }
+
 
 // Micro-sector color codes — same semantics as SectorMiniSectors.tsx
 function segmentColor(value: number | null): string {
@@ -131,8 +141,10 @@ export function QualifyingOverviewDashboard({
   allDrivers,
   sessionWeather,
   getColor,
+  sessionKey,
 }: Props) {
   const validLaps = useMemo(() => laps.filter(isValidLap), [laps]);
+
 
   // PUNTO 1 — best real & theoretical best
   const bestLap = useMemo(() => bestLapOf(laps), [laps]);
@@ -275,8 +287,104 @@ export function QualifyingOverviewDashboard({
     return minB - minA; // negative = improved
   }, [evolutionData]);
 
+  // ── Telemetry compare (Punto 3b — on-demand fetch) ──
+  type TeleState =
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; you: TelemetryPoint[]; ref: TelemetryPoint[] };
+  const [teleState, setTeleState] = useState<TeleState>({ status: "idle" });
+  const [cursorTime, setCursorTime] = useState<number | null>(null);
+
+  // Reset when the laps to compare change.
+  useEffect(() => {
+    setTeleState({ status: "idle" });
+    setCursorTime(null);
+  }, [bestLap?.date_start, referenceLap?.date_start, referenceDriverNumber]);
+
+  const mapToPoints = (car: CarData[]): TelemetryPoint[] => {
+    if (!car.length) return [];
+    const t0 = new Date(car[0].date).getTime();
+    return car
+      .map((c) => {
+        const ts = new Date(c.date).getTime();
+        if (!Number.isFinite(ts)) return null;
+        return {
+          time: (ts - t0) / 1000,
+          speed: c.speed,
+          throttle: c.throttle,
+          brake: c.brake,
+          rpm: c.rpm,
+          gear: c.n_gear,
+          date: c.date,
+        } as TelemetryPoint;
+      })
+      .filter((p): p is TelemetryPoint => p != null);
+  };
+
+  const loadTelemetry = async () => {
+    if (!bestLap || !referenceLap || !referenceDriver) return;
+    setTeleState({ status: "loading" });
+    try {
+      const ownStart = bestLap.date_start!;
+      const ownEnd = new Date(
+        new Date(ownStart).getTime() + (bestLap.lap_duration as number) * 1000,
+      ).toISOString();
+      const refStart = referenceLap.date_start!;
+      const refEnd = new Date(
+        new Date(refStart).getTime() + (referenceLap.lap_duration as number) * 1000,
+      ).toISOString();
+      // Sequential fetch to respect the openf1 client rate limiter.
+      const ownCar = await getCarData(
+        sessionKey,
+        driver.driver_number,
+        ownStart,
+        ownEnd,
+      );
+      const refCar = await getCarData(
+        sessionKey,
+        referenceDriver.driver_number,
+        refStart,
+        refEnd,
+      );
+      const you = mapToPoints(ownCar);
+      const ref = mapToPoints(refCar);
+      if (!you.length && !ref.length) {
+        setTeleState({ status: "error", message: "Telemetria non disponibile per questi giri." });
+        return;
+      }
+      setTeleState({ status: "ready", you, ref });
+    } catch {
+      setTeleState({ status: "error", message: "Errore nel caricamento della telemetria." });
+    }
+  };
+
+  const telemetryDrivers: DriverTelemetry[] = useMemo(() => {
+    if (teleState.status !== "ready" || !referenceDriver) return [];
+    const arr: DriverTelemetry[] = [];
+    if (teleState.you.length) {
+      arr.push({
+        driverNumber: driver.driver_number,
+        acronym: driver.name_acronym,
+        color: driverColor,
+        data: teleState.you,
+      });
+    }
+    if (teleState.ref.length) {
+      arr.push({
+        driverNumber: referenceDriver.driver_number,
+        acronym: referenceDriver.name_acronym,
+        color: getColor(referenceDriver.driver_number),
+        data: teleState.ref,
+      });
+    }
+    return arr;
+  }, [teleState, driver, driverColor, referenceDriver, getColor]);
+
   // ── Render ──
   const accent = `#${driverColor}`;
+
+
 
   return (
     <div className="space-y-4">
@@ -610,6 +718,99 @@ export function QualifyingOverviewDashboard({
             )}
           </AccordionContent>
         </AccordionItem>
+
+        {/* PUNTO 3b — Confronto telemetria */}
+        <AccordionItem
+          value="telemetry"
+          className="border border-border/60 rounded-xl bg-card overflow-hidden !border-b"
+        >
+          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4" style={{ color: accent }} />
+              <span className="text-[11px] font-black uppercase tracking-[0.22em]">
+                Confronto telemetria miglior giro
+              </span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={loadTelemetry}
+                disabled={
+                  !bestLap ||
+                  !referenceLap ||
+                  !referenceDriver ||
+                  teleState.status === "loading"
+                }
+              >
+                {teleState.status === "loading"
+                  ? "Caricamento…"
+                  : teleState.status === "ready"
+                  ? "Ricarica telemetria"
+                  : "Carica confronto telemetria"}
+              </Button>
+              {referenceDriver && bestLap && referenceLap && (
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: `#${driverColor}` }}
+                    />
+                    <span className="font-mono">{driver.name_acronym}</span>
+                    <span>(selezionato)</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: `#${getColor(referenceDriver.driver_number)}` }}
+                    />
+                    <span className="font-mono">{referenceDriver.name_acronym}</span>
+                    <span>
+                      ({compareMode === "pole" ? "pole" : "riferimento"})
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {!bestLap ? (
+              <Placeholder>Miglior giro del pilota non disponibile.</Placeholder>
+            ) : !referenceLap || !referenceDriver ? (
+              <Placeholder>Giro di riferimento non disponibile.</Placeholder>
+            ) : teleState.status === "idle" ? (
+              <div className="text-[11px] text-muted-foreground">
+                La telemetria viene scaricata solo su richiesta per non sovraccaricare le API.
+                Premi il pulsante per caricare il confronto tra i due migliori giri.
+              </div>
+            ) : teleState.status === "loading" ? (
+              <div className="text-[11px] text-muted-foreground">Caricamento telemetria…</div>
+            ) : teleState.status === "error" ? (
+              <Placeholder>{teleState.message}</Placeholder>
+            ) : telemetryDrivers.length === 0 ? (
+              <Placeholder>Telemetria non disponibile per questo giro.</Placeholder>
+            ) : (
+              <>
+                <TelemetryCharts
+                  drivers={telemetryDrivers}
+                  cursorTime={cursorTime}
+                  onCursorChange={setCursorTime}
+                  onCursorClick={(t) => setCursorTime(t)}
+                />
+                <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5">
+                  <Info className="h-3 w-3 flex-shrink-0 mt-px" />
+                  <span>
+                    Asse tempo relativo al via del giro (in secondi). I due tracciati sono allineati sull'inizio
+                    del giro, non su un riferimento di distanza.
+                  </span>
+                </div>
+              </>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
 
         {/* PUNTO 4 — Track evolution */}
         <AccordionItem

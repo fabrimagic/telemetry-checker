@@ -159,7 +159,7 @@ export function DrivingAnalysis({ drivers, raceAverageContext, onAvgChange }: Pr
           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Superclipping</span>
         </div>
         <p className="text-[10px] text-muted-foreground mb-2">
-          Deceleration while throttle is at 100%
+          Calo degli RPM con freno premuto al 100%
         </p>
         {analyses.map((a) => (
           <div key={a.driverNumber} className="flex items-center gap-2 mb-1.5">

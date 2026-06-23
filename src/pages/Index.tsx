@@ -1111,7 +1111,9 @@ export default function Index() {
                     allDrivers={allDrivers}
                     sessionWeather={sessionWeather}
                     getColor={getColor}
+                    sessionKey={sessionKey!}
                   />
+
                 )}
 
 
