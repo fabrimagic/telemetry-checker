@@ -1047,6 +1047,12 @@ export default function Index() {
                 <SoftSensorsTimelineCard timeline={vreResult?.soft_sensors_timeline ?? null} />
               )}
 
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && (
+                <PitStopsChartCard
+                  pitStops={pitStopsData.filter((p) => p.driver_number === singleDriverState.driver.driver_number)}
+                />
+              )}
+
 
 
               {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && (
