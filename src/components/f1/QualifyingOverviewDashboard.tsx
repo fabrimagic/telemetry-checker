@@ -141,8 +141,10 @@ export function QualifyingOverviewDashboard({
   allDrivers,
   sessionWeather,
   getColor,
+  sessionKey,
 }: Props) {
   const validLaps = useMemo(() => laps.filter(isValidLap), [laps]);
+
 
   // PUNTO 1 — best real & theoretical best
   const bestLap = useMemo(() => bestLapOf(laps), [laps]);
