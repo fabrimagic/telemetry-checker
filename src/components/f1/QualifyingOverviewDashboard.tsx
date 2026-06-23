@@ -8,6 +8,7 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import {
   Accordion,
@@ -36,11 +37,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { getCarData } from "@/lib/openf1";
 import type { CarData, Driver, Lap, SessionResult, WeatherData } from "@/lib/openf1";
-import {
-  TelemetryCharts,
-  type DriverTelemetry,
-  type TelemetryPoint,
-} from "@/components/f1/TelemetryCharts";
+
+// Telemetry sample enriched with cumulative distance estimated by integrating speed.
+interface TelemetrySample {
+  time: number;       // seconds since start of lap
+  distance: number;   // meters since start of lap (estimated by ∫v dt)
+  speed: number | null;
+  throttle: number | null;
+  brake: number | null;
+  rpm: number | null;
+  gear: number | null;
+}
+
+// Aligned point on the common distance grid.
+interface AlignedPoint {
+  distance: number;
+  speed_you: number | null;
+  speed_ref: number | null;
+  throttle_you: number | null;
+  throttle_ref: number | null;
+  brake_you: number | null;
+  brake_ref: number | null;
+  rpm_you: number | null;
+  rpm_ref: number | null;
+  gear_you: number | null;
+  gear_ref: number | null;
+}
 
 interface Props {
   driver: Driver;
@@ -101,6 +123,155 @@ function bestLapOf(laps: Lap[]): Lap | null {
 const Placeholder = ({ children = "Dati non disponibili" }: { children?: React.ReactNode }) => (
   <div className="text-xs text-muted-foreground italic">{children}</div>
 );
+
+// Self-contained distance-aligned compare chart for the qualifying telemetry section.
+// Renders two overlaid lines (you vs reference) on a shared distance axis (meters),
+// or — when deltaFields is provided — a single delta line (a − b).
+interface DistanceCompareChartProps {
+  label: string;
+  data: AlignedPoint[];
+  fieldYou?: keyof AlignedPoint;
+  fieldRef?: keyof AlignedPoint;
+  deltaFields?: { a: keyof AlignedPoint; b: keyof AlignedPoint };
+  youColor: string;
+  refColor: string;
+  youName: string;
+  refName: string;
+  height: number;
+  unit?: string;
+  yDomain?: [number, number];
+  cursor: number | null;
+  onCursor: (d: number | null) => void;
+  showXAxis: boolean;
+}
+
+function DistanceCompareChart({
+  label,
+  data,
+  fieldYou,
+  fieldRef,
+  deltaFields,
+  youColor,
+  refColor,
+  youName,
+  refName,
+  height,
+  unit = "",
+  yDomain,
+  cursor,
+  onCursor,
+  showXAxis,
+}: DistanceCompareChartProps) {
+  const series = deltaFields
+    ? data.map((p) => {
+        const a = p[deltaFields.a] as number | null;
+        const b = p[deltaFields.b] as number | null;
+        return { distance: p.distance, delta: a != null && b != null ? a - b : null };
+      })
+    : data;
+  return (
+    <div className="relative">
+      <span className="absolute top-0 left-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider z-10">
+        {label}
+      </span>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart
+          data={series}
+          margin={{ top: 18, right: 12, left: 0, bottom: showXAxis ? 18 : 0 }}
+          onMouseMove={(s: any) => {
+            const d = s?.activePayload?.[0]?.payload?.distance;
+            if (typeof d === "number") onCursor(d);
+          }}
+          onMouseLeave={() => onCursor(null)}
+        >
+          <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.4} vertical={false} />
+          <XAxis
+            dataKey="distance"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+            axisLine={false}
+            tickLine={false}
+            hide={!showXAxis}
+            tickFormatter={(v) => `${Math.round(v as number)}`}
+            label={
+              showXAxis
+                ? {
+                    value: "Distanza (m)",
+                    position: "insideBottom",
+                    offset: -4,
+                    style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" },
+                  }
+                : undefined
+            }
+          />
+          <YAxis
+            width={42}
+            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+            axisLine={false}
+            tickLine={false}
+            domain={yDomain ?? ["auto", "auto"]}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--background))",
+              border: "1px solid hsl(var(--border))",
+              fontSize: 11,
+            }}
+            labelFormatter={(v) => `${Math.round(v as number)} m`}
+            formatter={(val: any, name: any) => {
+              if (val == null || !Number.isFinite(val)) return ["—", name];
+              const v = Number(val);
+              return [`${v.toFixed(unit === "%" ? 0 : 1)}${unit}`, name];
+            }}
+          />
+          {cursor != null && (
+            <ReferenceLine x={cursor} stroke="hsl(0 0% 50%)" strokeDasharray="2 2" />
+          )}
+          {deltaFields ? (
+            <Line
+              type="monotone"
+              dataKey="delta"
+              name={youName}
+              stroke={youColor}
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+              connectNulls
+            />
+          ) : (
+            <>
+              <Line
+                type="monotone"
+                dataKey={fieldYou as string}
+                name={youName}
+                stroke={youColor}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey={fieldRef as string}
+                name={refName}
+                stroke={refColor}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+            </>
+          )}
+          {!deltaFields && <Legend wrapperStyle={{ fontSize: 10 }} />}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+
+
 
 const StatCard = ({
   icon,
@@ -287,39 +458,60 @@ export function QualifyingOverviewDashboard({
     return minB - minA; // negative = improved
   }, [evolutionData]);
 
-  // ── Telemetry compare (Punto 3b — on-demand fetch) ──
+
+  // ── Telemetry compare (Punto 3b — on-demand fetch, distance-aligned) ──
   type TeleState =
     | { status: "idle" }
     | { status: "loading" }
     | { status: "error"; message: string }
-    | { status: "ready"; you: TelemetryPoint[]; ref: TelemetryPoint[] };
+    | { status: "ready"; you: TelemetrySample[]; ref: TelemetrySample[] };
   const [teleState, setTeleState] = useState<TeleState>({ status: "idle" });
-  const [cursorTime, setCursorTime] = useState<number | null>(null);
+  const [cursorDistance, setCursorDistance] = useState<number | null>(null);
 
   // Reset when the laps to compare change.
   useEffect(() => {
     setTeleState({ status: "idle" });
-    setCursorTime(null);
+    setCursorDistance(null);
   }, [bestLap?.date_start, referenceLap?.date_start, referenceDriverNumber]);
 
-  const mapToPoints = (car: CarData[]): TelemetryPoint[] => {
+  // Map raw CarData[] → TelemetrySample[] with cumulative distance estimated by
+  // trapezoidal integration of speed (km/h → m/s). OpenF1 does not provide a
+  // direct distance channel: this is an estimate.
+  const mapToSamples = (car: CarData[]): TelemetrySample[] => {
     if (!car.length) return [];
     const t0 = new Date(car[0].date).getTime();
-    return car
-      .map((c) => {
-        const ts = new Date(c.date).getTime();
-        if (!Number.isFinite(ts)) return null;
-        return {
-          time: (ts - t0) / 1000,
-          speed: c.speed,
-          throttle: c.throttle,
-          brake: c.brake,
-          rpm: c.rpm,
-          gear: c.n_gear,
-          date: c.date,
-        } as TelemetryPoint;
-      })
-      .filter((p): p is TelemetryPoint => p != null);
+    let prevT: number | null = null;
+    let prevSpeedMs: number | null = null;
+    let distance = 0;
+    const out: TelemetrySample[] = [];
+    for (const c of car) {
+      const ts = new Date(c.date).getTime();
+      if (!Number.isFinite(ts)) continue;
+      const tSec = (ts - t0) / 1000;
+      const speed = typeof c.speed === "number" && Number.isFinite(c.speed) ? c.speed : null;
+      const speedMs = speed != null ? speed / 3.6 : null;
+
+      if (prevT != null) {
+        let dt = tSec - prevT;
+        if (!Number.isFinite(dt) || dt <= 0) dt = 0;
+        if (dt > 0 && speedMs != null) {
+          const vAvg = prevSpeedMs != null ? (prevSpeedMs + speedMs) / 2 : speedMs;
+          distance += vAvg * dt;
+        }
+      }
+      out.push({
+        time: tSec,
+        distance,
+        speed,
+        throttle: typeof c.throttle === "number" ? c.throttle : null,
+        brake: typeof c.brake === "number" ? c.brake : null,
+        rpm: typeof c.rpm === "number" ? c.rpm : null,
+        gear: typeof c.n_gear === "number" ? c.n_gear : null,
+      });
+      prevT = tSec;
+      if (speedMs != null) prevSpeedMs = speedMs;
+    }
+    return out;
   };
 
   const loadTelemetry = async () => {
@@ -335,21 +527,11 @@ export function QualifyingOverviewDashboard({
         new Date(refStart).getTime() + (referenceLap.lap_duration as number) * 1000,
       ).toISOString();
       // Sequential fetch to respect the openf1 client rate limiter.
-      const ownCar = await getCarData(
-        sessionKey,
-        driver.driver_number,
-        ownStart,
-        ownEnd,
-      );
-      const refCar = await getCarData(
-        sessionKey,
-        referenceDriver.driver_number,
-        refStart,
-        refEnd,
-      );
-      const you = mapToPoints(ownCar);
-      const ref = mapToPoints(refCar);
-      if (!you.length && !ref.length) {
+      const ownCar = await getCarData(sessionKey, driver.driver_number, ownStart, ownEnd);
+      const refCar = await getCarData(sessionKey, referenceDriver.driver_number, refStart, refEnd);
+      const you = mapToSamples(ownCar);
+      const ref = mapToSamples(refCar);
+      if (you.length < 2 || ref.length < 2) {
         setTeleState({ status: "error", message: "Telemetria non disponibile per questi giri." });
         return;
       }
@@ -359,27 +541,69 @@ export function QualifyingOverviewDashboard({
     }
   };
 
-  const telemetryDrivers: DriverTelemetry[] = useMemo(() => {
-    if (teleState.status !== "ready" || !referenceDriver) return [];
-    const arr: DriverTelemetry[] = [];
-    if (teleState.you.length) {
-      arr.push({
-        driverNumber: driver.driver_number,
-        acronym: driver.name_acronym,
-        color: driverColor,
-        data: teleState.you,
-      });
+  // Interpolate a single channel value at a given distance over a monotone-in-distance series.
+  const interpolateAt = (
+    samples: TelemetrySample[],
+    distance: number,
+    field: keyof Pick<TelemetrySample, "speed" | "throttle" | "brake" | "rpm" | "gear">,
+  ): number | null => {
+    if (!samples.length) return null;
+    // Binary search for the right bracket.
+    let lo = 0, hi = samples.length - 1;
+    if (distance <= samples[0].distance) return samples[0][field];
+    if (distance >= samples[hi].distance) return samples[hi][field];
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (samples[mid].distance <= distance) lo = mid;
+      else hi = mid;
     }
-    if (teleState.ref.length) {
-      arr.push({
-        driverNumber: referenceDriver.driver_number,
-        acronym: referenceDriver.name_acronym,
-        color: getColor(referenceDriver.driver_number),
-        data: teleState.ref,
-      });
+    const a = samples[lo], b = samples[hi];
+    const va = a[field], vb = b[field];
+    if (va == null && vb == null) return null;
+    if (va == null) return vb;
+    if (vb == null) return va;
+    const span = b.distance - a.distance;
+    if (span <= 0) return va;
+    const t = (distance - a.distance) / span;
+    // Gear is integer-like; snap to nearest to avoid fractional gears.
+    if (field === "gear") return t < 0.5 ? va : vb;
+    return va + (vb - va) * t;
+  };
+
+  // Build the distance-aligned dataset on a common grid (500 points, capped at min lap distance).
+  const alignedData: AlignedPoint[] = useMemo(() => {
+    if (teleState.status !== "ready") return [];
+    const youMax = teleState.you[teleState.you.length - 1].distance;
+    const refMax = teleState.ref[teleState.ref.length - 1].distance;
+    const maxD = Math.min(youMax, refMax);
+    if (!Number.isFinite(maxD) || maxD <= 0) return [];
+    const N = 500;
+    const out: AlignedPoint[] = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const d = (maxD * i) / (N - 1);
+      out[i] = {
+        distance: d,
+        speed_you: interpolateAt(teleState.you, d, "speed"),
+        speed_ref: interpolateAt(teleState.ref, d, "speed"),
+        throttle_you: interpolateAt(teleState.you, d, "throttle"),
+        throttle_ref: interpolateAt(teleState.ref, d, "throttle"),
+        brake_you: interpolateAt(teleState.you, d, "brake"),
+        brake_ref: interpolateAt(teleState.ref, d, "brake"),
+        rpm_you: interpolateAt(teleState.you, d, "rpm"),
+        rpm_ref: interpolateAt(teleState.ref, d, "rpm"),
+        gear_you: interpolateAt(teleState.you, d, "gear"),
+        gear_ref: interpolateAt(teleState.ref, d, "gear"),
+      };
     }
-    return arr;
-  }, [teleState, driver, driverColor, referenceDriver, getColor]);
+    return out;
+  }, [teleState]);
+
+  const refColorHex = referenceDriver ? `#${getColor(referenceDriver.driver_number)}` : "#888";
+  const youColorHex = `#${driverColor}`;
+  const youAcr = driver.name_acronym;
+  const refAcr = referenceDriver?.name_acronym ?? "REF";
+
+
 
   // ── Render ──
   const accent = `#${driverColor}`;
@@ -789,21 +1013,79 @@ export function QualifyingOverviewDashboard({
               <div className="text-[11px] text-muted-foreground">Caricamento telemetria…</div>
             ) : teleState.status === "error" ? (
               <Placeholder>{teleState.message}</Placeholder>
-            ) : telemetryDrivers.length === 0 ? (
-              <Placeholder>Telemetria non disponibile per questo giro.</Placeholder>
+            ) : alignedData.length === 0 ? (
+              <Placeholder>Telemetria non sufficiente per costruire l'asse distanza.</Placeholder>
             ) : (
               <>
-                <TelemetryCharts
-                  drivers={telemetryDrivers}
-                  cursorTime={cursorTime}
-                  onCursorChange={setCursorTime}
-                  onCursorClick={(t) => setCursorTime(t)}
+                <DistanceCompareChart
+                  label="Velocità (km/h)"
+                  data={alignedData}
+                  fieldYou="speed_you"
+                  fieldRef="speed_ref"
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={youAcr}
+                  refName={refAcr}
+                  height={180}
+                  unit=" km/h"
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={false}
+                />
+                <DistanceCompareChart
+                  label="Delta velocità (selezionato − riferimento)"
+                  data={alignedData}
+                  deltaFields={{ a: "speed_you", b: "speed_ref" }}
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={`${youAcr} − ${refAcr}`}
+                  refName=""
+                  height={120}
+                  unit=" km/h"
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={false}
+                />
+                <DistanceCompareChart
+                  label="Gas (%)"
+                  data={alignedData}
+                  fieldYou="throttle_you"
+                  fieldRef="throttle_ref"
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={youAcr}
+                  refName={refAcr}
+                  height={110}
+                  unit="%"
+                  yDomain={[0, 100]}
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={false}
+                />
+                <DistanceCompareChart
+                  label="Freno (%)"
+                  data={alignedData}
+                  fieldYou="brake_you"
+                  fieldRef="brake_ref"
+                  youColor={youColorHex}
+                  refColor={refColorHex}
+                  youName={youAcr}
+                  refName={refAcr}
+                  height={90}
+                  unit="%"
+                  yDomain={[0, 100]}
+                  cursor={cursorDistance}
+                  onCursor={setCursorDistance}
+                  showXAxis={true}
                 />
                 <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5">
                   <Info className="h-3 w-3 flex-shrink-0 mt-px" />
                   <span>
-                    Asse tempo relativo al via del giro (in secondi). I due tracciati sono allineati sull'inizio
-                    del giro, non su un riferimento di distanza.
+                    I due tracciati sono allineati sulla <strong>distanza percorsa in pista</strong> (posizione lungo il giro),
+                    così da confrontare i piloti nello stesso punto del tracciato. La distanza è <strong>stimata</strong>{" "}
+                    integrando la velocità nel tempo (OpenF1 non fornisce un canale distanza diretto), quindi è soggetta a
+                    piccole imprecisioni dovute al campionamento. L'allineamento è limitato alla porzione di giro coperta
+                    da entrambi i tracciati.
                   </span>
                 </div>
               </>
