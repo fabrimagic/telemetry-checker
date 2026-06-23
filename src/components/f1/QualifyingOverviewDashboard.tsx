@@ -1247,7 +1247,7 @@ export function QualifyingOverviewDashboard({
                     <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5 mt-2">
                       <Info className="h-3 w-3 flex-shrink-0 mt-px" />
                       <span>
-                        <strong>Superclipping</strong>: calo degli RPM con freno premuto al 100%.{" "}
+                        <strong>Superclipping</strong>: calo degli RPM con acceleratore premuto al 100%.{" "}
                         <strong>Lift &amp; Coast</strong>: fase di rilascio con gas e freno entrambi a zero. Sono indicatori di
                         stile di guida derivati dalla telemetria, non misure dirette, e dipendono dalla densità di
                         campionamento OpenF1.
