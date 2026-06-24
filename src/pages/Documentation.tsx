@@ -864,7 +864,7 @@ export default function Documentation() {
           <Tip>L'analisi pre-gara può richiedere fino a qualche minuto la prima volta perché aggrega tutte le sessioni del weekend.</Tip>
         </DocSection>
 
-        <DocSection id="gp-preview" title="Anteprima GP (affinità circuito)" icon={<Sparkles2Placeholder />} >
+        <DocSection id="gp-preview" title="Anteprima GP (affinità circuito)" icon={<Beaker className="h-4 w-4" />}>
           <p>
             La pagina <strong className="text-foreground">Anteprima GP</strong> (raggiungibile da
             <code className="text-primary"> /anteprima-gp</code>) stima, in vista del prossimo Gran Premio,
