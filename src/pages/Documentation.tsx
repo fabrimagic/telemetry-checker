@@ -608,6 +608,60 @@ export default function Documentation() {
           <p>Sono indicatori qualitativi (basso / medio / alto / sconosciuto), non valori fisici assoluti, e supportano la lettura strategica senza mai sostituirla.</p>
         </DocSection>
 
+        <DocSection id="soft-sensors-timeline" title="Soft Sensors: timeline gara" icon={<Thermometer className="h-4 w-4" />}>
+          <p>
+            Una vista temporale dei tre Soft Sensors (Termico, Stress, Grip) lungo l'intera gara: mostra come ciascuno
+            stato latente evolve giro per giro, in modo da inquadrare quando la gomma è andata in finestra, è stata sotto stress
+            o quando la pista è cambiata significativamente. Le barre verticali segnalano cambi di mescola e neutralizzazioni.
+          </p>
+          <p className="text-xs italic">Disponibile per Gara e Sprint.</p>
+        </DocSection>
+
+        {/* ───────────── DASHBOARD SESSIONE ───────────── */}
+        <SectionDivider title="Dashboard dedicate a Prove Libere e Qualifica" />
+
+        <DocSection id="practice-overview" title="Dashboard Prove Libere" icon={<FlaskConical className="h-4 w-4" />}>
+          <p>
+            Quando la sessione selezionata è di <strong className="text-foreground">Prove Libere</strong>, l'app mostra
+            una dashboard pensata per le sessioni di prova: l'obiettivo non è il singolo giro veloce ma capire passo,
+            consistenza e degrado lungo i long run.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Riepilogo sessione</strong> — miglior giro del pilota, numero di giri completati, mescole usate.</li>
+            <li><strong className="text-foreground">Long run rilevati</strong> — finestre di giri consecutivi compatibili con simulazioni di passo gara, con mescola, lunghezza, passo medio.</li>
+            <li><strong className="text-foreground">Andamento dei tempi</strong> e <strong className="text-foreground">degrado per stint</strong>, con avvertenze quando il campione è troppo corto.</li>
+            <li>
+              <strong className="text-foreground">Confronto telemetria miglior giro</strong> — la stessa card descritta sopra,
+              ma applicata al miglior giro della sessione di prove.
+            </li>
+          </ul>
+        </DocSection>
+
+        <DocSection id="qualifying-overview" title="Dashboard Qualifica / Sprint Qualifica" icon={<Timer className="h-4 w-4" />}>
+          <p>
+            Per le sessioni di <strong className="text-foreground">Qualifica</strong> e <strong className="text-foreground">Sprint Qualifica</strong>
+            l'app mostra una dashboard dedicata al giro singolo. Le sezioni principali sono:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Risultato e settori</strong> del pilota selezionato (best lap, S1/S2/S3),
+              con indicazione di chi ha fatto la pole.
+            </li>
+            <li>
+              <strong className="text-foreground">Track Evolution</strong> — andamento del miglior tempo della sessione lungo Q1/Q2/Q3 (o equivalenti),
+              utile per capire quanto è migliorato il grip pista nel corso della qualifica.
+            </li>
+            <li>
+              <strong className="text-foreground">Analisi mini-settori</strong> — dove il pilota ha guadagnato o perso rispetto al riferimento.
+            </li>
+            <li>
+              <strong className="text-foreground">Confronto telemetria allineato per distanza</strong> — il miglior giro del pilota
+              vs il giro della pole (o di un altro pilota a scelta), con grafici di velocità, acceleratore, freno e RPM,
+              più analisi dello stile di guida e delta-time per posizione in pista (vedi sezione dedicata).
+            </li>
+          </ul>
+        </DocSection>
+
         {/* ───────────── VIRTUAL RACE ENGINEER ───────────── */}
         <SectionDivider title="Virtual Race Engineer (VRE)" />
 
