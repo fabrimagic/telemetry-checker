@@ -185,6 +185,7 @@ export default function Documentation() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Altre sezioni</p>
               <TocLink href="#championship-page">Mondiale Piloti & Costruttori</TocLink>
               <TocLink href="#pre-race">Analisi Pre-Gara</TocLink>
+              <TocLink href="#gp-preview">Anteprima GP (affinità circuito)</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Buono a sapersi</p>
               <TocLink href="#data-source">Fonte dei dati</TocLink>
