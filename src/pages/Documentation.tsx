@@ -452,6 +452,14 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="lap-precip-outlook" title="Outlook pioggia per giro" icon={<Cloud className="h-4 w-4" />}>
+          <p>
+            Una card mostra, per ogni giro della sessione, una <strong className="text-foreground">stima della probabilità di pioggia</strong>
+            e dell'intensità attesa. È utile soprattutto per le sessioni con condizioni miste, per capire in quale finestra
+            di giri la pista era effettivamente bagnata o in transizione.
+          </p>
+        </DocSection>
+
         <DocSection id="stints" title="Stint" icon={<Activity className="h-4 w-4" />}>
           <p>
             Elenca tutti gli stint del pilota con mescola (Soft / Medium / Hard / Intermediate / Wet),
