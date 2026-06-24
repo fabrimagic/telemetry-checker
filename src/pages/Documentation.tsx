@@ -133,24 +133,34 @@ export default function Documentation() {
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Analisi singolo pilota</p>
               <TocLink href="#single-driver-flow">Flusso analisi singolo pilota</TocLink>
+              <TocLink href="#driver-cockpit">Cockpit pilota</TocLink>
               <TocLink href="#session-report">Report Sessione</TocLink>
               <TocLink href="#lap-times-chart">Grafico Tempi al Giro</TocLink>
               <TocLink href="#lap-table">Tabella Giri</TocLink>
               <TocLink href="#telemetry">Telemetria & Track Map</TocLink>
+              <TocLink href="#telemetry-compare">Confronto telemetria miglior giro</TocLink>
               <TocLink href="#sectors">Settori e Mini-Settori</TocLink>
               <TocLink href="#driving-analysis">Analisi di Guida</TocLink>
               <TocLink href="#weather-card">Meteo</TocLink>
+              <TocLink href="#lap-precip-outlook">Outlook pioggia per giro</TocLink>
               <TocLink href="#stints">Stint</TocLink>
               <TocLink href="#pit-stops">Pit Stop</TocLink>
+              <TocLink href="#pit-stops-chart">Pit Stop: grafico comparativo</TocLink>
               <TocLink href="#overtakes">Sorpassi</TocLink>
               <TocLink href="#race-diary">Diario di Gara</TocLink>
               <TocLink href="#cumulative-deviation">Deviazione Cumulativa</TocLink>
               <TocLink href="#sector-vs-winner">Confronto Settori vs Vincitore</TocLink>
+              <TocLink href="#performance-radar">Radar prestazioni</TocLink>
               <TocLink href="#mini-charts">Mini-grafici (Posizione, Gap, Intervallo)</TocLink>
               <TocLink href="#event-timeline">Timeline Eventi del Pilota</TocLink>
               <TocLink href="#tyre-degradation-card">Degrado Gomme</TocLink>
               <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
               <TocLink href="#soft-sensors">Soft Sensors (Termico / Stress / Grip)</TocLink>
+              <TocLink href="#soft-sensors-timeline">Soft Sensors: timeline gara</TocLink>
+
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Dashboard sessione</p>
+              <TocLink href="#practice-overview">Dashboard Prove Libere</TocLink>
+              <TocLink href="#qualifying-overview">Dashboard Qualifica / Sprint Qualifica</TocLink>
             </div>
             <div className="space-y-1">
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-2 mb-2 pb-1.5 border-b border-border/60">Virtual Race Engineer</p>
@@ -175,6 +185,7 @@ export default function Documentation() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Altre sezioni</p>
               <TocLink href="#championship-page">Mondiale Piloti & Costruttori</TocLink>
               <TocLink href="#pre-race">Analisi Pre-Gara</TocLink>
+              <TocLink href="#gp-preview">Anteprima GP (affinità circuito)</TocLink>
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Buono a sapersi</p>
               <TocLink href="#data-source">Fonte dei dati</TocLink>
@@ -224,10 +235,18 @@ export default function Documentation() {
             <li><strong className="text-foreground">Reset</strong> — appare quando una sessione è caricata: svuota la selezione e torna alla home.</li>
           </ul>
           <p>
-            È disponibile anche una pagina di <strong className="text-foreground">Analisi Pre-Gara</strong>
-            (raggiungibile da <code className="text-primary">/pre-race</code>) che usa i long run di pratica e
-            la qualifica per stimare chi avrà il passo migliore in gara.
+            Sono disponibili anche due pagine dedicate al weekend di gara:
           </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Analisi Pre-Gara</strong> (<code className="text-primary">/pre-race</code>) — usa i long run delle libere
+              e la qualifica per stimare chi avrà il passo migliore in gara.
+            </li>
+            <li>
+              <strong className="text-foreground">Anteprima GP</strong> (<code className="text-primary">/anteprima-gp</code>) — stima l'<em>affinità</em>
+              di ogni team con il circuito del prossimo Gran Premio incrociando il profilo del tracciato con il profilo della vettura.
+            </li>
+          </ul>
         </DocSection>
 
         <DocSection id="countdown" title="Conto alla rovescia prossima gara" icon={<CalendarClock className="h-4 w-4" />}>
@@ -284,6 +303,15 @@ export default function Documentation() {
           <p>Per le sessioni di Prove Libere alcune card (es. Pit stop, Sorpassi, VRE) non sono disponibili: in quei casi l'app mostra solo ciò che ha senso analizzare.</p>
         </DocSection>
 
+        <DocSection id="driver-cockpit" title="Cockpit pilota" icon={<Gauge className="h-4 w-4" />}>
+          <p>
+            In cima all'analisi singolo pilota, il <strong className="text-foreground">Cockpit</strong> riassume in un colpo d'occhio
+            chi stai analizzando: foto del pilota con bordo nel colore del team, sigla, numero, scuderia, posizione finale
+            (o di partenza per qualifica/sprint), miglior giro della sessione e i suoi tre settori, mescola del miglior giro
+            e numero di giri completati. È pensato come "intestazione" della dashboard del pilota.
+          </p>
+        </DocSection>
+
         <DocSection id="session-report" title="Report Sessione" icon={<LayoutDashboard className="h-4 w-4" />}>
           <p>
             Il <strong className="text-foreground">Report Sessione</strong> è una panoramica di tutto ciò che è successo
@@ -323,6 +351,40 @@ export default function Documentation() {
             La <strong className="text-foreground">Track Map</strong> visualizza il tracciato come ricostruito dai dati GPS,
             con un cursore mobile sincronizzato con i grafici telemetrici: spostando il cursore nei grafici, il punto
             sulla mappa si muove di conseguenza, e viceversa.
+          </p>
+        </DocSection>
+
+        <DocSection id="telemetry-compare" title="Confronto telemetria miglior giro" icon={<Gauge className="h-4 w-4" />}>
+          <p>
+            Una card dedicata confronta il <strong className="text-foreground">miglior giro del pilota selezionato</strong>
+            con un giro di riferimento, allineando i due tracciati <strong className="text-foreground">per distanza percorsa in pista</strong>
+            (non per tempo dal via del giro). Così ogni punto della curva corrisponde alla stessa posizione del tracciato per entrambi i piloti.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              In <strong className="text-foreground">qualifica e sprint qualifica</strong> il riferimento di default è la
+              <em> pole</em> della sessione; puoi sostituirlo con un altro pilota.
+            </li>
+            <li>
+              Nelle <strong className="text-foreground">prove libere</strong> il riferimento di default è il miglior giro assoluto della sessione;
+              puoi scegliere il miglior giro di un qualsiasi altro pilota che ha preso parte alla stessa sessione.
+            </li>
+          </ul>
+          <p>
+            Sotto i grafici sovrapposti di velocità, acceleratore, freno e RPM trovi due analisi aggiuntive:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Stile di guida</strong> — conteggio e durata di Superclipping e Lift &amp; Coast
+              per entrambi i giri confrontati.
+            </li>
+            <li>
+              <strong className="text-foreground">Delta-time per posizione in pista</strong> — il distacco tra i due piloti punto per punto
+              lungo il tracciato. Valori negativi significano che il pilota selezionato è arrivato in quel punto in anticipo rispetto al riferimento.
+            </li>
+          </ul>
+          <p className="text-xs italic">
+            La distanza è stimata integrando la velocità nel tempo: è un'approssimazione dipendente dalla densità di campionamento di OpenF1.
           </p>
         </DocSection>
 
@@ -390,6 +452,14 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="lap-precip-outlook" title="Outlook pioggia per giro" icon={<Cloud className="h-4 w-4" />}>
+          <p>
+            Una card mostra, per ogni giro della sessione, una <strong className="text-foreground">stima della probabilità di pioggia</strong>
+            e dell'intensità attesa. È utile soprattutto per le sessioni con condizioni miste, per capire in quale finestra
+            di giri la pista era effettivamente bagnata o in transizione.
+          </p>
+        </DocSection>
+
         <DocSection id="stints" title="Stint" icon={<Activity className="h-4 w-4" />}>
           <p>
             Elenca tutti gli stint del pilota con mescola (Soft / Medium / Hard / Intermediate / Wet),
@@ -401,6 +471,14 @@ export default function Documentation() {
           <p>
             Mostra tutti i pit stop del pilota con il giro, la durata della sosta vera e propria e il tempo totale
             in pit lane. È disponibile solo nelle sessioni di Gara e Sprint.
+          </p>
+        </DocSection>
+
+        <DocSection id="pit-stops-chart" title="Pit Stop: grafico comparativo" icon={<Wrench className="h-4 w-4" />}>
+          <p>
+            Una vista grafica dei pit stop confronta a colpo d'occhio la <strong className="text-foreground">durata delle soste</strong>
+            del pilota selezionato con quelle degli altri piloti. Aiuta a capire se una sosta è stata particolarmente lenta o veloce
+            rispetto allo standard della gara.
           </p>
         </DocSection>
 
@@ -443,6 +521,16 @@ export default function Documentation() {
             È disponibile solo per Gara e Sprint. Il confronto esclude giri sotto Safety Car / VSC / bandiera rossa e gli outlier;
             se i giri puliti sono pochi (&lt; 5), il riquadro viene mostrato sbiadito per segnalare la minore affidabilità del dato.
           </p>
+        </DocSection>
+
+        <DocSection id="performance-radar" title="Radar prestazioni" icon={<Target className="h-4 w-4" />}>
+          <p>
+            Un grafico radar sintetizza la prestazione complessiva del pilota in gara su più dimensioni
+            (passo, costanza, gestione gomme, qualità delle soste, sorpassi, esposizione a neutralizzazioni),
+            mettendolo a confronto con il riferimento della sessione. Serve a inquadrare i punti di forza e di debolezza
+            con una sola immagine.
+          </p>
+          <p className="text-xs italic">Disponibile per Gara e Sprint.</p>
         </DocSection>
 
         <DocSection id="mini-charts" title="Mini-grafici (Posizione, Gap, Intervallo)" icon={<BarChart3 className="h-4 w-4" />}>
@@ -518,6 +606,60 @@ export default function Documentation() {
             <li><strong className="text-foreground">Grip</strong> — qualità della pista (gommatura, evoluzione, contaminazione).</li>
           </ul>
           <p>Sono indicatori qualitativi (basso / medio / alto / sconosciuto), non valori fisici assoluti, e supportano la lettura strategica senza mai sostituirla.</p>
+        </DocSection>
+
+        <DocSection id="soft-sensors-timeline" title="Soft Sensors: timeline gara" icon={<Thermometer className="h-4 w-4" />}>
+          <p>
+            Una vista temporale dei tre Soft Sensors (Termico, Stress, Grip) lungo l'intera gara: mostra come ciascuno
+            stato latente evolve giro per giro, in modo da inquadrare quando la gomma è andata in finestra, è stata sotto stress
+            o quando la pista è cambiata significativamente. Le barre verticali segnalano cambi di mescola e neutralizzazioni.
+          </p>
+          <p className="text-xs italic">Disponibile per Gara e Sprint.</p>
+        </DocSection>
+
+        {/* ───────────── DASHBOARD SESSIONE ───────────── */}
+        <SectionDivider title="Dashboard dedicate a Prove Libere e Qualifica" />
+
+        <DocSection id="practice-overview" title="Dashboard Prove Libere" icon={<FlaskConical className="h-4 w-4" />}>
+          <p>
+            Quando la sessione selezionata è di <strong className="text-foreground">Prove Libere</strong>, l'app mostra
+            una dashboard pensata per le sessioni di prova: l'obiettivo non è il singolo giro veloce ma capire passo,
+            consistenza e degrado lungo i long run.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong className="text-foreground">Riepilogo sessione</strong> — miglior giro del pilota, numero di giri completati, mescole usate.</li>
+            <li><strong className="text-foreground">Long run rilevati</strong> — finestre di giri consecutivi compatibili con simulazioni di passo gara, con mescola, lunghezza, passo medio.</li>
+            <li><strong className="text-foreground">Andamento dei tempi</strong> e <strong className="text-foreground">degrado per stint</strong>, con avvertenze quando il campione è troppo corto.</li>
+            <li>
+              <strong className="text-foreground">Confronto telemetria miglior giro</strong> — la stessa card descritta sopra,
+              ma applicata al miglior giro della sessione di prove.
+            </li>
+          </ul>
+        </DocSection>
+
+        <DocSection id="qualifying-overview" title="Dashboard Qualifica / Sprint Qualifica" icon={<Timer className="h-4 w-4" />}>
+          <p>
+            Per le sessioni di <strong className="text-foreground">Qualifica</strong> e <strong className="text-foreground">Sprint Qualifica</strong>
+            l'app mostra una dashboard dedicata al giro singolo. Le sezioni principali sono:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Risultato e settori</strong> del pilota selezionato (best lap, S1/S2/S3),
+              con indicazione di chi ha fatto la pole.
+            </li>
+            <li>
+              <strong className="text-foreground">Track Evolution</strong> — andamento del miglior tempo della sessione lungo Q1/Q2/Q3 (o equivalenti),
+              utile per capire quanto è migliorato il grip pista nel corso della qualifica.
+            </li>
+            <li>
+              <strong className="text-foreground">Analisi mini-settori</strong> — dove il pilota ha guadagnato o perso rispetto al riferimento.
+            </li>
+            <li>
+              <strong className="text-foreground">Confronto telemetria allineato per distanza</strong> — il miglior giro del pilota
+              vs il giro della pole (o di un altro pilota a scelta), con grafici di velocità, acceleratore, freno e RPM,
+              più analisi dello stile di guida e delta-time per posizione in pista (vedi sezione dedicata).
+            </li>
+          </ul>
         </DocSection>
 
         {/* ───────────── VIRTUAL RACE ENGINEER ───────────── */}
@@ -720,6 +862,22 @@ export default function Documentation() {
             <li><strong className="text-foreground">Watch List</strong> — piloti da tenere d'occhio in gara.</li>
           </ul>
           <Tip>L'analisi pre-gara può richiedere fino a qualche minuto la prima volta perché aggrega tutte le sessioni del weekend.</Tip>
+        </DocSection>
+
+        <DocSection id="gp-preview" title="Anteprima GP (affinità circuito)" icon={<Beaker className="h-4 w-4" />}>
+          <p>
+            La pagina <strong className="text-foreground">Anteprima GP</strong> (raggiungibile da
+            <code className="text-primary"> /anteprima-gp</code>) stima, in vista del prossimo Gran Premio,
+            quanto ciascun team sia <strong className="text-foreground">"affine"</strong> al circuito che si correrà.
+            Incrocia il <em>profilo del tracciato</em> (mix di curve lente, medie, veloci, importanza di trazione,
+            staccata, ecc.) con il <em>profilo di prestazione</em> di ogni vettura ricavato dalle gare già disputate.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Un ranking dei team dal più al meno favorito sul tracciato.</li>
+            <li>Una narrativa che spiega <em>perché</em> un team è in quella posizione (es. "forte in curva lenta, debole nelle staccate").</li>
+            <li>Un'indicazione di <strong className="text-foreground">affidabilità</strong> della stima, che cresce con il numero di gare nel dataset.</li>
+          </ul>
+          <p className="text-xs italic">È un'inquadratura preliminare, non una previsione: non considera meteo, eventuali aggiornamenti tecnici dell'ultima ora o problemi di affidabilità.</p>
         </DocSection>
 
         {/* ───────────── BUONO A SAPERSI ───────────── */}
