@@ -133,24 +133,34 @@ export default function Documentation() {
 
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Analisi singolo pilota</p>
               <TocLink href="#single-driver-flow">Flusso analisi singolo pilota</TocLink>
+              <TocLink href="#driver-cockpit">Cockpit pilota</TocLink>
               <TocLink href="#session-report">Report Sessione</TocLink>
               <TocLink href="#lap-times-chart">Grafico Tempi al Giro</TocLink>
               <TocLink href="#lap-table">Tabella Giri</TocLink>
               <TocLink href="#telemetry">Telemetria & Track Map</TocLink>
+              <TocLink href="#telemetry-compare">Confronto telemetria miglior giro</TocLink>
               <TocLink href="#sectors">Settori e Mini-Settori</TocLink>
               <TocLink href="#driving-analysis">Analisi di Guida</TocLink>
               <TocLink href="#weather-card">Meteo</TocLink>
+              <TocLink href="#lap-precip-outlook">Outlook pioggia per giro</TocLink>
               <TocLink href="#stints">Stint</TocLink>
               <TocLink href="#pit-stops">Pit Stop</TocLink>
+              <TocLink href="#pit-stops-chart">Pit Stop: grafico comparativo</TocLink>
               <TocLink href="#overtakes">Sorpassi</TocLink>
               <TocLink href="#race-diary">Diario di Gara</TocLink>
               <TocLink href="#cumulative-deviation">Deviazione Cumulativa</TocLink>
               <TocLink href="#sector-vs-winner">Confronto Settori vs Vincitore</TocLink>
+              <TocLink href="#performance-radar">Radar prestazioni</TocLink>
               <TocLink href="#mini-charts">Mini-grafici (Posizione, Gap, Intervallo)</TocLink>
               <TocLink href="#event-timeline">Timeline Eventi del Pilota</TocLink>
               <TocLink href="#tyre-degradation-card">Degrado Gomme</TocLink>
               <TocLink href="#key-decision-moments">Key Decision Moments</TocLink>
               <TocLink href="#soft-sensors">Soft Sensors (Termico / Stress / Grip)</TocLink>
+              <TocLink href="#soft-sensors-timeline">Soft Sensors: timeline gara</TocLink>
+
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-5 mb-2 pb-1.5 border-b border-border/60">Dashboard sessione</p>
+              <TocLink href="#practice-overview">Dashboard Prove Libere</TocLink>
+              <TocLink href="#qualifying-overview">Dashboard Qualifica / Sprint Qualifica</TocLink>
             </div>
             <div className="space-y-1">
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mt-2 mb-2 pb-1.5 border-b border-border/60">Virtual Race Engineer</p>
