@@ -354,6 +354,40 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="telemetry-compare" title="Confronto telemetria miglior giro" icon={<Gauge className="h-4 w-4" />}>
+          <p>
+            Una card dedicata confronta il <strong className="text-foreground">miglior giro del pilota selezionato</strong>
+            con un giro di riferimento, allineando i due tracciati <strong className="text-foreground">per distanza percorsa in pista</strong>
+            (non per tempo dal via del giro). Così ogni punto della curva corrisponde alla stessa posizione del tracciato per entrambi i piloti.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              In <strong className="text-foreground">qualifica e sprint qualifica</strong> il riferimento di default è la
+              <em> pole</em> della sessione; puoi sostituirlo con un altro pilota.
+            </li>
+            <li>
+              Nelle <strong className="text-foreground">prove libere</strong> il riferimento di default è il miglior giro assoluto della sessione;
+              puoi scegliere il miglior giro di un qualsiasi altro pilota che ha preso parte alla stessa sessione.
+            </li>
+          </ul>
+          <p>
+            Sotto i grafici sovrapposti di velocità, acceleratore, freno e RPM trovi due analisi aggiuntive:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Stile di guida</strong> — conteggio e durata di Superclipping e Lift &amp; Coast
+              per entrambi i giri confrontati.
+            </li>
+            <li>
+              <strong className="text-foreground">Delta-time per posizione in pista</strong> — il distacco tra i due piloti punto per punto
+              lungo il tracciato. Valori negativi significano che il pilota selezionato è arrivato in quel punto in anticipo rispetto al riferimento.
+            </li>
+          </ul>
+          <p className="text-xs italic">
+            La distanza è stimata integrando la velocità nel tempo: è un'approssimazione dipendente dalla densità di campionamento di OpenF1.
+          </p>
+        </DocSection>
+
         <DocSection id="sectors" title="Settori e Mini-Settori" icon={<Map className="h-4 w-4" />}>
           <p>
             Visualizza il tempo dei tre settori del giro e un'analisi a <strong className="text-foreground">mini-settori</strong>
