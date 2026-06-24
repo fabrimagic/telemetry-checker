@@ -303,6 +303,15 @@ export default function Documentation() {
           <p>Per le sessioni di Prove Libere alcune card (es. Pit stop, Sorpassi, VRE) non sono disponibili: in quei casi l'app mostra solo ciò che ha senso analizzare.</p>
         </DocSection>
 
+        <DocSection id="driver-cockpit" title="Cockpit pilota" icon={<Gauge className="h-4 w-4" />}>
+          <p>
+            In cima all'analisi singolo pilota, il <strong className="text-foreground">Cockpit</strong> riassume in un colpo d'occhio
+            chi stai analizzando: foto del pilota con bordo nel colore del team, sigla, numero, scuderia, posizione finale
+            (o di partenza per qualifica/sprint), miglior giro della sessione e i suoi tre settori, mescola del miglior giro
+            e numero di giri completati. È pensato come "intestazione" della dashboard del pilota.
+          </p>
+        </DocSection>
+
         <DocSection id="session-report" title="Report Sessione" icon={<LayoutDashboard className="h-4 w-4" />}>
           <p>
             Il <strong className="text-foreground">Report Sessione</strong> è una panoramica di tutto ciò che è successo
