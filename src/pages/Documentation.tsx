@@ -864,6 +864,22 @@ export default function Documentation() {
           <Tip>L'analisi pre-gara può richiedere fino a qualche minuto la prima volta perché aggrega tutte le sessioni del weekend.</Tip>
         </DocSection>
 
+        <DocSection id="gp-preview" title="Anteprima GP (affinità circuito)" icon={<Sparkles2Placeholder />} >
+          <p>
+            La pagina <strong className="text-foreground">Anteprima GP</strong> (raggiungibile da
+            <code className="text-primary"> /anteprima-gp</code>) stima, in vista del prossimo Gran Premio,
+            quanto ciascun team sia <strong className="text-foreground">"affine"</strong> al circuito che si correrà.
+            Incrocia il <em>profilo del tracciato</em> (mix di curve lente, medie, veloci, importanza di trazione,
+            staccata, ecc.) con il <em>profilo di prestazione</em> di ogni vettura ricavato dalle gare già disputate.
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Un ranking dei team dal più al meno favorito sul tracciato.</li>
+            <li>Una narrativa che spiega <em>perché</em> un team è in quella posizione (es. "forte in curva lenta, debole nelle staccate").</li>
+            <li>Un'indicazione di <strong className="text-foreground">affidabilità</strong> della stima, che cresce con il numero di gare nel dataset.</li>
+          </ul>
+          <p className="text-xs italic">È un'inquadratura preliminare, non una previsione: non considera meteo, eventuali aggiornamenti tecnici dell'ultima ora o problemi di affidabilità.</p>
+        </DocSection>
+
         {/* ───────────── BUONO A SAPERSI ───────────── */}
         <SectionDivider title="Buono a sapersi" />
 
