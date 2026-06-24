@@ -474,6 +474,14 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="pit-stops-chart" title="Pit Stop: grafico comparativo" icon={<Wrench className="h-4 w-4" />}>
+          <p>
+            Una vista grafica dei pit stop confronta a colpo d'occhio la <strong className="text-foreground">durata delle soste</strong>
+            del pilota selezionato con quelle degli altri piloti. Aiuta a capire se una sosta è stata particolarmente lenta o veloce
+            rispetto allo standard della gara.
+          </p>
+        </DocSection>
+
         <DocSection id="overtakes" title="Sorpassi" icon={<Swords className="h-4 w-4" />}>
           <p>
             Elenco dei sorpassi <strong className="text-foreground">effettuati</strong> e <strong className="text-foreground">subiti</strong> dal pilota,
