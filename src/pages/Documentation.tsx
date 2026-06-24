@@ -235,10 +235,18 @@ export default function Documentation() {
             <li><strong className="text-foreground">Reset</strong> — appare quando una sessione è caricata: svuota la selezione e torna alla home.</li>
           </ul>
           <p>
-            È disponibile anche una pagina di <strong className="text-foreground">Analisi Pre-Gara</strong>
-            (raggiungibile da <code className="text-primary">/pre-race</code>) che usa i long run di pratica e
-            la qualifica per stimare chi avrà il passo migliore in gara.
+            Sono disponibili anche due pagine dedicate al weekend di gara:
           </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Analisi Pre-Gara</strong> (<code className="text-primary">/pre-race</code>) — usa i long run delle libere
+              e la qualifica per stimare chi avrà il passo migliore in gara.
+            </li>
+            <li>
+              <strong className="text-foreground">Anteprima GP</strong> (<code className="text-primary">/anteprima-gp</code>) — stima l'<em>affinità</em>
+              di ogni team con il circuito del prossimo Gran Premio incrociando il profilo del tracciato con il profilo della vettura.
+            </li>
+          </ul>
         </DocSection>
 
         <DocSection id="countdown" title="Conto alla rovescia prossima gara" icon={<CalendarClock className="h-4 w-4" />}>
