@@ -523,6 +523,16 @@ export default function Documentation() {
           </p>
         </DocSection>
 
+        <DocSection id="performance-radar" title="Radar prestazioni" icon={<Target className="h-4 w-4" />}>
+          <p>
+            Un grafico radar sintetizza la prestazione complessiva del pilota in gara su più dimensioni
+            (passo, costanza, gestione gomme, qualità delle soste, sorpassi, esposizione a neutralizzazioni),
+            mettendolo a confronto con il riferimento della sessione. Serve a inquadrare i punti di forza e di debolezza
+            con una sola immagine.
+          </p>
+          <p className="text-xs italic">Disponibile per Gara e Sprint.</p>
+        </DocSection>
+
         <DocSection id="mini-charts" title="Mini-grafici (Posizione, Gap, Intervallo)" icon={<BarChart3 className="h-4 w-4" />}>
           <p>
             Una griglia di mini-grafici sotto la sezione cockpit riassume la dinamica di gara del pilota giro per giro:
