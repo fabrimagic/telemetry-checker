@@ -172,6 +172,17 @@ export interface AlternativeStrategy {
    * Informative only — does NOT change the sort order.
    */
   indistinguishable_from_actual?: boolean;
+  /**
+   * Presentation-only fields. When the displayed delta has been capped to the
+   * same plausibility ceiling used for the recommended strategy
+   * (MAX_PLAUSIBLE_DELTA = pitLoss × 2.5), `delta_clamped` is true and
+   * `raw_delta_vs_actual` preserves the original pre-clamp value for
+   * diagnostics. Scoring, uncertainty and the promotion check ALWAYS run on
+   * the raw value (the clamp is applied AFTER those phases); these fields are
+   * informational only and must not be consumed by ranking logic.
+   */
+  delta_clamped?: boolean;
+  raw_delta_vs_actual?: number;
 }
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW";
