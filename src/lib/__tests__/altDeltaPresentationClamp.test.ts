@@ -137,7 +137,7 @@ describe("VRE — presentation-only plausibility clamp on alternatives", () => {
       a => a.estimated_delta_vs_actual > recGain + 0.05,
     );
     if (overrec) {
-      const insights = result!.insights ?? [];
+      const insights = result!.narrative_insights ?? [];
       const hit = insights.some(s => /non è stata promossa|risk-adjusted/i.test(s));
       expect(hit).toBe(true);
     }
