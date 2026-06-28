@@ -2568,6 +2568,80 @@ export function computeVirtualRaceEngineer(
       }
     }
 
+    // ── Presentation-only plausibility clamp on alternatives ──
+    // Mirrors the cap applied to bestDelta in section 3 (MAX_PLAUSIBLE_DELTA =
+    // pitLoss × 2.5) so the gains shown for recommended and alternatives are
+    // on the SAME scale and visually comparable. CRITICAL: applied AFTER
+    // scoring, uncertainty propagation and the promotion check have all run
+    // on raw values, so this clamp NEVER influences ranking or robustness
+    // classification. Raw values are preserved on `raw_delta_vs_actual`.
+    {
+      const MAX_PLAUSIBLE_DELTA_DISPLAY = pitLoss * 2.5;
+      // Also clamp the recommended gain in case it was overwritten by a
+      // promoted alternative whose raw delta exceeded the cap.
+      if (recommendedStrategy.estimated_gain_seconds > MAX_PLAUSIBLE_DELTA_DISPLAY) {
+        recommendedStrategy.estimated_gain_seconds =
+          Math.round(MAX_PLAUSIBLE_DELTA_DISPLAY * 10) / 10;
+        recommendedStrategy.time_delta_vs_actual =
+          -recommendedStrategy.estimated_gain_seconds;
+      }
+      for (const alt of alternatives) {
+        if (alt.estimated_delta_vs_actual > MAX_PLAUSIBLE_DELTA_DISPLAY) {
+          alt.raw_delta_vs_actual = alt.estimated_delta_vs_actual;
+          alt.delta_clamped = true;
+          alt.estimated_delta_vs_actual =
+            Math.round(MAX_PLAUSIBLE_DELTA_DISPLAY * 10) / 10;
+          alt.time_delta_vs_actual = -alt.estimated_delta_vs_actual;
+          alt.cons.push(
+            `Guadagno nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+          );
+        }
+      }
+    }
+
+    // ── Explainability: why an alternative with a larger shown delta was
+    // NOT promoted to recommended. Uses already-computed robustness,
+    // uncertainty and clamp flags; never invents numbers.
+    {
+      const recGain = recommendedStrategy.estimated_gain_seconds;
+      const altsAbove = alternatives
+        .map((a, i) => ({ a, i }))
+        .filter(({ a }) => a.estimated_delta_vs_actual > recGain + 0.05);
+      if (altsAbove.length > 0) {
+        const top = altsAbove[0].a;
+        const reasons: string[] = [];
+        const robust = top.analysis?.robustness.robustness_label;
+        if (robust === "FRAGILE") reasons.push("classificata FRAGILE");
+        if (top.delta_clamped) reasons.push("guadagno fortemente estrapolato oltre il range osservato (clamp di plausibilità)");
+        if (top.indistinguishable_from_actual) {
+          const std = top.delta_uncertainty_std ?? 0;
+          reasons.push(`vantaggio entro la banda di incertezza del modello di degrado (±${std.toFixed(1)}s)`);
+        }
+        if (reasons.length === 0) {
+          reasons.push("differenza risk-adjusted sotto la soglia di promozione (1.0s)");
+        }
+        const text = `"${top.name}" mostra un guadagno nominale superiore alla raccomandata (${top.estimated_delta_vs_actual.toFixed(1)}s vs ${recGain.toFixed(1)}s) ma non è stata promossa: ${reasons.join("; ")}. Su base risk-adjusted la raccomandata resta preferibile.`;
+        narrativeCollector.add({
+          id: "alt_shown_delta_exceeds_rec_unpromoted",
+          category: "risk_scoring",
+          priority: "supporting",
+          target: "global",
+          data: {
+            alt_name: top.name,
+            alt_shown_delta: top.estimated_delta_vs_actual,
+            rec_gain: recGain,
+            robustness_label: robust,
+            delta_clamped: !!top.delta_clamped,
+            indistinguishable_from_actual: !!top.indistinguishable_from_actual,
+            delta_uncertainty_std: top.delta_uncertainty_std,
+          },
+          prerendered_text: text,
+        });
+      }
+    }
+
+
+
 
     // Soft sensor scoring narrative
     if (softSensorScoringGate.soft_sensor_scoring_enabled) {
