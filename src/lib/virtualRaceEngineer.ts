@@ -1254,6 +1254,99 @@ export function computeVirtualRaceEngineer(
         }
       }
     }
+
+    // ── 4a-extra-bis. Reduced-stops strategies (N-1, down to legal minimum) ──
+    // Generates counterfactuals with FEWER stops than actual. Always preserves the
+    // two-compound rule; relies on the existing simulateStrategyCost (which applies
+    // MAX_DEG_LOSS_PER_LAP clamp + capped cliffPenalty) and on the downstream
+    // uncertainty pipeline (stdDev grows with stint length → reduced-stop band
+    // widens automatically). No new heuristics introduced.
+    if (actualPitLaps.length >= 2 && actualAdjustedTime != null) {
+      // Observed max stint length per compound (real race) → extrapolation distance.
+      const observedMaxByCompound = new Map<string, number>();
+      for (const s of stintAnalyses) {
+        const cur = observedMaxByCompound.get(s.compound) ?? 0;
+        if (s.laps_count > cur) observedMaxByCompound.set(s.compound, s.laps_count);
+      }
+
+      type RedCand = { pits: number[]; comps: string[]; time: number; mergedLen: number; mergedCompound: string };
+
+      const reduceOnce = (pits: number[], comps: string[]): RedCand | null => {
+        let best: RedCand | null = null;
+        for (let k = 0; k < pits.length; k++) {
+          const newPits = pits.filter((_, i) => i !== k);
+          // For the fused stint we evaluate both adjacent compounds and keep the
+          // best legal time. Drop comps[k+1] → fused stint uses comps[k]; drop
+          // comps[k] → fused stint uses comps[k+1].
+          const candComps: string[][] = [comps.filter((_, i) => i !== k + 1)];
+          if (comps[k] !== comps[k + 1]) candComps.push(comps.filter((_, i) => i !== k));
+          for (const newComps of candComps) {
+            if (!hasMinTwoCompounds(newComps)) continue;
+            const t = simulateStrategyCost(newPits, newComps);
+            if (t == null) continue;
+            if (!best || t < best.time) {
+              const prevPit = k === 0 ? 0 : pits[k - 1];
+              const nextPit = k + 1 < pits.length ? pits[k + 1] : totalLaps;
+              const mergedLen = nextPit - prevPit;
+              const mergedCompound = newComps[k];
+              best = { pits: newPits, comps: newComps, time: t, mergedLen, mergedCompound };
+            }
+          }
+        }
+        return best;
+      };
+
+      const reducedCandidates: RedCand[] = [];
+      const nMinus1 = reduceOnce(actualPitLaps, actualCompounds);
+      if (nMinus1) reducedCandidates.push(nMinus1);
+
+      // Iterate down to legal minimum (1 stop, still 2 compounds) if we started with ≥3.
+      if (actualPitLaps.length >= 3 && nMinus1) {
+        let cur = nMinus1;
+        while (cur.pits.length > 1) {
+          const next = reduceOnce(cur.pits, cur.comps);
+          if (!next) break;
+          cur = next;
+        }
+        if (cur.pits.length < nMinus1.pits.length) reducedCandidates.push(cur);
+      }
+
+      for (const cand of reducedCandidates) {
+        const observedMax = observedMaxByCompound.get(cand.mergedCompound) ?? 0;
+        const overLaps = Math.max(0, cand.mergedLen - observedMax);
+        const cliffThreshold = CLIFF_THRESHOLDS[cand.mergedCompound] ?? CLIFF_THRESHOLD_DEFAULT;
+        const cliffRisk = cand.mergedLen > cliffThreshold;
+
+        const cons: string[] = [
+          "Una sosta in meno: lo stint risultante è più lungo di qualunque stint realmente percorso in gara",
+        ];
+        if (overLaps > 0) {
+          cons.push(`Stint esteso di ${overLaps} giri oltre il massimo osservato (${observedMax} giri su ${cand.mergedCompound}): stima del degrado in estrapolazione, meno affidabile`);
+        } else {
+          cons.push("Stima del degrado nel finale del long stint meno affidabile (estrapolazione del modello oltre il range osservato)");
+        }
+        if (cliffRisk) {
+          cons.push(`Rischio cliff/degrado non lineare: stint da ${cand.mergedLen} giri su ${cand.mergedCompound} oltre la soglia di cliff (~${cliffThreshold} giri)`);
+        }
+
+        const pros: string[] = [
+          `Una sosta in meno: risparmio di un pit loss completo (~${pitLoss.toFixed(1)}s) ed esposizione ridotta al traffico ai box`,
+        ];
+
+        const desc = `Pit ai giri ${cand.pits.join(", ")} (${cand.comps.join(" → ")})`;
+
+        alternatives.push({
+          name: `${cand.pits.length}-stop`,
+          description: desc,
+          pit_laps: cand.pits,
+          compounds: cand.comps,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - cand.time) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - cand.time) * 10) / 10,
+          pros,
+          cons,
+        });
+      }
+    }
   }
 
   // ── 4b. Traffic Release Predictor ──
