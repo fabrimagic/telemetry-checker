@@ -1040,7 +1040,7 @@ export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerR
           </div>
         )}
 
-        <LappedTrafficSection result={result} />
+        
 
         {/* Narrative chapters (Lever 1) — falls back to flat insights when chapters empty */}
         <NarrativeChapters
