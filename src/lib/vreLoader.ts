@@ -77,6 +77,13 @@ export interface VreLoaderInput {
    * becomes "non disponibile" while the other works.
    */
   precomputedCumDev?: CumulativeDeviationResult | null;
+  /**
+   * Optional precomputed session-wide laps. When provided, the loader reuses
+   * them for the lapped-traffic analysis (and skips its own `getAllLaps`
+   * fetch for that purpose). Head-to-head passes the shared value across both
+   * drivers to avoid a duplicate session-scoped fetch (reduces 429 risk).
+   */
+  precomputedAllLaps?: Lap[] | null;
 }
 
 export interface VreLoaderOutput {
