@@ -77,6 +77,13 @@ export interface VreLoaderInput {
    * becomes "non disponibile" while the other works.
    */
   precomputedCumDev?: CumulativeDeviationResult | null;
+  /**
+   * Optional precomputed session-wide laps. When provided, the loader reuses
+   * them for the lapped-traffic analysis (and skips its own `getAllLaps`
+   * fetch for that purpose). Head-to-head passes the shared value across both
+   * drivers to avoid a duplicate session-scoped fetch (reduces 429 risk).
+   */
+  precomputedAllLaps?: Lap[] | null;
 }
 
 export interface VreLoaderOutput {
@@ -109,6 +116,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     analysisMode = "RACE_ENGINEER",
     computeAlternative = false,
     precomputedCumDev,
+    precomputedAllLaps,
   } = input;
 
   const out: VreLoaderOutput = {
@@ -252,12 +260,14 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     // (head-to-head loads two drivers in parallel; fetching session-scoped data twice
     //  doubles 429 risk and can produce asymmetric "non disponibile" gaps).
     let cumDev: CumulativeDeviationResult | null = precomputedCumDev ?? null;
+    let sessionAllLapsCache: Lap[] | null = precomputedAllLaps ?? null;
     if (cumDev == null) {
       try {
         const [sessionAllLaps, sessionResults] = await Promise.all([
-          getAllLaps(sessionKey),
+          sessionAllLapsCache ? Promise.resolve(sessionAllLapsCache) : getAllLaps(sessionKey),
           getSessionResult(sessionKey),
         ]);
+        sessionAllLapsCache = sessionAllLaps;
         if (sessionAllLaps.length && sessionResults.length) {
           cumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
         }
@@ -299,6 +309,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
       analysisMode,
       lapWorkEstimates,
       totalEstimatedWork,
+      sessionAllLapsCache ?? undefined,
     );
     out.vreResult = vre;
 
@@ -322,6 +333,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
             "POST_RACE",
             lapWorkEstimates,
             totalEstimatedWork,
+            sessionAllLapsCache ?? undefined,
           );
           out.alternativeVreResult = altVre;
         } catch { /* optional — alternative is best-effort */ }

@@ -136,11 +136,13 @@ export default function Compare() {
     (async () => {
       let sharedCumDev: CumulativeDeviationResult | null = null;
       let sharedSessionResults: SessionResult[] | null = null;
+      let sharedAllLaps: Awaited<ReturnType<typeof getAllLaps>> | null = null;
       try {
         const [sessionAllLaps, sessionResults] = await Promise.all([
           getAllLaps(sessionKey),
           getSessionResult(sessionKey),
         ]);
+        if (sessionAllLaps.length) sharedAllLaps = sessionAllLaps;
         if (sessionAllLaps.length && sessionResults.length) {
           sharedCumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
         }
@@ -163,6 +165,7 @@ export default function Compare() {
             analysisMode: "RACE_ENGINEER",
             computeAlternative: true,
             precomputedCumDev: sharedCumDev,
+            precomputedAllLaps: sharedAllLaps,
           }),
           loadVreForDriver({
             driverNumber: driverObjB.driver_number,
@@ -176,6 +179,7 @@ export default function Compare() {
             analysisMode: "RACE_ENGINEER",
             computeAlternative: true,
             precomputedCumDev: sharedCumDev,
+            precomputedAllLaps: sharedAllLaps,
           }),
         ]);
         if (cancelled) return;

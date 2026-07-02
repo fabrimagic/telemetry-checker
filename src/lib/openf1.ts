@@ -459,6 +459,13 @@ export interface RaceControlMessage {
   sector: number | null;
   meeting_key: number;
   session_key: number;
+  /**
+   * Additive optional fields provided by OpenF1 on driver-scoped messages
+   * (blue flags, black-and-white, sector yellows). Kept optional so existing
+   * callers/tests don't need to populate them — no behavior change.
+   */
+  driver_number?: number | null;
+  lap_number?: number | null;
 }
 
 export function getRaceControl(sessionKey: number) {

@@ -16,6 +16,7 @@ import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, NEUTRALIZATION_PIT_LOSS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
+import { detectLappedTraffic, type LappedTrafficResult } from "./lappedTraffic";
 import { computeTyreWarmupPenalty, computeStintWarmupCost, computeStartWarmupTempFactor, computeStartTractionPenalty, START_WARMUP_FRACTION } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { classifyStrategyIntent, type IntentClassification } from "./strategyIntent";
@@ -245,6 +246,15 @@ export interface VirtualRaceEngineerResult {
    * verdicts) do NOT account for penalties. See raceControlPenalties.ts.
    */
   detected_penalties: DetectedPenalty[];
+  /**
+   * Lapped-traffic cost analysis (optional). Present only when the caller
+   * passes `allSessionLaps`. INFORMATIONAL: the estimated cost is NOT
+   * applied to any strategic score, penalty, or counterfactual simulation
+   * — projecting future encounters with backmarkers would be speculative.
+   * It IS used to contaminate stint pace-loss laps (same treatment as
+   * battle / weather / neutralization).
+   */
+  lapped_traffic?: LappedTrafficResult;
 }
 
 /* ── Helpers ── */
@@ -504,6 +514,7 @@ export function computeVirtualRaceEngineer(
   analysisMode: AnalysisMode = "POST_RACE",
   lapWorkEstimates?: LapWorkEstimate[],
   totalEstimatedWork?: number,
+  allSessionLaps?: Lap[],
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) {
     console.warn("[VRE] returning null:", "missing stints or laps");
@@ -669,7 +680,34 @@ export function computeVirtualRaceEngineer(
   const driverCumDev: DriverCumulativeDeviation | null = cumDevResult?.drivers.find(d => d.driver_number === driverNumber) ?? null;
   // Battle context built early just for pace loss contamination check
   const earlyBattleCtx = diaryEvents ? buildBattleContext(diaryEvents) : null;
-  const paceLossResults = computeAllStintPaceLoss(driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap);
+
+  // ── 1c. Lapped-traffic detection & cost estimate ──
+  // Optional: only when the caller passes the full-session laps. When absent,
+  // `lappedTrafficResult` stays undefined and behavior is bit-identical to the
+  // pre-change baseline (no snapshot should move). INFORMATIONAL ONLY: the
+  // cost is NOT applied to any strategic score or counterfactual — the only
+  // strategic effect is excluding encounter laps from the pace-loss windows.
+  let lappedTrafficResult: LappedTrafficResult | undefined;
+  if (allSessionLaps && allSessionLaps.length > 0) {
+    try {
+      lappedTrafficResult = detectLappedTraffic({
+        allSessionLaps,
+        driverLaps: laps,
+        driverNumber,
+        stints,
+        raceControl,
+        weatherMap,
+        trackStatusMap,
+        battleContext: earlyBattleCtx,
+      });
+    } catch { /* best-effort — never break VRE */ }
+  }
+  const lappedEncounterLapsForPaceLoss = lappedTrafficResult?.encounter_lap_numbers ?? null;
+
+  const paceLossResults = computeAllStintPaceLoss(
+    driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap,
+    undefined, lappedEncounterLapsForPaceLoss,
+  );
   const plDegAdj = paceLossDegradationAdjustment(paceLossResults);
   const plCliffMult = paceLossCliffMultiplier(paceLossResults);
   const plPitShift = paceLossPitUrgencyShift(paceLossResults);
@@ -2050,6 +2088,34 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 7b-bis. Lapped-traffic insight & confidence factor (informational) ──
+  if (lappedTrafficResult) {
+    const lt = lappedTrafficResult;
+    if (lt.encounter_lap_count === 0) {
+      confidenceFactors.push("Analisi doppiaggi disponibile: nessun incontro rilevato");
+    } else {
+      confidenceFactors.push(
+        `Analisi doppiaggi disponibile: ${lt.encounter_lap_count} giri con doppiaggi (${lt.total_lapped_count} vetture), confidenza ${lt.confidence}`
+      );
+      const bfRatio = Math.round(lt.blue_flag_corroboration_ratio * 100);
+      const parts: string[] = [];
+      parts.push(`Traffico doppiati: ${lt.total_lapped_count} vetture doppiate in ${lt.encounter_lap_count} giri`);
+      if (lt.cost_distinguishable_from_noise && lt.median_cost_seconds != null && lt.total_time_lost_seconds != null) {
+        parts.push(`costo mediano ~${lt.median_cost_seconds.toFixed(2)}s/giro, totale stimato ~${lt.total_time_lost_seconds.toFixed(1)}s (confidenza ${lt.confidence}${bfRatio > 0 ? `, ${bfRatio}% corroborati da bandiera blu` : ""})`);
+      } else {
+        parts.push(`costo non distinguibile dal rumore (confidenza ${lt.confidence})`);
+      }
+      let text = parts.join(" — ") + ".";
+      if (lt.confidence === "LOW" || !lt.cost_distinguishable_from_noise) {
+        text += " Dato indicativo: pochi delta validi o mediana non positiva.";
+      }
+      text += " " + lt.method_declaration;
+      narrativeInsights.push(text);
+    }
+  }
+
+
+
   // ── 7c. Diary context insights ──
   if (integratedContext.diary_context) {
     const dc = integratedContext.diary_context;
@@ -2784,5 +2850,6 @@ export function computeVirtualRaceEngineer(
     soft_sensor_scoring_gate: softSensorScoringGate,
     analysis_mode: analysisMode,
     detected_penalties: penaltiesForDriver(detectRaceControlPenalties(raceControl), driverNumber),
+    ...(lappedTrafficResult ? { lapped_traffic: lappedTrafficResult } : {}),
   };
 }

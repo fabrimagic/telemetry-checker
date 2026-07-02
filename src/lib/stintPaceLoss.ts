@@ -58,6 +58,13 @@ export interface PaceLossContaminationFlags {
   weather: boolean;
   neutralization: boolean;
   battle: boolean;
+  /**
+   * True when at least one lap in the stint was identified as a
+   * lapped-traffic encounter by `lappedTraffic.ts`. Additive, optional
+   * upstream: when the encounter set isn't provided, this stays `false`
+   * and behavior is identical to the pre-change baseline.
+   */
+  lapped_traffic: boolean;
 }
 
 export type PaceLossConfidence = "HIGH" | "MEDIUM" | "LOW";
@@ -96,6 +103,7 @@ function identifyContaminatedLaps(
   battleContext: BattleContext | null,
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
+  lappedTrafficEncounterLaps: Set<number> | null = null,
 ): { contaminated: Set<number>; flags: PaceLossContaminationFlags } {
   const contaminated = new Set<number>();
   const flags: PaceLossContaminationFlags = {
@@ -103,6 +111,7 @@ function identifyContaminatedLaps(
     weather: false,
     neutralization: false,
     battle: false,
+    lapped_traffic: false,
   };
 
   for (const lap of stintLapNumbers) {
@@ -124,6 +133,12 @@ function identifyContaminatedLaps(
     if (battleContext?.battle_laps.has(lap)) {
       contaminated.add(lap);
       flags.battle = true;
+    }
+
+    // Lapped-traffic contamination (additive; null = disabled → identical to legacy behavior)
+    if (lappedTrafficEncounterLaps && lappedTrafficEncounterLaps.has(lap)) {
+      contaminated.add(lap);
+      flags.lapped_traffic = true;
     }
   }
 
@@ -267,6 +282,7 @@ export function computeAllStintPaceLoss(
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
   config: PaceLossConfig = DEFAULT_PACE_LOSS_CONFIG,
+  lappedTrafficEncounterLaps: Set<number> | null = null,
 ): StintPaceLossResult[] {
   if (!driverDev || driverDev.laps.length === 0) {
     return stints.map((s) => ({
@@ -276,7 +292,7 @@ export function computeAllStintPaceLoss(
       pace_loss_used_for_strategy: false,
       pace_loss_reason: "Dati deviazione cumulativa non disponibili per questo stint",
       pace_loss_confidence: "LOW" as PaceLossConfidence,
-      pace_loss_contamination_flags: { traffic: false, weather: false, neutralization: false, battle: false },
+      pace_loss_contamination_flags: { traffic: false, weather: false, neutralization: false, battle: false, lapped_traffic: false },
       valid_laps_used: 0,
       contaminated_laps_count: 0,
     }));
@@ -286,7 +302,7 @@ export function computeAllStintPaceLoss(
     const stintLaps = extractStintLaps(driverDev, stint);
     const lapNumbers = stintLaps.map((l) => l.lap_number);
     const { contaminated, flags } = identifyContaminatedLaps(
-      lapNumbers, battleContext, weatherMap, trackStatusMap,
+      lapNumbers, battleContext, weatherMap, trackStatusMap, lappedTrafficEncounterLaps,
     );
 
     const contaminationRatio = stintLaps.length > 0
