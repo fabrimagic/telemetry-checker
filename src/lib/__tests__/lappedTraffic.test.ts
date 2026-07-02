@@ -76,6 +76,46 @@ describe("detectLappedTraffic", () => {
     expect(r.blue_flag_corroboration_ratio).toBe(0);
   });
 
+  it("regression: a car retired after 3 laps at analyzed pace produces zero encounters", () => {
+    // Driver 1: 20 laps @ 90s. Driver 2: same pace, only 3 laps then retires.
+    // Naive counter-only logic would flag every subsequent lap as a lapping;
+    // the retirement guard must filter them out.
+    const a = driverLaps(1, 20, 90);
+    const b = driverLaps(2, 3, 90);
+    const r = detectLappedTraffic({
+      allSessionLaps: [...a, ...b],
+      driverLaps: a,
+      driverNumber: 1,
+      stints: singleStint(20),
+      raceControl: [],
+      weatherMap: new Map(),
+      trackStatusMap: new Map(),
+      battleContext: null,
+    });
+    expect(r.encounter_lap_count).toBe(0);
+    expect(r.total_lapped_count).toBe(0);
+  });
+
+  it("control: a genuinely slow car that runs the full race is still detected after the guard", () => {
+    // Driver 1: 12 laps @ 90s (total 1080s). Driver 2: slow, runs the WHOLE
+    // race at 135s pace up to and beyond t=1080 → last start after every
+    // analyzed lap tStart → the guard does not filter it.
+    const a = driverLaps(1, 12, 90);
+    const b = driverLaps(2, 10, 135); // last start at t=1215 > 1080
+    const r = detectLappedTraffic({
+      allSessionLaps: [...a, ...b],
+      driverLaps: a,
+      driverNumber: 1,
+      stints: singleStint(12),
+      raceControl: [],
+      weatherMap: new Map(),
+      trackStatusMap: new Map(),
+      battleContext: null,
+    });
+    expect(r.encounter_lap_count).toBeGreaterThan(0);
+    expect(r.total_lapped_count).toBeGreaterThan(0);
+  });
+
   it("interpolates missing date_start when possible, excludes when not", () => {
     const a = driverLaps(1, 5, 90);
     const b = driverLaps(2, 4, 120);
