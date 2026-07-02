@@ -1890,6 +1890,12 @@ export function computeVirtualRaceEngineer(
 
     recommendedStrategy.pros = recPros;
     recommendedStrategy.cons = recCons;
+    if (recommendedStrategy.delta_clamped) {
+      const _cap = pitLoss * 2.5;
+      recommendedStrategy.cons.push(
+        `Guadagno nominale limitato al massimo plausibile (~${_cap.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+      );
+    }
   }
 
 
