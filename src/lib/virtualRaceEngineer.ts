@@ -1037,7 +1037,12 @@ export function computeVirtualRaceEngineer(
   }
 
   // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
-  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[], forActualStrategy: boolean = false): number | null {
+  function simulateTimeRaw(
+    pitLapsArr: number[],
+    compoundsArr: string[],
+    forActualStrategy: boolean = false,
+    interceptOverrideByStint?: (number | null)[],
+  ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateTimeRaw requires at least two compounds");
       return null;
@@ -1051,6 +1056,8 @@ export function computeVirtualRaceEngineer(
         console.warn("[VRE] returning null:", `simulateTimeRaw missing model for ${sb.compound}`);
         return null;
       }
+      const interceptOverride = interceptOverrideByStint?.[si];
+      const baseIntercept = (interceptOverride != null && Number.isFinite(interceptOverride)) ? interceptOverride : model.intercept;
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
@@ -1061,7 +1068,7 @@ export function computeVirtualRaceEngineer(
         const MAX_DEG_LOSS_PER_LAP = 3.5;
         const degRaw = model.slope * tyreLife;
         const degClamped = Math.min(degRaw, MAX_DEG_LOSS_PER_LAP);
-        total += model.intercept + degClamped + warmupPenalty;
+        total += baseIntercept + degClamped + warmupPenalty;
       }
       if (isFirstStint) {
         total += computeStartTractionPenalty(sb.compound, trackTempAtStart);
