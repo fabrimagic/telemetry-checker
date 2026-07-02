@@ -58,6 +58,13 @@ export interface PaceLossContaminationFlags {
   weather: boolean;
   neutralization: boolean;
   battle: boolean;
+  /**
+   * True when at least one lap in the stint was identified as a
+   * lapped-traffic encounter by `lappedTraffic.ts`. Additive, optional
+   * upstream: when the encounter set isn't provided, this stays `false`
+   * and behavior is identical to the pre-change baseline.
+   */
+  lapped_traffic: boolean;
 }
 
 export type PaceLossConfidence = "HIGH" | "MEDIUM" | "LOW";
