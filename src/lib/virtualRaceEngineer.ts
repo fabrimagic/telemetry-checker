@@ -2711,6 +2711,18 @@ export function computeVirtualRaceEngineer(
       // Also clamp the recommended gain in case it was overwritten by a
       // promoted alternative whose raw delta exceeded the cap.
       if (recommendedStrategy.estimated_gain_seconds > MAX_PLAUSIBLE_DELTA_DISPLAY) {
+        // Only capture the pre-clamp raw if not already captured by the
+        // initial bestDelta clamp (which stored the true pre-clamp value).
+        if (!recommendedStrategy.delta_clamped) {
+          recommendedStrategy.raw_gain_seconds =
+            Math.round(recommendedStrategy.estimated_gain_seconds * 10) / 10;
+          recommendedStrategy.delta_clamped = true;
+          if (recommendedStrategy.cons) {
+            recommendedStrategy.cons.push(
+              `Guadagno nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+            );
+          }
+        }
         recommendedStrategy.estimated_gain_seconds =
           Math.round(MAX_PLAUSIBLE_DELTA_DISPLAY * 10) / 10;
         recommendedStrategy.time_delta_vs_actual =
@@ -2725,6 +2737,15 @@ export function computeVirtualRaceEngineer(
           alt.time_delta_vs_actual = -alt.estimated_delta_vs_actual;
           alt.cons.push(
             `Guadagno nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+          );
+        } else if (alt.estimated_delta_vs_actual < -MAX_PLAUSIBLE_DELTA_DISPLAY) {
+          alt.raw_delta_vs_actual = alt.estimated_delta_vs_actual;
+          alt.delta_clamped = true;
+          alt.estimated_delta_vs_actual =
+            -Math.round(MAX_PLAUSIBLE_DELTA_DISPLAY * 10) / 10;
+          alt.time_delta_vs_actual = -alt.estimated_delta_vs_actual;
+          alt.cons.push(
+            `Svantaggio nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta inferiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta una perdita realistica.`,
           );
         }
       }
