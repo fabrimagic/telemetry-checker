@@ -514,6 +514,7 @@ export function computeVirtualRaceEngineer(
   analysisMode: AnalysisMode = "POST_RACE",
   lapWorkEstimates?: LapWorkEstimate[],
   totalEstimatedWork?: number,
+  allSessionLaps?: Lap[],
 ): VirtualRaceEngineerResult | null {
   if (!stints.length || !laps.length) {
     console.warn("[VRE] returning null:", "missing stints or laps");
