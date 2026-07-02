@@ -2088,6 +2088,31 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 7b-bis. Lapped-traffic insight & confidence factor (informational) ──
+  if (lappedTrafficResult) {
+    const lt = lappedTrafficResult;
+    if (lt.encounter_lap_count === 0) {
+      confidenceFactors.push("Analisi doppiaggi disponibile: nessun incontro rilevato");
+    } else {
+      confidenceFactors.push(
+        `Analisi doppiaggi disponibile: ${lt.encounter_lap_count} giri con doppiaggi (${lt.total_lapped_count} vetture), confidenza ${lt.confidence}`
+      );
+      const bfRatio = Math.round(lt.blue_flag_corroboration_ratio * 100);
+      const parts: string[] = [];
+      parts.push(`Traffico doppiati: ${lt.total_lapped_count} vetture doppiate in ${lt.encounter_lap_count} giri`);
+      if (lt.cost_distinguishable_from_noise && lt.median_cost_seconds != null && lt.total_time_lost_seconds != null) {
+        parts.push(`costo mediano ~${lt.median_cost_seconds.toFixed(2)}s/giro, totale stimato ~${lt.total_time_lost_seconds.toFixed(1)}s (confidenza ${lt.confidence}${bfRatio > 0 ? `, ${bfRatio}% corroborati da bandiera blu` : ""})`);
+      } else {
+        parts.push(`costo non distinguibile dal rumore (confidenza ${lt.confidence})`);
+      }
+      let text = parts.join(" — ") + ".";
+      if (lt.confidence === "LOW" || !lt.cost_distinguishable_from_noise) {
+        text += " Dato indicativo: pochi delta validi o mediana non positiva.";
+      }
+      text += " " + lt.method_declaration;
+      narrativeInsights.push(text);
+    }
+
   // ── 7c. Diary context insights ──
   if (integratedContext.diary_context) {
     const dc = integratedContext.diary_context;
