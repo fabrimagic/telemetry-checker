@@ -333,6 +333,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
             "POST_RACE",
             lapWorkEstimates,
             totalEstimatedWork,
+            sessionAllLapsCache ?? undefined,
           );
           out.alternativeVreResult = altVre;
         } catch { /* optional — alternative is best-effort */ }
