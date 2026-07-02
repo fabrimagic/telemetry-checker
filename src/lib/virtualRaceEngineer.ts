@@ -1229,7 +1229,14 @@ export function computeVirtualRaceEngineer(
 
   // Try shifts of ±5 laps for each pit stop AND different compound combinations
   if (actualPitLaps.length > 0 && actualAdjustedTime != null && actualSimTime != null) {
-    let bestTime = actualAdjustedTime;
+    // Selection is now driven by DELTA (not absolute time) because candidates
+    // may live in DIFFERENT simulation spaces: race-only combos are evaluated
+    // in the fuel-corrected space (baseline = actualAdjustedTime), whereas
+    // combos containing at least one PRACTICE compound are evaluated in the
+    // shared RAW-slope space (baseline = actualRawTime). Maximizing delta is
+    // equivalent to minimizing time only when the baseline is constant, which
+    // holds within each space. For race-only combos the numeric outcome is
+    // identical to the previous `bestTime` search.
 
     // Generate compound combos: actual + all permutations using available compounds
     const allAvailableCompounds = [...compoundModels.keys()];
@@ -1266,6 +1273,7 @@ export function computeVirtualRaceEngineer(
     const shift2Range = actualPitLaps.length >= 2 ? shifts : [0];
 
     for (const compounds of compoundCombos) {
+      const usesPractice = candidateUsesPractice(compounds);
       for (const shift1 of shifts) {
         for (const shift2 of shift2Range) {
           const candidatePits = actualPitLaps.map((p, i) => {
@@ -1280,16 +1288,25 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateStrategyCost(candidatePits, compounds, buildInterceptOverride(compounds));
-          if (t != null && t < bestTime) {
-            bestTime = t;
+          let delta: number;
+          if (usesPractice) {
+            const ev = evalCandidatePracticeSpace(candidatePits, compounds);
+            if (!ev) continue;
+            delta = ev.delta;
+          } else {
+            const t = simulateStrategyCost(candidatePits, compounds);
+            if (t == null) continue;
+            delta = actualAdjustedTime - t;
+          }
+          if (delta > bestDelta) {
             bestPitLaps = candidatePits;
             bestCompounds = compounds;
-            bestDelta = actualAdjustedTime! - t;
+            bestDelta = delta;
           }
         }
       }
     }
+
 
     // Clamp di plausibilita': un guadagno strategico realistico su una gara
     // intera e' nell'ordine di ~2.5x il pit loss (rimpiazzare un timing di pit
