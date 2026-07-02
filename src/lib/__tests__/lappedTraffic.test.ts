@@ -81,7 +81,7 @@ describe("detectLappedTraffic", () => {
     // Naive counter-only logic would flag every subsequent lap as a lapping;
     // the retirement guard must filter them out.
     const a = driverLaps(1, 20, 90);
-    const b = driverLaps(2, 3, 90);
+    const b = driverLaps(2, 3, 90, -1); // retires after 3 laps, last start at t=179
     const r = detectLappedTraffic({
       allSessionLaps: [...a, ...b],
       driverLaps: a,
