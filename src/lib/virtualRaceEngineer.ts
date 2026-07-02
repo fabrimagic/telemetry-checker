@@ -1969,6 +1969,9 @@ export function computeVirtualRaceEngineer(
 
     recommendedStrategy.pros = recPros;
     recommendedStrategy.cons = recCons;
+    if (candidateUsesPractice(bestCompounds)) {
+      recommendedStrategy.cons.push(PRACTICE_ASSUMPTION_CON);
+    }
     if (recommendedStrategy.delta_clamped) {
       const _cap = pitLoss * 2.5;
       recommendedStrategy.cons.push(
