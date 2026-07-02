@@ -1347,7 +1347,7 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateStrategyCost(actualPitLaps, altCompounds);
+        const altTime = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
         if (altTime != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
@@ -1357,7 +1357,7 @@ export function computeVirtualRaceEngineer(
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
             time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
-            cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
+            cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista differenti tra prove e gara"],
           });
         }
       }
