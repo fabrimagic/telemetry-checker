@@ -391,23 +391,20 @@ export function computePositionAdjustment(
  * missing altScores entry does not silently re-order siblings.
  */
 export function sortAlternativesByPositionAwareScore<
-  A extends { name: string; estimated_delta_vs_actual: number; position_score_adjustment?: number },
-  S extends { name: string; isRecommended?: boolean },
+  A extends { estimated_delta_vs_actual: number; position_score_adjustment?: number },
 >(
   alternatives: A[],
-  altScores: Map<number, { adjusted_score: number }>,
-  scoringInput: S[],
+  scoreByRef: Map<A, number | undefined>,
 ): void {
   // Snapshot original indices for stable tiebreaker.
   const originalIndex = new Map<A, number>();
   alternatives.forEach((a, i) => originalIndex.set(a, i));
 
   alternatives.sort((a, b) => {
-    const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
-    const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
+    // Reference-based lookup (no name resolution → duplicate names are safe).
     // Both branches use higher=better convention (see jsdoc above).
-    const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
-    const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+    const baseA = scoreByRef.get(a) ?? a.estimated_delta_vs_actual;
+    const baseB = scoreByRef.get(b) ?? b.estimated_delta_vs_actual;
     const scoreA = baseA - (a.position_score_adjustment ?? 0);
     const scoreB = baseB - (b.position_score_adjustment ?? 0);
     if (scoreB !== scoreA) return scoreB - scoreA;
@@ -1178,55 +1175,78 @@ export function computeVirtualRaceEngineer(
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
 
+  // Local helper: validate a candidate pit sequence with the same rules used by
+  // the recommended-strategy search — strictly increasing, minimum spacing of
+  // 3 laps, first pit ≥ 3, last pit ≤ totalLaps − 3. Prevents the undercut /
+  // overcut / N+1 branches from producing duplicate or non-monotonic pits when
+  // actual pits are close together.
+  const isValidPitSequence = (pits: number[]): boolean => {
+    if (pits.length === 0) return true;
+    if (pits[0] < 3) return false;
+    if (pits[pits.length - 1] > totalLaps - 3) return false;
+    for (let i = 1; i < pits.length; i++) {
+      if (pits[i] - pits[i - 1] < 3) return false;
+    }
+    return true;
+  };
+
   if (actualPitLaps.length > 0 && actualSimTime != null && actualAdjustedTime != null) {
     // Undercut
     const undercutPits = actualPitLaps.map((p, i) => i === 0 ? Math.max(3, p - 3) : p);
-    const undercutTime = simulateStrategyCost(undercutPits, actualCompounds);
-    if (undercutTime != null) {
-      alternatives.push({
-        name: "Undercut anticipato",
-        description: `Pit al giro ${undercutPits[0]} invece di ${actualPitLaps[0]}`,
-        pit_laps: undercutPits,
-        compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
-        time_delta_vs_actual: -Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
-        pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
-        cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
-      });
+    if (isValidPitSequence(undercutPits)) {
+      const undercutTime = simulateStrategyCost(undercutPits, actualCompounds);
+      if (undercutTime != null) {
+        alternatives.push({
+          name: "Undercut anticipato",
+          description: `Pit al giro ${undercutPits[0]} invece di ${actualPitLaps[0]}`,
+          pit_laps: undercutPits,
+          compounds: actualCompounds,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
+          pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
+          cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
+        });
+      }
     }
 
     // Overcut
     const overcutPits = actualPitLaps.map((p, i) => i === 0 ? Math.min(totalLaps - 3, p + 3) : p);
-    const overcutTime = simulateStrategyCost(overcutPits, actualCompounds);
-    if (overcutTime != null) {
-      alternatives.push({
-        name: "Overcut / estensione stint",
-        description: `Pit al giro ${overcutPits[0]} invece di ${actualPitLaps[0]}`,
-        pit_laps: overcutPits,
-        compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
-        time_delta_vs_actual: -Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
-        pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
-        cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
-      });
+    if (isValidPitSequence(overcutPits)) {
+      const overcutTime = simulateStrategyCost(overcutPits, actualCompounds);
+      if (overcutTime != null) {
+        alternatives.push({
+          name: "Overcut / estensione stint",
+          description: `Pit al giro ${overcutPits[0]} invece di ${actualPitLaps[0]}`,
+          pit_laps: overcutPits,
+          compounds: actualCompounds,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
+          pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
+          cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
+        });
+      }
     }
 
     // Opposite compound if available (race compounds)
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
-      const reversedTime = simulateStrategyCost(actualPitLaps, reversed);
-      if (reversedTime != null) {
-        alternatives.push({
-          name: "Strategia compound invertiti",
-          description: `Ordine mescole invertito: ${reversed.join(" → ")}`,
-          pit_laps: actualPitLaps,
-          compounds: reversed,
-          estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
-          time_delta_vs_actual: -Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
-          pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
-          cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
-        });
+      // BUGFIX: skip when the reversed sequence coincides with the real one
+      // (palindromic compounds → alternative identical to actual, delta ≈ 0).
+      if (reversed.join(",") !== actualCompounds.join(",")) {
+        const reversedTime = simulateStrategyCost(actualPitLaps, reversed);
+        if (reversedTime != null) {
+          alternatives.push({
+            name: "Strategia compound invertiti",
+            description: `Ordine mescole invertito: ${reversed.join(" → ")}`,
+            pit_laps: actualPitLaps,
+            compounds: reversed,
+            estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
+            time_delta_vs_actual: -Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
+            pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
+            cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
+          });
+        }
       }
     }
 
@@ -1283,26 +1303,34 @@ export function computeVirtualRaceEngineer(
       if (longestStint && longestStint.laps_count > 10) {
         const splitLap = Math.round(longestStint.lap_start + longestStint.laps_count / 2);
         const extraPits = [...actualPitLaps, splitLap].sort((a, b) => a - b);
-        for (const extraCompound of [...compoundModels.keys()]) {
-          const extraCompounds: string[] = [];
-          for (let si = 0; si <= extraPits.length; si++) {
-            if (si < actualCompounds.length) extraCompounds.push(actualCompounds[si]);
-            else extraCompounds.push(extraCompound);
-          }
-          while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
-          if (!hasMinTwoCompounds(extraCompounds)) continue;
-          const extraTime = simulateStrategyCost(extraPits, extraCompounds);
-          if (extraTime != null) {
-            alternatives.push({
-              name: `${extraPits.length}-stop`,
-              description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
-              pit_laps: extraPits,
-              compounds: extraCompounds,
-              estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-              time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-              pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
-              cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
-            });
+        // BUGFIX: validate the resulting sequence (strictly increasing, ≥3 laps
+        // spacing) — skip the whole N+1 branch if the extra split collides with
+        // real pits, otherwise we would emit non-monotonic pit sequences.
+        if (isValidPitSequence(extraPits)) {
+          for (const extraCompound of [...compoundModels.keys()]) {
+            const extraCompounds: string[] = [];
+            for (let si = 0; si <= extraPits.length; si++) {
+              if (si < actualCompounds.length) extraCompounds.push(actualCompounds[si]);
+              else extraCompounds.push(extraCompound);
+            }
+            while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
+            if (!hasMinTwoCompounds(extraCompounds)) continue;
+            const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+            if (extraTime != null) {
+              alternatives.push({
+                // BUGFIX: include the added compound in the name so the N+1
+                // siblings are distinguishable (name collisions previously
+                // caused scoring lookup collisions in the ranking).
+                name: `${extraPits.length}-stop (${extraCompound})`,
+                description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
+                pit_laps: extraPits,
+                compounds: extraCompounds,
+                estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+                time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+                pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
+                cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
+              });
+            }
           }
         }
       }
@@ -2508,10 +2536,12 @@ export function computeVirtualRaceEngineer(
       }
     }
 
-    // Attach scoring fields to alternatives
+    // Attach scoring fields to alternatives.
+    // BUGFIX: scoringInput has the recommended at position 0 and alternatives at
+    // positions ai+1, so the scored index for alternatives[ai] is exactly ai+1.
+    // Resolving by name would collide when N+1 branch produced same-name entries.
     for (let ai = 0; ai < alternatives.length; ai++) {
-      const idxInInput = scoringInput.findIndex(s => s.name === alternatives[ai].name && !s.isRecommended);
-      const scored = altScores.get(idxInInput);
+      const scored = altScores.get(ai + 1);
       if (scored) {
         alternatives[ai].scoring_without_soft_sensors = scored.scoring_without_soft_sensors;
         alternatives[ai].scoring_with_soft_sensors = scored.scoring_with_soft_sensors;
@@ -2537,16 +2567,22 @@ export function computeVirtualRaceEngineer(
       recommendedStrategy.cons.push(...__renderedAltRec.recommended_cons);
     }
 
+    // BUGFIX: snapshot alternatives BEFORE the in-place sort so the promotion
+    // logic can resolve the promoted alternative by its ORIGINAL index
+    // (bestAltScored.index - 1 refers to the pre-sort position).
+    const alternativesSnapshot = [...alternatives];
+
+    // Build a reference→adjusted_score map (reference-based, immune to
+    // duplicate names in the N+1 branch).
+    const scoreByRef = new Map<AlternativeStrategy, number | undefined>();
+    for (let ai = 0; ai < alternatives.length; ai++) {
+      scoreByRef.set(alternatives[ai], altScores.get(ai + 1)?.adjusted_score);
+    }
+
     // Reorder alternatives by risk-aware adjusted_score (higher=better),
     // then subtract the position-aware adjustment (lower=better in time-units)
     // so a NEGATIVE adjustment (attack bonus) pushes the strategy UP.
-    // Fallback convention check: both `ScoredStrategy.adjusted_score` AND
-    // `estimated_delta_vs_actual` follow the SAME higher=better convention
-    // (delta = actualTime − altTime, so positive = faster = better — see
-    // assignments at lines 884-994). The fallback therefore matches the
-    // main branch's sign. Stable tiebreaker on original index preserves
-    // pre-existing order when scores tie.
-    sortAlternativesByPositionAwareScore(alternatives, altScores, scoringInput);
+    sortAlternativesByPositionAwareScore(alternatives, scoreByRef);
 
 
     // ── Promotion check: if the top alternative is robustly better than recommended,
@@ -2557,8 +2593,11 @@ export function computeVirtualRaceEngineer(
       .sort((a, b) => b.adjusted_score - a.adjusted_score)[0];
 
     if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 1.0) {
+      // BUGFIX: use the pre-sort snapshot; bestAltScored.index maps to
+      // scoringInput position (rec=0, alts=ai+1), i.e. the ORIGINAL
+      // alternatives array position.
       const promoAltIdx = bestAltScored.index - 1;
-      const promoAlt = alternatives[promoAltIdx];
+      const promoAlt = alternativesSnapshot[promoAltIdx];
       if (promoAlt) {
         const promoRobust = promoAlt.analysis?.robustness.robustness_label;
         if (promoRobust !== "FRAGILE") {

@@ -9,20 +9,7 @@ exports[`simulateStrategyCost — scenario neutralization/opportunity bonus > RE
       "SOFT",
     ],
     "estimated_delta_vs_actual": 9.6,
-    "name": "2-stop",
-    "pit_laps": [
-      9,
-      15,
-    ],
-  },
-  {
-    "compounds": [
-      "SOFT",
-      "HARD",
-      "HARD",
-    ],
-    "estimated_delta_vs_actual": -32.5,
-    "name": "2-stop",
+    "name": "2-stop (SOFT)",
     "pit_laps": [
       9,
       15,
@@ -59,6 +46,19 @@ exports[`simulateStrategyCost — scenario neutralization/opportunity bonus > RE
     "name": "Undercut anticipato",
     "pit_laps": [
       12,
+    ],
+  },
+  {
+    "compounds": [
+      "SOFT",
+      "HARD",
+      "HARD",
+    ],
+    "estimated_delta_vs_actual": -32.5,
+    "name": "2-stop (HARD)",
+    "pit_laps": [
+      9,
+      15,
     ],
   },
 ]
