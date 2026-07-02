@@ -2850,5 +2850,6 @@ export function computeVirtualRaceEngineer(
     soft_sensor_scoring_gate: softSensorScoringGate,
     analysis_mode: analysisMode,
     detected_penalties: penaltiesForDriver(detectRaceControlPenalties(raceControl), driverNumber),
+    ...(lappedTrafficResult ? { lapped_traffic: lappedTrafficResult } : {}),
   };
 }
