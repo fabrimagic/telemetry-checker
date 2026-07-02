@@ -1175,55 +1175,78 @@ export function computeVirtualRaceEngineer(
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
 
+  // Local helper: validate a candidate pit sequence with the same rules used by
+  // the recommended-strategy search — strictly increasing, minimum spacing of
+  // 3 laps, first pit ≥ 3, last pit ≤ totalLaps − 3. Prevents the undercut /
+  // overcut / N+1 branches from producing duplicate or non-monotonic pits when
+  // actual pits are close together.
+  const isValidPitSequence = (pits: number[]): boolean => {
+    if (pits.length === 0) return true;
+    if (pits[0] < 3) return false;
+    if (pits[pits.length - 1] > totalLaps - 3) return false;
+    for (let i = 1; i < pits.length; i++) {
+      if (pits[i] - pits[i - 1] < 3) return false;
+    }
+    return true;
+  };
+
   if (actualPitLaps.length > 0 && actualSimTime != null && actualAdjustedTime != null) {
     // Undercut
     const undercutPits = actualPitLaps.map((p, i) => i === 0 ? Math.max(3, p - 3) : p);
-    const undercutTime = simulateStrategyCost(undercutPits, actualCompounds);
-    if (undercutTime != null) {
-      alternatives.push({
-        name: "Undercut anticipato",
-        description: `Pit al giro ${undercutPits[0]} invece di ${actualPitLaps[0]}`,
-        pit_laps: undercutPits,
-        compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
-        time_delta_vs_actual: -Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
-        pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
-        cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
-      });
+    if (isValidPitSequence(undercutPits)) {
+      const undercutTime = simulateStrategyCost(undercutPits, actualCompounds);
+      if (undercutTime != null) {
+        alternatives.push({
+          name: "Undercut anticipato",
+          description: `Pit al giro ${undercutPits[0]} invece di ${actualPitLaps[0]}`,
+          pit_laps: undercutPits,
+          compounds: actualCompounds,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - undercutTime) * 10) / 10,
+          pros: ["Riduce esposizione al degrado", "Potenziale vantaggio in aria pulita"],
+          cons: ["Stint successivo più lungo", "Rischio di perdere posizione se undercut non riuscito"],
+        });
+      }
     }
 
     // Overcut
     const overcutPits = actualPitLaps.map((p, i) => i === 0 ? Math.min(totalLaps - 3, p + 3) : p);
-    const overcutTime = simulateStrategyCost(overcutPits, actualCompounds);
-    if (overcutTime != null) {
-      alternatives.push({
-        name: "Overcut / estensione stint",
-        description: `Pit al giro ${overcutPits[0]} invece di ${actualPitLaps[0]}`,
-        pit_laps: overcutPits,
-        compounds: actualCompounds,
-        estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
-        time_delta_vs_actual: -Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
-        pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
-        cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
-      });
+    if (isValidPitSequence(overcutPits)) {
+      const overcutTime = simulateStrategyCost(overcutPits, actualCompounds);
+      if (overcutTime != null) {
+        alternatives.push({
+          name: "Overcut / estensione stint",
+          description: `Pit al giro ${overcutPits[0]} invece di ${actualPitLaps[0]}`,
+          pit_laps: overcutPits,
+          compounds: actualCompounds,
+          estimated_delta_vs_actual: Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
+          time_delta_vs_actual: -Math.round((actualAdjustedTime - overcutTime) * 10) / 10,
+          pros: ["Stint più corto su gomme fresche", "Potenziale track position"],
+          cons: ["Maggiore degrado sulle gomme vecchie", "Rischio di perdere tempo nel traffico"],
+        });
+      }
     }
 
     // Opposite compound if available (race compounds)
     const availableCompounds = [...new Set(actualCompounds)];
     if (availableCompounds.length >= 2) {
       const reversed = [...actualCompounds].reverse();
-      const reversedTime = simulateStrategyCost(actualPitLaps, reversed);
-      if (reversedTime != null) {
-        alternatives.push({
-          name: "Strategia compound invertiti",
-          description: `Ordine mescole invertito: ${reversed.join(" → ")}`,
-          pit_laps: actualPitLaps,
-          compounds: reversed,
-          estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
-          time_delta_vs_actual: -Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
-          pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
-          cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
-        });
+      // BUGFIX: skip when the reversed sequence coincides with the real one
+      // (palindromic compounds → alternative identical to actual, delta ≈ 0).
+      if (reversed.join(",") !== actualCompounds.join(",")) {
+        const reversedTime = simulateStrategyCost(actualPitLaps, reversed);
+        if (reversedTime != null) {
+          alternatives.push({
+            name: "Strategia compound invertiti",
+            description: `Ordine mescole invertito: ${reversed.join(" → ")}`,
+            pit_laps: actualPitLaps,
+            compounds: reversed,
+            estimated_delta_vs_actual: Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
+            time_delta_vs_actual: -Math.round((actualAdjustedTime - reversedTime) * 10) / 10,
+            pros: ["Diversa gestione del degrado", "Potenziale vantaggio nel finale"],
+            cons: ["Strategia meno convenzionale", "Rischio di passo non competitivo all'inizio"],
+          });
+        }
       }
     }
 
