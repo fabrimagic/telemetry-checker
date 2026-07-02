@@ -1086,6 +1086,39 @@ export function computeVirtualRaceEngineer(
   const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
 
+  // SLOPE-ONLY OVERRIDE HELPER — see the "Enrich with practice compound models"
+  // block for the semantic rationale. For each stint of the candidate strategy
+  // whose compound has a non-race model source (i.e. Practice), we override the
+  // simulation intercept with the intercept of the RACE model of the compound
+  // realmente usato in quella posizione della strategia reale. Stint aggiuntivo
+  // (ramo N+1) → intercept del compound dello stint che e' stato diviso. Race
+  // compounds → nessun override. Ritorna undefined quando nessun compound
+  // candidato e' practice, mantenendo bit-identico il percorso race-only.
+  const PRACTICE_ASSUMPTION_CON =
+    "Passo base della mescola practice assunto pari alla mescola sostituita: mancano dati di passo gara per questo compound, il delta riflette solo la differenza di degrado stimata dalle prove libere.";
+  const buildInterceptOverride = (
+    candidateCompounds: string[],
+    splitCompound?: string,
+  ): (number | null)[] | undefined => {
+    let hasPractice = false;
+    const out: (number | null)[] = candidateCompounds.map((c, i) => {
+      const m = compoundModels.get(c);
+      if (!m || m.source === "race") return null;
+      hasPractice = true;
+      const anchorCompound = i < actualCompounds.length ? actualCompounds[i] : splitCompound;
+      if (!anchorCompound) return null;
+      const raceModel = compoundModels.get(anchorCompound);
+      if (!raceModel || raceModel.source !== "race") return null;
+      return raceModel.intercept;
+    });
+    return hasPractice ? out : undefined;
+  };
+  const candidateUsesPractice = (candidateCompounds: string[]): boolean =>
+    candidateCompounds.some(c => {
+      const m = compoundModels.get(c);
+      return !!m && m.source !== "race";
+    });
+
   // Diagnose why the alternative-strategies engine cannot run when actual
   // simulation times are null. Distinguishes (a) actual strategy violating the
   // two-compound rule from (b) missing degradation models for actual compounds.
