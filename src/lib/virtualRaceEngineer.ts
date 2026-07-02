@@ -1259,10 +1259,10 @@ export function computeVirtualRaceEngineer(
     recommendedStrategy.delta_clamped = true;
     recommendedStrategy.raw_gain_seconds = Math.round(recommendedInitialClampRaw * 10) / 10;
   }
-  const recommendedUsesPractice = candidateUsesPractice(bestCompounds);
-  if (recommendedUsesPractice) {
-    recommendedStrategy.cons = [...(recommendedStrategy.cons ?? []), PRACTICE_ASSUMPTION_CON];
-  }
+  // NOTE: PRACTICE_ASSUMPTION_CON is added later, in the enrichment block that
+  // assigns `recommendedStrategy.cons = recCons`, and re-evaluated again AFTER
+  // the multi-criteria promotion, since a promotion overwrites both compounds
+  // and cons. See the two dedicated hooks below.
 
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
