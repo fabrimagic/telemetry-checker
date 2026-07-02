@@ -1074,6 +1074,7 @@ export function computeVirtualRaceEngineer(
   let bestPitLaps = actualPitLaps;
   let bestCompounds = actualCompounds;
   let bestReason = "Strategia reale già vicina all'ottimale";
+  let recommendedInitialClampRaw: number | null = null;
 
   // Try shifts of ±5 laps for each pit stop AND different compound combinations
   if (actualPitLaps.length > 0 && actualAdjustedTime != null && actualSimTime != null) {
