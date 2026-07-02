@@ -3093,7 +3093,7 @@ export function computeVirtualRaceEngineer(
   const recommendedUsesPractice = candidateUsesPractice(recommendedStrategy.compounds);
   if (recommendedUsesPractice) {
     confidenceFactors.push(
-      `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita, solo lo slope di degrado proviene dalle prove libere.`,
+      `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita; il confronto avviene su slope di regressione non corretti per l'effetto carburante (per omogeneità con il dato delle libere), quindi il degrado gomma reale è generalmente ≥ a quello stimato in questo spazio.`,
     );
     // Promotion path replaces cons with the promoted alternative's cons, which
     // already carry PRACTICE_ASSUMPTION_CON when the alt uses practice. Guard
