@@ -123,7 +123,7 @@ export function CumulativeDeviationCard({ sessionKey, results, drivers, visibleD
         <TrendingUp className="h-3.5 w-3.5" /> Deviazione Cumulativa
       </h3>
       <p className="text-[10px] text-muted-foreground mb-3">
-        Ritardo accumulato giro dopo giro rispetto al tempo medio del vincitore ({data.winner_driver_code} — benchmark: {data.winner_reference_avg_lap?.toFixed(3)}s).
+        Deviazione di passo cumulata rispetto al passo medio del vincitore ({data.winner_driver_code} — benchmark: {data.winner_reference_avg_lap?.toFixed(3)}s).
         Valori crescenti indicano una perdita progressiva di performance.
       </p>
 
