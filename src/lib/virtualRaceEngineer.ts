@@ -16,6 +16,7 @@ import type { DiaryEvent } from "./raceDiary";
 import type { CumulativeDeviationResult, DriverCumulativeDeviation } from "./cumulativeDeviation";
 import { type ScenarioId, SCENARIO_DEFINITIONS, NEUTRALIZATION_PIT_LOSS, isSimulatedScenario, applyScenarioToPhaseAdjustments, buildTimedScenarioModifiers, validateScenarioActivationLap, computeScenarioWindow } from "./scenarioContext";
 import { computeAllStintPaceLoss, paceLossDegradationAdjustment, paceLossCliffMultiplier, paceLossPitUrgencyShift, type StintPaceLossResult } from "./stintPaceLoss";
+import { detectLappedTraffic, type LappedTrafficResult } from "./lappedTraffic";
 import { computeTyreWarmupPenalty, computeStintWarmupCost, computeStartWarmupTempFactor, computeStartTractionPenalty, START_WARMUP_FRACTION } from "./tyreWarmup";
 import { enrichStrategyAnalysis, type EnrichedStrategyAnalysis } from "./strategyAnalysis";
 import { classifyStrategyIntent, type IntentClassification } from "./strategyIntent";
