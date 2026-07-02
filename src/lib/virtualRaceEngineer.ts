@@ -2505,10 +2505,12 @@ export function computeVirtualRaceEngineer(
       }
     }
 
-    // Attach scoring fields to alternatives
+    // Attach scoring fields to alternatives.
+    // BUGFIX: scoringInput has the recommended at position 0 and alternatives at
+    // positions ai+1, so the scored index for alternatives[ai] is exactly ai+1.
+    // Resolving by name would collide when N+1 branch produced same-name entries.
     for (let ai = 0; ai < alternatives.length; ai++) {
-      const idxInInput = scoringInput.findIndex(s => s.name === alternatives[ai].name && !s.isRecommended);
-      const scored = altScores.get(idxInInput);
+      const scored = altScores.get(ai + 1);
       if (scored) {
         alternatives[ai].scoring_without_soft_sensors = scored.scoring_without_soft_sensors;
         alternatives[ai].scoring_with_soft_sensors = scored.scoring_with_soft_sensors;
@@ -2534,16 +2536,22 @@ export function computeVirtualRaceEngineer(
       recommendedStrategy.cons.push(...__renderedAltRec.recommended_cons);
     }
 
+    // BUGFIX: snapshot alternatives BEFORE the in-place sort so the promotion
+    // logic can resolve the promoted alternative by its ORIGINAL index
+    // (bestAltScored.index - 1 refers to the pre-sort position).
+    const alternativesSnapshot = [...alternatives];
+
+    // Build a reference→adjusted_score map (reference-based, immune to
+    // duplicate names in the N+1 branch).
+    const scoreByRef = new Map<AlternativeStrategy, number | undefined>();
+    for (let ai = 0; ai < alternatives.length; ai++) {
+      scoreByRef.set(alternatives[ai], altScores.get(ai + 1)?.adjusted_score);
+    }
+
     // Reorder alternatives by risk-aware adjusted_score (higher=better),
     // then subtract the position-aware adjustment (lower=better in time-units)
     // so a NEGATIVE adjustment (attack bonus) pushes the strategy UP.
-    // Fallback convention check: both `ScoredStrategy.adjusted_score` AND
-    // `estimated_delta_vs_actual` follow the SAME higher=better convention
-    // (delta = actualTime − altTime, so positive = faster = better — see
-    // assignments at lines 884-994). The fallback therefore matches the
-    // main branch's sign. Stable tiebreaker on original index preserves
-    // pre-existing order when scores tie.
-    sortAlternativesByPositionAwareScore(alternatives, altScores, scoringInput);
+    sortAlternativesByPositionAwareScore(alternatives, scoreByRef);
 
 
     // ── Promotion check: if the top alternative is robustly better than recommended,
@@ -2554,8 +2562,11 @@ export function computeVirtualRaceEngineer(
       .sort((a, b) => b.adjusted_score - a.adjusted_score)[0];
 
     if (recScored && bestAltScored && bestAltScored.adjusted_score > recScored.adjusted_score + 1.0) {
+      // BUGFIX: use the pre-sort snapshot; bestAltScored.index maps to
+      // scoringInput position (rec=0, alts=ai+1), i.e. the ORIGINAL
+      // alternatives array position.
       const promoAltIdx = bestAltScored.index - 1;
-      const promoAlt = alternatives[promoAltIdx];
+      const promoAlt = alternativesSnapshot[promoAltIdx];
       if (promoAlt) {
         const promoRobust = promoAlt.analysis?.robustness.robustness_label;
         if (promoRobust !== "FRAGILE") {
