@@ -1403,8 +1403,11 @@ export function computeVirtualRaceEngineer(
             }
             while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
             if (!hasMinTwoCompounds(extraCompounds)) continue;
-            const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+            const extraOverride = buildInterceptOverride(extraCompounds, longestStint.compound);
+            const extraTime = simulateStrategyCost(extraPits, extraCompounds, extraOverride);
             if (extraTime != null) {
+              const extraCons = ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"];
+              if (candidateUsesPractice(extraCompounds)) extraCons.push(PRACTICE_ASSUMPTION_CON);
               alternatives.push({
                 // BUGFIX: include the added compound in the name so the N+1
                 // siblings are distinguishable (name collisions previously
@@ -1416,7 +1419,7 @@ export function computeVirtualRaceEngineer(
                 estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
                 time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
                 pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
-                cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
+                cons: extraCons,
               });
             }
           }
