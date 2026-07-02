@@ -114,6 +114,54 @@ describe("detectLappedTraffic", () => {
     });
     expect(r.encounter_lap_count).toBeGreaterThan(0);
     expect(r.total_lapped_count).toBeGreaterThan(0);
+    // Lap 1 must NOT be an encounter: at end of lap 1 the slow car is
+    // simply behind on track within the same lap (deficit 1), not lapped.
+    const encLapNums = r.encounter_laps.map((e) => e.lap_number);
+    expect(encLapNums).not.toContain(1);
+    // The first real encounter is the lap where the slow car falls a full
+    // lap down (deficit transitions 1→2). With 90s vs 135s that is lap 4.
+    expect(Math.min(...encLapNums)).toBe(4);
+  });
+
+  it("regression: a car ~1s/lap slower running the whole race is never lapped", () => {
+    // Driver 1: 20 laps @ 90s. Driver 2 starts 3s behind and loses ~1s/lap,
+    // never reaching a full-lap deficit → zero encounters expected.
+    const a = driverLaps(1, 20, 90);
+    const b = driverLaps(2, 20, 91, 3);
+    const r = detectLappedTraffic({
+      allSessionLaps: [...a, ...b],
+      driverLaps: a,
+      driverNumber: 1,
+      stints: singleStint(20),
+      raceControl: [],
+      weatherMap: new Map(),
+      trackStatusMap: new Map(),
+      battleContext: null,
+    });
+    expect(r.encounter_lap_count).toBe(0);
+  });
+
+  it("regression: retired car whose last start coincides with an analyzed tStart yields zero encounters", () => {
+    // Driver 1: 20 laps @ 90s → tStart of lap 4 is t=270.
+    // Driver 2: 3 laps @ 90s starting at t=0 → last start at t=180, then
+    // one more crossing exactly at t=270 (retirement lap coincident with
+    // lap-4 tStart of the analyzed driver). The retirement guard uses
+    // `< tStart` so this edge case would slip through as a 0→1 deficit
+    // step; requiring deficit ≥ 2 must still yield zero encounters.
+    const a = driverLaps(1, 20, 90);
+    const b: typeof a = [];
+    for (let n = 1; n <= 4; n++) b.push(lap(2, n, 90, (n - 1) * 90));
+    const r = detectLappedTraffic({
+      allSessionLaps: [...a, ...b],
+      driverLaps: a,
+      driverNumber: 1,
+      stints: singleStint(20),
+      raceControl: [],
+      weatherMap: new Map(),
+      trackStatusMap: new Map(),
+      battleContext: null,
+    });
+    expect(r.encounter_lap_count).toBe(0);
   });
 
   it("interpolates missing date_start when possible, excludes when not", () => {
