@@ -119,6 +119,16 @@ export interface RecommendedStrategy {
    * Pure-pace fields are NEVER mutated by the position-aware adjustment.
    */
   ranking_time_estimate?: number;
+  /**
+   * Presentation-only fields, mirror of `AlternativeStrategy.delta_clamped` /
+   * `raw_delta_vs_actual`. When the recommended gain has been capped to the
+   * plausibility ceiling (MAX_PLAUSIBLE_DELTA = pitLoss × 2.5) — either at
+   * the bestDelta search or at the presentation clamp of a promoted alt —
+   * `delta_clamped` is true and `raw_gain_seconds` preserves the pre-clamp
+   * value. Informational only: NEVER consumed by ranking or promotion.
+   */
+  delta_clamped?: boolean;
+  raw_gain_seconds?: number;
 }
 
 export interface AlternativeStrategy {
