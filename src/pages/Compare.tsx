@@ -494,6 +494,33 @@ export default function Compare() {
                 subtitle="Timeline del gap giro dopo giro e contesto di gara dei due piloti."
               />
               <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+              {(() => {
+                const rA = dual.outA?.vreResult ?? null;
+                const rB = dual.outB?.vreResult ?? null;
+                const hasA = !!rA?.lapped_traffic;
+                const hasB = !!rB?.lapped_traffic;
+                if (!hasA && !hasB) return null;
+                const teamColorA = `#${driverObjA.team_colour || "888888"}`;
+                const teamColorB = `#${driverObjB.team_colour || "888888"}`;
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: teamColorA }} />
+                        {driverObjA.name_acronym}
+                      </div>
+                      {rA ? <LappedTrafficSection result={rA} /> : null}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: teamColorB }} />
+                        {driverObjB.name_acronym}
+                      </div>
+                      {rB ? <LappedTrafficSection result={rB} /> : null}
+                    </div>
+                  </div>
+                );
+              })()}
               <CompareDriverContext
                 driverA={driverObjA}
                 driverB={driverObjB}
