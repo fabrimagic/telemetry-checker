@@ -103,6 +103,7 @@ function identifyContaminatedLaps(
   battleContext: BattleContext | null,
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
+  lappedTrafficEncounterLaps: Set<number> | null = null,
 ): { contaminated: Set<number>; flags: PaceLossContaminationFlags } {
   const contaminated = new Set<number>();
   const flags: PaceLossContaminationFlags = {
@@ -110,6 +111,7 @@ function identifyContaminatedLaps(
     weather: false,
     neutralization: false,
     battle: false,
+    lapped_traffic: false,
   };
 
   for (const lap of stintLapNumbers) {
@@ -131,6 +133,12 @@ function identifyContaminatedLaps(
     if (battleContext?.battle_laps.has(lap)) {
       contaminated.add(lap);
       flags.battle = true;
+    }
+
+    // Lapped-traffic contamination (additive; null = disabled → identical to legacy behavior)
+    if (lappedTrafficEncounterLaps && lappedTrafficEncounterLaps.has(lap)) {
+      contaminated.add(lap);
+      flags.lapped_traffic = true;
     }
   }
 
