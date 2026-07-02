@@ -391,23 +391,20 @@ export function computePositionAdjustment(
  * missing altScores entry does not silently re-order siblings.
  */
 export function sortAlternativesByPositionAwareScore<
-  A extends { name: string; estimated_delta_vs_actual: number; position_score_adjustment?: number },
-  S extends { name: string; isRecommended?: boolean },
+  A extends { estimated_delta_vs_actual: number; position_score_adjustment?: number },
 >(
   alternatives: A[],
-  altScores: Map<number, { adjusted_score: number }>,
-  scoringInput: S[],
+  scoreByRef: Map<A, number | undefined>,
 ): void {
   // Snapshot original indices for stable tiebreaker.
   const originalIndex = new Map<A, number>();
   alternatives.forEach((a, i) => originalIndex.set(a, i));
 
   alternatives.sort((a, b) => {
-    const idxA = scoringInput.findIndex(s => s.name === a.name && !s.isRecommended);
-    const idxB = scoringInput.findIndex(s => s.name === b.name && !s.isRecommended);
+    // Reference-based lookup (no name resolution → duplicate names are safe).
     // Both branches use higher=better convention (see jsdoc above).
-    const baseA = altScores.get(idxA)?.adjusted_score ?? a.estimated_delta_vs_actual;
-    const baseB = altScores.get(idxB)?.adjusted_score ?? b.estimated_delta_vs_actual;
+    const baseA = scoreByRef.get(a) ?? a.estimated_delta_vs_actual;
+    const baseB = scoreByRef.get(b) ?? b.estimated_delta_vs_actual;
     const scoreA = baseA - (a.position_score_adjustment ?? 0);
     const scoreB = baseB - (b.position_score_adjustment ?? 0);
     if (scoreB !== scoreA) return scoreB - scoreA;
