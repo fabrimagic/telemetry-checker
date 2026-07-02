@@ -2112,6 +2112,9 @@ export function computeVirtualRaceEngineer(
       text += " " + lt.method_declaration;
       narrativeInsights.push(text);
     }
+  }
+
+
 
   // ── 7c. Diary context insights ──
   if (integratedContext.diary_context) {
