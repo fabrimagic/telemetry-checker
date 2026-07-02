@@ -1201,7 +1201,7 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateStrategyCost(candidatePits, compounds);
+          const t = simulateStrategyCost(candidatePits, compounds, buildInterceptOverride(compounds));
           if (t != null && t < bestTime) {
             bestTime = t;
             bestPitLaps = candidatePits;
