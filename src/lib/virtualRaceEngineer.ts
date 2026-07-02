@@ -1504,26 +1504,36 @@ export function computeVirtualRaceEngineer(
             }
             while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
             if (!hasMinTwoCompounds(extraCompounds)) continue;
-            const extraOverride = buildInterceptOverride(extraCompounds, longestStint.compound);
-            const extraTime = simulateStrategyCost(extraPits, extraCompounds, extraOverride);
-            if (extraTime != null) {
-              const extraCons = ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"];
-              if (candidateUsesPractice(extraCompounds)) extraCons.push(PRACTICE_ASSUMPTION_CON);
-              alternatives.push({
-                // BUGFIX: include the added compound in the name so the N+1
-                // siblings are distinguishable (name collisions previously
-                // caused scoring lookup collisions in the ranking).
-                name: `${extraPits.length}-stop (${extraCompound})`,
-                description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
-                pit_laps: extraPits,
-                compounds: extraCompounds,
-                estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-                time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-                pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
-                cons: extraCons,
-              });
+            const usesPractice = candidateUsesPractice(extraCompounds);
+            let extraDelta: number | null = null;
+            if (usesPractice) {
+              // Practice compound in N+1 branch → evaluate in raw-slope space
+              // with anchor to raw intercept of the compound of the split stint.
+              const ev = evalCandidatePracticeSpace(extraPits, extraCompounds, longestStint.compound);
+              if (ev == null) continue;
+              extraDelta = ev.delta;
+            } else {
+              const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+              if (extraTime == null) continue;
+              extraDelta = actualAdjustedTime - extraTime;
             }
+            const extraCons = ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"];
+            if (usesPractice) extraCons.push(PRACTICE_ASSUMPTION_CON);
+            alternatives.push({
+              // BUGFIX: include the added compound in the name so the N+1
+              // siblings are distinguishable (name collisions previously
+              // caused scoring lookup collisions in the ranking).
+              name: `${extraPits.length}-stop (${extraCompound})`,
+              description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
+              pit_laps: extraPits,
+              compounds: extraCompounds,
+              estimated_delta_vs_actual: Math.round(extraDelta * 10) / 10,
+              time_delta_vs_actual: -Math.round(extraDelta * 10) / 10,
+              pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
+              cons: extraCons,
+            });
           }
+
         }
       }
     }
