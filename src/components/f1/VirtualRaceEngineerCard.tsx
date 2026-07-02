@@ -883,12 +883,79 @@ function TrafficPredictionsTable({ predictions }: { predictions: TrafficPredicti
   );
 }
 
+/* ── Lapped Traffic Section (informational — does NOT modify any strategic score) ── */
+export function LappedTrafficSection({ result }: { result: VirtualRaceEngineerResult }) {
+  const { lapped_traffic } = result;
+  if (!lapped_traffic) return null;
+  return (
+    <div
+      data-testid="lapped-traffic"
+      className="rounded border border-sky-500/30 bg-sky-500/5 p-2 space-y-1.5"
+    >
+      <p className="text-[11px] font-semibold text-sky-300 flex items-center gap-1.5">
+        <span>🚦</span> Traffico doppiati
+        <span className="ml-auto text-[9px] font-mono uppercase text-sky-200/70">
+          confidenza {lapped_traffic.confidence}
+        </span>
+      </p>
+      {lapped_traffic.encounter_lap_count === 0 ? (
+        <p className="text-[10px] text-muted-foreground leading-snug">
+          Nessun doppiaggio rilevato nella sessione.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Doppiaggi</p>
+              <p className="text-sm font-bold font-mono text-foreground">{lapped_traffic.total_lapped_count}</p>
+              <p className="text-[9px] text-muted-foreground">in {lapped_traffic.encounter_lap_count} giri</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Costo mediano</p>
+              <p className="text-sm font-bold font-mono text-foreground">
+                {lapped_traffic.median_cost_seconds != null
+                  ? `+${lapped_traffic.median_cost_seconds.toFixed(2)}s`
+                  : "—"}
+              </p>
+              <p className="text-[9px] text-muted-foreground">per giro</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Tempo tot. stimato</p>
+              <p className="text-sm font-bold font-mono text-foreground">
+                {lapped_traffic.total_time_lost_seconds != null
+                  ? `+${lapped_traffic.total_time_lost_seconds.toFixed(1)}s`
+                  : "—"}
+              </p>
+              <p className="text-[9px] text-muted-foreground">{lapped_traffic.valid_delta_count} delta validi</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Bandiera blu</p>
+              <p className="text-sm font-bold font-mono text-foreground">
+                {Math.round(lapped_traffic.blue_flag_corroboration_ratio * 100)}%
+              </p>
+              <p className="text-[9px] text-muted-foreground">corroborazione</p>
+            </div>
+          </div>
+          {!lapped_traffic.cost_distinguishable_from_noise && (
+            <p className="text-[10px] text-amber-200/90 leading-snug">
+              ⚠ Costo non distinguibile dal rumore (mediana ≤ 0): valore non dichiarato.
+            </p>
+          )}
+        </>
+      )}
+      <p className="text-[9px] text-muted-foreground italic leading-snug">
+        {lapped_traffic.method_declaration} L'analisi strategica NON applica questo costo ad alcun punteggio o simulazione: predire incontri futuri con i doppiati sarebbe speculativo.
+      </p>
+    </div>
+  );
+}
+
 /* ── Global Analysis Section (shared, contesto comune a tutte le strategie) ── */
 export function GlobalAnalysisSection({ result }: { result: VirtualRaceEngineerResult }) {
   const {
     integrated_context, narrative_insights, narrative_chapters, weather_impact, neutralisation_impact,
     traffic_analysis, pace_loss_results, confidence_factors, practice_compounds_used,
-    detected_penalties, driver_acronym, lapped_traffic,
+    detected_penalties, driver_acronym,
   } = result;
 
   return (
