@@ -755,7 +755,16 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // Enrich with practice compound models (only add compounds not already from race)
+  // Enrich with practice compound models (only add compounds not already from race).
+  // SLOPE-ONLY SEMANTICS: memorizziamo il modello practice con il suo intercept
+  // GREZZO (nessun rebase al passo gara). L'intercept grezzo NON viene mai usato
+  // dalle simulazioni: quando una strategia candidata usa un compound practice,
+  // il chiamante costruisce un `interceptOverrideByStint` che àncora il passo
+  // base al compound di gara realmente usato in quella posizione della strategia
+  // reale, e passa l'override a `simulateStrategyCost` / `simulateTimeRaw`.
+  // In questo modo si conserva SOLO la differenza di degrado (slope) stimata
+  // dalle prove libere, eliminando la dipendenza arbitraria dal primo modello
+  // race nell'ordine di inserzione della Map.
   const practiceCompoundsUsed: string[] = [];
   // Slope di degrado minimo plausibile (s/giro) perche' un modello derivato dalle
   // prove libere sia usabile come estrapolazione di uno stint di gara. I long-run
@@ -767,18 +776,9 @@ export function computeVirtualRaceEngineer(
   const MIN_PRACTICE_DEG_SLOPE = 0.04; // s/giro
   for (const pm of practiceModels) {
     if (!compoundModels.has(pm.compound) && pm.rSquared > 0.3 && pm.slope >= MIN_PRACTICE_DEG_SLOPE) {
-      // Adjust practice intercept to race pace: use median race lap time as baseline
-      const raceModels = [...compoundModels.values()].filter(m => m.source === "race");
-      let paceOffset = 0;
-      if (raceModels.length > 0) {
-        // Estimate offset between practice and race pace at tyre life = 5
-        const raceBasePace = raceModels[0].intercept + raceModels[0].slope * 5;
-        const practiceBasePace = pm.intercept + pm.slope * 5;
-        paceOffset = raceBasePace - practiceBasePace;
-      }
       compoundModels.set(pm.compound, {
         slope: pm.slope,
-        intercept: pm.intercept + paceOffset,
+        intercept: pm.intercept, // raw — never used without override (see above)
         source: pm.source,
         // Practice models do not currently expose a slope std error → null.
         // Uncertainty propagation falls back to the systematic
@@ -939,8 +939,18 @@ export function computeVirtualRaceEngineer(
     return bounds;
   }
 
-  // Full cost function: simulates total adjusted race time
-  function simulateStrategyCost(pitLapsArr: number[], compoundsArr: string[]): number | null {
+  // Full cost function: simulates total adjusted race time.
+  // `interceptOverrideByStint` (optional): allineato posizionalmente a
+  // `stintBounds`. Quando presente e non-null per lo stint `si`, il valore
+  // sostituisce `model.intercept` come passo base di quello stint. Slope,
+  // warmup, cliff, pit costs e ogni altro contributo restano invariati. Con
+  // parametro assente il comportamento e' bit-identico alla versione precedente
+  // (usato dalla slope-only semantics per i compound derivati dalle prove libere).
+  function simulateStrategyCost(
+    pitLapsArr: number[],
+    compoundsArr: string[],
+    interceptOverrideByStint?: (number | null)[],
+  ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateStrategyCost requires at least two compounds");
       return null;
@@ -956,11 +966,12 @@ export function computeVirtualRaceEngineer(
         console.warn("[VRE] returning null:", `simulateStrategyCost missing model for ${sb.compound}`);
         return null;
       }
+      const interceptOverride = interceptOverrideByStint?.[si];
       const stintLength = sb.end - sb.start + 1;
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
-        const baseLap = model.intercept;
+        const baseLap = (interceptOverride != null && Number.isFinite(interceptOverride)) ? interceptOverride : model.intercept;
         // Clamp della perdita di degrado per-giro: le gomme reali plateauano,
         // non degradano linearmente all'infinito. Evita che slope ripidi
         // (spesso contaminati da battaglie/traffico) gonfino stint lunghi.
@@ -1026,7 +1037,12 @@ export function computeVirtualRaceEngineer(
   }
 
   // Simple raw time (with observed neutralisation-aware pit loss) for delta calculation baseline
-  function simulateTimeRaw(pitLapsArr: number[], compoundsArr: string[], forActualStrategy: boolean = false): number | null {
+  function simulateTimeRaw(
+    pitLapsArr: number[],
+    compoundsArr: string[],
+    forActualStrategy: boolean = false,
+    interceptOverrideByStint?: (number | null)[],
+  ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateTimeRaw requires at least two compounds");
       return null;
@@ -1040,6 +1056,8 @@ export function computeVirtualRaceEngineer(
         console.warn("[VRE] returning null:", `simulateTimeRaw missing model for ${sb.compound}`);
         return null;
       }
+      const interceptOverride = interceptOverrideByStint?.[si];
+      const baseIntercept = (interceptOverride != null && Number.isFinite(interceptOverride)) ? interceptOverride : model.intercept;
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
@@ -1050,7 +1068,7 @@ export function computeVirtualRaceEngineer(
         const MAX_DEG_LOSS_PER_LAP = 3.5;
         const degRaw = model.slope * tyreLife;
         const degClamped = Math.min(degRaw, MAX_DEG_LOSS_PER_LAP);
-        total += model.intercept + degClamped + warmupPenalty;
+        total += baseIntercept + degClamped + warmupPenalty;
       }
       if (isFirstStint) {
         total += computeStartTractionPenalty(sb.compound, trackTempAtStart);
@@ -1067,6 +1085,39 @@ export function computeVirtualRaceEngineer(
   const actualPitLaps = pitStops.map(p => p.lap_number);
   const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
+
+  // SLOPE-ONLY OVERRIDE HELPER — see the "Enrich with practice compound models"
+  // block for the semantic rationale. For each stint of the candidate strategy
+  // whose compound has a non-race model source (i.e. Practice), we override the
+  // simulation intercept with the intercept of the RACE model of the compound
+  // realmente usato in quella posizione della strategia reale. Stint aggiuntivo
+  // (ramo N+1) → intercept del compound dello stint che e' stato diviso. Race
+  // compounds → nessun override. Ritorna undefined quando nessun compound
+  // candidato e' practice, mantenendo bit-identico il percorso race-only.
+  const PRACTICE_ASSUMPTION_CON =
+    "Passo base della mescola practice assunto pari alla mescola sostituita: mancano dati di passo gara per questo compound, il delta riflette solo la differenza di degrado stimata dalle prove libere.";
+  const buildInterceptOverride = (
+    candidateCompounds: string[],
+    splitCompound?: string,
+  ): (number | null)[] | undefined => {
+    let hasPractice = false;
+    const out: (number | null)[] = candidateCompounds.map((c, i) => {
+      const m = compoundModels.get(c);
+      if (!m || m.source === "race") return null;
+      hasPractice = true;
+      const anchorCompound = i < actualCompounds.length ? actualCompounds[i] : splitCompound;
+      if (!anchorCompound) return null;
+      const raceModel = compoundModels.get(anchorCompound);
+      if (!raceModel || raceModel.source !== "race") return null;
+      return raceModel.intercept;
+    });
+    return hasPractice ? out : undefined;
+  };
+  const candidateUsesPractice = (candidateCompounds: string[]): boolean =>
+    candidateCompounds.some(c => {
+      const m = compoundModels.get(c);
+      return !!m && m.source !== "race";
+    });
 
   // Diagnose why the alternative-strategies engine cannot run when actual
   // simulation times are null. Distinguishes (a) actual strategy violating the
@@ -1150,7 +1201,7 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateStrategyCost(candidatePits, compounds);
+          const t = simulateStrategyCost(candidatePits, compounds, buildInterceptOverride(compounds));
           if (t != null && t < bestTime) {
             bestTime = t;
             bestPitLaps = candidatePits;
@@ -1207,6 +1258,10 @@ export function computeVirtualRaceEngineer(
   if (recommendedInitialClampRaw != null) {
     recommendedStrategy.delta_clamped = true;
     recommendedStrategy.raw_gain_seconds = Math.round(recommendedInitialClampRaw * 10) / 10;
+  }
+  const recommendedUsesPractice = candidateUsesPractice(bestCompounds);
+  if (recommendedUsesPractice) {
+    recommendedStrategy.cons = [...(recommendedStrategy.cons ?? []), PRACTICE_ASSUMPTION_CON];
   }
 
   // ── 4. Alternative strategies ──
@@ -1296,7 +1351,7 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateStrategyCost(actualPitLaps, altCompounds);
+        const altTime = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
         if (altTime != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
@@ -1306,7 +1361,7 @@ export function computeVirtualRaceEngineer(
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
             time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
-            cons: ["Stima basata su dati Practice (passo diverso dalla gara)", "Condizioni pista differenti tra prove e gara"],
+            cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista differenti tra prove e gara"],
           });
         }
       }
@@ -1315,7 +1370,7 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[0] = practiceCompound;
-        const altTime2 = simulateStrategyCost(actualPitLaps, altCompounds);
+        const altTime2 = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
         if (altTime2 != null) {
           alternatives.push({
             name: `Stint iniziale su ${practiceCompound}`,
@@ -1325,7 +1380,7 @@ export function computeVirtualRaceEngineer(
             estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
             time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime2) * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
-            cons: ["Stima basata su dati Practice", "Condizioni pista e carburante differenti"],
+            cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista e carburante differenti"],
           });
         }
       }
@@ -1352,8 +1407,11 @@ export function computeVirtualRaceEngineer(
             }
             while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
             if (!hasMinTwoCompounds(extraCompounds)) continue;
-            const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+            const extraOverride = buildInterceptOverride(extraCompounds, longestStint.compound);
+            const extraTime = simulateStrategyCost(extraPits, extraCompounds, extraOverride);
             if (extraTime != null) {
+              const extraCons = ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"];
+              if (candidateUsesPractice(extraCompounds)) extraCons.push(PRACTICE_ASSUMPTION_CON);
               alternatives.push({
                 // BUGFIX: include the added compound in the name so the N+1
                 // siblings are distinguishable (name collisions previously
@@ -1365,7 +1423,7 @@ export function computeVirtualRaceEngineer(
                 estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
                 time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
                 pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
-                cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
+                cons: extraCons,
               });
             }
           }
@@ -2917,6 +2975,12 @@ export function computeVirtualRaceEngineer(
     const msg = `Strategie alternative non calcolate: ${alternativesUnavailableReason}`;
     confidenceFactors.push(`⚠️ ${msg}`);
     narrativeInsights.push(`⚠️ ${msg}`);
+  }
+
+  if (recommendedUsesPractice) {
+    confidenceFactors.push(
+      `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita, solo lo slope di degrado proviene dalle prove libere.`,
+    );
   }
 
 
