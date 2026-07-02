@@ -1068,6 +1068,27 @@ export function computeVirtualRaceEngineer(
   const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
 
+  // Diagnose why the alternative-strategies engine cannot run when actual
+  // simulation times are null. Distinguishes (a) actual strategy violating the
+  // two-compound rule from (b) missing degradation models for actual compounds.
+  // The message is later surfaced via confidence_factors AND narrative_insights.
+  let alternativesUnavailableReason: string | null = null;
+  if (actualAdjustedTime == null || actualSimTime == null) {
+    if (!hasMinTwoCompounds(actualCompounds)) {
+      alternativesUnavailableReason =
+        "la strategia reale non soddisfa la regola dei due compound validi, quindi nessuna alternativa può essere simulata coerentemente.";
+    } else {
+      const missing = [...new Set(actualCompounds.filter(c => !compoundModels.has(c)))];
+      if (missing.length > 0) {
+        alternativesUnavailableReason =
+          `nessun modello di degrado affidabile è disponibile per la mescola ${missing.join(", ")} usata dalla strategia reale (stint troppo corti o contaminati), quindi non è possibile simulare strategie alternative.`;
+      } else {
+        alternativesUnavailableReason =
+          "il modello di simulazione della strategia reale non è disponibile, quindi non è possibile confrontare alternative.";
+      }
+    }
+  }
+
   // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
   const recommendedWindows: RecommendedStrategy["pit_windows"] = [];
   let bestDelta = 0;
