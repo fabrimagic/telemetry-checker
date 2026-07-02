@@ -259,6 +259,15 @@ export function detectLappedTraffic(input: LappedTrafficInput): LappedTrafficRes
 
     const lappedInThisLap: number[] = [];
     for (const [dn, starts] of othersStarts.entries()) {
+      // Retirement guard: if the other car's LAST known lap start is before
+      // the analyzed lap's start, that car was no longer on track at this
+      // point (retired or stopped). Its lap counter is frozen, so the naive
+      // deficit vs the analyzed driver would grow by one every subsequent
+      // lap and produce phantom "lapping" events until the end of the race.
+      // A genuinely lapped car keeps crossing the line for the whole race,
+      // so its last start is always after the analyzed lap's tStart — this
+      // guard filters false positives without dropping true positives.
+      if (starts.length === 0 || starts[starts.length - 1].t < tStart) continue;
       const cStart = completedAt(starts, tStart);
       const cEnd = completedAt(starts, tEnd);
       if (cStart == null || cEnd == null) continue; // driver not in this window
