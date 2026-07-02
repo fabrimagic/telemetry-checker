@@ -119,6 +119,16 @@ export interface RecommendedStrategy {
    * Pure-pace fields are NEVER mutated by the position-aware adjustment.
    */
   ranking_time_estimate?: number;
+  /**
+   * Presentation-only fields, mirror of `AlternativeStrategy.delta_clamped` /
+   * `raw_delta_vs_actual`. When the recommended gain has been capped to the
+   * plausibility ceiling (MAX_PLAUSIBLE_DELTA = pitLoss × 2.5) — either at
+   * the bestDelta search or at the presentation clamp of a promoted alt —
+   * `delta_clamped` is true and `raw_gain_seconds` preserves the pre-clamp
+   * value. Informational only: NEVER consumed by ranking or promotion.
+   */
+  delta_clamped?: boolean;
+  raw_gain_seconds?: number;
 }
 
 export interface AlternativeStrategy {
@@ -1058,12 +1068,34 @@ export function computeVirtualRaceEngineer(
   const actualSimTime = simulateTimeRaw(actualPitLaps, actualCompounds, true);
   const actualAdjustedTime = simulateStrategyCost(actualPitLaps, actualCompounds);
 
+  // Diagnose why the alternative-strategies engine cannot run when actual
+  // simulation times are null. Distinguishes (a) actual strategy violating the
+  // two-compound rule from (b) missing degradation models for actual compounds.
+  // The message is later surfaced via confidence_factors AND narrative_insights.
+  let alternativesUnavailableReason: string | null = null;
+  if (actualAdjustedTime == null || actualSimTime == null) {
+    if (!hasMinTwoCompounds(actualCompounds)) {
+      alternativesUnavailableReason =
+        "la strategia reale non soddisfa la regola dei due compound validi, quindi nessuna alternativa può essere simulata coerentemente.";
+    } else {
+      const missing = [...new Set(actualCompounds.filter(c => !compoundModels.has(c)))];
+      if (missing.length > 0) {
+        alternativesUnavailableReason =
+          `nessun modello di degrado affidabile è disponibile per la mescola ${missing.join(", ")} usata dalla strategia reale (stint troppo corti o contaminati), quindi non è possibile simulare strategie alternative.`;
+      } else {
+        alternativesUnavailableReason =
+          "il modello di simulazione della strategia reale non è disponibile, quindi non è possibile confrontare alternative.";
+      }
+    }
+  }
+
   // ── 3. Find optimal pit window (using risk-adjusted scoring) ──
   const recommendedWindows: RecommendedStrategy["pit_windows"] = [];
   let bestDelta = 0;
   let bestPitLaps = actualPitLaps;
   let bestCompounds = actualCompounds;
   let bestReason = "Strategia reale già vicina all'ottimale";
+  let recommendedInitialClampRaw: number | null = null;
 
   // Try shifts of ±5 laps for each pit stop AND different compound combinations
   if (actualPitLaps.length > 0 && actualAdjustedTime != null && actualSimTime != null) {
@@ -1135,6 +1167,7 @@ export function computeVirtualRaceEngineer(
     // estrapolazione di modelli di degrado contaminati, non una strategia reale.
     const MAX_PLAUSIBLE_DELTA = pitLoss * 2.5;
     if (bestDelta > MAX_PLAUSIBLE_DELTA) {
+      recommendedInitialClampRaw = bestDelta;
       bestDelta = MAX_PLAUSIBLE_DELTA;
     }
 
@@ -1171,6 +1204,10 @@ export function computeVirtualRaceEngineer(
     time_delta_vs_actual: -Math.round(bestDelta * 10) / 10,
     reason: bestReason,
   };
+  if (recommendedInitialClampRaw != null) {
+    recommendedStrategy.delta_clamped = true;
+    recommendedStrategy.raw_gain_seconds = Math.round(recommendedInitialClampRaw * 10) / 10;
+  }
 
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
@@ -1874,6 +1911,12 @@ export function computeVirtualRaceEngineer(
 
     recommendedStrategy.pros = recPros;
     recommendedStrategy.cons = recCons;
+    if (recommendedStrategy.delta_clamped) {
+      const _cap = pitLoss * 2.5;
+      recommendedStrategy.cons.push(
+        `Guadagno nominale limitato al massimo plausibile (~${_cap.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+      );
+    }
   }
 
 
@@ -2689,6 +2732,18 @@ export function computeVirtualRaceEngineer(
       // Also clamp the recommended gain in case it was overwritten by a
       // promoted alternative whose raw delta exceeded the cap.
       if (recommendedStrategy.estimated_gain_seconds > MAX_PLAUSIBLE_DELTA_DISPLAY) {
+        // Only capture the pre-clamp raw if not already captured by the
+        // initial bestDelta clamp (which stored the true pre-clamp value).
+        if (!recommendedStrategy.delta_clamped) {
+          recommendedStrategy.raw_gain_seconds =
+            Math.round(recommendedStrategy.estimated_gain_seconds * 10) / 10;
+          recommendedStrategy.delta_clamped = true;
+          if (recommendedStrategy.cons) {
+            recommendedStrategy.cons.push(
+              `Guadagno nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+            );
+          }
+        }
         recommendedStrategy.estimated_gain_seconds =
           Math.round(MAX_PLAUSIBLE_DELTA_DISPLAY * 10) / 10;
         recommendedStrategy.time_delta_vs_actual =
@@ -2703,6 +2758,15 @@ export function computeVirtualRaceEngineer(
           alt.time_delta_vs_actual = -alt.estimated_delta_vs_actual;
           alt.cons.push(
             `Guadagno nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta superiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta un vantaggio realistico.`,
+          );
+        } else if (alt.estimated_delta_vs_actual < -MAX_PLAUSIBLE_DELTA_DISPLAY) {
+          alt.raw_delta_vs_actual = alt.estimated_delta_vs_actual;
+          alt.delta_clamped = true;
+          alt.estimated_delta_vs_actual =
+            -Math.round(MAX_PLAUSIBLE_DELTA_DISPLAY * 10) / 10;
+          alt.time_delta_vs_actual = -alt.estimated_delta_vs_actual;
+          alt.cons.push(
+            `Svantaggio nominale limitato al massimo plausibile (~${MAX_PLAUSIBLE_DELTA_DISPLAY.toFixed(1)}s, pari a 2.5× il pit loss): un delta inferiore deriverebbe dall'estrapolazione del modello di degrado oltre il range osservato e non rappresenta una perdita realistica.`,
           );
         }
       }
@@ -2845,6 +2909,16 @@ export function computeVirtualRaceEngineer(
   }
 
   // (Soft sensors computed earlier in section 9a for scoring integration)
+
+  // Declare — via confidence_factors + narrative_insights — WHY the
+  // alternative-strategies engine produced nothing. Silence here would leave
+  // the user with an unexplained empty section.
+  if (alternativesUnavailableReason && alternatives.length === 0) {
+    const msg = `Strategie alternative non calcolate: ${alternativesUnavailableReason}`;
+    confidenceFactors.push(`⚠️ ${msg}`);
+    narrativeInsights.push(`⚠️ ${msg}`);
+  }
+
 
   return {
     driver_number: driverNumber,
