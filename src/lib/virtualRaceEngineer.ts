@@ -971,7 +971,7 @@ export function computeVirtualRaceEngineer(
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
         const tyreLife = lap - sb.start;
-        const baseLap = model.intercept;
+        const baseLap = (interceptOverride != null && Number.isFinite(interceptOverride)) ? interceptOverride : model.intercept;
         // Clamp della perdita di degrado per-giro: le gomme reali plateauano,
         // non degradano linearmente all'infinito. Evita che slope ripidi
         // (spesso contaminati da battaglie/traffico) gonfino stint lunghi.
