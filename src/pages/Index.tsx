@@ -145,6 +145,7 @@ export default function Index() {
     laps: any; stints: any; pits: any; weather: any; raceControl: any;
     intervals: any; positions: any; allDrivers: any; practiceModels: any;
     diaryEvents: DiaryEvent[] | null; cumDevResult: CumulativeDeviationResult | null;
+    allSessionLaps?: import("@/lib/openf1").Lap[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
