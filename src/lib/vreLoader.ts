@@ -309,6 +309,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
       analysisMode,
       lapWorkEstimates,
       totalEstimatedWork,
+      sessionAllLapsCache ?? undefined,
     );
     out.vreResult = vre;
 
