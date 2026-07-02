@@ -1071,6 +1071,7 @@ export function computeVirtualRaceEngineer(
     compoundsArr: string[],
     forActualStrategy: boolean = false,
     interceptOverrideByStint?: (number | null)[],
+    modelsOverride?: Map<string, { slope: number; intercept: number }>,
   ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateTimeRaw requires at least two compounds");
@@ -1078,13 +1079,15 @@ export function computeVirtualRaceEngineer(
     }
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
+    const modelsMap: Map<string, { slope: number; intercept: number }> = modelsOverride ?? compoundModels;
     for (let si = 0; si < stintBounds.length; si++) {
       const sb = stintBounds[si];
-      const model = compoundModels.get(sb.compound);
+      const model = modelsMap.get(sb.compound);
       if (!model) {
         console.warn("[VRE] returning null:", `simulateTimeRaw missing model for ${sb.compound}`);
         return null;
       }
+
       const interceptOverride = interceptOverrideByStint?.[si];
       const baseIntercept = (interceptOverride != null && Number.isFinite(interceptOverride)) ? interceptOverride : model.intercept;
       const isFirstStint = si === 0;
