@@ -345,6 +345,7 @@ export default function Index() {
 
             // Compute cumulative deviation for VRE integration
             let cumDevForVre: CumulativeDeviationResult | null = null;
+            let sessionAllLapsForVre: import("@/lib/openf1").Lap[] = [];
             try {
               const [sessionAllLaps, sessionResults] = await Promise.all([
                 getAllLaps(sessionKey),
@@ -354,6 +355,7 @@ export default function Index() {
                 cumDevForVre = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
               }
               setSessionAllLaps(sessionAllLaps);
+              sessionAllLapsForVre = sessionAllLaps;
             } catch { /* optional */ }
             setCumDevResult(cumDevForVre);
 
@@ -365,6 +367,7 @@ export default function Index() {
               weather: sessionWeather, raceControl: raceControlMessages,
               intervals: ivls, positions: pos, allDrivers, practiceModels,
               diaryEvents: diaryForVre, cumDevResult: cumDevForVre,
+              allSessionLaps: sessionAllLapsForVre,
             };
             const vre = computeVirtualRaceEngineer(
               driverNumber, driver.name_acronym, sessionKey,
@@ -373,6 +376,8 @@ export default function Index() {
               ivls, pos, allDrivers, practiceModels, vreRiskMode,
               diaryForVre, cumDevForVre, vreScenario, vreScenarioLap, vreScenarioDuration, vreCustomDeg,
               vreAnalysisMode,
+              undefined, undefined,
+              sessionAllLapsForVre.length ? sessionAllLapsForVre : undefined,
             );
             setVreResult(vre);
 
