@@ -275,7 +275,19 @@ export function detectLappedTraffic(input: LappedTrafficInput): LappedTrafficRes
       if (starts[0].t > tEnd) continue;
       const deficitStart = laps_A_start - cStart;
       const deficitEnd = laps_A_end - cEnd;
-      if (deficitEnd >= 1 && deficitEnd === deficitStart + 1) {
+      // Semantics of finish-line deficit:
+      //   deficit 0 → the other car is AHEAD on track (has already completed
+      //     the same lap count as the analyzed driver at this timestamp).
+      //   deficit 1 → the other car is BEHIND on track within the SAME lap
+      //     (one fewer completed crossings, but still on the current lap).
+      //   deficit ≥ 2 → the other car is a FULL lap or more behind → lapped.
+      // Therefore a real lapping event is the transition from 1 (same lap,
+      // behind) to 2 (a full lap down). The 0→1 transition is just a
+      // regular on-track overtake or the starting grid order at lap 1, not
+      // a lapping. Requiring deficitEnd ≥ 2 eliminates those false
+      // positives (including retired cars whose last start coincides with
+      // tStart, which slipped past the retirement guard as a 0→1 step).
+      if (deficitEnd >= 2 && deficitEnd === deficitStart + 1) {
         lappedInThisLap.push(dn);
       }
     }
