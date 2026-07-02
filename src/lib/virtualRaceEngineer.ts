@@ -939,8 +939,18 @@ export function computeVirtualRaceEngineer(
     return bounds;
   }
 
-  // Full cost function: simulates total adjusted race time
-  function simulateStrategyCost(pitLapsArr: number[], compoundsArr: string[]): number | null {
+  // Full cost function: simulates total adjusted race time.
+  // `interceptOverrideByStint` (optional): allineato posizionalmente a
+  // `stintBounds`. Quando presente e non-null per lo stint `si`, il valore
+  // sostituisce `model.intercept` come passo base di quello stint. Slope,
+  // warmup, cliff, pit costs e ogni altro contributo restano invariati. Con
+  // parametro assente il comportamento e' bit-identico alla versione precedente
+  // (usato dalla slope-only semantics per i compound derivati dalle prove libere).
+  function simulateStrategyCost(
+    pitLapsArr: number[],
+    compoundsArr: string[],
+    interceptOverrideByStint?: (number | null)[],
+  ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateStrategyCost requires at least two compounds");
       return null;
@@ -956,6 +966,7 @@ export function computeVirtualRaceEngineer(
         console.warn("[VRE] returning null:", `simulateStrategyCost missing model for ${sb.compound}`);
         return null;
       }
+      const interceptOverride = interceptOverrideByStint?.[si];
       const stintLength = sb.end - sb.start + 1;
       const isFirstStint = si === 0;
       for (let lap = sb.start; lap <= sb.end; lap++) {
