@@ -1153,6 +1153,51 @@ export function computeVirtualRaceEngineer(
       return !!m && m.source !== "race";
     });
 
+  // ── Practice-space evaluation ──
+  // When a candidate strategy uses at least one PRACTICE compound, we must
+  // evaluate both the candidate and the actual-strategy baseline in the same
+  // RAW-slope space to eliminate the corrected-vs-raw slope asymmetry
+  // (race slopes in `compoundModels` are fuel-corrected; practice slopes
+  // are raw regression → practice compounds would enjoy a systematic bias
+  // equal to the fuel correction over the stint length).
+  //
+  // Builds an ad-hoc simulation map that merges `rawRaceModels` with the
+  // practice models (already raw). If any compound needed by candidate or
+  // actual baseline is missing from that map (no raw regression available),
+  // returns null and the candidate is discarded — NO mixed-space fallback.
+  // Intercept overrides for practice stints anchor to the RAW intercept of
+  // the substituted race compound.
+  const practiceSpaceSimMap = new Map<string, { slope: number; intercept: number }>();
+  for (const [c, m] of rawRaceModels) practiceSpaceSimMap.set(c, m);
+  for (const [c, m] of compoundModels) {
+    if (m.source !== "race" && !practiceSpaceSimMap.has(c)) {
+      practiceSpaceSimMap.set(c, { slope: m.slope, intercept: m.intercept });
+    }
+  }
+  let _actualRawTimeCache: number | null | undefined = undefined;
+  const getActualRawTime = (): number | null => {
+    if (_actualRawTimeCache !== undefined) return _actualRawTimeCache;
+    for (const c of actualCompounds) {
+      if (!practiceSpaceSimMap.has(c)) { _actualRawTimeCache = null; return null; }
+    }
+    _actualRawTimeCache = simulateStrategyCost(actualPitLaps, actualCompounds, undefined, practiceSpaceSimMap);
+    return _actualRawTimeCache;
+  };
+  const evalCandidatePracticeSpace = (
+    candidatePits: number[],
+    candidateCompounds: string[],
+    splitCompound?: string,
+  ): { candidateTime: number; actualRawTime: number; delta: number } | null => {
+    for (const c of candidateCompounds) if (!practiceSpaceSimMap.has(c)) return null;
+    const actualRawTime = getActualRawTime();
+    if (actualRawTime == null) return null;
+    const override = buildInterceptOverride(candidateCompounds, splitCompound, rawRaceModels);
+    const candidateTime = simulateStrategyCost(candidatePits, candidateCompounds, override, practiceSpaceSimMap);
+    if (candidateTime == null) return null;
+    return { candidateTime, actualRawTime, delta: actualRawTime - candidateTime };
+  };
+
+
   // Diagnose why the alternative-strategies engine cannot run when actual
   // simulation times are null. Distinguishes (a) actual strategy violating the
   // two-compound rule from (b) missing degradation models for actual compounds.
