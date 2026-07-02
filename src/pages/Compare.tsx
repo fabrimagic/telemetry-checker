@@ -13,6 +13,7 @@ import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
+import { LappedTrafficSection } from "@/components/f1/VirtualRaceEngineerCard";
 import { DataIntegrityNotice } from "@/components/f1/DataIntegrityNotice";
 import { detectDataIntegrityIssues } from "@/lib/dataIntegrity";
 import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
