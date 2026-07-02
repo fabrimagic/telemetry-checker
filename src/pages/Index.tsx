@@ -1088,6 +1088,10 @@ export default function Index() {
                 />
               )}
 
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && vreResult && (
+                <LappedTrafficSection result={vreResult} />
+              )}
+
 
 
               {kdmResult && kdmResult.decision_points.length > 0 && (
