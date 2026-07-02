@@ -1259,6 +1259,10 @@ export function computeVirtualRaceEngineer(
     recommendedStrategy.delta_clamped = true;
     recommendedStrategy.raw_gain_seconds = Math.round(recommendedInitialClampRaw * 10) / 10;
   }
+  const recommendedUsesPractice = candidateUsesPractice(bestCompounds);
+  if (recommendedUsesPractice) {
+    recommendedStrategy.cons = [...(recommendedStrategy.cons ?? []), PRACTICE_ASSUMPTION_CON];
+  }
 
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
