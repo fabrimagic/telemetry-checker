@@ -1303,26 +1303,34 @@ export function computeVirtualRaceEngineer(
       if (longestStint && longestStint.laps_count > 10) {
         const splitLap = Math.round(longestStint.lap_start + longestStint.laps_count / 2);
         const extraPits = [...actualPitLaps, splitLap].sort((a, b) => a - b);
-        for (const extraCompound of [...compoundModels.keys()]) {
-          const extraCompounds: string[] = [];
-          for (let si = 0; si <= extraPits.length; si++) {
-            if (si < actualCompounds.length) extraCompounds.push(actualCompounds[si]);
-            else extraCompounds.push(extraCompound);
-          }
-          while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
-          if (!hasMinTwoCompounds(extraCompounds)) continue;
-          const extraTime = simulateStrategyCost(extraPits, extraCompounds);
-          if (extraTime != null) {
-            alternatives.push({
-              name: `${extraPits.length}-stop`,
-              description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
-              pit_laps: extraPits,
-              compounds: extraCompounds,
-              estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-              time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-              pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
-              cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
-            });
+        // BUGFIX: validate the resulting sequence (strictly increasing, ≥3 laps
+        // spacing) — skip the whole N+1 branch if the extra split collides with
+        // real pits, otherwise we would emit non-monotonic pit sequences.
+        if (isValidPitSequence(extraPits)) {
+          for (const extraCompound of [...compoundModels.keys()]) {
+            const extraCompounds: string[] = [];
+            for (let si = 0; si <= extraPits.length; si++) {
+              if (si < actualCompounds.length) extraCompounds.push(actualCompounds[si]);
+              else extraCompounds.push(extraCompound);
+            }
+            while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
+            if (!hasMinTwoCompounds(extraCompounds)) continue;
+            const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+            if (extraTime != null) {
+              alternatives.push({
+                // BUGFIX: include the added compound in the name so the N+1
+                // siblings are distinguishable (name collisions previously
+                // caused scoring lookup collisions in the ranking).
+                name: `${extraPits.length}-stop (${extraCompound})`,
+                description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
+                pit_laps: extraPits,
+                compounds: extraCompounds,
+                estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+                time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
+                pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
+                cons: ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"],
+              });
+            }
           }
         }
       }
