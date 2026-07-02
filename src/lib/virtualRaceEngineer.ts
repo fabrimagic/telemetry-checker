@@ -1145,6 +1145,7 @@ export function computeVirtualRaceEngineer(
     // estrapolazione di modelli di degrado contaminati, non una strategia reale.
     const MAX_PLAUSIBLE_DELTA = pitLoss * 2.5;
     if (bestDelta > MAX_PLAUSIBLE_DELTA) {
+      recommendedInitialClampRaw = bestDelta;
       bestDelta = MAX_PLAUSIBLE_DELTA;
     }
 
@@ -1181,6 +1182,10 @@ export function computeVirtualRaceEngineer(
     time_delta_vs_actual: -Math.round(bestDelta * 10) / 10,
     reason: bestReason,
   };
+  if (recommendedInitialClampRaw != null) {
+    recommendedStrategy.delta_clamped = true;
+    recommendedStrategy.raw_gain_seconds = Math.round(recommendedInitialClampRaw * 10) / 10;
+  }
 
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
