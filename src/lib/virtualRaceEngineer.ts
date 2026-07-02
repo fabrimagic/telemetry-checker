@@ -755,7 +755,16 @@ export function computeVirtualRaceEngineer(
     }
   }
 
-  // Enrich with practice compound models (only add compounds not already from race)
+  // Enrich with practice compound models (only add compounds not already from race).
+  // SLOPE-ONLY SEMANTICS: memorizziamo il modello practice con il suo intercept
+  // GREZZO (nessun rebase al passo gara). L'intercept grezzo NON viene mai usato
+  // dalle simulazioni: quando una strategia candidata usa un compound practice,
+  // il chiamante costruisce un `interceptOverrideByStint` che àncora il passo
+  // base al compound di gara realmente usato in quella posizione della strategia
+  // reale, e passa l'override a `simulateStrategyCost` / `simulateTimeRaw`.
+  // In questo modo si conserva SOLO la differenza di degrado (slope) stimata
+  // dalle prove libere, eliminando la dipendenza arbitraria dal primo modello
+  // race nell'ordine di inserzione della Map.
   const practiceCompoundsUsed: string[] = [];
   // Slope di degrado minimo plausibile (s/giro) perche' un modello derivato dalle
   // prove libere sia usabile come estrapolazione di uno stint di gara. I long-run
@@ -767,18 +776,9 @@ export function computeVirtualRaceEngineer(
   const MIN_PRACTICE_DEG_SLOPE = 0.04; // s/giro
   for (const pm of practiceModels) {
     if (!compoundModels.has(pm.compound) && pm.rSquared > 0.3 && pm.slope >= MIN_PRACTICE_DEG_SLOPE) {
-      // Adjust practice intercept to race pace: use median race lap time as baseline
-      const raceModels = [...compoundModels.values()].filter(m => m.source === "race");
-      let paceOffset = 0;
-      if (raceModels.length > 0) {
-        // Estimate offset between practice and race pace at tyre life = 5
-        const raceBasePace = raceModels[0].intercept + raceModels[0].slope * 5;
-        const practiceBasePace = pm.intercept + pm.slope * 5;
-        paceOffset = raceBasePace - practiceBasePace;
-      }
       compoundModels.set(pm.compound, {
         slope: pm.slope,
-        intercept: pm.intercept + paceOffset,
+        intercept: pm.intercept, // raw — never used without override (see above)
         source: pm.source,
         // Practice models do not currently expose a slope std error → null.
         // Uncertainty propagation falls back to the systematic
