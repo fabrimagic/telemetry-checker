@@ -700,7 +700,11 @@ export function computeVirtualRaceEngineer(
         trackStatusMap,
         battleContext: earlyBattleCtx,
       });
-    } catch { /* best-effort — never break VRE */ }
+    } catch (err) {
+      // best-effort — never break VRE, but keep diagnostics visible: silent
+      // catches have masked root causes in the past.
+      console.warn(`[VRE] detectLappedTraffic failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   const lappedEncounterLapsForPaceLoss = lappedTrafficResult?.encounter_lap_numbers ?? null;
 
