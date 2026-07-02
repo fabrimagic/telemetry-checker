@@ -2910,6 +2910,16 @@ export function computeVirtualRaceEngineer(
 
   // (Soft sensors computed earlier in section 9a for scoring integration)
 
+  // Declare — via confidence_factors + narrative_insights — WHY the
+  // alternative-strategies engine produced nothing. Silence here would leave
+  // the user with an unexplained empty section.
+  if (alternativesUnavailableReason && alternatives.length === 0) {
+    const msg = `Strategie alternative non calcolate: ${alternativesUnavailableReason}`;
+    confidenceFactors.push(`⚠️ ${msg}`);
+    narrativeInsights.push(`⚠️ ${msg}`);
+  }
+
+
   return {
     driver_number: driverNumber,
     driver_acronym: driverAcronym,
