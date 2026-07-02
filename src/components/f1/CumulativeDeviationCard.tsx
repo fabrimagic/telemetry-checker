@@ -221,13 +221,11 @@ export function CumulativeDeviationCard({ sessionKey, results, drivers, visibleD
           Legenda
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2 space-y-1.5 text-[10px] text-muted-foreground bg-muted/30 rounded-md p-3">
-          <p><strong className="text-foreground">Deviazione cumulativa:</strong> somma dei delta giro per giro rispetto al tempo medio del vincitore. Indica il ritardo totale accumulato.</p>
-          <p><strong className="text-foreground">Benchmark:</strong> tempo medio del vincitore calcolato escludendo out lap, primo giro, e giri anomali ({">"} 1.5× mediana).</p>
+          <p><strong className="text-foreground">Deviazione cumulativa:</strong> somma dei delta giro per giro rispetto al passo medio del vincitore. Indica lo scostamento totale di passo accumulato sui giri validi.</p>
+          <p><strong className="text-foreground">Benchmark:</strong> tempo medio del vincitore calcolato con filtro strutturale: esclusi solo out lap e primo giro; inclusi in-lap, giri in regime di neutralizzazione (SC/VSC) e giri con tempi qualsiasi. Lo stesso filtro si applica a ogni pilota per garantire che il vincitore converga a zero.</p>
           <p><strong className="text-foreground">Delta giro:</strong> differenza tra il tempo sul giro del pilota e il benchmark del vincitore.</p>
-          <p><strong className="text-foreground">Nota:</strong> questa metrica è descrittiva e non rappresenta direttamente il degrado gomme. Giri con pit stop, out lap o tempi anomali sono esclusi dal calcolo.</p>
-          {filteredDriverData.some((d) => d.final_cumulative_delta != null && d.final_cumulative_delta < 0) && (
-            <p><strong className="text-foreground">Valori negativi:</strong> un valore negativo indica che il pilota ha avuto un passo medio sui giri validi più veloce rispetto al benchmark del vincitore. Questo può accadere quando un pilota ha un ritmo puro superiore ma perde la gara per fattori esterni al passo (strategia, pit stop, safety car, incidenti o penalità).</p>
-          )}
+          <p><strong className="text-foreground">Attenzione al risultato finale:</strong> il valore finale della curva non rappresenta il distacco al traguardo: out lap e primo giro sono esclusi dalla cumulata, mentre le perdite reali ai pit stop e in partenza si concentrano proprio lì. Di conseguenza un pilota può chiudere la curva in territorio negativo pur avendo concluso la gara dietro al vincitore, quando il suo passo sui giri validi è stato più veloce del passo medio del vincitore.</p>
+          <p><strong className="text-foreground">Nota:</strong> questa metrica è descrittiva e non rappresenta direttamente il degrado gomme. Giri con pit stop o out lap sono esclusi dal calcolo.</p>
         </CollapsibleContent>
       </Collapsible>
     </div>
