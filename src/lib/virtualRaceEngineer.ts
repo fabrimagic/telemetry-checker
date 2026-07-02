@@ -246,6 +246,15 @@ export interface VirtualRaceEngineerResult {
    * verdicts) do NOT account for penalties. See raceControlPenalties.ts.
    */
   detected_penalties: DetectedPenalty[];
+  /**
+   * Lapped-traffic cost analysis (optional). Present only when the caller
+   * passes `allSessionLaps`. INFORMATIONAL: the estimated cost is NOT
+   * applied to any strategic score, penalty, or counterfactual simulation
+   * — projecting future encounters with backmarkers would be speculative.
+   * It IS used to contaminate stint pace-loss laps (same treatment as
+   * battle / weather / neutralization).
+   */
+  lapped_traffic?: LappedTrafficResult;
 }
 
 /* ── Helpers ── */
