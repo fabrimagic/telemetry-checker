@@ -79,7 +79,7 @@ import {
 import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel, type AnalysisMode } from "@/lib/virtualRaceEngineer";
-import { VirtualRaceEngineerCard } from "@/components/f1/VirtualRaceEngineerCard";
+import { VirtualRaceEngineerCard, LappedTrafficSection } from "@/components/f1/VirtualRaceEngineerCard";
 import { VRESetupCard } from "@/components/f1/VRESetupCard";
 import type { ViewMode } from "@/components/f1/VREViewModes";
 import type { RiskMode } from "@/lib/riskAppetite";
@@ -1086,6 +1086,10 @@ export default function Index() {
                   driverAcronym={singleDriverState.driver.name_acronym}
                   driverColor={getColor(singleDriverState.driver.driver_number)}
                 />
+              )}
+
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && vreResult && (
+                <LappedTrafficSection result={vreResult} />
               )}
 
 
