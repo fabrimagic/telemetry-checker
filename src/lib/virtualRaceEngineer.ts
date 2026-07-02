@@ -2977,6 +2977,12 @@ export function computeVirtualRaceEngineer(
     narrativeInsights.push(`⚠️ ${msg}`);
   }
 
+  if (recommendedUsesPractice) {
+    confidenceFactors.push(
+      `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita, solo lo slope di degrado proviene dalle prove libere.`,
+    );
+  }
+
 
   return {
     driver_number: driverNumber,
