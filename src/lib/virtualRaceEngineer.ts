@@ -728,6 +728,10 @@ export function computeVirtualRaceEngineer(
   // Build a simple lap time predictor per compound (race data first)
   const compoundModels = new Map<string, { slope: number; intercept: number; source: string; slopeStdError: number | null }>();
   const compoundCandidateBest = new Map<string, CompoundModelCandidate>();
+  // Tracks which stint number won the model selection for each race compound.
+  // Used to build `rawRaceModels` below by pulling the RAW regression from the
+  // exact same stint that fed the corrected model, keeping raw/corrected paired.
+  const winningStintByCompound = new Map<string, number>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
     if (!model) continue;
@@ -752,6 +756,7 @@ export function computeVirtualRaceEngineer(
         null;
       compoundModels.set(sa.compound, { ...model, source: "race", slopeStdError: resolvedSe });
       compoundCandidateBest.set(sa.compound, candidate);
+      winningStintByCompound.set(sa.compound, sa.stint_number);
     }
   }
 
@@ -788,6 +793,27 @@ export function computeVirtualRaceEngineer(
       practiceCompoundsUsed.push(pm.compound);
     }
   }
+
+  // ── Raw race models per compound ──
+  // Same stint that won the corrected-model selection above, but pulling the
+  // RAW linear regression (slope + intercept from `rawDegResults`) with no
+  // fuel/temperature correction. Used when a candidate strategy contains at
+  // least one PRACTICE compound: to avoid the corrected-vs-raw slope asymmetry
+  // (practice slopes come raw from the free-practice regression, race slopes
+  // come fuel-corrected → practice compounds gain a systematic ~1s/giro bias
+  // equal to the fuel correction, which on a 25-lap stint compounds to ~27s
+  // of fake advantage), we evaluate the candidate AND the actual-strategy
+  // baseline in the shared raw-slope space. If the compound has no raw entry
+  // (stint too short/contaminated for the raw regression), the entry is
+  // simply absent from the map and any candidate needing it will be skipped.
+  const rawRaceModels = new Map<string, { slope: number; intercept: number }>();
+  for (const [compound, stintNum] of winningStintByCompound) {
+    const rawRes = rawDegResults.find(r => r.stint === stintNum);
+    if (rawRes && Number.isFinite(rawRes.slopeSecPerLap) && Number.isFinite(rawRes.intercept)) {
+      rawRaceModels.set(compound, { slope: rawRes.slopeSecPerLap, intercept: rawRes.intercept });
+    }
+  }
+
 
 
   // F1 regulation: at least 2 different compounds must be used during a dry race
