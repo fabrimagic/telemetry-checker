@@ -728,6 +728,10 @@ export function computeVirtualRaceEngineer(
   // Build a simple lap time predictor per compound (race data first)
   const compoundModels = new Map<string, { slope: number; intercept: number; source: string; slopeStdError: number | null }>();
   const compoundCandidateBest = new Map<string, CompoundModelCandidate>();
+  // Tracks which stint number won the model selection for each race compound.
+  // Used to build `rawRaceModels` below by pulling the RAW regression from the
+  // exact same stint that fed the corrected model, keeping raw/corrected paired.
+  const winningStintByCompound = new Map<string, number>();
   for (const sa of stintAnalyses) {
     const model = degradationModels.get(sa.stint_number);
     if (!model) continue;
@@ -752,6 +756,7 @@ export function computeVirtualRaceEngineer(
         null;
       compoundModels.set(sa.compound, { ...model, source: "race", slopeStdError: resolvedSe });
       compoundCandidateBest.set(sa.compound, candidate);
+      winningStintByCompound.set(sa.compound, sa.stint_number);
     }
   }
 
@@ -788,6 +793,27 @@ export function computeVirtualRaceEngineer(
       practiceCompoundsUsed.push(pm.compound);
     }
   }
+
+  // ── Raw race models per compound ──
+  // Same stint that won the corrected-model selection above, but pulling the
+  // RAW linear regression (slope + intercept from `rawDegResults`) with no
+  // fuel/temperature correction. Used when a candidate strategy contains at
+  // least one PRACTICE compound: to avoid the corrected-vs-raw slope asymmetry
+  // (practice slopes come raw from the free-practice regression, race slopes
+  // come fuel-corrected → practice compounds gain a systematic ~1s/giro bias
+  // equal to the fuel correction, which on a 25-lap stint compounds to ~27s
+  // of fake advantage), we evaluate the candidate AND the actual-strategy
+  // baseline in the shared raw-slope space. If the compound has no raw entry
+  // (stint too short/contaminated for the raw regression), the entry is
+  // simply absent from the map and any candidate needing it will be skipped.
+  const rawRaceModels = new Map<string, { slope: number; intercept: number }>();
+  for (const [compound, stintNum] of winningStintByCompound) {
+    const rawRes = rawDegResults.find(r => r.stint === stintNum);
+    if (rawRes && Number.isFinite(rawRes.slopeSecPerLap) && Number.isFinite(rawRes.intercept)) {
+      rawRaceModels.set(compound, { slope: rawRes.slopeSecPerLap, intercept: rawRes.intercept });
+    }
+  }
+
 
 
   // F1 regulation: at least 2 different compounds must be used during a dry race
@@ -950,6 +976,7 @@ export function computeVirtualRaceEngineer(
     pitLapsArr: number[],
     compoundsArr: string[],
     interceptOverrideByStint?: (number | null)[],
+    modelsOverride?: Map<string, { slope: number; intercept: number }>,
   ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateStrategyCost requires at least two compounds");
@@ -959,13 +986,15 @@ export function computeVirtualRaceEngineer(
 
     let totalCost = 0;
 
+    const modelsMap: Map<string, { slope: number; intercept: number }> = modelsOverride ?? compoundModels;
     for (let si = 0; si < stintBounds.length; si++) {
       const sb = stintBounds[si];
-      const model = compoundModels.get(sb.compound);
+      const model = modelsMap.get(sb.compound);
       if (!model) {
         console.warn("[VRE] returning null:", `simulateStrategyCost missing model for ${sb.compound}`);
         return null;
       }
+
       const interceptOverride = interceptOverrideByStint?.[si];
       const stintLength = sb.end - sb.start + 1;
       const isFirstStint = si === 0;
@@ -1042,6 +1071,7 @@ export function computeVirtualRaceEngineer(
     compoundsArr: string[],
     forActualStrategy: boolean = false,
     interceptOverrideByStint?: (number | null)[],
+    modelsOverride?: Map<string, { slope: number; intercept: number }>,
   ): number | null {
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateTimeRaw requires at least two compounds");
@@ -1049,13 +1079,15 @@ export function computeVirtualRaceEngineer(
     }
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
+    const modelsMap: Map<string, { slope: number; intercept: number }> = modelsOverride ?? compoundModels;
     for (let si = 0; si < stintBounds.length; si++) {
       const sb = stintBounds[si];
-      const model = compoundModels.get(sb.compound);
+      const model = modelsMap.get(sb.compound);
       if (!model) {
         console.warn("[VRE] returning null:", `simulateTimeRaw missing model for ${sb.compound}`);
         return null;
       }
+
       const interceptOverride = interceptOverrideByStint?.[si];
       const baseIntercept = (interceptOverride != null && Number.isFinite(interceptOverride)) ? interceptOverride : model.intercept;
       const isFirstStint = si === 0;
@@ -1095,10 +1127,11 @@ export function computeVirtualRaceEngineer(
   // compounds → nessun override. Ritorna undefined quando nessun compound
   // candidato e' practice, mantenendo bit-identico il percorso race-only.
   const PRACTICE_ASSUMPTION_CON =
-    "Passo base della mescola practice assunto pari alla mescola sostituita: mancano dati di passo gara per questo compound, il delta riflette solo la differenza di degrado stimata dalle prove libere.";
+    "Passo base della mescola practice assunto pari alla mescola sostituita; confronto effettuato su slope di regressione non corretti per l'effetto carburante, per omogeneità con il dato delle libere. Il degrado gomma reale è generalmente ≥ a quello stimato in questo spazio.";
   const buildInterceptOverride = (
     candidateCompounds: string[],
     splitCompound?: string,
+    anchorModels: Map<string, { intercept: number }> = compoundModels,
   ): (number | null)[] | undefined => {
     let hasPractice = false;
     const out: (number | null)[] = candidateCompounds.map((c, i) => {
@@ -1107,17 +1140,63 @@ export function computeVirtualRaceEngineer(
       hasPractice = true;
       const anchorCompound = i < actualCompounds.length ? actualCompounds[i] : splitCompound;
       if (!anchorCompound) return null;
-      const raceModel = compoundModels.get(anchorCompound);
-      if (!raceModel || raceModel.source !== "race") return null;
-      return raceModel.intercept;
+      const anchor = anchorModels.get(anchorCompound);
+      if (!anchor) return null;
+      return anchor.intercept;
     });
     return hasPractice ? out : undefined;
   };
   const candidateUsesPractice = (candidateCompounds: string[]): boolean =>
+
     candidateCompounds.some(c => {
       const m = compoundModels.get(c);
       return !!m && m.source !== "race";
     });
+
+  // ── Practice-space evaluation ──
+  // When a candidate strategy uses at least one PRACTICE compound, we must
+  // evaluate both the candidate and the actual-strategy baseline in the same
+  // RAW-slope space to eliminate the corrected-vs-raw slope asymmetry
+  // (race slopes in `compoundModels` are fuel-corrected; practice slopes
+  // are raw regression → practice compounds would enjoy a systematic bias
+  // equal to the fuel correction over the stint length).
+  //
+  // Builds an ad-hoc simulation map that merges `rawRaceModels` with the
+  // practice models (already raw). If any compound needed by candidate or
+  // actual baseline is missing from that map (no raw regression available),
+  // returns null and the candidate is discarded — NO mixed-space fallback.
+  // Intercept overrides for practice stints anchor to the RAW intercept of
+  // the substituted race compound.
+  const practiceSpaceSimMap = new Map<string, { slope: number; intercept: number }>();
+  for (const [c, m] of rawRaceModels) practiceSpaceSimMap.set(c, m);
+  for (const [c, m] of compoundModels) {
+    if (m.source !== "race" && !practiceSpaceSimMap.has(c)) {
+      practiceSpaceSimMap.set(c, { slope: m.slope, intercept: m.intercept });
+    }
+  }
+  let _actualRawTimeCache: number | null | undefined = undefined;
+  const getActualRawTime = (): number | null => {
+    if (_actualRawTimeCache !== undefined) return _actualRawTimeCache;
+    for (const c of actualCompounds) {
+      if (!practiceSpaceSimMap.has(c)) { _actualRawTimeCache = null; return null; }
+    }
+    _actualRawTimeCache = simulateStrategyCost(actualPitLaps, actualCompounds, undefined, practiceSpaceSimMap);
+    return _actualRawTimeCache;
+  };
+  const evalCandidatePracticeSpace = (
+    candidatePits: number[],
+    candidateCompounds: string[],
+    splitCompound?: string,
+  ): { candidateTime: number; actualRawTime: number; delta: number } | null => {
+    for (const c of candidateCompounds) if (!practiceSpaceSimMap.has(c)) return null;
+    const actualRawTime = getActualRawTime();
+    if (actualRawTime == null) return null;
+    const override = buildInterceptOverride(candidateCompounds, splitCompound, rawRaceModels);
+    const candidateTime = simulateStrategyCost(candidatePits, candidateCompounds, override, practiceSpaceSimMap);
+    if (candidateTime == null) return null;
+    return { candidateTime, actualRawTime, delta: actualRawTime - candidateTime };
+  };
+
 
   // Diagnose why the alternative-strategies engine cannot run when actual
   // simulation times are null. Distinguishes (a) actual strategy violating the
@@ -1150,7 +1229,14 @@ export function computeVirtualRaceEngineer(
 
   // Try shifts of ±5 laps for each pit stop AND different compound combinations
   if (actualPitLaps.length > 0 && actualAdjustedTime != null && actualSimTime != null) {
-    let bestTime = actualAdjustedTime;
+    // Selection is now driven by DELTA (not absolute time) because candidates
+    // may live in DIFFERENT simulation spaces: race-only combos are evaluated
+    // in the fuel-corrected space (baseline = actualAdjustedTime), whereas
+    // combos containing at least one PRACTICE compound are evaluated in the
+    // shared RAW-slope space (baseline = actualRawTime). Maximizing delta is
+    // equivalent to minimizing time only when the baseline is constant, which
+    // holds within each space. For race-only combos the numeric outcome is
+    // identical to the previous `bestTime` search.
 
     // Generate compound combos: actual + all permutations using available compounds
     const allAvailableCompounds = [...compoundModels.keys()];
@@ -1187,6 +1273,7 @@ export function computeVirtualRaceEngineer(
     const shift2Range = actualPitLaps.length >= 2 ? shifts : [0];
 
     for (const compounds of compoundCombos) {
+      const usesPractice = candidateUsesPractice(compounds);
       for (const shift1 of shifts) {
         for (const shift2 of shift2Range) {
           const candidatePits = actualPitLaps.map((p, i) => {
@@ -1201,16 +1288,25 @@ export function computeVirtualRaceEngineer(
           if (candidatePits[0] < 2) valid = false;
           if (!valid) continue;
 
-          const t = simulateStrategyCost(candidatePits, compounds, buildInterceptOverride(compounds));
-          if (t != null && t < bestTime) {
-            bestTime = t;
+          let delta: number;
+          if (usesPractice) {
+            const ev = evalCandidatePracticeSpace(candidatePits, compounds);
+            if (!ev) continue;
+            delta = ev.delta;
+          } else {
+            const t = simulateStrategyCost(candidatePits, compounds);
+            if (t == null) continue;
+            delta = actualAdjustedTime - t;
+          }
+          if (delta > bestDelta) {
             bestPitLaps = candidatePits;
             bestCompounds = compounds;
-            bestDelta = actualAdjustedTime! - t;
+            bestDelta = delta;
           }
         }
       }
     }
+
 
     // Clamp di plausibilita': un guadagno strategico realistico su una gara
     // intera e' nell'ordine di ~2.5x il pit loss (rimpiazzare un timing di pit
@@ -1351,15 +1447,15 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
-        if (altTime != null) {
+        const ev = evalCandidatePracticeSpace(actualPitLaps, altCompounds);
+        if (ev != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
             description: `Ultimo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[actualCompounds.length - 1]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
-            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime) * 10) / 10,
+            estimated_delta_vs_actual: Math.round(ev.delta * 10) / 10,
+            time_delta_vs_actual: -Math.round(ev.delta * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
             cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista differenti tra prove e gara"],
           });
@@ -1370,21 +1466,22 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[0] = practiceCompound;
-        const altTime2 = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
-        if (altTime2 != null) {
+        const ev2 = evalCandidatePracticeSpace(actualPitLaps, altCompounds);
+        if (ev2 != null) {
           alternatives.push({
             name: `Stint iniziale su ${practiceCompound}`,
             description: `Primo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[0]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
-            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime2) * 10) / 10,
+            estimated_delta_vs_actual: Math.round(ev2.delta * 10) / 10,
+            time_delta_vs_actual: -Math.round(ev2.delta * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
             cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista e carburante differenti"],
           });
         }
       }
     }
+
 
 
     // ── 4a-extra. N+1 stop strategy (SC makes extra stop cheaper) ──
@@ -1407,26 +1504,36 @@ export function computeVirtualRaceEngineer(
             }
             while (extraCompounds.length > extraPits.length + 1) extraCompounds.pop();
             if (!hasMinTwoCompounds(extraCompounds)) continue;
-            const extraOverride = buildInterceptOverride(extraCompounds, longestStint.compound);
-            const extraTime = simulateStrategyCost(extraPits, extraCompounds, extraOverride);
-            if (extraTime != null) {
-              const extraCons = ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"];
-              if (candidateUsesPractice(extraCompounds)) extraCons.push(PRACTICE_ASSUMPTION_CON);
-              alternatives.push({
-                // BUGFIX: include the added compound in the name so the N+1
-                // siblings are distinguishable (name collisions previously
-                // caused scoring lookup collisions in the ranking).
-                name: `${extraPits.length}-stop (${extraCompound})`,
-                description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
-                pit_laps: extraPits,
-                compounds: extraCompounds,
-                estimated_delta_vs_actual: Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-                time_delta_vs_actual: -Math.round((actualAdjustedTime - extraTime) * 10) / 10,
-                pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
-                cons: extraCons,
-              });
+            const usesPractice = candidateUsesPractice(extraCompounds);
+            let extraDelta: number | null = null;
+            if (usesPractice) {
+              // Practice compound in N+1 branch → evaluate in raw-slope space
+              // with anchor to raw intercept of the compound of the split stint.
+              const ev = evalCandidatePracticeSpace(extraPits, extraCompounds, longestStint.compound);
+              if (ev == null) continue;
+              extraDelta = ev.delta;
+            } else {
+              const extraTime = simulateStrategyCost(extraPits, extraCompounds);
+              if (extraTime == null) continue;
+              extraDelta = actualAdjustedTime - extraTime;
             }
+            const extraCons = ["Pit stop aggiuntivo", "Maggiore esposizione al traffico"];
+            if (usesPractice) extraCons.push(PRACTICE_ASSUMPTION_CON);
+            alternatives.push({
+              // BUGFIX: include the added compound in the name so the N+1
+              // siblings are distinguishable (name collisions previously
+              // caused scoring lookup collisions in the ranking).
+              name: `${extraPits.length}-stop (${extraCompound})`,
+              description: `Pit ai giri ${extraPits.join(", ")} (${extraCompounds.join(" → ")})`,
+              pit_laps: extraPits,
+              compounds: extraCompounds,
+              estimated_delta_vs_actual: Math.round(extraDelta * 10) / 10,
+              time_delta_vs_actual: -Math.round(extraDelta * 10) / 10,
+              pros: ["Stint più corti = meno degrado", "Vantaggio se pit loss ridotto (SC)"],
+              cons: extraCons,
+            });
           }
+
         }
       }
     }
@@ -2986,7 +3093,7 @@ export function computeVirtualRaceEngineer(
   const recommendedUsesPractice = candidateUsesPractice(recommendedStrategy.compounds);
   if (recommendedUsesPractice) {
     confidenceFactors.push(
-      `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita, solo lo slope di degrado proviene dalle prove libere.`,
+      `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita; il confronto avviene su slope di regressione non corretti per l'effetto carburante (per omogeneità con il dato delle libere), quindi il degrado gomma reale è generalmente ≥ a quello stimato in questo spazio.`,
     );
     // Promotion path replaces cons with the promoted alternative's cons, which
     // already carry PRACTICE_ASSUMPTION_CON when the alt uses practice. Guard
