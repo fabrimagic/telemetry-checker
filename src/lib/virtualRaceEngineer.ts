@@ -1447,15 +1447,15 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[altCompounds.length - 1] = practiceCompound;
-        const altTime = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
-        if (altTime != null) {
+        const ev = evalCandidatePracticeSpace(actualPitLaps, altCompounds);
+        if (ev != null) {
           alternatives.push({
             name: `Stint finale su ${practiceCompound}`,
             description: `Ultimo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[actualCompounds.length - 1]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime) * 10) / 10,
-            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime) * 10) / 10,
+            estimated_delta_vs_actual: Math.round(ev.delta * 10) / 10,
+            time_delta_vs_actual: -Math.round(ev.delta * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Compound alternativo non usato in gara"],
             cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista differenti tra prove e gara"],
           });
@@ -1466,21 +1466,22 @@ export function computeVirtualRaceEngineer(
       if (actualCompounds.length >= 2) {
         const altCompounds = [...actualCompounds];
         altCompounds[0] = practiceCompound;
-        const altTime2 = simulateStrategyCost(actualPitLaps, altCompounds, buildInterceptOverride(altCompounds));
-        if (altTime2 != null) {
+        const ev2 = evalCandidatePracticeSpace(actualPitLaps, altCompounds);
+        if (ev2 != null) {
           alternatives.push({
             name: `Stint iniziale su ${practiceCompound}`,
             description: `Primo stint con ${practiceCompound} (dati da Practice) invece di ${actualCompounds[0]}`,
             pit_laps: actualPitLaps,
             compounds: altCompounds,
-            estimated_delta_vs_actual: Math.round((actualAdjustedTime - altTime2) * 10) / 10,
-            time_delta_vs_actual: -Math.round((actualAdjustedTime - altTime2) * 10) / 10,
+            estimated_delta_vs_actual: Math.round(ev2.delta * 10) / 10,
+            time_delta_vs_actual: -Math.round(ev2.delta * 10) / 10,
             pros: [`Degrado ${practiceCompound} stimato dalle prove libere`, "Scelta strategica diversa all'inizio"],
             cons: [PRACTICE_ASSUMPTION_CON, "Condizioni pista e carburante differenti"],
           });
         }
       }
     }
+
 
 
     // ── 4a-extra. N+1 stop strategy (SC makes extra stop cheaper) ──
