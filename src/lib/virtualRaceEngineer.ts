@@ -680,7 +680,34 @@ export function computeVirtualRaceEngineer(
   const driverCumDev: DriverCumulativeDeviation | null = cumDevResult?.drivers.find(d => d.driver_number === driverNumber) ?? null;
   // Battle context built early just for pace loss contamination check
   const earlyBattleCtx = diaryEvents ? buildBattleContext(diaryEvents) : null;
-  const paceLossResults = computeAllStintPaceLoss(driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap);
+
+  // ── 1c. Lapped-traffic detection & cost estimate ──
+  // Optional: only when the caller passes the full-session laps. When absent,
+  // `lappedTrafficResult` stays undefined and behavior is bit-identical to the
+  // pre-change baseline (no snapshot should move). INFORMATIONAL ONLY: the
+  // cost is NOT applied to any strategic score or counterfactual — the only
+  // strategic effect is excluding encounter laps from the pace-loss windows.
+  let lappedTrafficResult: LappedTrafficResult | undefined;
+  if (allSessionLaps && allSessionLaps.length > 0) {
+    try {
+      lappedTrafficResult = detectLappedTraffic({
+        allSessionLaps,
+        driverLaps: laps,
+        driverNumber,
+        stints,
+        raceControl,
+        weatherMap,
+        trackStatusMap,
+        battleContext: earlyBattleCtx,
+      });
+    } catch { /* best-effort — never break VRE */ }
+  }
+  const lappedEncounterLapsForPaceLoss = lappedTrafficResult?.encounter_lap_numbers ?? null;
+
+  const paceLossResults = computeAllStintPaceLoss(
+    driverCumDev, stints, earlyBattleCtx, weatherMap, trackStatusMap,
+    undefined, lappedEncounterLapsForPaceLoss,
+  );
   const plDegAdj = paceLossDegradationAdjustment(paceLossResults);
   const plCliffMult = paceLossCliffMultiplier(paceLossResults);
   const plPitShift = paceLossPitUrgencyShift(paceLossResults);
