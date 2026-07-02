@@ -225,7 +225,7 @@ export function CumulativeDeviationCard({ sessionKey, results, drivers, visibleD
           <p><strong className="text-foreground">Benchmark:</strong> tempo medio del vincitore calcolato con filtro strutturale: esclusi solo out lap e primo giro; inclusi in-lap, giri in regime di neutralizzazione (SC/VSC) e giri con tempi qualsiasi. Lo stesso filtro si applica a ogni pilota per garantire che il vincitore converga a zero.</p>
           <p><strong className="text-foreground">Delta giro:</strong> differenza tra il tempo sul giro del pilota e il benchmark del vincitore.</p>
           <p><strong className="text-foreground">Attenzione al risultato finale:</strong> il valore finale della curva non rappresenta il distacco al traguardo: out lap e primo giro sono esclusi dalla cumulata, mentre le perdite reali ai pit stop e in partenza si concentrano proprio lì. Di conseguenza un pilota può chiudere la curva in territorio negativo pur avendo concluso la gara dietro al vincitore, quando il suo passo sui giri validi è stato più veloce del passo medio del vincitore.</p>
-          <p><strong className="text-foreground">Nota:</strong> questa metrica è descrittiva e non rappresenta direttamente il degrado gomme. Giri con pit stop o out lap sono esclusi dal calcolo.</p>
+          <p><strong className="text-foreground">Nota:</strong> questa metrica è descrittiva e non rappresenta direttamente il degrado gomme. Sono esclusi solo gli out lap e il primo giro.</p>
         </CollapsibleContent>
       </Collapsible>
     </div>
