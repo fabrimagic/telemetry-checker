@@ -134,15 +134,48 @@ describe("Practice slope-only semantics", () => {
     expect(r!.confidence_factors.some(f => f.toLowerCase().includes("compound derivato dalle practice"))).toBe(false);
   });
 
-  it("quando la raccomandata seleziona un combo con compound practice, compare la riga nei confidence_factors e nei cons", () => {
-    // HARD practice con slope basso e passo attraente → potenzialmente promosso
-    // nella ricerca combo. Se non selezionato in una determinata configurazione,
-    // il test tollera l'assenza (non tutte le combo vincono in tutte le sim).
-    const r = run([{ compound: "HARD", slope: 0.05, intercept: 90, rSquared: 0.8, source: "Practice 1" }]);
+  // Fixture dedicata: il compound race MEDIUM del secondo stint ha uno slope
+  // di degrado catastrofico (0.30 s/lap), mentre HARD practice ha slope basso
+  // (0.05 s/lap) sopra il gate minimo. In questa configurazione la ricerca
+  // combo NON può che preferire HARD al posto di MEDIUM, quindi la raccomandata
+  // contiene HARD con certezza.
+  function buildLapsDegradedMedium(): Lap[] {
+    const laps: Lap[] = [];
+    for (let i = 1; i <= pitLap; i++) laps.push(buildLap(driver, i, 90 + (i - 1) * 0.05));
+    for (let i = pitLap + 1; i <= totalLaps; i++) {
+      laps.push(buildLap(driver, i, 90.5 + (i - (pitLap + 1)) * 0.30, { is_pit_out_lap: i === pitLap + 1 }));
+    }
+    return laps;
+  }
+  function runDegraded(practiceModels: PracticeCompoundModel[]) {
+    return computeVirtualRaceEngineer(
+      driver, "ANT", 9999, buildLapsDegradedMedium(), buildStints("SOFT_FIRST"), pits, weather,
+      [] as RaceControlMessage[], [] as IntervalData[], [] as PositionData[], [D],
+      practiceModels, "BALANCED", null, null, "REAL_CONTEXT", null, null, null, "RACE_ENGINEER",
+    );
+  }
+
+  it("quando la raccomandata seleziona un combo con compound practice, compare la riga nei confidence_factors e nei cons (asserzione incondizionata)", () => {
+    const r = runDegraded([{ compound: "HARD", slope: 0.05, intercept: 90, rSquared: 0.9, source: "Practice 1" }]);
     expect(r).not.toBeNull();
-    const recCompounds = r!.recommended_strategy.compounds;
-    if (recCompounds.includes("HARD")) {
-      expect(r!.confidence_factors.some(f => f.toLowerCase().includes("compound derivato dalle practice"))).toBe(true);
+    expect(r!.recommended_strategy.compounds).toContain("HARD");
+    expect(r!.confidence_factors.some(f => f.toLowerCase().includes("compound derivato dalle practice"))).toBe(true);
+    expect((r!.recommended_strategy.cons ?? []).some(c => c.toLowerCase().includes("passo base"))).toBe(true);
+  });
+
+  it("quando la raccomandata risulta PROMOSSA da un'alternativa con compound practice, il con sul passo base sopravvive nei cons finali", () => {
+    // Stessa fixture ad alto degrado: se il percorso finale è la promozione
+    // multi-criterio (reason inizia con "Promossa da scoring multi-criterio"),
+    // i cons vengono sostituiti da quelli dell'alternativa promossa. Il guard
+    // post-promozione deve comunque garantire la presenza del con.
+    const r = runDegraded([{ compound: "HARD", slope: 0.05, intercept: 90, rSquared: 0.9, source: "Practice 1" }]);
+    expect(r).not.toBeNull();
+    // Invariante: se HARD (practice) finisce nei compound raccomandati — sia
+    // per selezione diretta in combo sia per promozione — il con è presente.
+    expect(r!.recommended_strategy.compounds).toContain("HARD");
+    expect((r!.recommended_strategy.cons ?? []).some(c => c.toLowerCase().includes("passo base"))).toBe(true);
+    // Verifica esplicita del ramo di promozione quando avviene.
+    if ((r!.recommended_strategy.reason ?? "").toLowerCase().includes("promossa")) {
       expect((r!.recommended_strategy.cons ?? []).some(c => c.toLowerCase().includes("passo base"))).toBe(true);
     }
   });

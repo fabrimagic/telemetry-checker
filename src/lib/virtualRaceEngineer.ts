@@ -1259,10 +1259,10 @@ export function computeVirtualRaceEngineer(
     recommendedStrategy.delta_clamped = true;
     recommendedStrategy.raw_gain_seconds = Math.round(recommendedInitialClampRaw * 10) / 10;
   }
-  const recommendedUsesPractice = candidateUsesPractice(bestCompounds);
-  if (recommendedUsesPractice) {
-    recommendedStrategy.cons = [...(recommendedStrategy.cons ?? []), PRACTICE_ASSUMPTION_CON];
-  }
+  // NOTE: PRACTICE_ASSUMPTION_CON is added later, in the enrichment block that
+  // assigns `recommendedStrategy.cons = recCons`, and re-evaluated again AFTER
+  // the multi-criteria promotion, since a promotion overwrites both compounds
+  // and cons. See the two dedicated hooks below.
 
   // ── 4. Alternative strategies ──
   const alternatives: AlternativeStrategy[] = [];
@@ -1969,6 +1969,9 @@ export function computeVirtualRaceEngineer(
 
     recommendedStrategy.pros = recPros;
     recommendedStrategy.cons = recCons;
+    if (candidateUsesPractice(bestCompounds)) {
+      recommendedStrategy.cons.push(PRACTICE_ASSUMPTION_CON);
+    }
     if (recommendedStrategy.delta_clamped) {
       const _cap = pitLoss * 2.5;
       recommendedStrategy.cons.push(
@@ -2977,10 +2980,21 @@ export function computeVirtualRaceEngineer(
     narrativeInsights.push(`⚠️ ${msg}`);
   }
 
+  // Re-evaluate practice usage on the FINAL compounds (may have been overwritten
+  // by a multi-criteria promotion). This drives both the confidence factor line
+  // and the guarantee that PRACTICE_ASSUMPTION_CON survives in cons.
+  const recommendedUsesPractice = candidateUsesPractice(recommendedStrategy.compounds);
   if (recommendedUsesPractice) {
     confidenceFactors.push(
       `ℹ️ Strategia raccomandata usa un compound derivato dalle Practice: passo base assunto pari alla mescola sostituita, solo lo slope di degrado proviene dalle prove libere.`,
     );
+    // Promotion path replaces cons with the promoted alternative's cons, which
+    // already carry PRACTICE_ASSUMPTION_CON when the alt uses practice. Guard
+    // idempotently to also cover any code path that bypasses the enrichment.
+    const cons = recommendedStrategy.cons ?? (recommendedStrategy.cons = []);
+    if (!cons.includes(PRACTICE_ASSUMPTION_CON)) {
+      cons.push(PRACTICE_ASSUMPTION_CON);
+    }
   }
 
 
