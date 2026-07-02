@@ -1127,10 +1127,11 @@ export function computeVirtualRaceEngineer(
   // compounds → nessun override. Ritorna undefined quando nessun compound
   // candidato e' practice, mantenendo bit-identico il percorso race-only.
   const PRACTICE_ASSUMPTION_CON =
-    "Passo base della mescola practice assunto pari alla mescola sostituita: mancano dati di passo gara per questo compound, il delta riflette solo la differenza di degrado stimata dalle prove libere.";
+    "Passo base della mescola practice assunto pari alla mescola sostituita; confronto effettuato su slope di regressione non corretti per l'effetto carburante, per omogeneità con il dato delle libere. Il degrado gomma reale è generalmente ≥ a quello stimato in questo spazio.";
   const buildInterceptOverride = (
     candidateCompounds: string[],
     splitCompound?: string,
+    anchorModels: Map<string, { intercept: number }> = compoundModels,
   ): (number | null)[] | undefined => {
     let hasPractice = false;
     const out: (number | null)[] = candidateCompounds.map((c, i) => {
@@ -1139,13 +1140,14 @@ export function computeVirtualRaceEngineer(
       hasPractice = true;
       const anchorCompound = i < actualCompounds.length ? actualCompounds[i] : splitCompound;
       if (!anchorCompound) return null;
-      const raceModel = compoundModels.get(anchorCompound);
-      if (!raceModel || raceModel.source !== "race") return null;
-      return raceModel.intercept;
+      const anchor = anchorModels.get(anchorCompound);
+      if (!anchor) return null;
+      return anchor.intercept;
     });
     return hasPractice ? out : undefined;
   };
   const candidateUsesPractice = (candidateCompounds: string[]): boolean =>
+
     candidateCompounds.some(c => {
       const m = compoundModels.get(c);
       return !!m && m.source !== "race";
