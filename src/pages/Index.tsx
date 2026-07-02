@@ -811,6 +811,8 @@ export default function Index() {
         args.weather, args.raceControl,
         args.intervals, args.positions, args.allDrivers, args.practiceModels, rm,
         args.diaryEvents, args.cumDevResult, sc, sl, sd, cd, am,
+        undefined, undefined,
+        args.allSessionLaps && args.allSessionLaps.length ? args.allSessionLaps : undefined,
       );
       setVreResult(newVre);
     } catch (e) {
