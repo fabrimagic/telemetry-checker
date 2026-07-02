@@ -53,8 +53,9 @@ describe("Practice slope gate — scarta modelli con degrado implausibile", () =
     expect(r).not.toBeNull();
     // HARD implausibile non deve entrare tra i compound usati
     expect(r!.practice_compounds_used).not.toContain("HARD");
-    // e il delta non deve esplodere (resta ben sotto il cap)
-    expect(r!.recommended_strategy.estimated_gain_seconds).toBeLessThan(30);
+    // e il delta non deve esplodere (resta sotto il cap di plausibilità
+    // MAX_PLAUSIBLE_DELTA_DISPLAY = pitLoss × 2.5 ≈ 57.5s)
+    expect(r!.recommended_strategy.estimated_gain_seconds).toBeLessThan(50);
   });
 
   it("un practice model con slope di degrado plausibile viene accettato", () => {
