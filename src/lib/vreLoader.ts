@@ -260,12 +260,14 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     // (head-to-head loads two drivers in parallel; fetching session-scoped data twice
     //  doubles 429 risk and can produce asymmetric "non disponibile" gaps).
     let cumDev: CumulativeDeviationResult | null = precomputedCumDev ?? null;
+    let sessionAllLapsCache: Lap[] | null = precomputedAllLaps ?? null;
     if (cumDev == null) {
       try {
         const [sessionAllLaps, sessionResults] = await Promise.all([
-          getAllLaps(sessionKey),
+          sessionAllLapsCache ? Promise.resolve(sessionAllLapsCache) : getAllLaps(sessionKey),
           getSessionResult(sessionKey),
         ]);
+        sessionAllLapsCache = sessionAllLaps;
         if (sessionAllLaps.length && sessionResults.length) {
           cumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
         }
