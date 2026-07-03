@@ -366,12 +366,32 @@ export function QualifyingOverviewDashboard({
     [allDrivers, driver.driver_number],
   );
 
+  // Best opponent = driver (other than self) with the fastest valid lap in the session,
+  // using the same validity definition as bestLapOf/isValidLap above.
+  // Mirrors the default reference selection used by TelemetryCompareCard in race sessions.
+  const bestOpponentDriverNum = useMemo<number | null>(() => {
+    let best: { num: number; t: number } | null = null;
+    for (const d of otherDrivers) {
+      const dl = sessionAllLaps.filter((l) => l.driver_number === d.driver_number);
+      const bl = bestLapOf(dl);
+      if (bl && typeof bl.lap_duration === "number") {
+        if (!best || (bl.lap_duration as number) < best.t) {
+          best = { num: d.driver_number, t: bl.lap_duration as number };
+        }
+      }
+    }
+    return best?.num ?? null;
+  }, [otherDrivers, sessionAllLaps]);
+
   const [compareMode, setCompareMode] = useState<"pole" | "other">(
     isSelectedPole ? "other" : "pole",
   );
   const [otherDriverNum, setOtherDriverNum] = useState<number | null>(() => {
-    // default: pole if available and not self, else first other driver
+    // If the selected driver is the poleman (or pole is unknown), default to the best
+    // opponent by fastest valid lap — not the first entry in arbitrary API order.
+    // Otherwise default to the pole; fall back to the first other driver if nothing else.
     if (pole && pole.driver_number !== driver.driver_number) return pole.driver_number;
+    if (bestOpponentDriverNum != null) return bestOpponentDriverNum;
     return otherDrivers[0]?.driver_number ?? null;
   });
 
