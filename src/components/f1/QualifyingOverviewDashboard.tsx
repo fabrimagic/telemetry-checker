@@ -1054,8 +1054,21 @@ export function QualifyingOverviewDashboard({
                     />
                     <span className="font-mono">{referenceDriver.name_acronym}</span>
                     <span>
-                      ({compareMode === "pole" ? "pole" : "riferimento"})
+                      ({compareMode === "pole"
+                        ? "pole"
+                        : isSelectedPole
+                        ? "miglior avversario"
+                        : "riferimento"})
                     </span>
+                  </span>
+                </div>
+              )}
+              {isSelectedPole && compareMode === "other" && (
+                <div className="text-[10px] text-muted-foreground leading-snug flex gap-1.5 basis-full">
+                  <Info className="h-3 w-3 flex-shrink-0 mt-px" />
+                  <span>
+                    Il pilota selezionato detiene il miglior giro della sessione: il confronto proposto è quindi con
+                    il miglior tempo degli avversari. Puoi cambiare il riferimento dal selettore nella sezione di confronto.
                   </span>
                 </div>
               )}
