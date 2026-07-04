@@ -571,4 +571,34 @@ describe("computeSoftSensorsTimeline — observed warmup from lap-time residuals
     const cleanLap = tl.by_lap.find(l => l.tyre_thermal.reasons.some(r => /Warmup da modello/i.test(r)));
     expect(cleanLap).toBeDefined();
   });
+
+  it("warmup prolungato robusto a contaminazione della finestra ancorata al modello (HARD, residui alti fino a tyreAge=7)", () => {
+    // Profilo esatto richiesto: [3.0,3.0,2.8,2.6,2.4,2.2,2.0,1.8,0,0,...]
+    // Con il criterio precedente (baseline ancorata a tyreAge∈[4,9]) la baseline
+    // includeva i giri lenti 4..7 e i residui scendevano sotto soglia troppo
+    // presto; con la nuova baseline (mediana dei 4 puliti più veloci in [0, 12])
+    // il completamento osservato è ≥7 e la contraddizione scatta.
+    const stint1: StintAnalysis = {
+      stint_number: 1, compound: "MEDIUM", lap_start: 1, lap_end: 15, laps_count: 15,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const stint2: StintAnalysis = {
+      stint_number: 2, compound: "HARD", lap_start: 16, lap_end: 40, laps_count: 25,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const laps: Lap[] = [];
+    for (let l = 1; l <= 15; l++) laps.push(buildLapObj(l, 92));
+    const base = 90;
+    const residuals = [3.0, 3.0, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 25; i++) laps.push(buildLapObj(16 + i, base + residuals[i]));
+    const { weatherMap, trackStatusMap } = greenMaps(40);
+
+    const tl = computeSoftSensorsTimeline([stint1, stint2], [], [], [], null, weatherMap, trackStatusMap, 40, laps);
+    const observed = tl.summary.observed_warmup_completion_by_stint?.get(2);
+    expect(observed).not.toBeNull();
+    expect(observed!).toBeGreaterThanOrEqual(7);
+
+    const interp = computeWarmupInterpretation(tl, [stint1, stint2]);
+    expect(interp.warmup_anomalies.some(a => a.stint_number === 2 && a.type === "SLOWER_THAN_EXPECTED")).toBe(true);
+  });
 });
