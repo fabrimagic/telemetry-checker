@@ -2629,13 +2629,13 @@ export function computeVirtualRaceEngineer(
   const degradationValidationContext = computeDegradationValidationContext(softSensorsTimeline, stintAnalyses, degradationValidations, paceLossResults, weatherMap, trackStatusMap);
 
   // Soft sensor refinement adjustments
-  const recSSAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline);
+  const recSSAdj = computeStrategySoftSensorAdjustment(bestPitLaps, bestCompounds, totalLaps, softSensorsTimeline, stintAnalyses);
   recommendedStrategy.soft_sensor_adjustment = recSSAdj;
   if (recSSAdj.total_soft_sensor_adjustment !== 0) {
     recommendedStrategy.soft_sensor_notes = recSSAdj.adjustment_reasons;
   }
   for (const alt of alternatives) {
-    const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline);
+    const altAdj = computeStrategySoftSensorAdjustment(alt.pit_laps, alt.compounds, totalLaps, softSensorsTimeline, stintAnalyses);
     alt.soft_sensor_adjustment = altAdj;
     if (altAdj.total_soft_sensor_adjustment !== 0) {
       alt.soft_sensor_notes = altAdj.adjustment_reasons;

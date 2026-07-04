@@ -209,3 +209,132 @@ describe("computeDegradationValidationContext — support/contradiction from sou
     expect(stintCtx.contradiction_signals.length).toBeGreaterThan(0);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * computeStrategySoftSensorAdjustment — refinement corrections
+ * ══════════════════════════════════════════════════════════════════ */
+
+import { computeStrategySoftSensorAdjustment } from "../softSensors";
+
+function makeState(
+  lap: number,
+  stintNumber: number,
+  thermalLabel: SoftSensorsLapState["tyre_thermal"]["label"],
+  stressLabel: SoftSensorsLapState["tyre_stress"]["label"],
+  gripLabel: SoftSensorsLapState["track_grip"]["label"] = "STABLE",
+  overall: SoftSensorConfidence = "HIGH",
+): SoftSensorsLapState {
+  return {
+    lap_number: lap,
+    stint_number: stintNumber,
+    tyre_thermal: { label: thermalLabel, score: 0.5, confidence: overall, reasons: [] },
+    tyre_stress: { label: stressLabel, score: 0.5, confidence: overall, reasons: [] },
+    track_grip: { label: gripLabel, score: 0.5, confidence: overall, reasons: [] },
+    overall_confidence: overall,
+    reliability_notes: [],
+  };
+}
+
+function makeStint(n: number, compound: string, lap_start: number, lap_end: number): StintAnalysis {
+  return {
+    stint_number: n,
+    compound,
+    lap_start,
+    lap_end,
+    laps_count: lap_end - lap_start + 1,
+    tyre_age_at_start: 0,
+    avg_lap_time: null,
+    degradation_slope: null,
+    r_squared: null,
+    excluded_laps: 0,
+  };
+}
+
+function makeTimeline(states: SoftSensorsLapState[]): SoftSensorsTimeline {
+  return {
+    by_lap: states,
+    summary: {
+      latest_state: states[states.length - 1] ?? null,
+      first_high_stress_lap: null,
+      first_critical_stress_lap: null,
+      warmup_laps_by_stint: new Map(),
+      grip_transitions: [],
+      overall_confidence: "HIGH",
+      reliability_notes: [],
+    },
+  };
+}
+
+describe("computeStrategySoftSensorAdjustment — grip removed from scoring", () => {
+  it("grip_adjustment_total is always 0 and total excludes grip regardless of observed grip labels", () => {
+    // Every observed lap is LOW_GRIP HIGH-confidence: previous impl would push grip up.
+    const states: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 30; l++) {
+      states.push(makeState(l, l <= 15 ? 1 : 2, "IN_WINDOW", "LOW", "LOW_GRIP"));
+    }
+    const timeline = makeTimeline(states);
+    const stints = [makeStint(1, "SOFT", 1, 15), makeStint(2, "HARD", 16, 30)];
+    const adj = computeStrategySoftSensorAdjustment([15], ["SOFT", "HARD"], 30, timeline, stints);
+    expect(adj.grip_adjustment_total).toBe(0);
+    expect(adj.total_soft_sensor_adjustment).toBe(adj.thermal_adjustment_total + adj.stress_adjustment_total);
+    expect(adj.adjustment_reasons.some(r => /grip/i.test(r))).toBe(false);
+  });
+});
+
+describe("computeStrategySoftSensorAdjustment — mapping by tyre life, not absolute lap", () => {
+  it("does not penalize a simulated old-tyre lap using warmup observed at real pit lap", () => {
+    // Real race: stint 1 SOFT laps 1-10, stint 2 HARD laps 11-30. Real warmup on HARD at laps 11-13.
+    const states: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 10; l++) states.push(makeState(l, 1, l <= 3 ? "WARMING_UP" : "IN_WINDOW", "LOW"));
+    for (let l = 11; l <= 30; l++) {
+      const tyreLife = l - 11;
+      states.push(makeState(l, 2, tyreLife < 3 ? "WARMING_UP" : "IN_WINDOW", "LOW"));
+    }
+    const timeline = makeTimeline(states);
+    const realStints = [makeStint(1, "SOFT", 1, 10), makeStint(2, "HARD", 11, 30)];
+    // Simulated strategy: SOFT 1-20, HARD 21-30. At absolute laps 11-13 the sim
+    // tyre is SOFT with tyreLife 10-12 (old). Prior impl would transplant the
+    // WARMING_UP from lap 11 (real HARD tyreLife=0) onto old SOFT → false penalty.
+    const adj = computeStrategySoftSensorAdjustment([20], ["SOFT", "HARD"], 30, timeline, realStints);
+    // Simulated stint 2 (HARD 21-30) has tyreLife 0..9. Real HARD warmup at
+    // tyreLife 0-2 is available and maps correctly, but only for tyreLife<simLapsAffected
+    // triggers no adj (WARMING_UP within model). So thermal must be 0.
+    expect(adj.thermal_adjustment_total).toBe(0);
+  });
+
+  it("does emit thermal adjustment when observed WARMING_UP persists beyond model at correct compound+tyre life", () => {
+    // Real race: MEDIUM stint at laps 1-20 with WARMING_UP persisting to tyreLife=4 (beyond model=3)
+    const states: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 20; l++) {
+      const tyreLife = l - 1;
+      // Extended warmup: WARMING_UP for tyreLife 0..4
+      states.push(makeState(l, 1, tyreLife <= 4 ? "WARMING_UP" : "IN_WINDOW", "LOW"));
+    }
+    // Pad with dummy hard for laps 21-30
+    for (let l = 21; l <= 30; l++) states.push(makeState(l, 2, "IN_WINDOW", "LOW"));
+    const timeline = makeTimeline(states);
+    const realStints = [makeStint(1, "MEDIUM", 1, 20), makeStint(2, "HARD", 21, 30)];
+    // Simulated strategy: HARD 1-10, MEDIUM 11-30. Second stint MEDIUM tyreLife 0..4
+    // maps to real MEDIUM tyreLife 0..4 (WARMING_UP). At tyreLife>=model(3)
+    // still WARMING_UP → +0.08 penalty per lap for tyreLife=3,4 → thermal>0.
+    const adj = computeStrategySoftSensorAdjustment([10], ["HARD", "MEDIUM"], 30, timeline, realStints);
+    expect(adj.thermal_adjustment_total).toBeGreaterThan(0);
+    expect(adj.adjustment_reasons.some(r => /vita gomma/i.test(r))).toBe(true);
+  });
+
+  it("skips simulated laps entirely when compound was never observed in the real race, without error", () => {
+    // Real race: only SOFT and HARD observed.
+    const states: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 15; l++) states.push(makeState(l, 1, "IN_WINDOW", "LOW"));
+    for (let l = 16; l <= 30; l++) states.push(makeState(l, 2, "IN_WINDOW", "LOW"));
+    const timeline = makeTimeline(states);
+    const realStints = [makeStint(1, "SOFT", 1, 15), makeStint(2, "HARD", 16, 30)];
+    // Simulated uses INTERMEDIATE — never observed.
+    const adj = computeStrategySoftSensorAdjustment([15], ["INTERMEDIATE", "INTERMEDIATE"], 30, timeline, realStints);
+    expect(adj.thermal_adjustment_total).toBe(0);
+    expect(adj.stress_adjustment_total).toBe(0);
+    expect(adj.total_soft_sensor_adjustment).toBe(0);
+    // All 30 laps unmatched (>50%) → LOW confidence
+    expect(adj.confidence).toBe("HIGH"); // total<0.05 forces HIGH per rule
+  });
+});
