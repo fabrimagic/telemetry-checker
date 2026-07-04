@@ -415,14 +415,25 @@ export function estimateTyreStressState(
   const sources: string[] = ["tyre_age", "stint_length"];
   let confidence = "HIGH" as SoftSensorConfidence;
 
-  let stressScore = 0;
+  // Separazione in due accumulatori per rompere la circolarità con la
+  // validazione del degrado. La somma osservazionale + derivato coincide con
+  // lo stressScore che il sensore già produceva, così label, soglie e
+  // confidence restano bit-identiche.
+  //  - observational: segnali indipendenti dal fit (età gomma/stint, battaglia,
+  //    restart, meteo misto). Sono l'unica componente utilizzabile a valle
+  //    come corroborazione della validazione del degrado.
+  //  - derived: contributi provenienti dalla effective_slope della validazione
+  //    e dallo stato del pace loss. Non possono corroborare la validazione da
+  //    cui provengono, pena doppio conteggio della stessa fonte.
+  let observationalRaw = 0;
+  let derivedRaw = 0;
 
   const ageRatio = stintLength > 0 ? tyreAge / stintLength : 0;
   if (ageRatio > 0.8) {
-    stressScore += 0.3;
+    observationalRaw += 0.3;
     reasons.push(`Gomma a ${Math.round(ageRatio * 100)}% della lunghezza stint`);
   } else if (ageRatio > 0.5) {
-    stressScore += 0.15;
+    observationalRaw += 0.15;
   }
 
   if (degradationValidation) {
@@ -433,10 +444,10 @@ export function estimateTyreStressState(
     } else if (degradationValidation.status === "VALID") {
       const slope = degradationValidation.effective_slope;
       if (slope > 0.12) {
-        stressScore += 0.3;
+        derivedRaw += 0.3;
         reasons.push(`Degrado elevato (${slope.toFixed(3)} s/giro)`);
       } else if (slope > 0.06) {
-        stressScore += 0.15;
+        derivedRaw += 0.15;
         reasons.push(`Degrado moderato (${slope.toFixed(3)} s/giro)`);
       }
     }
@@ -447,10 +458,10 @@ export function estimateTyreStressState(
   if (paceLossResult) {
     sources.push("pace_loss");
     if (paceLossResult.pace_loss_status === "CLIFF_RISK") {
-      stressScore += 0.35;
+      derivedRaw += 0.35;
       reasons.push("Rischio cliff rilevato dal pace loss");
     } else if (paceLossResult.pace_loss_status === "HIGH_LOSS") {
-      stressScore += 0.2;
+      derivedRaw += 0.2;
       reasons.push("Perdita di passo elevata");
     } else if (paceLossResult.pace_loss_status === "UNRELIABLE") {
       contaminated.push("pace loss inaffidabile");
@@ -459,14 +470,14 @@ export function estimateTyreStressState(
   }
 
   if (battleContext && battleContext.battle_laps.has(currentLap)) {
-    stressScore += 0.1;
+    observationalRaw += 0.1;
     reasons.push("Battaglia attiva: stress addizionale da guida aggressiva");
     sources.push("battle_context");
   }
 
   const currentWeather = weatherMap.get(currentLap);
   if (currentWeather === "MIXED") {
-    stressScore += 0.1;
+    observationalRaw += 0.1;
     reasons.push("Meteo misto: stress termico da variazione aderenza");
     sources.push("weather");
     if (confidence === "HIGH") confidence = "MEDIUM";
@@ -482,12 +493,21 @@ export function estimateTyreStressState(
     }
   }
   if (justRestarted) {
-    stressScore += 0.1;
+    observationalRaw += 0.1;
     reasons.push("Restart recente: stress da riscaldamento rapido");
     sources.push("track_status");
   }
 
-  stressScore = Math.min(1, Math.max(0, stressScore));
+  const totalRaw = observationalRaw + derivedRaw;
+  let stressScore = Math.min(1, Math.max(0, totalRaw));
+
+  // Ripartizione delle quote esposte come sotto-punteggi: se il clamp riduce
+  // il totale, riscaliamo proporzionalmente osservazionale e derivato in modo
+  // che observational_score + derived_score === stressScore esattamente
+  // (prima dell'arrotondamento per esposizione).
+  const scale = totalRaw > 0 ? stressScore / totalRaw : 0;
+  const observationalScoreExact = observationalRaw * scale;
+  const derivedScoreExact = derivedRaw * scale;
 
   let label: TyreStressLabel;
   if (contaminated.length >= 2 || (confidence === "LOW" && stressScore < 0.3)) {
@@ -509,13 +529,22 @@ export function estimateTyreStressState(
     label = "LOW";
   }
 
+  // Arrotondamento delle quote garantendo comunque la coerenza numerica con
+  // score: derived_score = score - observational_score arrotondati, così il
+  // test di equivalenza somma == score è sempre soddisfatto.
+  const scoreRounded = stressScore > 0 ? Math.round(stressScore * 100) / 100 : 0;
+  const observationalRounded = Math.round(observationalScoreExact * 100) / 100;
+  const derivedRounded = Math.round((scoreRounded - observationalRounded) * 100) / 100;
+
   return {
     label,
-    score: stressScore > 0 ? Math.round(stressScore * 100) / 100 : null,
+    score: stressScore > 0 ? scoreRounded : null,
     confidence,
     reasons: reasons.length > 0 ? reasons : ["Nessun segnale di stress rilevato"],
     contaminated_by: contaminated.length > 0 ? contaminated : undefined,
     source_signals: sources,
+    observational_score: observationalRounded,
+    derived_score: derivedRounded,
   };
 }
 
