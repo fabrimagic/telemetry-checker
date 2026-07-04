@@ -290,6 +290,27 @@ export function estimateTyreThermalState(
   trackStatusMap: Map<number, TrackStatus>,
   battleContext: BattleContext | null,
 ): TyreThermalSensor {
+export function estimateTyreThermalState(
+  currentStint: StintAnalysis | null,
+  currentLap: number,
+  pitStops: PitStopAnalysis[],
+  weatherMap: Map<number, WeatherCondition>,
+  trackStatusMap: Map<number, TrackStatus>,
+  battleContext: BattleContext | null,
+  /**
+   * Completamento warmup osservato per questo stint dai residui dei tempi:
+   *   - `undefined`  → non valutato (giri del pilota non forniti): comportamento
+   *                    puramente da modello, identico al pre-refactor.
+   *   - `null`       → valutato ma non disponibile (fixture insufficienti):
+   *                    fallback al modello con confidence degradata a MEDIUM
+   *                    e reason "warmup da modello, non osservato".
+   *   - `number`     → soglia osservata di tyreAge da cui lo stint è considerato
+   *                    in finestra termica; sostituisce laps_affected del modello
+   *                    per il confronto di warmup, lasciando invariati i rami
+   *                    contestuali (restart, battaglia lunga, contaminazioni).
+   */
+  observedWarmupCompletion?: number | null,
+): TyreThermalSensor {
   if (!currentStint) {
     return { label: "UNKNOWN", score: null, confidence: "LOW", reasons: ["Nessuno stint attivo disponibile"] };
   }
@@ -303,7 +324,15 @@ export function estimateTyreThermalState(
   let confidence = "HIGH" as SoftSensorConfidence;
 
   const lapsAffected = warmupConfig?.laps_affected ?? 3;
-  const isInWarmup = tyreAge < lapsAffected;
+
+  // Soglia di warmup: osservata quando disponibile, altrimenti modello.
+  const hasObserved = typeof observedWarmupCompletion === "number";
+  const effectiveWarmupLaps = hasObserved ? (observedWarmupCompletion as number) : lapsAffected;
+  const warmupSource: "observed" | "model" = hasObserved ? "observed" : "model";
+  if (hasObserved) sources.push("observed_warmup");
+  const isInWarmup = tyreAge < effectiveWarmupLaps;
+  // Fallback dichiarato: giri forniti ma osservazione non calcolabile.
+  const isModelFallback = observedWarmupCompletion === null;
 
   const currentWeather = weatherMap.get(currentLap);
   if (currentWeather === "WET" || currentWeather === "MIXED") {
@@ -353,8 +382,10 @@ export function estimateTyreThermalState(
       }
     } else {
       label = "WARMING_UP";
-      score = 0.2 + (tyreAge / lapsAffected) * 0.4;
-      reasons.push(`Giro ${tyreAge + 1} di ${lapsAffected} previsti per il riscaldamento (${compound})`);
+      const denom = Math.max(1, effectiveWarmupLaps);
+      score = 0.2 + Math.min(1, tyreAge / denom) * 0.4;
+      const src = hasObserved ? "osservato" : "previsto";
+      reasons.push(`Giro ${tyreAge + 1} di ${effectiveWarmupLaps} ${src} per il riscaldamento (${compound})`);
     }
     if (inBattle) {
       // La battaglia disturba la lettura ma non cancella il fatto fisico del
@@ -378,10 +409,11 @@ export function estimateTyreThermalState(
     score = 0.85;
     reasons.push("Battaglia attiva con gomme ad alta età: probabile stress termico elevato");
     confidence = "MEDIUM";
-  } else if (tyreAge >= lapsAffected) {
+  } else if (tyreAge >= effectiveWarmupLaps) {
     label = "IN_WINDOW";
     score = 0.65;
-    reasons.push(`Gomme ${compound} a regime dopo ${lapsAffected} giri di riscaldamento`);
+    const src = hasObserved ? "osservati" : "previsti";
+    reasons.push(`Gomme ${compound} a regime dopo ${effectiveWarmupLaps} giri ${src} di riscaldamento`);
     if (currentWeather === "WET" || currentWeather === "MIXED") {
       confidence = "LOW";
     }
@@ -391,6 +423,11 @@ export function estimateTyreThermalState(
     confidence = "LOW";
   }
 
+  if (isModelFallback) {
+    reasons.push("Warmup da modello, non osservato (giri puliti insufficienti per la stima)");
+    if (confidence === "HIGH") confidence = "MEDIUM";
+  }
+
   return {
     label,
     score,
@@ -398,6 +435,10 @@ export function estimateTyreThermalState(
     reasons,
     contaminated_by: contaminated.length > 0 ? contaminated : undefined,
     source_signals: sources,
+    observed_warmup_completion: hasObserved
+      ? (observedWarmupCompletion as number)
+      : (observedWarmupCompletion === null ? null : undefined),
+    warmup_source: warmupSource,
   };
 }
 
