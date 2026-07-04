@@ -689,6 +689,26 @@ function findStintForLap(stints: StintAnalysis[], lap: number): StintAnalysis | 
   return stints.find(s => lap >= s.lap_start && lap <= s.lap_end) ?? null;
 }
 
+/**
+ * Confidence complessiva della timeline: aggregato distributivo su TUTTI i
+ * giri (non solo l'ultimo, che rendeva il gate dipendente da un singolo giro
+ * e bloccava lo scoring per gare finite sotto SC o con pioggia finale).
+ * Soglie:
+ *  - LOW    se > 40% dei giri ha overall_confidence LOW
+ *  - MEDIUM se > 30% dei giri ha confidence diversa da HIGH
+ *  - HIGH   altrimenti
+ * Timeline vuota → LOW.
+ */
+export function aggregateTimelineConfidence(byLap: SoftSensorsLapState[]): SoftSensorConfidence {
+  const total = byLap.length;
+  if (total === 0) return "LOW";
+  const lowCount = byLap.filter(l => l.overall_confidence === "LOW").length;
+  const nonHighCount = byLap.filter(l => l.overall_confidence !== "HIGH").length;
+  if (lowCount / total > 0.4) return "LOW";
+  if (nonHighCount / total > 0.3) return "MEDIUM";
+  return "HIGH";
+}
+
 export function computeSoftSensorsTimeline(
   stints: StintAnalysis[],
   pitStops: PitStopAnalysis[],
