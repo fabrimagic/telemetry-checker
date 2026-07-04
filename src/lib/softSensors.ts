@@ -1376,11 +1376,16 @@ export function computeStrategySoftSensorAdjustment(
   compounds: string[],
   totalLaps: number,
   timeline: SoftSensorsTimeline,
+  realStints: StintAnalysis[] = [],
 ): StrategySoftSensorAdjustment {
   if (timeline.by_lap.length === 0) {
     return {
       thermal_adjustment_total: 0,
       stress_adjustment_total: 0,
+      // Il grip è per costruzione invariante rispetto alla strategia comparata
+      // (si applica agli stessi giri assoluti per ogni strategia) e appartiene
+      // al contesto narrativo, non allo scoring comparativo. Manteniamo il
+      // campo nell'interfaccia per compatibilità ma vale sempre 0.
       grip_adjustment_total: 0,
       total_soft_sensor_adjustment: 0,
       adjustment_reasons: ["Timeline non disponibile"],
@@ -1397,11 +1402,35 @@ export function computeStrategySoftSensorAdjustment(
   }
   stintBounds.push({ start: cursor, end: totalLaps, compound: compounds[compounds.length - 1] || compounds[0], isFirst: pitLaps.length === 0 });
 
+  // Build index of observed sensor states keyed by (compound, tyre life).
+  // In caso di più stint reali sullo stesso compound, si preferisce quello più
+  // lungo (più giri = più copertura di vite gomma osservate).
+  const observedIndex = new Map<string, Map<number, SoftSensorsLapState>>();
+  const chosenStintLen = new Map<string, number>();
+  for (const rs of realStints) {
+    const cKey = (rs.compound ?? "").toUpperCase();
+    if (!cKey) continue;
+    const stintLen = rs.lap_end - rs.lap_start + 1;
+    const prev = chosenStintLen.get(cKey) ?? -1;
+    if (stintLen <= prev) continue;
+    chosenStintLen.set(cKey, stintLen);
+    const inner = new Map<number, SoftSensorsLapState>();
+    for (let lap = rs.lap_start; lap <= rs.lap_end; lap++) {
+      const idx = lap - 1;
+      if (idx < 0 || idx >= timeline.by_lap.length) continue;
+      const state = timeline.by_lap[idx];
+      if (!state) continue;
+      const tyreLife = lap - rs.lap_start;
+      inner.set(tyreLife, state);
+    }
+    observedIndex.set(cKey, inner);
+  }
+
   let thermalTotal = 0;
   let stressTotal = 0;
-  let gripTotal = 0;
   const reasons: string[] = [];
   let lowConfCount = 0;
+  let unmatchedCount = 0;
   let totalLapCount = 0;
 
   for (const sb of stintBounds) {
@@ -1409,12 +1438,19 @@ export function computeStrategySoftSensorAdjustment(
       const tyreLife = lap - sb.start;
       totalLapCount++;
 
-      // Get observed sensor state for this lap (use timeline if available)
-      const observed = lap <= timeline.by_lap.length ? timeline.by_lap[lap - 1] : null;
-      if (!observed) continue;
+      // Lookup observed sensor state by (simulated compound, simulated tyre life).
+      // Se non esiste alcun giro reale con lo stesso compound e la stessa vita
+      // gomma, si salta l'aggiustamento senza inventare nulla e si conta il giro
+      // come non affidabile ai fini del rapporto di confidence.
+      const cKey = (sb.compound ?? "").toUpperCase();
+      const observed = observedIndex.get(cKey)?.get(tyreLife) ?? null;
+      if (!observed) {
+        unmatchedCount++;
+        continue;
+      }
       if (observed.overall_confidence === "LOW") {
         lowConfCount++;
-        continue; // Skip low confidence laps
+        continue;
       }
 
       // 1. Thermal refinement — modulate warmup, not duplicate it
@@ -1422,18 +1458,14 @@ export function computeStrategySoftSensorAdjustment(
         const thermalLabel = observed.tyre_thermal.label;
         let thermalAdj = 0;
 
-        // We simulate using the strategy's compound, not the observed one
         const warmupConfig = TYRE_WARMUP_CONFIG[(sb.compound ?? "").toUpperCase()];
         const simLapsAffected = warmupConfig?.laps_affected ?? 3;
 
         if (thermalLabel === "COLD" && tyreLife < simLapsAffected) {
-          // COLD observed but warmup model already penalizes → small extra for mismatch
           thermalAdj = 0.05;
         } else if (thermalLabel === "WARMING_UP" && tyreLife >= simLapsAffected) {
-          // Still warming up beyond model prediction → slight extra penalty
           thermalAdj = 0.08;
         }
-        // IN_WINDOW → no adjustment (warmup model already handles it)
 
         thermalAdj = Math.min(thermalAdj, REFINEMENT_CAPS.thermal_per_lap);
         thermalTotal += thermalAdj;
@@ -1451,63 +1483,50 @@ export function computeStrategySoftSensorAdjustment(
         } else if (stressLabel === "HIGH" && stintProgress > 0.6) {
           stressAdj = 0.04;
         }
-        // LOW/MODERATE → no adjustment (degradation model handles normal wear)
 
         stressAdj = Math.min(stressAdj, REFINEMENT_CAPS.stress_per_lap);
         stressTotal += stressAdj;
       }
 
-      // 3. Grip refinement — light context modifier
-      {
-        const gripLabel = observed.track_grip.label;
-        let gripAdj = 0;
-
-        if (gripLabel === "LOW_GRIP" && observed.track_grip.confidence !== "LOW") {
-          gripAdj = 0.05;
-        } else if (gripLabel === "FALLING") {
-          gripAdj = 0.03;
-        } else if (gripLabel === "IMPROVING") {
-          gripAdj = -0.03; // slight benefit
-        }
-        // STABLE/MIXED/UNKNOWN → no adjustment
-
-        gripAdj = Math.max(-REFINEMENT_CAPS.grip_per_lap, Math.min(gripAdj, REFINEMENT_CAPS.grip_per_lap));
-        gripTotal += gripAdj;
-      }
+      // 3. Grip refinement DISABILITATO nello scoring comparativo:
+      // il grip è funzione del giro assoluto e non della strategia, quindi
+      // trasla tutti i punteggi ugualmente. Resta nel contesto narrativo.
     }
   }
 
   // Clamp totals
   thermalTotal = Math.min(thermalTotal, REFINEMENT_CAPS.total_max * 0.4);
   stressTotal = Math.min(stressTotal, REFINEMENT_CAPS.total_max * 0.4);
-  gripTotal = Math.max(-REFINEMENT_CAPS.total_max * 0.2, Math.min(gripTotal, REFINEMENT_CAPS.total_max * 0.2));
 
-  let total = thermalTotal + stressTotal + gripTotal;
+  let total = thermalTotal + stressTotal;
   total = Math.max(-REFINEMENT_CAPS.total_max, Math.min(total, REFINEMENT_CAPS.total_max));
 
   // Round
   thermalTotal = Math.round(thermalTotal * 100) / 100;
   stressTotal = Math.round(stressTotal * 100) / 100;
-  gripTotal = Math.round(gripTotal * 100) / 100;
   total = Math.round(total * 100) / 100;
 
   // Build reasons
   if (Math.abs(thermalTotal) > 0.01) reasons.push(`Warmup modulato: +${thermalTotal.toFixed(2)}s`);
   if (Math.abs(stressTotal) > 0.01) reasons.push(`Stress gomma tardivo: +${stressTotal.toFixed(2)}s`);
-  if (Math.abs(gripTotal) > 0.01) reasons.push(`Contesto grip: ${gripTotal > 0 ? "+" : ""}${gripTotal.toFixed(2)}s`);
-  if (reasons.length === 0) reasons.push("Nessun aggiustamento significativo dai soft sensors");
+  if (reasons.length > 0) {
+    reasons.push("Stati osservati mappati per vita gomma a parità di mescola");
+  } else {
+    reasons.push("Nessun aggiustamento significativo dai soft sensors");
+  }
 
-  // Confidence
-  const confRatio = totalLapCount > 0 ? lowConfCount / totalLapCount : 1;
+  // Confidence: pesano sia i giri LOW che quelli senza osservazioni comparabili
+  const unreliable = lowConfCount + unmatchedCount;
+  const confRatio = totalLapCount > 0 ? unreliable / totalLapCount : 1;
   let confidence: SoftSensorConfidence = "HIGH";
   if (confRatio > 0.5) confidence = "LOW";
   else if (confRatio > 0.2) confidence = "MEDIUM";
-  if (Math.abs(total) < 0.05) confidence = "HIGH"; // trivial adjustment = confident it's trivial
+  if (Math.abs(total) < 0.05) confidence = "HIGH";
 
   return {
     thermal_adjustment_total: thermalTotal,
     stress_adjustment_total: stressTotal,
-    grip_adjustment_total: gripTotal,
+    grip_adjustment_total: 0,
     total_soft_sensor_adjustment: total,
     adjustment_reasons: reasons,
     confidence,
