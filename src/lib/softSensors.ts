@@ -796,6 +796,9 @@ export function aggregateTimelineConfidence(byLap: SoftSensorsLapState[]): SoftS
   if (lowCount / total > 0.4) return "LOW";
   if (nonHighCount / total > 0.3) return "MEDIUM";
   return "HIGH";
+}
+
+
 
 /**
  * Stima osservazionale del completamento del warmup per stint, dai residui
