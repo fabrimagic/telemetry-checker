@@ -920,6 +920,14 @@ export function computeSoftSensorsTimeline(
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
   totalLaps: number,
+  /**
+   * Giri del pilota. Se forniti, abilita la stima OSSERVAZIONALE del
+   * completamento warmup per stint dai residui dei tempi sul giro. Se
+   * assenti, le label termiche restano bit-identiche al pre-refactor (pure
+   * modello); l'unica differenza in ogni caso è la rimozione del supporto
+   * termico tautologico in `analyzeThermalConsistency`.
+   */
+  driverLaps?: Lap[],
 ): SoftSensorsTimeline {
   const byLap: SoftSensorsLapState[] = [];
 
@@ -928,6 +936,13 @@ export function computeSoftSensorsTimeline(
   const warmupLapsByStint = new Map<number, number>();
   const gripTransitions: GripTransition[] = [];
   let prevGripLabel: TrackGripLabel | null = null;
+
+  // Pre-computa la stima osservazionale del warmup per stint (solo se il
+  // caller ha passato i giri del pilota — altrimenti la variabile resta
+  // undefined e il comportamento delle label è identico al pre-refactor).
+  const observedWarmupByStint = driverLaps
+    ? computeObservedWarmupByStint(stints, driverLaps, pitStops, weatherMap, trackStatusMap, battleContext)
+    : undefined;
 
   for (let lap = 1; lap <= totalLaps; lap++) {
     const stint = findStintForLap(stints, lap);
@@ -941,7 +956,16 @@ export function computeSoftSensorsTimeline(
       ? paceLossResults.find(r => r.stint_number === stint.stint_number) ?? null
       : null;
 
-    const thermal = estimateTyreThermalState(stint, lap, pitStops, weatherMap, trackStatusMap, battleContext);
+    const observedForStint = stint && observedWarmupByStint
+      ? (observedWarmupByStint.has(stint.stint_number)
+          ? observedWarmupByStint.get(stint.stint_number)
+          : undefined)
+      : undefined;
+
+    const thermal = estimateTyreThermalState(
+      stint, lap, pitStops, weatherMap, trackStatusMap, battleContext,
+      observedForStint,
+    );
     const stress = estimateTyreStressState(stint, stintValidation, stintPaceLoss, battleContext, lap, weatherMap, trackStatusMap);
     const grip = estimateTrackGripState(weatherMap, trackStatusMap, lap, totalLaps);
 
@@ -962,7 +986,6 @@ export function computeSoftSensorsTimeline(
       reliability_notes: notes,
     });
 
-    // Track summary metrics
     if (stress.label === "HIGH" && firstHighStressLap == null) firstHighStressLap = lap;
     if (stress.label === "CRITICAL" && firstCriticalStressLap == null) firstCriticalStressLap = lap;
 
@@ -997,6 +1020,7 @@ export function computeSoftSensorsTimeline(
       first_high_stress_lap: firstHighStressLap,
       first_critical_stress_lap: firstCriticalStressLap,
       warmup_laps_by_stint: warmupLapsByStint,
+      observed_warmup_completion_by_stint: observedWarmupByStint,
       grip_transitions: gripTransitions,
       overall_confidence: overallConf,
       reliability_notes: summaryNotes,
