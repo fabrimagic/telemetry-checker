@@ -564,7 +564,7 @@ describe("computeSoftSensorsTimeline — observed warmup from lap-time residuals
     for (let l = 1; l <= 20; l++) laps.push(buildLapObj(l, 90));
     const { weatherMap, trackStatusMap } = greenMaps(20);
     // Contamina i primi 6 giri con SC → 0 giri puliti in fase iniziale
-    for (let l = 1; l <= 6; l++) trackStatusMap.set(l, "SC");
+    for (let l = 1; l <= 7; l++) trackStatusMap.set(l, "SC");
     const tl = computeSoftSensorsTimeline([stint], [], [], [], null, weatherMap, trackStatusMap, 20, laps);
     expect(tl.summary.observed_warmup_completion_by_stint?.get(1)).toBeNull();
     // Confidence degradata: primo giro pulito non contaminato dovrebbe avere reason "Warmup da modello"
