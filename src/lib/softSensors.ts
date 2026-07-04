@@ -607,10 +607,6 @@ export function estimateTrackGripState(
     reasons.push("Segnali insufficienti per determinare lo stato grip");
     confidence = "LOW";
   }
-    label = "UNKNOWN";
-    reasons.push("Segnali insufficienti per determinare lo stato grip");
-    confidence = "LOW";
-  }
 
   return {
     label,
