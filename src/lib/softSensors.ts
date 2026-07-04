@@ -316,7 +316,9 @@ export function estimateTyreThermalState(
     label = "UNKNOWN";
     reasons.push("Segnali contrastanti: lettura termica non affidabile");
     confidence = "LOW";
-  } else if (isInWarmup && !inBattle) {
+  } else if (isInWarmup) {
+    // NOTA: nessuno dei rami sottostanti emette "OVERHEATED"; è una label
+    // riservata (vedi commento sul tipo TyreThermalLabel).
     if (tyreAge === 0) {
       label = "COLD";
       score = 0.15;
@@ -330,10 +332,17 @@ export function estimateTyreThermalState(
       score = 0.2 + (tyreAge / lapsAffected) * 0.4;
       reasons.push(`Giro ${tyreAge + 1} di ${lapsAffected} previsti per il riscaldamento (${compound})`);
     }
+    if (inBattle) {
+      // La battaglia disturba la lettura ma non cancella il fatto fisico del
+      // riscaldamento: manteniamo la label warmup e degradiamo la confidence.
+      contaminated.push("battaglia attiva");
+      reasons.push("Battaglia attiva durante il warmup: lettura degradata ma coerente col riscaldamento");
+      confidence = "MEDIUM";
+    }
     if (recentNeutralization) {
       reasons.push("Neutralizzazione recente: gomme potenzialmente più fredde del previsto");
       if (score != null) score = Math.max(0.1, score - 0.15);
-      confidence = "MEDIUM";
+      if (confidence === "HIGH") confidence = "MEDIUM";
     }
   } else if (recentNeutralization && tyreAge < lapsAffected + 2) {
     label = "WARMING_UP";
