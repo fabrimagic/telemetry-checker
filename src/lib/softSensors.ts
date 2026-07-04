@@ -756,24 +756,10 @@ export function computeSoftSensorsTimeline(
 
   const latestState = byLap.length > 0 ? byLap[byLap.length - 1] : null;
 
-  // Confidence complessiva: aggregato distributivo su TUTTI i giri della
-  // timeline (non solo l'ultimo, che rendeva il gate dipendente da un singolo
-  // giro e bloccava lo scoring per gare finite sotto SC o con pioggia finale).
-  // Soglie:
-  //  - LOW   se > 40% dei giri ha overall_confidence LOW
-  //  - MEDIUM se > 30% dei giri ha confidence diversa da HIGH
-  //  - HIGH  altrimenti
+  const overallConf = aggregateTimelineConfidence(byLap);
   const totalLapsSeen = byLap.length;
   const lowCount = byLap.filter(l => l.overall_confidence === "LOW").length;
   const nonHighCount = byLap.filter(l => l.overall_confidence !== "HIGH").length;
-  let overallConf: SoftSensorConfidence = "HIGH";
-  if (totalLapsSeen > 0) {
-    if (lowCount / totalLapsSeen > 0.4) overallConf = "LOW";
-    else if (nonHighCount / totalLapsSeen > 0.3) overallConf = "MEDIUM";
-    else overallConf = "HIGH";
-  } else {
-    overallConf = "LOW";
-  }
 
   const summaryNotes: string[] = [];
   if (totalLapsSeen > 0) {
