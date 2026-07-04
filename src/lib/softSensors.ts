@@ -57,6 +57,20 @@ export interface TyreThermalSensor extends SoftSensorResult {
 
 export interface TyreStressSensor extends SoftSensorResult {
   label: TyreStressLabel;
+  /**
+   * Sotto-punteggio derivato ESCLUSIVAMENTE da segnali osservazionali
+   * indipendenti dal fit del degrado (età gomma/stint, battaglia attiva,
+   * restart recente, meteo misto). È l'unica componente che può essere
+   * usata come corroborazione indipendente in analyzeStressConsistency.
+   */
+  observational_score?: number;
+  /**
+   * Sotto-punteggio derivato dalle uscite di altri moduli (effective_slope
+   * della validazione del degrado, stato del pace loss). NON può essere
+   * usato come corroborazione della validazione del degrado, perché è già
+   * funzione di quella stessa fonte: userlo introduce circolarità.
+   */
+  derived_score?: number;
 }
 
 export interface TrackGripSensor extends SoftSensorResult {
