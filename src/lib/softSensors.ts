@@ -289,14 +289,6 @@ export function estimateTyreThermalState(
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
   battleContext: BattleContext | null,
-): TyreThermalSensor {
-export function estimateTyreThermalState(
-  currentStint: StintAnalysis | null,
-  currentLap: number,
-  pitStops: PitStopAnalysis[],
-  weatherMap: Map<number, WeatherCondition>,
-  trackStatusMap: Map<number, TrackStatus>,
-  battleContext: BattleContext | null,
   /**
    * Completamento warmup osservato per questo stint dai residui dei tempi:
    *   - `undefined`  → non valutato (giri del pilota non forniti): comportamento
