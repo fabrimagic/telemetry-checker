@@ -119,6 +119,12 @@ export interface SoftSensorsTimelineSummary {
   first_high_stress_lap: number | null;
   first_critical_stress_lap: number | null;
   warmup_laps_by_stint: Map<number, number>;
+  /**
+   * Completamento warmup osservato per stint (tyreAge). Popolato solo quando
+   * `computeSoftSensorsTimeline` riceve i giri del pilota. `null` = valutato
+   * ma insufficiente. Assente per stint = non valutato.
+   */
+  observed_warmup_completion_by_stint?: Map<number, number | null>;
   grip_transitions: GripTransition[];
   overall_confidence: SoftSensorConfidence;
   reliability_notes: string[];
