@@ -31,6 +31,13 @@ import { TYRE_WARMUP_CONFIG } from "./tyreWarmup";
 
 export type SoftSensorConfidence = "HIGH" | "MEDIUM" | "LOW";
 
+/**
+ * NOTE: "OVERHEATED" è una label riservata: nessun estimatore attuale la emette.
+ * Viene mantenuta nel tipo per compatibilità con i consumatori a valle (gate,
+ * refinement e decision context) che la contemplano in modo difensivo. I rami
+ * che la consumano non sono attivi finché non verrà introdotto un estimatore
+ * dedicato.
+ */
 export type TyreThermalLabel = "COLD" | "WARMING_UP" | "IN_WINDOW" | "HOT" | "OVERHEATED" | "UNKNOWN";
 export type TyreStressLabel = "LOW" | "MODERATE" | "HIGH" | "CRITICAL" | "UNKNOWN";
 export type TrackGripLabel = "LOW_GRIP" | "IMPROVING" | "STABLE" | "FALLING" | "MIXED" | "UNKNOWN";
@@ -309,7 +316,9 @@ export function estimateTyreThermalState(
     label = "UNKNOWN";
     reasons.push("Segnali contrastanti: lettura termica non affidabile");
     confidence = "LOW";
-  } else if (isInWarmup && !inBattle) {
+  } else if (isInWarmup) {
+    // NOTA: nessuno dei rami sottostanti emette "OVERHEATED"; è una label
+    // riservata (vedi commento sul tipo TyreThermalLabel).
     if (tyreAge === 0) {
       label = "COLD";
       score = 0.15;
@@ -323,10 +332,17 @@ export function estimateTyreThermalState(
       score = 0.2 + (tyreAge / lapsAffected) * 0.4;
       reasons.push(`Giro ${tyreAge + 1} di ${lapsAffected} previsti per il riscaldamento (${compound})`);
     }
+    if (inBattle) {
+      // La battaglia disturba la lettura ma non cancella il fatto fisico del
+      // riscaldamento: manteniamo la label warmup e degradiamo la confidence.
+      contaminated.push("battaglia attiva");
+      reasons.push("Battaglia attiva durante il warmup: lettura degradata ma coerente col riscaldamento");
+      confidence = "MEDIUM";
+    }
     if (recentNeutralization) {
       reasons.push("Neutralizzazione recente: gomme potenzialmente più fredde del previsto");
       if (score != null) score = Math.max(0.1, score - 0.15);
-      confidence = "MEDIUM";
+      if (confidence === "HIGH") confidence = "MEDIUM";
     }
   } else if (recentNeutralization && tyreAge < lapsAffected + 2) {
     label = "WARMING_UP";
@@ -529,12 +545,21 @@ export function estimateTrackGripState(
     sources.push("track_status");
   }
 
+  // La finestra "earlier" deve contenere solo giri STRETTAMENTE precedenti
+  // all'inizio della finestra "recent" (altrimenti nei primi giri le due
+  // finestre si sovrappongono e gli stessi giri vengono contati due volte).
+  const recentStart = Math.max(1, currentLap - windowSize + 1);
+  const earlierEnd = recentStart - 1;
+  const earlierStart = Math.max(1, earlierEnd - windowSize + 1);
   const earlierWeather: WeatherCondition[] = [];
-  for (let l = Math.max(1, currentLap - windowSize * 2 + 1); l <= Math.max(1, currentLap - windowSize); l++) {
-    const w = weatherMap.get(l);
-    if (w) earlierWeather.push(w);
+  if (earlierEnd >= earlierStart && earlierEnd >= 1) {
+    for (let l = earlierStart; l <= earlierEnd; l++) {
+      const w = weatherMap.get(l);
+      if (w) earlierWeather.push(w);
+    }
   }
   const earlierWet = earlierWeather.filter(w => w === "WET").length;
+  const hasEarlierWindow = earlierWeather.length > 0;
 
   let label: TrackGripLabel;
   let score: number | null = null;
@@ -553,7 +578,9 @@ export function estimateTrackGripState(
     score = 0.45;
     reasons.push("Prevalenza di condizioni miste nella finestra recente");
     confidence = "MEDIUM";
-  } else if (earlierWet > 0 && wetCount === 0 && dryCount > 0) {
+  } else if (hasEarlierWindow && earlierWet > 0 && wetCount === 0 && dryCount > 0) {
+    // Richiede una finestra earlier realmente disponibile: senza giri
+    // precedenti sufficienti la transizione bagnato→asciutto non è valutabile.
     label = "IMPROVING";
     score = 0.55;
     reasons.push("Transizione da bagnato ad asciutto: pista in fase di asciugatura");
@@ -572,7 +599,8 @@ export function estimateTrackGripState(
     } else {
       label = "IMPROVING";
       score = 0.55;
-      reasons.push("Fase iniziale gara su asciutto: pista in fase di gommatura");
+      reasons.push("Fase iniziale gara su asciutto: pista in fase di gommatura (assunzione di evoluzione tipica della pista, non verificata sui tempi)");
+      confidence = "MEDIUM";
     }
   } else {
     label = "UNKNOWN";
@@ -657,6 +685,26 @@ function findStintForLap(stints: StintAnalysis[], lap: number): StintAnalysis | 
   return stints.find(s => lap >= s.lap_start && lap <= s.lap_end) ?? null;
 }
 
+/**
+ * Confidence complessiva della timeline: aggregato distributivo su TUTTI i
+ * giri (non solo l'ultimo, che rendeva il gate dipendente da un singolo giro
+ * e bloccava lo scoring per gare finite sotto SC o con pioggia finale).
+ * Soglie:
+ *  - LOW    se > 40% dei giri ha overall_confidence LOW
+ *  - MEDIUM se > 30% dei giri ha confidence diversa da HIGH
+ *  - HIGH   altrimenti
+ * Timeline vuota → LOW.
+ */
+export function aggregateTimelineConfidence(byLap: SoftSensorsLapState[]): SoftSensorConfidence {
+  const total = byLap.length;
+  if (total === 0) return "LOW";
+  const lowCount = byLap.filter(l => l.overall_confidence === "LOW").length;
+  const nonHighCount = byLap.filter(l => l.overall_confidence !== "HIGH").length;
+  if (lowCount / total > 0.4) return "LOW";
+  if (nonHighCount / total > 0.3) return "MEDIUM";
+  return "HIGH";
+}
+
 export function computeSoftSensorsTimeline(
   stints: StintAnalysis[],
   pitStops: PitStopAnalysis[],
@@ -723,9 +771,16 @@ export function computeSoftSensorsTimeline(
   }
 
   const latestState = byLap.length > 0 ? byLap[byLap.length - 1] : null;
-  const overallConf = latestState?.overall_confidence ?? "LOW";
+
+  const overallConf = aggregateTimelineConfidence(byLap);
+  const totalLapsSeen = byLap.length;
+  const lowCount = byLap.filter(l => l.overall_confidence === "LOW").length;
+  const nonHighCount = byLap.filter(l => l.overall_confidence !== "HIGH").length;
 
   const summaryNotes: string[] = [];
+  if (totalLapsSeen > 0) {
+    summaryNotes.push(`Distribuzione confidence: ${lowCount}/${totalLapsSeen} giri LOW, ${nonHighCount - lowCount}/${totalLapsSeen} giri MEDIUM`);
+  }
   if (firstCriticalStressLap != null) summaryNotes.push(`Primo stress critico al giro ${firstCriticalStressLap}`);
   if (gripTransitions.length > 0) summaryNotes.push(`${gripTransitions.length} transizione/i grip rilevate`);
 
@@ -838,21 +893,24 @@ export function computeDegradationValidationContext(
     const gripResult = analyzeGripContamination(stintLaps, dv, trackStatusMap);
 
     // ── AGGREGATION ──
-    const supportSignals: string[] = [];
-    const contradictionSignals: string[] = [];
-    const notes: string[] = [];
-
-    // Collect signals
-    supportSignals.push(...thermalResult.notes.filter(n => !n.includes("contamin")));
-    supportSignals.push(...stressResult.notes.filter(n => !n.includes("incoeren")));
-    supportSignals.push(...gripResult.notes.filter(n => n.includes("stabil") || n.includes("favorev")));
-
-    contradictionSignals.push(...thermalResult.notes.filter(n => n.includes("contamin") || n.includes("instabil")));
-    contradictionSignals.push(...stressResult.notes.filter(n => n.includes("incoeren") || n.includes("contamin")));
-    contradictionSignals.push(...gripResult.notes.filter(n => n.includes("contamin") || n.includes("instabil")));
-
-    // Notes = all sub-notes
-    notes.push(...thermalResult.notes, ...stressResult.notes, ...gripResult.notes);
+    // I singoli analyzer classificano ogni nota alla fonte come "support" o
+    // "contradiction"; qui aggreghiamo direttamente senza più filtrare per
+    // substring del testo (che era fragile e perdeva note come "grip in calo").
+    const supportSignals: string[] = [
+      ...thermalResult.support_notes,
+      ...stressResult.support_notes,
+      ...gripResult.support_notes,
+    ];
+    const contradictionSignals: string[] = [
+      ...thermalResult.contradiction_notes,
+      ...stressResult.contradiction_notes,
+      ...gripResult.contradiction_notes,
+    ];
+    const notes: string[] = [
+      ...thermalResult.notes,
+      ...stressResult.notes,
+      ...gripResult.notes,
+    ];
 
     // Low confidence laps
     const lowConfLaps = stintLaps.filter(l => l.overall_confidence === "LOW");
@@ -942,10 +1000,33 @@ function emptyStintValidation(stintNumber: number): StintValidationContext {
   };
 }
 
-interface AxisResult { support: number; contamination: number; notes: string[] }
+/**
+ * Ogni analyzer di asse classifica le note direttamente alla fonte come
+ * `support_notes` o `contradiction_notes`, evitando la fragile riclassificazione
+ * per substring nell'aggregazione. `notes` è mantenuto per compatibilità con
+ * `thermal_notes`/`stress_notes`/`grip_notes` di StintValidationContext e
+ * conserva l'ordine originale in cui le note sono state prodotte.
+ */
+interface AxisResult {
+  support: number;
+  contamination: number;
+  notes: string[];
+  support_notes: string[];
+  contradiction_notes: string[];
+}
+
+function pushSupport(res: { notes: string[]; support_notes: string[] }, note: string): void {
+  res.notes.push(note);
+  res.support_notes.push(note);
+}
+
+function pushContradiction(res: { notes: string[]; contradiction_notes: string[] }, note: string): void {
+  res.notes.push(note);
+  res.contradiction_notes.push(note);
+}
 
 function analyzeThermalConsistency(stintLaps: SoftSensorsLapState[], stint: StintAnalysis): AxisResult {
-  const notes: string[] = [];
+  const res = { notes: [] as string[], support_notes: [] as string[], contradiction_notes: [] as string[] };
   let support = 0.5; // neutral baseline
   let contamination = 0;
 
@@ -962,35 +1043,42 @@ function analyzeThermalConsistency(stintLaps: SoftSensorsLapState[], stint: Stin
 
   if (warmupCount > expectedWarmup + 2) {
     contamination += 0.4;
-    notes.push(`Warmup prolungato (${warmupCount} giri vs ${expectedWarmup} previsti): primi giri possibilmente contaminati`);
+    pushContradiction(res, `Warmup prolungato (${warmupCount} giri vs ${expectedWarmup} previsti): primi giri possibilmente contaminati`);
   } else if (warmupCount > 0 && warmupCount <= expectedWarmup) {
     support += 0.15;
-    notes.push(`Warmup coerente con il modello (${warmupCount}/${expectedWarmup} giri)`);
+    pushSupport(res, `Warmup coerente con il modello (${warmupCount}/${expectedWarmup} giri)`);
   }
 
   // Check for rapid IN_WINDOW entry
   const firstInWindow = stintLaps.findIndex(l => l.tyre_thermal.label === "IN_WINDOW");
   if (firstInWindow >= 0 && firstInWindow < expectedWarmup - 1) {
     support += 0.1;
-    notes.push("Ingresso rapido in finestra termica: buon supporto per la parte centrale dello stint");
+    pushSupport(res, "Ingresso rapido in finestra termica: buon supporto per la parte centrale dello stint");
   }
 
   // Thermal instability check
   const thermalLabels = new Set(stintLaps.map(l => l.tyre_thermal.label));
   if (thermalLabels.size >= 4) {
     contamination += 0.3;
-    notes.push("Stato termico instabile durante lo stint: ridotta affidabilità della lettura");
+    pushContradiction(res, "Stato termico instabile durante lo stint: ridotta affidabilità della lettura");
   }
 
-  // HOT/OVERHEATED early without convergence
+  // NOTA: OVERHEATED è riservata e attualmente mai emessa (vedi commento sul
+  // tipo TyreThermalLabel); il ramo è mantenuto in modo difensivo.
   const earlyHot = stintLaps.slice(0, Math.min(5, stintLaps.length))
     .filter(l => l.tyre_thermal.label === "HOT" || l.tyre_thermal.label === "OVERHEATED");
   if (earlyHot.length >= 2) {
     contamination += 0.2;
-    notes.push("Stato termico elevato nei primi giri: possibile instabilità, non necessariamente degrado");
+    pushContradiction(res, "Stato termico elevato nei primi giri: possibile instabilità, non necessariamente degrado");
   }
 
-  return { support: Math.min(1, Math.max(0, support)), contamination: Math.min(1, contamination), notes };
+  return {
+    support: Math.min(1, Math.max(0, support)),
+    contamination: Math.min(1, contamination),
+    notes: res.notes,
+    support_notes: res.support_notes,
+    contradiction_notes: res.contradiction_notes,
+  };
 }
 
 function analyzeStressConsistency(
@@ -998,7 +1086,7 @@ function analyzeStressConsistency(
   dv: DegradationValidationResult,
   paceLoss?: StintPaceLossResult,
 ): AxisResult {
-  const notes: string[] = [];
+  const res = { notes: [] as string[], support_notes: [] as string[], contradiction_notes: [] as string[] };
   let support = 0.4;
   let contamination = 0;
   const hasHighSlope = dv.effective_slope > 0.06;
@@ -1007,39 +1095,43 @@ function analyzeStressConsistency(
   const lowStressLaps = stintLaps.filter(l => l.tyre_stress.label === "LOW");
   const unknownStress = stintLaps.filter(l => l.tyre_stress.label === "UNKNOWN");
 
-  // Progressive stress check: are high-stress laps concentrated at end?
   const secondHalf = stintLaps.slice(Math.floor(stintLaps.length / 2));
   const secondHalfHighStress = secondHalf.filter(l => l.tyre_stress.label === "HIGH" || l.tyre_stress.label === "CRITICAL");
 
   if (highStressLaps.length > stintLaps.length * 0.4 && dv.status === "VALID") {
     support += 0.3;
-    notes.push("Stress elevato coerente con degrado validato: supporto forte");
+    pushSupport(res, "Stress elevato coerente con degrado validato: supporto forte");
   } else if (secondHalfHighStress.length > secondHalf.length * 0.5 && dv.status === "VALID") {
     support += 0.2;
-    notes.push("Stress crescente nella seconda metà dello stint: pattern coerente con degrado progressivo");
+    pushSupport(res, "Stress crescente nella seconda metà dello stint: pattern coerente con degrado progressivo");
   }
 
   if (lowStressLaps.length > stintLaps.length * 0.7 && hasHighSlope) {
     contamination += 0.4;
-    notes.push("Stress basso nonostante slope elevata: possibile incoerenza o contaminazione del fit");
+    pushContradiction(res, "Stress basso nonostante slope elevata: possibile incoerenza o contaminazione del fit");
   }
 
   if (unknownStress.length > stintLaps.length * 0.4) {
     contamination += 0.2;
-    notes.push("Troppi giri con stress non determinabile: segnale debole");
+    pushContradiction(res, "Troppi giri con stress non determinabile: segnale debole");
   }
 
-  // Pace loss as accessory signal
   if (paceLoss) {
     if (paceLoss.pace_loss_status === "CLIFF_RISK" && highStressLaps.length > 2) {
       support += 0.15;
-      notes.push("Pace loss con rischio cliff convergente con stress elevato");
+      pushSupport(res, "Pace loss con rischio cliff convergente con stress elevato");
     } else if (paceLoss.pace_loss_status === "UNRELIABLE") {
       contamination += 0.1;
     }
   }
 
-  return { support: Math.min(1, Math.max(0, support)), contamination: Math.min(1, contamination), notes };
+  return {
+    support: Math.min(1, Math.max(0, support)),
+    contamination: Math.min(1, contamination),
+    notes: res.notes,
+    support_notes: res.support_notes,
+    contradiction_notes: res.contradiction_notes,
+  };
 }
 
 function analyzeGripContamination(
@@ -1047,7 +1139,7 @@ function analyzeGripContamination(
   dv: DegradationValidationResult,
   trackStatusMap?: Map<number, TrackStatus>,
 ): AxisResult {
-  const notes: string[] = [];
+  const res = { notes: [] as string[], support_notes: [] as string[], contradiction_notes: [] as string[] };
   let support = 0.5;
   let contamination = 0;
 
@@ -1058,23 +1150,22 @@ function analyzeGripContamination(
 
   if (stableGripLaps.length > stintLaps.length * 0.6) {
     support += 0.3;
-    notes.push("Condizioni pista stabili: contesto favorevole a una stima affidabile del degrado");
+    pushSupport(res, "Condizioni pista stabili: contesto favorevole a una stima affidabile del degrado");
   } else if (improvingGripLaps.length > stintLaps.length * 0.4 && dv.effective_slope > 0.03) {
     contamination += 0.2;
-    notes.push("Grip in miglioramento durante stint con slope positiva: parte del trend potrebbe essere pista, non gomma");
+    pushContradiction(res, "Grip in miglioramento durante stint con slope positiva: parte del trend potrebbe essere pista, non gomma");
   }
 
   if (mixedGripLaps.length > stintLaps.length * 0.3) {
     contamination += 0.35;
-    notes.push("Grip pista instabile durante lo stint: lettura del degrado potenzialmente contaminata");
+    pushContradiction(res, "Grip pista instabile durante lo stint: lettura del degrado potenzialmente contaminata");
   }
 
   if (fallingGripLaps.length > stintLaps.length * 0.3) {
     contamination += 0.25;
-    notes.push("Grip in calo: degrado stimato potrebbe includere effetto pista");
+    pushContradiction(res, "Grip in calo: degrado stimato potrebbe includere effetto pista");
   }
 
-  // Neutralisations within stint
   if (trackStatusMap) {
     let neutLaps = 0;
     for (const l of stintLaps) {
@@ -1083,12 +1174,19 @@ function analyzeGripContamination(
     }
     if (neutLaps > stintLaps.length * 0.2) {
       contamination += 0.15;
-      notes.push("Neutralizzazioni durante lo stint: ridotta affidabilità della lettura del degrado");
+      pushContradiction(res, "Neutralizzazioni durante lo stint: ridotta affidabilità della lettura del degrado");
     }
   }
 
-  return { support: Math.min(1, Math.max(0, support)), contamination: Math.min(1, contamination), notes };
+  return {
+    support: Math.min(1, Math.max(0, support)),
+    contamination: Math.min(1, contamination),
+    notes: res.notes,
+    support_notes: res.support_notes,
+    contradiction_notes: res.contradiction_notes,
+  };
 }
+
 
 /* ══════════════════════════════════════════════════════════════════
  * SUPPORT LAYER 3: ENHANCED NARRATIVE INSIGHTS
