@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   aggregateTimelineConfidence,
   estimateTyreThermalState,
+  estimateTyreStressState,
   estimateTrackGripState,
   computeDegradationValidationContext,
   type SoftSensorsLapState,
