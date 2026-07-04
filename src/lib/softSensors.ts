@@ -53,6 +53,16 @@ export interface SoftSensorResult {
 
 export interface TyreThermalSensor extends SoftSensorResult {
   label: TyreThermalLabel;
+  /**
+   * Completamento warmup osservato dai residui dei tempi sul giro (tyreAge a
+   * partire dalla quale lo stint è considerato in finestra). `number` = stima
+   * osservata disponibile; `null` = valutazione tentata ma non disponibile
+   * (fallback al modello con confidence degradata); assente = giri del pilota
+   * non forniti al call site (comportamento puramente da modello, legacy).
+   */
+  observed_warmup_completion?: number | null;
+  /** "observed" quando la label warmup deriva dai residui; "model" altrimenti. */
+  warmup_source?: "observed" | "model";
 }
 
 export interface TyreStressSensor extends SoftSensorResult {
