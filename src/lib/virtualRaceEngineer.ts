@@ -2611,7 +2611,7 @@ export function computeVirtualRaceEngineer(
   // ── 9a. Compute Soft Sensors Timeline early (needed for scoring gate) ──
   const softSensorsTimeline = computeSoftSensorsTimeline(
     stintAnalyses, pitStopAnalyses, degradationValidations, paceLossResults,
-    earlyBattleCtx, weatherMap, trackStatusMap, totalLaps,
+    earlyBattleCtx, weatherMap, trackStatusMap, totalLaps, laps,
   );
   const softSensors: SoftSensorsContext | undefined = softSensorsTimeline.summary.latest_state
     ? {

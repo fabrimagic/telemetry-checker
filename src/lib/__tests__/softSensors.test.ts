@@ -448,3 +448,127 @@ describe("analyzeStressConsistency — circolarità stress ↔ validazione", () 
   });
 });
 
+
+/* ══════════════════════════════════════════════════════════════════
+ * OBSERVED WARMUP — sensore termico da residui tempi sul giro
+ * ══════════════════════════════════════════════════════════════════ */
+
+import { computeSoftSensorsTimeline, computeWarmupInterpretation } from "../softSensors";
+import type { Lap } from "../openf1";
+
+function buildLapObj(lapNumber: number, duration: number, opts: Partial<Lap> = {}): Lap {
+  return {
+    lap_number: lapNumber,
+    lap_duration: duration,
+    duration_sector_1: null,
+    duration_sector_2: null,
+    duration_sector_3: null,
+    st_speed: null,
+    date_start: null,
+    is_pit_out_lap: false,
+    driver_number: 1,
+    session_key: 0,
+    segments_sector_1: null,
+    segments_sector_2: null,
+    segments_sector_3: null,
+    ...opts,
+  };
+}
+
+function greenMaps(totalLaps: number): { weatherMap: Map<number, WeatherCondition>; trackStatusMap: Map<number, TrackStatus> } {
+  const weatherMap = new Map<number, WeatherCondition>();
+  const trackStatusMap = new Map<number, TrackStatus>();
+  for (let l = 1; l <= totalLaps; l++) { weatherMap.set(l, "DRY"); trackStatusMap.set(l, "GREEN"); }
+  return { weatherMap, trackStatusMap };
+}
+
+describe("computeSoftSensorsTimeline — observed warmup from lap-time residuals", () => {
+  it("warmup osservato completato a tyreAge=2 vs modello=4 (HARD): label IN_WINDOW da tyreAge 2, interpretation FASTER, supporto osservato in consistency", () => {
+    // HARD → lapsAffected=4. Baseline (tyreAge 4..9) attorno a 90s. Residui:
+    //   tyreAge 0: +2.0s, 1: +1.5s, 2: +0.1s, 3: +0.05s, 4..: 0
+    // Regola: due giri consecutivi con residuo <0.3s ⇒ completamento a tyreAge 2.
+    const stint: StintAnalysis = {
+      stint_number: 1, compound: "HARD", lap_start: 1, lap_end: 20, laps_count: 20,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const laps: Lap[] = [];
+    const base = 90;
+    const residuals = [2.0, 1.5, 0.1, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 20; i++) laps.push(buildLapObj(i + 1, base + residuals[i]));
+    const { weatherMap, trackStatusMap } = greenMaps(20);
+
+    const tl = computeSoftSensorsTimeline([stint], [], [], [], null, weatherMap, trackStatusMap, 20, laps);
+    // Da tyreAge 2 (lap 3) in poi deve essere IN_WINDOW
+    expect(tl.by_lap[2].tyre_thermal.label).toBe("IN_WINDOW");
+    expect(tl.by_lap[3].tyre_thermal.label).toBe("IN_WINDOW");
+    expect(tl.by_lap[1].tyre_thermal.label).toBe("WARMING_UP");
+    expect(tl.summary.observed_warmup_completion_by_stint?.get(1)).toBe(2);
+    // Interpretation (stint 1 skipped): use stint 2 setup below invece
+  });
+
+  it("warmup osservato prolungato (residui alti fino a tyreAge=7 vs modello=4): WARMING_UP fino al completamento osservato, contraddizione in consistency", () => {
+    // Configurazione con due stint per esercitare anche computeWarmupInterpretation
+    // (che salta lo stint 1). Focalizziamoci sullo stint 2 HARD.
+    const stint1: StintAnalysis = {
+      stint_number: 1, compound: "MEDIUM", lap_start: 1, lap_end: 15, laps_count: 15,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const stint2: StintAnalysis = {
+      stint_number: 2, compound: "HARD", lap_start: 16, lap_end: 40, laps_count: 25,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const laps: Lap[] = [];
+    // Stint 1: uniform 92s (baseline stint 1 = 92)
+    for (let l = 1; l <= 15; l++) laps.push(buildLapObj(l, 92));
+    // Stint 2 baseline 90s, residuals long warmup (fino a tyreAge 6 alti, poi bassi)
+    const base = 90;
+    // residuals[i] = residuo per tyreAge i
+    const residuals = [2.0, 1.8, 1.6, 1.4, 1.2, 1.0, 0.8, 0.1, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 25; i++) laps.push(buildLapObj(16 + i, base + residuals[i]));
+    const { weatherMap, trackStatusMap } = greenMaps(40);
+
+    const tl = computeSoftSensorsTimeline([stint1, stint2], [], [], [], null, weatherMap, trackStatusMap, 40, laps);
+    // Observed completion per stint 2 dovrebbe essere 7 (primi due residui <0.3s a tyreAge 7 e 8)
+    expect(tl.summary.observed_warmup_completion_by_stint?.get(2)).toBe(7);
+    // WARMING_UP fino a tyreAge 6 (lap 22), IN_WINDOW da tyreAge 7 (lap 23)
+    expect(tl.by_lap[16 + 6 - 1].tyre_thermal.label).toBe("WARMING_UP"); // lap 22
+    expect(tl.by_lap[16 + 7 - 1].tyre_thermal.label).toBe("IN_WINDOW"); // lap 23
+
+    const interp = computeWarmupInterpretation(tl, [stint1, stint2]);
+    expect(interp.warmup_anomalies.some(a => a.stint_number === 2 && a.type === "SLOWER_THAN_EXPECTED")).toBe(true);
+  });
+
+  it("senza driverLaps: label identiche al pre-refactor, no supporto termico tautologico", () => {
+    const stint: StintAnalysis = {
+      stint_number: 1, compound: "MEDIUM", lap_start: 1, lap_end: 20, laps_count: 20,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const { weatherMap, trackStatusMap } = greenMaps(20);
+    const tl = computeSoftSensorsTimeline([stint], [], [], [], null, weatherMap, trackStatusMap, 20);
+    // MEDIUM lapsAffected=3 → giro 4 (tyreAge=3) IN_WINDOW
+    expect(tl.by_lap[3].tyre_thermal.label).toBe("IN_WINDOW");
+    expect(tl.by_lap[2].tyre_thermal.label).toBe("WARMING_UP");
+    // warmup_source assente/model
+    const src = tl.by_lap[0].tyre_thermal.warmup_source;
+    expect(src === undefined || src === "model").toBe(true);
+    // observed_warmup_completion_by_stint deve essere undefined (non valutato)
+    expect(tl.summary.observed_warmup_completion_by_stint).toBeUndefined();
+  });
+
+  it("giri iniziali contaminati da Safety Car: fallback dichiarato (warmup da modello, confidence degradata)", () => {
+    const stint: StintAnalysis = {
+      stint_number: 1, compound: "MEDIUM", lap_start: 1, lap_end: 20, laps_count: 20,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const laps: Lap[] = [];
+    for (let l = 1; l <= 20; l++) laps.push(buildLapObj(l, 90));
+    const { weatherMap, trackStatusMap } = greenMaps(20);
+    // Contamina i primi 6 giri con SC → 0 giri puliti in fase iniziale
+    for (let l = 1; l <= 7; l++) trackStatusMap.set(l, "SC");
+    const tl = computeSoftSensorsTimeline([stint], [], [], [], null, weatherMap, trackStatusMap, 20, laps);
+    expect(tl.summary.observed_warmup_completion_by_stint?.get(1)).toBeNull();
+    // Confidence degradata: primo giro pulito non contaminato dovrebbe avere reason "Warmup da modello"
+    const cleanLap = tl.by_lap.find(l => l.tyre_thermal.reasons.some(r => /Warmup da modello/i.test(r)));
+    expect(cleanLap).toBeDefined();
+  });
+});

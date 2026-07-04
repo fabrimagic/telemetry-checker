@@ -18,6 +18,7 @@
  */
 
 import type { StintAnalysis, PitStopAnalysis } from "./virtualRaceEngineer";
+import type { Lap } from "./openf1";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
 import type { DegradationValidationResult } from "./degradationValidation";
@@ -53,6 +54,16 @@ export interface SoftSensorResult {
 
 export interface TyreThermalSensor extends SoftSensorResult {
   label: TyreThermalLabel;
+  /**
+   * Completamento warmup osservato dai residui dei tempi sul giro (tyreAge a
+   * partire dalla quale lo stint è considerato in finestra). `number` = stima
+   * osservata disponibile; `null` = valutazione tentata ma non disponibile
+   * (fallback al modello con confidence degradata); assente = giri del pilota
+   * non forniti al call site (comportamento puramente da modello, legacy).
+   */
+  observed_warmup_completion?: number | null;
+  /** "observed" quando la label warmup deriva dai residui; "model" altrimenti. */
+  warmup_source?: "observed" | "model";
 }
 
 export interface TyreStressSensor extends SoftSensorResult {
@@ -108,6 +119,12 @@ export interface SoftSensorsTimelineSummary {
   first_high_stress_lap: number | null;
   first_critical_stress_lap: number | null;
   warmup_laps_by_stint: Map<number, number>;
+  /**
+   * Completamento warmup osservato per stint (tyreAge). Popolato solo quando
+   * `computeSoftSensorsTimeline` riceve i giri del pilota. `null` = valutato
+   * ma insufficiente. Assente per stint = non valutato.
+   */
+  observed_warmup_completion_by_stint?: Map<number, number | null>;
   grip_transitions: GripTransition[];
   overall_confidence: SoftSensorConfidence;
   reliability_notes: string[];
@@ -279,6 +296,19 @@ export function estimateTyreThermalState(
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
   battleContext: BattleContext | null,
+  /**
+   * Completamento warmup osservato per questo stint dai residui dei tempi:
+   *   - `undefined`  → non valutato (giri del pilota non forniti): comportamento
+   *                    puramente da modello, identico al pre-refactor.
+   *   - `null`       → valutato ma non disponibile (fixture insufficienti):
+   *                    fallback al modello con confidence degradata a MEDIUM
+   *                    e reason "warmup da modello, non osservato".
+   *   - `number`     → soglia osservata di tyreAge da cui lo stint è considerato
+   *                    in finestra termica; sostituisce laps_affected del modello
+   *                    per il confronto di warmup, lasciando invariati i rami
+   *                    contestuali (restart, battaglia lunga, contaminazioni).
+   */
+  observedWarmupCompletion?: number | null,
 ): TyreThermalSensor {
   if (!currentStint) {
     return { label: "UNKNOWN", score: null, confidence: "LOW", reasons: ["Nessuno stint attivo disponibile"] };
@@ -293,7 +323,15 @@ export function estimateTyreThermalState(
   let confidence = "HIGH" as SoftSensorConfidence;
 
   const lapsAffected = warmupConfig?.laps_affected ?? 3;
-  const isInWarmup = tyreAge < lapsAffected;
+
+  // Soglia di warmup: osservata quando disponibile, altrimenti modello.
+  const hasObserved = typeof observedWarmupCompletion === "number";
+  const effectiveWarmupLaps = hasObserved ? (observedWarmupCompletion as number) : lapsAffected;
+  const warmupSource: "observed" | "model" = hasObserved ? "observed" : "model";
+  if (hasObserved) sources.push("observed_warmup");
+  const isInWarmup = tyreAge < effectiveWarmupLaps;
+  // Fallback dichiarato: giri forniti ma osservazione non calcolabile.
+  const isModelFallback = observedWarmupCompletion === null;
 
   const currentWeather = weatherMap.get(currentLap);
   if (currentWeather === "WET" || currentWeather === "MIXED") {
@@ -343,8 +381,10 @@ export function estimateTyreThermalState(
       }
     } else {
       label = "WARMING_UP";
-      score = 0.2 + (tyreAge / lapsAffected) * 0.4;
-      reasons.push(`Giro ${tyreAge + 1} di ${lapsAffected} previsti per il riscaldamento (${compound})`);
+      const denom = Math.max(1, effectiveWarmupLaps);
+      score = 0.2 + Math.min(1, tyreAge / denom) * 0.4;
+      const src = hasObserved ? "osservato" : "previsto";
+      reasons.push(`Giro ${tyreAge + 1} di ${effectiveWarmupLaps} ${src} per il riscaldamento (${compound})`);
     }
     if (inBattle) {
       // La battaglia disturba la lettura ma non cancella il fatto fisico del
@@ -368,10 +408,11 @@ export function estimateTyreThermalState(
     score = 0.85;
     reasons.push("Battaglia attiva con gomme ad alta età: probabile stress termico elevato");
     confidence = "MEDIUM";
-  } else if (tyreAge >= lapsAffected) {
+  } else if (tyreAge >= effectiveWarmupLaps) {
     label = "IN_WINDOW";
     score = 0.65;
-    reasons.push(`Gomme ${compound} a regime dopo ${lapsAffected} giri di riscaldamento`);
+    const src = hasObserved ? "osservati" : "previsti";
+    reasons.push(`Gomme ${compound} a regime dopo ${effectiveWarmupLaps} giri ${src} di riscaldamento`);
     if (currentWeather === "WET" || currentWeather === "MIXED") {
       confidence = "LOW";
     }
@@ -381,6 +422,11 @@ export function estimateTyreThermalState(
     confidence = "LOW";
   }
 
+  if (isModelFallback) {
+    reasons.push("Warmup da modello, non osservato (giri puliti insufficienti per la stima)");
+    if (confidence === "HIGH") confidence = "MEDIUM";
+  }
+
   return {
     label,
     score,
@@ -388,6 +434,10 @@ export function estimateTyreThermalState(
     reasons,
     contaminated_by: contaminated.length > 0 ? contaminated : undefined,
     source_signals: sources,
+    observed_warmup_completion: hasObserved
+      ? (observedWarmupCompletion as number)
+      : (observedWarmupCompletion === null ? null : undefined),
+    warmup_source: warmupSource,
   };
 }
 
@@ -748,6 +798,119 @@ export function aggregateTimelineConfidence(byLap: SoftSensorsLapState[]): SoftS
   return "HIGH";
 }
 
+
+
+/**
+ * Stima osservazionale del completamento del warmup per stint, dai residui
+ * dei tempi sul giro. Restituisce il tyreAge a partire dal quale lo stint è
+ * considerato in finestra termica; `null` se non stimabile.
+ *
+ * Criterio "giro pulito" (per baseline e per la valutazione del warmup):
+ *   - lap_duration disponibile
+ *   - track status GREEN
+ *   - meteo diverso da WET/MIXED
+ *   - non in battaglia (battleContext.battle_laps)
+ *   - non pit-out (is_pit_out_lap) e non pit-in (lap coincidente con un pitStop)
+ *
+ * Baseline = mediana dei giri puliti con tyreAge ∈ [lapsAffected, lapsAffected+5].
+ * Occorrono almeno 2 giri puliti sia nella finestra baseline sia nella fase
+ * iniziale (tyreAge < lapsAffected+5) per considerare la stima disponibile.
+ *
+ * Completamento osservato = primo tyreAge N tale che i giri di tyreAge N e N+1
+ * siano entrambi puliti e con residuo (lap_duration − baseline) < 0.3s.
+ * Se nessun N soddisfa entro la fase iniziale osservabile, si assume l'ultimo
+ * tyreAge tentato (fallback conservativo verso il modello: N = lapsAffected).
+ */
+function computeObservedWarmupByStint(
+  stints: StintAnalysis[],
+  driverLaps: Lap[],
+  pitStops: PitStopAnalysis[],
+  weatherMap: Map<number, WeatherCondition>,
+  trackStatusMap: Map<number, TrackStatus>,
+  battleContext: BattleContext | null,
+): Map<number, number | null> {
+  const out = new Map<number, number | null>();
+  const lapsByNumber = new Map<number, Lap>();
+  for (const l of driverLaps) {
+    if (l.lap_number != null) lapsByNumber.set(l.lap_number, l);
+  }
+  const pitLapSet = new Set<number>(pitStops.map(p => p.lap_number));
+
+  const isClean = (lapNumber: number): boolean => {
+    const lap = lapsByNumber.get(lapNumber);
+    if (!lap || lap.lap_duration == null) return false;
+    const ts = trackStatusMap.get(lapNumber);
+    if (ts && ts !== "GREEN") return false;
+    const w = weatherMap.get(lapNumber);
+    if (w === "WET" || w === "MIXED") return false;
+    if (battleContext?.battle_laps.has(lapNumber)) return false;
+    if (lap.is_pit_out_lap) return false;
+    if (pitLapSet.has(lapNumber)) return false;
+    return true;
+  };
+
+  for (const stint of stints) {
+    const compound = (stint.compound ?? "").toUpperCase();
+    const lapsAffected = TYRE_WARMUP_CONFIG[compound]?.laps_affected ?? 3;
+
+    // Baseline window: tyreAge in [lapsAffected, lapsAffected+5]
+    const baselineDurations: number[] = [];
+    for (let tyreAge = lapsAffected; tyreAge <= lapsAffected + 5; tyreAge++) {
+      const lapN = stint.lap_start + tyreAge;
+      if (lapN > stint.lap_end) break;
+      if (isClean(lapN)) {
+        const d = lapsByNumber.get(lapN)!.lap_duration!;
+        baselineDurations.push(d);
+      }
+    }
+    if (baselineDurations.length < 2) {
+      out.set(stint.stint_number, null);
+      continue;
+    }
+    const sorted = [...baselineDurations].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const baseline = sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+
+    // Initial phase: tyreAge < lapsAffected+5. Need ≥2 clean laps here to
+    // even attempt an observation.
+    let initialClean = 0;
+    const maxInitialAge = Math.min(lapsAffected + 4, stint.lap_end - stint.lap_start);
+    for (let tyreAge = 0; tyreAge <= maxInitialAge; tyreAge++) {
+      if (isClean(stint.lap_start + tyreAge)) initialClean++;
+    }
+    if (initialClean < 2) {
+      out.set(stint.stint_number, null);
+      continue;
+    }
+
+    // Find first tyreAge N with two consecutive clean laps whose residual
+    // (duration − baseline) < 0.3s.
+    const THRESHOLD = 0.3;
+    let observed: number | null = null;
+    const scanEnd = Math.min(lapsAffected + 5, stint.lap_end - stint.lap_start - 1);
+    for (let tyreAge = 0; tyreAge <= scanEnd; tyreAge++) {
+      const lap1 = stint.lap_start + tyreAge;
+      const lap2 = lap1 + 1;
+      if (!isClean(lap1) || !isClean(lap2)) continue;
+      const d1 = lapsByNumber.get(lap1)!.lap_duration! - baseline;
+      const d2 = lapsByNumber.get(lap2)!.lap_duration! - baseline;
+      if (d1 < THRESHOLD && d2 < THRESHOLD) {
+        observed = tyreAge;
+        break;
+      }
+    }
+    // Fallback conservativo: se non si trova nessuna coppia entro la finestra,
+    // consideriamo il warmup non stimabile → null (verrà usato il modello con
+    // confidence degradata).
+    out.set(stint.stint_number, observed);
+  }
+
+  return out;
+}
+
+
 export function computeSoftSensorsTimeline(
   stints: StintAnalysis[],
   pitStops: PitStopAnalysis[],
@@ -757,6 +920,14 @@ export function computeSoftSensorsTimeline(
   weatherMap: Map<number, WeatherCondition>,
   trackStatusMap: Map<number, TrackStatus>,
   totalLaps: number,
+  /**
+   * Giri del pilota. Se forniti, abilita la stima OSSERVAZIONALE del
+   * completamento warmup per stint dai residui dei tempi sul giro. Se
+   * assenti, le label termiche restano bit-identiche al pre-refactor (pure
+   * modello); l'unica differenza in ogni caso è la rimozione del supporto
+   * termico tautologico in `analyzeThermalConsistency`.
+   */
+  driverLaps?: Lap[],
 ): SoftSensorsTimeline {
   const byLap: SoftSensorsLapState[] = [];
 
@@ -765,6 +936,13 @@ export function computeSoftSensorsTimeline(
   const warmupLapsByStint = new Map<number, number>();
   const gripTransitions: GripTransition[] = [];
   let prevGripLabel: TrackGripLabel | null = null;
+
+  // Pre-computa la stima osservazionale del warmup per stint (solo se il
+  // caller ha passato i giri del pilota — altrimenti la variabile resta
+  // undefined e il comportamento delle label è identico al pre-refactor).
+  const observedWarmupByStint = driverLaps
+    ? computeObservedWarmupByStint(stints, driverLaps, pitStops, weatherMap, trackStatusMap, battleContext)
+    : undefined;
 
   for (let lap = 1; lap <= totalLaps; lap++) {
     const stint = findStintForLap(stints, lap);
@@ -778,7 +956,16 @@ export function computeSoftSensorsTimeline(
       ? paceLossResults.find(r => r.stint_number === stint.stint_number) ?? null
       : null;
 
-    const thermal = estimateTyreThermalState(stint, lap, pitStops, weatherMap, trackStatusMap, battleContext);
+    const observedForStint = stint && observedWarmupByStint
+      ? (observedWarmupByStint.has(stint.stint_number)
+          ? observedWarmupByStint.get(stint.stint_number)
+          : undefined)
+      : undefined;
+
+    const thermal = estimateTyreThermalState(
+      stint, lap, pitStops, weatherMap, trackStatusMap, battleContext,
+      observedForStint,
+    );
     const stress = estimateTyreStressState(stint, stintValidation, stintPaceLoss, battleContext, lap, weatherMap, trackStatusMap);
     const grip = estimateTrackGripState(weatherMap, trackStatusMap, lap, totalLaps);
 
@@ -799,7 +986,6 @@ export function computeSoftSensorsTimeline(
       reliability_notes: notes,
     });
 
-    // Track summary metrics
     if (stress.label === "HIGH" && firstHighStressLap == null) firstHighStressLap = lap;
     if (stress.label === "CRITICAL" && firstCriticalStressLap == null) firstCriticalStressLap = lap;
 
@@ -834,6 +1020,7 @@ export function computeSoftSensorsTimeline(
       first_high_stress_lap: firstHighStressLap,
       first_critical_stress_lap: firstCriticalStressLap,
       warmup_laps_by_stint: warmupLapsByStint,
+      observed_warmup_completion_by_stint: observedWarmupByStint,
       grip_transitions: gripTransitions,
       overall_confidence: overallConf,
       reliability_notes: summaryNotes,
@@ -852,7 +1039,11 @@ export function computeWarmupInterpretation(
   timeline: SoftSensorsTimeline,
   stints: StintAnalysis[],
 ): WarmupInterpretation {
-  const observedByStint = new Map<number, number>(timeline.summary.warmup_laps_by_stint);
+  // Preferisci il completamento osservato (dai residui) quando disponibile;
+  // se assente, ripiega sul conteggio dei giri COLD/WARMING_UP della timeline.
+  const observedCompletion = timeline.summary.observed_warmup_completion_by_stint;
+  const warmupCountsByStint = timeline.summary.warmup_laps_by_stint;
+  const observedByStint = new Map<number, number>();
   const anomalies: WarmupAnomaly[] = [];
   const notes: string[] = [];
 
@@ -860,34 +1051,46 @@ export function computeWarmupInterpretation(
     const compound = (stint.compound ?? "").toUpperCase();
     const warmupConfig = TYRE_WARMUP_CONFIG[compound];
     const expectedLaps = warmupConfig?.laps_affected ?? 3;
-    const observedLaps = observedByStint.get(stint.stint_number) ?? 0;
 
     // Skip first stint (no pit stop warmup)
     if (stint.stint_number === 1) continue;
 
-    if (observedLaps === 0) {
-      // No warmup detected — could be missing data
-      notes.push(`Stint ${stint.stint_number}: nessun giro di riscaldamento rilevato (dati potenzialmente incompleti)`);
+    const obsCompletion = observedCompletion?.get(stint.stint_number);
+    if (obsCompletion == null) {
+      // Osservazione non disponibile per lo stint (o non valutata affatto):
+      // dichiaralo esplicitamente e non emettere anomalie.
+      if (observedCompletion) {
+        notes.push(`Stint ${stint.stint_number} (${compound}): warmup osservato non disponibile (giri puliti insufficienti) — confronto vs modello non attuabile`);
+      } else {
+        // Modalità legacy: fallback al conteggio giri warmup dalla timeline.
+        const legacyLaps = warmupCountsByStint.get(stint.stint_number) ?? 0;
+        if (legacyLaps === 0) {
+          notes.push(`Stint ${stint.stint_number}: nessun giro di riscaldamento rilevato (dati potenzialmente incompleti)`);
+        }
+      }
       continue;
     }
 
-    const diff = observedLaps - expectedLaps;
-    if (diff <= -2) {
-      anomalies.push({
-        stint_number: stint.stint_number,
-        type: "FASTER_THAN_EXPECTED",
-        expected_laps: expectedLaps,
-        observed_laps: observedLaps,
-        detail: `Stint ${stint.stint_number} (${compound}): warmup completato in ${observedLaps} giri vs ${expectedLaps} previsti — riscaldamento più rapido del modello`,
-      });
-    } else if (diff >= 2) {
+    observedByStint.set(stint.stint_number, obsCompletion);
+    const diff = obsCompletion - expectedLaps;
+    if (diff > 2) {
       anomalies.push({
         stint_number: stint.stint_number,
         type: "SLOWER_THAN_EXPECTED",
         expected_laps: expectedLaps,
-        observed_laps: observedLaps,
-        detail: `Stint ${stint.stint_number} (${compound}): warmup persistente per ${observedLaps} giri vs ${expectedLaps} previsti — riscaldamento più lento del modello`,
+        observed_laps: obsCompletion,
+        detail: `Stint ${stint.stint_number} (${compound}): warmup osservato completato al giro ${obsCompletion} vs ${expectedLaps} previsti — anomalia (>2 giri oltre il modello)`,
       });
+    } else if (diff < -1) {
+      anomalies.push({
+        stint_number: stint.stint_number,
+        type: "FASTER_THAN_EXPECTED",
+        expected_laps: expectedLaps,
+        observed_laps: obsCompletion,
+        detail: `Stint ${stint.stint_number} (${compound}): warmup osservato anticipato (${obsCompletion} vs ${expectedLaps} previsti)`,
+      });
+    } else {
+      notes.push(`Stint ${stint.stint_number} (${compound}): warmup osservato coerente col modello (${obsCompletion} vs ${expectedLaps})`);
     }
   }
 
@@ -1076,27 +1279,38 @@ function analyzeThermalConsistency(stintLaps: SoftSensorsLapState[], stint: Stin
   const warmupConfig = TYRE_WARMUP_CONFIG[(stint.compound ?? "").toUpperCase()];
   const expectedWarmup = warmupConfig?.laps_affected ?? 3;
 
-  // Count warmup laps (COLD/WARMING_UP at start)
+  // Rimosso il "supporto tautologico" da warmup coerente col modello: quando
+  // le label termiche sono da modello, per costruzione l'osservato coincide
+  // col previsto e non costituisce corroborazione indipendente. Il supporto
+  // termico può ora scattare SOLO quando esiste una stima OSSERVATA del
+  // completamento warmup per lo stint (dai residui dei tempi sul giro).
+  const firstThermal = stintLaps[0]?.tyre_thermal;
+  const warmupSource = firstThermal?.warmup_source;
+  const observedCompletion = firstThermal?.observed_warmup_completion;
+
+  if (warmupSource === "observed" && typeof observedCompletion === "number") {
+    const diff = observedCompletion - expectedWarmup;
+    if (Math.abs(diff) <= 1) {
+      support += 0.15;
+      pushSupport(res, `Warmup osservato coerente col modello (osservato ${observedCompletion} vs ${expectedWarmup} previsti): supporto da segnale indipendente (residui tempi sul giro)`);
+    } else if (diff > 2) {
+      contamination += 0.4;
+      pushContradiction(res, `Warmup osservato prolungato (${observedCompletion} vs ${expectedWarmup} previsti): contraddizione da segnale osservato (residui tempi sul giro)`);
+    }
+  }
+
+  // Conteggio giri COLD/WARMING_UP per la sola contaminazione da warmup
+  // molto lungo (indipendente dalla provenienza della label): resta utile a
+  // segnalare stint dove i primi giri sono potenzialmente contaminati.
   let warmupCount = 0;
   for (const l of stintLaps) {
     if (l.tyre_thermal.label === "COLD" || l.tyre_thermal.label === "WARMING_UP") {
       warmupCount++;
     } else break;
   }
-
-  if (warmupCount > expectedWarmup + 2) {
+  if (warmupCount > expectedWarmup + 2 && warmupSource !== "observed") {
     contamination += 0.4;
     pushContradiction(res, `Warmup prolungato (${warmupCount} giri vs ${expectedWarmup} previsti): primi giri possibilmente contaminati`);
-  } else if (warmupCount > 0 && warmupCount <= expectedWarmup) {
-    support += 0.15;
-    pushSupport(res, `Warmup coerente con il modello (${warmupCount}/${expectedWarmup} giri)`);
-  }
-
-  // Check for rapid IN_WINDOW entry
-  const firstInWindow = stintLaps.findIndex(l => l.tyre_thermal.label === "IN_WINDOW");
-  if (firstInWindow >= 0 && firstInWindow < expectedWarmup - 1) {
-    support += 0.1;
-    pushSupport(res, "Ingresso rapido in finestra termica: buon supporto per la parte centrale dello stint");
   }
 
   // Thermal instability check
