@@ -812,14 +812,28 @@ export function aggregateTimelineConfidence(byLap: SoftSensorsLapState[]): SoftS
  *   - non in battaglia (battleContext.battle_laps)
  *   - non pit-out (is_pit_out_lap) e non pit-in (lap coincidente con un pitStop)
  *
- * Baseline = mediana dei giri puliti con tyreAge ∈ [lapsAffected, lapsAffected+5].
- * Occorrono almeno 2 giri puliti sia nella finestra baseline sia nella fase
- * iniziale (tyreAge < lapsAffected+5) per considerare la stima disponibile.
+ * Baseline (robusta alla contaminazione da warmup):
+ *   mediana dei 4 giri puliti PIÙ VELOCI con tyreAge ∈ [0, lapsAffected+8].
+ *   I giri più veloci sono per costruzione post-warmup e non possono essere
+ *   contaminati da esso — ancorare la baseline a una finestra "dove il modello
+ *   prevede il regime" gonfia la baseline quando il warmup è realmente
+ *   prolungato e fa scendere i residui sotto soglia troppo presto.
+ *   Se i puliti in finestra sono <4 si usano quelli disponibili; se sono <2
+ *   la stima resta non disponibile (fallback al modello con confidence bassa).
  *
- * Completamento osservato = primo tyreAge N tale che i giri di tyreAge N e N+1
- * siano entrambi puliti e con residuo (lap_duration − baseline) < 0.3s.
- * Se nessun N soddisfa entro la fase iniziale osservabile, si assume l'ultimo
- * tyreAge tentato (fallback conservativo verso il modello: N = lapsAffected).
+ *   Bias residuo dichiarato: prendere la mediana dei più veloci è leggermente
+ *   OTTIMISTICA a causa del degrado entro la finestra (giri più tardivi sono
+ *   sistematicamente più lenti dei più precoci a parità di temperatura), il
+ *   che rende la stima marginalmente più incline a dichiarare warmup
+ *   PROLUNGATO e marginalmente meno incline a dichiararlo ANTICIPATO. È la
+ *   direzione accettabile: l'anomalia operativa da non perdere è il
+ *   prolungamento (ha implicazioni di setup / temperatura ambiente).
+ *
+ * Completamento osservato = primo tyreAge N ∈ [0, lapsAffected+8] tale che i
+ * giri di tyreAge N e N+1 siano entrambi puliti e con residuo
+ * (lap_duration − baseline) < 0.3s.
+ * Se nessun N soddisfa entro la finestra di scansione, la funzione restituisce
+ * null e il caller usa il modello con confidence degradata.
  */
 function computeObservedWarmupByStint(
   stints: StintAnalysis[],
@@ -852,44 +866,47 @@ function computeObservedWarmupByStint(
   for (const stint of stints) {
     const compound = (stint.compound ?? "").toUpperCase();
     const lapsAffected = TYRE_WARMUP_CONFIG[compound]?.laps_affected ?? 3;
+    const windowMaxAge = lapsAffected + 8;
 
-    // Baseline window: tyreAge in [lapsAffected, lapsAffected+5]
-    const baselineDurations: number[] = [];
-    for (let tyreAge = lapsAffected; tyreAge <= lapsAffected + 5; tyreAge++) {
+    // Baseline: raccogli i giri puliti nella finestra estesa [0, lapsAffected+8].
+    const cleanDurations: number[] = [];
+    const maxAgeInStint = stint.lap_end - stint.lap_start;
+    for (let tyreAge = 0; tyreAge <= Math.min(windowMaxAge, maxAgeInStint); tyreAge++) {
       const lapN = stint.lap_start + tyreAge;
-      if (lapN > stint.lap_end) break;
       if (isClean(lapN)) {
-        const d = lapsByNumber.get(lapN)!.lap_duration!;
-        baselineDurations.push(d);
+        cleanDurations.push(lapsByNumber.get(lapN)!.lap_duration!);
       }
     }
-    if (baselineDurations.length < 2) {
+    if (cleanDurations.length < 2) {
       out.set(stint.stint_number, null);
       continue;
     }
-    const sorted = [...baselineDurations].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const baseline = sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
-
-    // Initial phase: tyreAge < lapsAffected+5. Need ≥2 clean laps here to
-    // even attempt an observation.
-    let initialClean = 0;
-    const maxInitialAge = Math.min(lapsAffected + 4, stint.lap_end - stint.lap_start);
-    for (let tyreAge = 0; tyreAge <= maxInitialAge; tyreAge++) {
-      if (isClean(stint.lap_start + tyreAge)) initialClean++;
+    // Safeguard contro fasi iniziali completamente contaminate: se non ci sono
+    // almeno 2 giri puliti con tyreAge < lapsAffected non possiamo osservare
+    // la fase di warmup e ritorniamo null (fallback al modello). Senza questo
+    // check un'unica coppia pulita tardiva farebbe apparire il warmup come
+    // "già completato" al primo giro pulito disponibile.
+    let earlyClean = 0;
+    for (let tyreAge = 0; tyreAge < lapsAffected; tyreAge++) {
+      if (isClean(stint.lap_start + tyreAge)) earlyClean++;
     }
-    if (initialClean < 2) {
+    if (earlyClean < 2) {
       out.set(stint.stint_number, null);
       continue;
     }
+    // Mediana dei 4 (o meno) giri puliti più veloci nella finestra.
+    const sortedAsc = [...cleanDurations].sort((a, b) => a - b);
+    const fastest = sortedAsc.slice(0, Math.min(4, sortedAsc.length));
+    const mid = Math.floor(fastest.length / 2);
+    const baseline = fastest.length % 2 === 0
+      ? (fastest[mid - 1] + fastest[mid]) / 2
+      : fastest[mid];
 
-    // Find first tyreAge N with two consecutive clean laps whose residual
-    // (duration − baseline) < 0.3s.
+    // Trova il primo tyreAge N ∈ [0, lapsAffected+8] con due giri consecutivi
+    // puliti e residuo (duration − baseline) < 0.3s.
     const THRESHOLD = 0.3;
     let observed: number | null = null;
-    const scanEnd = Math.min(lapsAffected + 5, stint.lap_end - stint.lap_start - 1);
+    const scanEnd = Math.min(windowMaxAge, maxAgeInStint - 1);
     for (let tyreAge = 0; tyreAge <= scanEnd; tyreAge++) {
       const lap1 = stint.lap_start + tyreAge;
       const lap2 = lap1 + 1;
@@ -901,9 +918,8 @@ function computeObservedWarmupByStint(
         break;
       }
     }
-    // Fallback conservativo: se non si trova nessuna coppia entro la finestra,
-    // consideriamo il warmup non stimabile → null (verrà usato il modello con
-    // confidence degradata).
+    // Se nessuna coppia soddisfa: null → il caller ripiega sul modello con
+    // confidence degradata (nessuna assunzione N = lapsAffected).
     out.set(stint.stint_number, observed);
   }
 

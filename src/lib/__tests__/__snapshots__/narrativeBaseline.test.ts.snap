@@ -358,7 +358,7 @@ exports[`VRE narrative baseline (pre-refactor snapshot) > scenario C — invalid
     "Warmup più rapido del previsto nello stint 2 (1 giri vs 4 previsti)",
     "Stress gomma elevato a partire dal giro 24 (stint 2, HARD)",
     "Grip pista: transizione da in miglioramento a stabile al giro 10",
-    "Soft sensors integrati nello scoring strategico come input debole (gate: attivo). Effetto massimo limitato a ±1.0s per strategia.",
+    "Soft sensors esclusi dallo scoring: Supporto validazione degrado debole (WEAK) — soft sensors non affidabili per lo scoring",
   ],
   "ok": true,
   "recommended": {
