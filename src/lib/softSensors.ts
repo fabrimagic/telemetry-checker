@@ -1039,7 +1039,11 @@ export function computeWarmupInterpretation(
   timeline: SoftSensorsTimeline,
   stints: StintAnalysis[],
 ): WarmupInterpretation {
-  const observedByStint = new Map<number, number>(timeline.summary.warmup_laps_by_stint);
+  // Preferisci il completamento osservato (dai residui) quando disponibile;
+  // se assente, ripiega sul conteggio dei giri COLD/WARMING_UP della timeline.
+  const observedCompletion = timeline.summary.observed_warmup_completion_by_stint;
+  const warmupCountsByStint = timeline.summary.warmup_laps_by_stint;
+  const observedByStint = new Map<number, number>();
   const anomalies: WarmupAnomaly[] = [];
   const notes: string[] = [];
 
@@ -1047,34 +1051,46 @@ export function computeWarmupInterpretation(
     const compound = (stint.compound ?? "").toUpperCase();
     const warmupConfig = TYRE_WARMUP_CONFIG[compound];
     const expectedLaps = warmupConfig?.laps_affected ?? 3;
-    const observedLaps = observedByStint.get(stint.stint_number) ?? 0;
 
     // Skip first stint (no pit stop warmup)
     if (stint.stint_number === 1) continue;
 
-    if (observedLaps === 0) {
-      // No warmup detected — could be missing data
-      notes.push(`Stint ${stint.stint_number}: nessun giro di riscaldamento rilevato (dati potenzialmente incompleti)`);
+    const obsCompletion = observedCompletion?.get(stint.stint_number);
+    if (obsCompletion == null) {
+      // Osservazione non disponibile per lo stint (o non valutata affatto):
+      // dichiaralo esplicitamente e non emettere anomalie.
+      if (observedCompletion) {
+        notes.push(`Stint ${stint.stint_number} (${compound}): warmup osservato non disponibile (giri puliti insufficienti) — confronto vs modello non attuabile`);
+      } else {
+        // Modalità legacy: fallback al conteggio giri warmup dalla timeline.
+        const legacyLaps = warmupCountsByStint.get(stint.stint_number) ?? 0;
+        if (legacyLaps === 0) {
+          notes.push(`Stint ${stint.stint_number}: nessun giro di riscaldamento rilevato (dati potenzialmente incompleti)`);
+        }
+      }
       continue;
     }
 
-    const diff = observedLaps - expectedLaps;
-    if (diff <= -2) {
-      anomalies.push({
-        stint_number: stint.stint_number,
-        type: "FASTER_THAN_EXPECTED",
-        expected_laps: expectedLaps,
-        observed_laps: observedLaps,
-        detail: `Stint ${stint.stint_number} (${compound}): warmup completato in ${observedLaps} giri vs ${expectedLaps} previsti — riscaldamento più rapido del modello`,
-      });
-    } else if (diff >= 2) {
+    observedByStint.set(stint.stint_number, obsCompletion);
+    const diff = obsCompletion - expectedLaps;
+    if (diff > 2) {
       anomalies.push({
         stint_number: stint.stint_number,
         type: "SLOWER_THAN_EXPECTED",
         expected_laps: expectedLaps,
-        observed_laps: observedLaps,
-        detail: `Stint ${stint.stint_number} (${compound}): warmup persistente per ${observedLaps} giri vs ${expectedLaps} previsti — riscaldamento più lento del modello`,
+        observed_laps: obsCompletion,
+        detail: `Stint ${stint.stint_number} (${compound}): warmup osservato completato al giro ${obsCompletion} vs ${expectedLaps} previsti — anomalia (>2 giri oltre il modello)`,
       });
+    } else if (diff < -1) {
+      anomalies.push({
+        stint_number: stint.stint_number,
+        type: "FASTER_THAN_EXPECTED",
+        expected_laps: expectedLaps,
+        observed_laps: obsCompletion,
+        detail: `Stint ${stint.stint_number} (${compound}): warmup osservato anticipato (${obsCompletion} vs ${expectedLaps} previsti)`,
+      });
+    } else {
+      notes.push(`Stint ${stint.stint_number} (${compound}): warmup osservato coerente col modello (${obsCompletion} vs ${expectedLaps})`);
     }
   }
 
