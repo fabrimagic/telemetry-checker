@@ -31,6 +31,13 @@ import { TYRE_WARMUP_CONFIG } from "./tyreWarmup";
 
 export type SoftSensorConfidence = "HIGH" | "MEDIUM" | "LOW";
 
+/**
+ * NOTE: "OVERHEATED" è una label riservata: nessun estimatore attuale la emette.
+ * Viene mantenuta nel tipo per compatibilità con i consumatori a valle (gate,
+ * refinement e decision context) che la contemplano in modo difensivo. I rami
+ * che la consumano non sono attivi finché non verrà introdotto un estimatore
+ * dedicato.
+ */
 export type TyreThermalLabel = "COLD" | "WARMING_UP" | "IN_WINDOW" | "HOT" | "OVERHEATED" | "UNKNOWN";
 export type TyreStressLabel = "LOW" | "MODERATE" | "HIGH" | "CRITICAL" | "UNKNOWN";
 export type TrackGripLabel = "LOW_GRIP" | "IMPROVING" | "STABLE" | "FALLING" | "MIXED" | "UNKNOWN";
