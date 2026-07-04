@@ -881,6 +881,19 @@ function computeObservedWarmupByStint(
       out.set(stint.stint_number, null);
       continue;
     }
+    // Safeguard contro fasi iniziali completamente contaminate: se non ci sono
+    // almeno 2 giri puliti con tyreAge < lapsAffected non possiamo osservare
+    // la fase di warmup e ritorniamo null (fallback al modello). Senza questo
+    // check un'unica coppia pulita tardiva farebbe apparire il warmup come
+    // "già completato" al primo giro pulito disponibile.
+    let earlyClean = 0;
+    for (let tyreAge = 0; tyreAge < lapsAffected; tyreAge++) {
+      if (isClean(stint.lap_start + tyreAge)) earlyClean++;
+    }
+    if (earlyClean < 2) {
+      out.set(stint.stint_number, null);
+      continue;
+    }
     // Mediana dei 4 (o meno) giri puliti più veloci nella finestra.
     const sortedAsc = [...cleanDurations].sort((a, b) => a - b);
     const fastest = sortedAsc.slice(0, Math.min(4, sortedAsc.length));
