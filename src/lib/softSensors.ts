@@ -1279,27 +1279,38 @@ function analyzeThermalConsistency(stintLaps: SoftSensorsLapState[], stint: Stin
   const warmupConfig = TYRE_WARMUP_CONFIG[(stint.compound ?? "").toUpperCase()];
   const expectedWarmup = warmupConfig?.laps_affected ?? 3;
 
-  // Count warmup laps (COLD/WARMING_UP at start)
+  // Rimosso il "supporto tautologico" da warmup coerente col modello: quando
+  // le label termiche sono da modello, per costruzione l'osservato coincide
+  // col previsto e non costituisce corroborazione indipendente. Il supporto
+  // termico può ora scattare SOLO quando esiste una stima OSSERVATA del
+  // completamento warmup per lo stint (dai residui dei tempi sul giro).
+  const firstThermal = stintLaps[0]?.tyre_thermal;
+  const warmupSource = firstThermal?.warmup_source;
+  const observedCompletion = firstThermal?.observed_warmup_completion;
+
+  if (warmupSource === "observed" && typeof observedCompletion === "number") {
+    const diff = observedCompletion - expectedWarmup;
+    if (Math.abs(diff) <= 1) {
+      support += 0.15;
+      pushSupport(res, `Warmup osservato coerente col modello (osservato ${observedCompletion} vs ${expectedWarmup} previsti): supporto da segnale indipendente (residui tempi sul giro)`);
+    } else if (diff > 2) {
+      contamination += 0.4;
+      pushContradiction(res, `Warmup osservato prolungato (${observedCompletion} vs ${expectedWarmup} previsti): contraddizione da segnale osservato (residui tempi sul giro)`);
+    }
+  }
+
+  // Conteggio giri COLD/WARMING_UP per la sola contaminazione da warmup
+  // molto lungo (indipendente dalla provenienza della label): resta utile a
+  // segnalare stint dove i primi giri sono potenzialmente contaminati.
   let warmupCount = 0;
   for (const l of stintLaps) {
     if (l.tyre_thermal.label === "COLD" || l.tyre_thermal.label === "WARMING_UP") {
       warmupCount++;
     } else break;
   }
-
-  if (warmupCount > expectedWarmup + 2) {
+  if (warmupCount > expectedWarmup + 2 && warmupSource !== "observed") {
     contamination += 0.4;
     pushContradiction(res, `Warmup prolungato (${warmupCount} giri vs ${expectedWarmup} previsti): primi giri possibilmente contaminati`);
-  } else if (warmupCount > 0 && warmupCount <= expectedWarmup) {
-    support += 0.15;
-    pushSupport(res, `Warmup coerente con il modello (${warmupCount}/${expectedWarmup} giri)`);
-  }
-
-  // Check for rapid IN_WINDOW entry
-  const firstInWindow = stintLaps.findIndex(l => l.tyre_thermal.label === "IN_WINDOW");
-  if (firstInWindow >= 0 && firstInWindow < expectedWarmup - 1) {
-    support += 0.1;
-    pushSupport(res, "Ingresso rapido in finestra termica: buon supporto per la parte centrale dello stint");
   }
 
   // Thermal instability check
