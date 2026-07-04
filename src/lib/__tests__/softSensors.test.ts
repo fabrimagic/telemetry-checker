@@ -338,3 +338,112 @@ describe("computeStrategySoftSensorAdjustment — mapping by tyre life, not abso
     expect(adj.confidence).toBe("HIGH"); // total<0.05 forces HIGH per rule
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════
+ * analyzeStressConsistency (indirectly via computeDegradationValidationContext)
+ * — circolarità stress ↔ validazione degrado
+ * ══════════════════════════════════════════════════════════════════ */
+
+import { computeDegradationValidationContext as _cdvc } from "../softSensors";
+
+function makeStressState(
+  lap: number,
+  stintNumber: number,
+  observational: number,
+  derived: number,
+): SoftSensorsLapState {
+  const total = Math.min(1, observational + derived);
+  const scale = observational + derived > 0 ? total / (observational + derived) : 0;
+  const obsRounded = Math.round(observational * scale * 100) / 100;
+  const scoreRounded = Math.round(total * 100) / 100;
+  const derRounded = Math.round((scoreRounded - obsRounded) * 100) / 100;
+  let label: SoftSensorsLapState["tyre_stress"]["label"] = "LOW";
+  if (total >= 0.4) label = "HIGH";
+  else if (total >= 0.2) label = "MODERATE";
+  return {
+    lap_number: lap,
+    stint_number: stintNumber,
+    tyre_thermal: { label: "IN_WINDOW", score: 0.5, confidence: "HIGH", reasons: [] },
+    tyre_stress: {
+      label,
+      score: scoreRounded,
+      confidence: "HIGH",
+      reasons: [],
+      observational_score: obsRounded,
+      derived_score: derRounded,
+    },
+    track_grip: { label: "STABLE", score: 0.5, confidence: "HIGH", reasons: [] },
+    overall_confidence: "HIGH",
+    reliability_notes: [],
+  };
+}
+
+describe("analyzeStressConsistency — circolarità stress ↔ validazione", () => {
+  it("caso di circolarità pura: stress da sola slope alta, senza segnali osservazionali → nessun supporto, contraddizione rilevata", () => {
+    const laps: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 15; l++) laps.push(makeStressState(l, 1, 0, 0.65));
+    const timeline = makeTimeline(laps);
+    const stints = [makeStint(1, "MEDIUM", 1, 15)];
+    const dv = { original: { stint: 1 }, status: "VALID", effective_slope: 0.15 } as unknown as DegradationValidationResult;
+
+    const ctx = _cdvc(timeline, stints, [dv]);
+    const stintCtx = ctx.by_stint[0];
+    expect(stintCtx).toBeDefined();
+    const stressSupport = stintCtx.support_signals.filter(s => /stress/i.test(s));
+    expect(stressSupport).toHaveLength(0);
+    expect(stintCtx.contradiction_signals.some(c => /Stress osservazionale basso nonostante slope elevata/i.test(c))).toBe(true);
+  });
+
+  it("caso genuino: stress osservazionale concentrato nella seconda metà con validazione VALID → supporto", () => {
+    const laps: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 10; l++) laps.push(makeStressState(l, 1, 0.05, 0));
+    for (let l = 11; l <= 20; l++) laps.push(makeStressState(l, 1, 0.4, 0));
+    const timeline = makeTimeline(laps);
+    const stints = [makeStint(1, "MEDIUM", 1, 20)];
+    const dv = { original: { stint: 1 }, status: "VALID", effective_slope: 0.08 } as unknown as DegradationValidationResult;
+
+    const ctx = _cdvc(timeline, stints, [dv]);
+    const stintCtx = ctx.by_stint[0];
+    expect(stintCtx.support_signals.some(s => /stress osservazionale/i.test(s))).toBe(true);
+  });
+
+  it("pace_loss CLIFF_RISK NON aggiunge più supporto (rimosso doppio conteggio)", () => {
+    const laps: SoftSensorsLapState[] = [];
+    for (let l = 1; l <= 15; l++) laps.push(makeStressState(l, 1, 0, 0.6));
+    const timeline = makeTimeline(laps);
+    const stints = [makeStint(1, "MEDIUM", 1, 15)];
+    const dv = { original: { stint: 1 }, status: "VALID", effective_slope: 0.08 } as unknown as DegradationValidationResult;
+    const paceLoss = { stint_number: 1, pace_loss_status: "CLIFF_RISK" } as unknown as import("../stintPaceLoss").StintPaceLossResult;
+
+    const ctx = _cdvc(timeline, stints, [dv], [paceLoss]);
+    const stintCtx = ctx.by_stint[0];
+    expect(stintCtx.support_signals.some(s => /cliff/i.test(s) || /convergente/i.test(s))).toBe(false);
+  });
+
+  it("equivalenza: observational_score + derived_score === score, e label invariata", () => {
+    const stint: StintAnalysis = {
+      stint_number: 1, compound: "MEDIUM", lap_start: 1, lap_end: 20, laps_count: 20,
+      tyre_age_at_start: 0, avg_lap_time: null, degradation_slope: null, r_squared: null, excluded_laps: 0,
+    };
+    const dv = { status: "VALID", effective_slope: 0.08 } as unknown as DegradationValidationResult;
+    const paceLoss = { pace_loss_status: "HIGH_LOSS" } as unknown as import("../stintPaceLoss").StintPaceLossResult;
+    const battle: BattleContext = {
+      total_episodes: 1, total_battle_laps: 1, attacking_episodes: 1, defending_episodes: 0,
+      longest_episode: null, episodes: [], battle_laps: new Set<number>([12]),
+    };
+    const weatherMap = new Map<number, WeatherCondition>();
+    const trackStatusMap = new Map<number, TrackStatus>();
+    for (let l = 1; l <= 20; l++) { weatherMap.set(l, "DRY"); trackStatusMap.set(l, "GREEN"); }
+
+    // Lap 12: ageRatio = 11/20 = 0.55 → obs 0.15; battle → obs +0.10 → obs 0.25
+    // slope 0.08 → der 0.15; pace HIGH_LOSS → der +0.20 → der 0.35
+    // total = 0.60, label HIGH.
+    const res = estimateTyreStressState(stint, dv, paceLoss, battle, 12, weatherMap, trackStatusMap);
+    expect(res.score).not.toBeNull();
+    const obs = res.observational_score ?? 0;
+    const der = res.derived_score ?? 0;
+    expect(Math.round((obs + der) * 100) / 100).toBe(res.score);
+    expect(res.label).toBe("HIGH");
+  });
+});
+
