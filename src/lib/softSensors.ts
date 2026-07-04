@@ -891,21 +891,24 @@ export function computeDegradationValidationContext(
     const gripResult = analyzeGripContamination(stintLaps, dv, trackStatusMap);
 
     // ── AGGREGATION ──
-    const supportSignals: string[] = [];
-    const contradictionSignals: string[] = [];
-    const notes: string[] = [];
-
-    // Collect signals
-    supportSignals.push(...thermalResult.notes.filter(n => !n.includes("contamin")));
-    supportSignals.push(...stressResult.notes.filter(n => !n.includes("incoeren")));
-    supportSignals.push(...gripResult.notes.filter(n => n.includes("stabil") || n.includes("favorev")));
-
-    contradictionSignals.push(...thermalResult.notes.filter(n => n.includes("contamin") || n.includes("instabil")));
-    contradictionSignals.push(...stressResult.notes.filter(n => n.includes("incoeren") || n.includes("contamin")));
-    contradictionSignals.push(...gripResult.notes.filter(n => n.includes("contamin") || n.includes("instabil")));
-
-    // Notes = all sub-notes
-    notes.push(...thermalResult.notes, ...stressResult.notes, ...gripResult.notes);
+    // I singoli analyzer classificano ogni nota alla fonte come "support" o
+    // "contradiction"; qui aggreghiamo direttamente senza più filtrare per
+    // substring del testo (che era fragile e perdeva note come "grip in calo").
+    const supportSignals: string[] = [
+      ...thermalResult.support_notes,
+      ...stressResult.support_notes,
+      ...gripResult.support_notes,
+    ];
+    const contradictionSignals: string[] = [
+      ...thermalResult.contradiction_notes,
+      ...stressResult.contradiction_notes,
+      ...gripResult.contradiction_notes,
+    ];
+    const notes: string[] = [
+      ...thermalResult.notes,
+      ...stressResult.notes,
+      ...gripResult.notes,
+    ];
 
     // Low confidence laps
     const lowConfLaps = stintLaps.filter(l => l.overall_confidence === "LOW");
