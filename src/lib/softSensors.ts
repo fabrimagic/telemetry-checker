@@ -18,6 +18,7 @@
  */
 
 import type { StintAnalysis, PitStopAnalysis } from "./virtualRaceEngineer";
+import type { Lap } from "./openf1";
 import type { WeatherCondition } from "./weatherClassification";
 import type { TrackStatus } from "./trackStatusClassification";
 import type { DegradationValidationResult } from "./degradationValidation";
