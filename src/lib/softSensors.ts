@@ -796,7 +796,117 @@ export function aggregateTimelineConfidence(byLap: SoftSensorsLapState[]): SoftS
   if (lowCount / total > 0.4) return "LOW";
   if (nonHighCount / total > 0.3) return "MEDIUM";
   return "HIGH";
+
+/**
+ * Stima osservazionale del completamento del warmup per stint, dai residui
+ * dei tempi sul giro. Restituisce il tyreAge a partire dal quale lo stint è
+ * considerato in finestra termica; `null` se non stimabile.
+ *
+ * Criterio "giro pulito" (per baseline e per la valutazione del warmup):
+ *   - lap_duration disponibile
+ *   - track status GREEN
+ *   - meteo diverso da WET/MIXED
+ *   - non in battaglia (battleContext.battle_laps)
+ *   - non pit-out (is_pit_out_lap) e non pit-in (lap coincidente con un pitStop)
+ *
+ * Baseline = mediana dei giri puliti con tyreAge ∈ [lapsAffected, lapsAffected+5].
+ * Occorrono almeno 2 giri puliti sia nella finestra baseline sia nella fase
+ * iniziale (tyreAge < lapsAffected+5) per considerare la stima disponibile.
+ *
+ * Completamento osservato = primo tyreAge N tale che i giri di tyreAge N e N+1
+ * siano entrambi puliti e con residuo (lap_duration − baseline) < 0.3s.
+ * Se nessun N soddisfa entro la fase iniziale osservabile, si assume l'ultimo
+ * tyreAge tentato (fallback conservativo verso il modello: N = lapsAffected).
+ */
+function computeObservedWarmupByStint(
+  stints: StintAnalysis[],
+  driverLaps: Lap[],
+  pitStops: PitStopAnalysis[],
+  weatherMap: Map<number, WeatherCondition>,
+  trackStatusMap: Map<number, TrackStatus>,
+  battleContext: BattleContext | null,
+): Map<number, number | null> {
+  const out = new Map<number, number | null>();
+  const lapsByNumber = new Map<number, Lap>();
+  for (const l of driverLaps) {
+    if (l.lap_number != null) lapsByNumber.set(l.lap_number, l);
+  }
+  const pitLapSet = new Set<number>(pitStops.map(p => p.lap_number));
+
+  const isClean = (lapNumber: number): boolean => {
+    const lap = lapsByNumber.get(lapNumber);
+    if (!lap || lap.lap_duration == null) return false;
+    const ts = trackStatusMap.get(lapNumber);
+    if (ts && ts !== "GREEN") return false;
+    const w = weatherMap.get(lapNumber);
+    if (w === "WET" || w === "MIXED") return false;
+    if (battleContext?.battle_laps.has(lapNumber)) return false;
+    if (lap.is_pit_out_lap) return false;
+    if (pitLapSet.has(lapNumber)) return false;
+    return true;
+  };
+
+  for (const stint of stints) {
+    const compound = (stint.compound ?? "").toUpperCase();
+    const lapsAffected = TYRE_WARMUP_CONFIG[compound]?.laps_affected ?? 3;
+
+    // Baseline window: tyreAge in [lapsAffected, lapsAffected+5]
+    const baselineDurations: number[] = [];
+    for (let tyreAge = lapsAffected; tyreAge <= lapsAffected + 5; tyreAge++) {
+      const lapN = stint.lap_start + tyreAge;
+      if (lapN > stint.lap_end) break;
+      if (isClean(lapN)) {
+        const d = lapsByNumber.get(lapN)!.lap_duration!;
+        baselineDurations.push(d);
+      }
+    }
+    if (baselineDurations.length < 2) {
+      out.set(stint.stint_number, null);
+      continue;
+    }
+    const sorted = [...baselineDurations].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const baseline = sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+
+    // Initial phase: tyreAge < lapsAffected+5. Need ≥2 clean laps here to
+    // even attempt an observation.
+    let initialClean = 0;
+    const maxInitialAge = Math.min(lapsAffected + 4, stint.lap_end - stint.lap_start);
+    for (let tyreAge = 0; tyreAge <= maxInitialAge; tyreAge++) {
+      if (isClean(stint.lap_start + tyreAge)) initialClean++;
+    }
+    if (initialClean < 2) {
+      out.set(stint.stint_number, null);
+      continue;
+    }
+
+    // Find first tyreAge N with two consecutive clean laps whose residual
+    // (duration − baseline) < 0.3s.
+    const THRESHOLD = 0.3;
+    let observed: number | null = null;
+    const scanEnd = Math.min(lapsAffected + 5, stint.lap_end - stint.lap_start - 1);
+    for (let tyreAge = 0; tyreAge <= scanEnd; tyreAge++) {
+      const lap1 = stint.lap_start + tyreAge;
+      const lap2 = lap1 + 1;
+      if (!isClean(lap1) || !isClean(lap2)) continue;
+      const d1 = lapsByNumber.get(lap1)!.lap_duration! - baseline;
+      const d2 = lapsByNumber.get(lap2)!.lap_duration! - baseline;
+      if (d1 < THRESHOLD && d2 < THRESHOLD) {
+        observed = tyreAge;
+        break;
+      }
+    }
+    // Fallback conservativo: se non si trova nessuna coppia entro la finestra,
+    // consideriamo il warmup non stimabile → null (verrà usato il modello con
+    // confidence degradata).
+    out.set(stint.stint_number, observed);
+  }
+
+  return out;
 }
+
 
 export function computeSoftSensorsTimeline(
   stints: StintAnalysis[],
