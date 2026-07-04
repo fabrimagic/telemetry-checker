@@ -545,12 +545,21 @@ export function estimateTrackGripState(
     sources.push("track_status");
   }
 
+  // La finestra "earlier" deve contenere solo giri STRETTAMENTE precedenti
+  // all'inizio della finestra "recent" (altrimenti nei primi giri le due
+  // finestre si sovrappongono e gli stessi giri vengono contati due volte).
+  const recentStart = Math.max(1, currentLap - windowSize + 1);
+  const earlierEnd = recentStart - 1;
+  const earlierStart = Math.max(1, earlierEnd - windowSize + 1);
   const earlierWeather: WeatherCondition[] = [];
-  for (let l = Math.max(1, currentLap - windowSize * 2 + 1); l <= Math.max(1, currentLap - windowSize); l++) {
-    const w = weatherMap.get(l);
-    if (w) earlierWeather.push(w);
+  if (earlierEnd >= earlierStart && earlierEnd >= 1) {
+    for (let l = earlierStart; l <= earlierEnd; l++) {
+      const w = weatherMap.get(l);
+      if (w) earlierWeather.push(w);
+    }
   }
   const earlierWet = earlierWeather.filter(w => w === "WET").length;
+  const hasEarlierWindow = earlierWeather.length > 0;
 
   let label: TrackGripLabel;
   let score: number | null = null;
@@ -569,7 +578,9 @@ export function estimateTrackGripState(
     score = 0.45;
     reasons.push("Prevalenza di condizioni miste nella finestra recente");
     confidence = "MEDIUM";
-  } else if (earlierWet > 0 && wetCount === 0 && dryCount > 0) {
+  } else if (hasEarlierWindow && earlierWet > 0 && wetCount === 0 && dryCount > 0) {
+    // Richiede una finestra earlier realmente disponibile: senza giri
+    // precedenti sufficienti la transizione bagnato→asciutto non è valutabile.
     label = "IMPROVING";
     score = 0.55;
     reasons.push("Transizione da bagnato ad asciutto: pista in fase di asciugatura");
@@ -588,9 +599,14 @@ export function estimateTrackGripState(
     } else {
       label = "IMPROVING";
       score = 0.55;
-      reasons.push("Fase iniziale gara su asciutto: pista in fase di gommatura");
+      reasons.push("Fase iniziale gara su asciutto: pista in fase di gommatura (assunzione di evoluzione tipica della pista, non verificata sui tempi)");
+      confidence = "MEDIUM";
     }
   } else {
+    label = "UNKNOWN";
+    reasons.push("Segnali insufficienti per determinare lo stato grip");
+    confidence = "LOW";
+  }
     label = "UNKNOWN";
     reasons.push("Segnali insufficienti per determinare lo stato grip");
     confidence = "LOW";
