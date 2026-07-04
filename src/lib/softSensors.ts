@@ -1134,24 +1134,47 @@ function analyzeStressConsistency(
   let contamination = 0;
   const hasHighSlope = dv.effective_slope > 0.06;
 
-  const highStressLaps = stintLaps.filter(l => l.tyre_stress.label === "HIGH" || l.tyre_stress.label === "CRITICAL");
-  const lowStressLaps = stintLaps.filter(l => l.tyre_stress.label === "LOW");
+  // Corroborazione indipendente dal fit: usiamo ESCLUSIVAMENTE la componente
+  // osservazionale dello stress (età gomma, battaglia, restart, meteo misto),
+  // che per costruzione NON contiene contributi dalla effective_slope o dal
+  // pace_loss. Senza questa separazione la corroborazione sarebbe circolare
+  // (slope alta → stress alto → "conferma" della slope).
+  //
+  // Soglie:
+  //  - 0.3: coincide con la soglia MODERATE del sensore di stress totale;
+  //    identifica un giro con almeno un contributo osservazionale robusto
+  //    (es. ageRatio > 0.8) oppure due contributi minori sommati.
+  //  - 0.15: soglia "basso stress osservazionale", coerente col vecchio
+  //    concetto di label LOW (< 0.2 sullo score totale) traslato sulla
+  //    componente osservazionale.
+  const OBS_HIGH = 0.3;
+  const OBS_LOW = 0.15;
+  const obsOf = (l: SoftSensorsLapState): number => l.tyre_stress.observational_score ?? 0;
+
+  const highObsLaps = stintLaps.filter(l => obsOf(l) >= OBS_HIGH);
+  const lowObsLaps = stintLaps.filter(l => obsOf(l) < OBS_LOW);
   const unknownStress = stintLaps.filter(l => l.tyre_stress.label === "UNKNOWN");
 
   const secondHalf = stintLaps.slice(Math.floor(stintLaps.length / 2));
-  const secondHalfHighStress = secondHalf.filter(l => l.tyre_stress.label === "HIGH" || l.tyre_stress.label === "CRITICAL");
+  const secondHalfHighObs = secondHalf.filter(l => obsOf(l) >= OBS_HIGH);
 
-  if (highStressLaps.length > stintLaps.length * 0.4 && dv.status === "VALID") {
-    support += 0.3;
-    pushSupport(res, "Stress elevato coerente con degrado validato: supporto forte");
-  } else if (secondHalfHighStress.length > secondHalf.length * 0.5 && dv.status === "VALID") {
-    support += 0.2;
-    pushSupport(res, "Stress crescente nella seconda metà dello stint: pattern coerente con degrado progressivo");
+  if (dv.status === "VALID") {
+    if (highObsLaps.length > stintLaps.length * 0.4) {
+      support += 0.3;
+      pushSupport(res, "Stress osservazionale elevato in oltre il 40% dello stint validato: corroborazione da segnali indipendenti dal fit (età gomma, battaglie, restart)");
+    } else if (secondHalfHighObs.length > secondHalf.length * 0.5) {
+      support += 0.2;
+      pushSupport(res, "Stress osservazionale concentrato nella seconda metà dello stint validato: pattern indipendente dal fit coerente con degrado progressivo");
+    }
   }
 
-  if (lowStressLaps.length > stintLaps.length * 0.7 && hasHighSlope) {
+  // Contraddizione stress osservazionale basso ↔ slope elevata: ora è un vero
+  // rilevatore di incoerenza, perché lo stress osservazionale non include la
+  // slope stessa (nel vecchio criterio slope alta gonfiava direttamente lo
+  // stress totale, rendendo questa contraddizione quasi irraggiungibile).
+  if (lowObsLaps.length > stintLaps.length * 0.7 && hasHighSlope) {
     contamination += 0.4;
-    pushContradiction(res, "Stress basso nonostante slope elevata: possibile incoerenza o contaminazione del fit");
+    pushContradiction(res, "Stress osservazionale basso nonostante slope elevata: incoerenza tra segnali indipendenti dal fit e degrado stimato");
   }
 
   if (unknownStress.length > stintLaps.length * 0.4) {
@@ -1159,13 +1182,12 @@ function analyzeStressConsistency(
     pushContradiction(res, "Troppi giri con stress non determinabile: segnale debole");
   }
 
-  if (paceLoss) {
-    if (paceLoss.pace_loss_status === "CLIFF_RISK" && highStressLaps.length > 2) {
-      support += 0.15;
-      pushSupport(res, "Pace loss con rischio cliff convergente con stress elevato");
-    } else if (paceLoss.pace_loss_status === "UNRELIABLE") {
-      contamination += 0.1;
-    }
+  // Il bonus di supporto "pace loss CLIFF_RISK + stress elevato" è stato
+  // rimosso: era doppio conteggio, perché il pace_loss è già input della
+  // componente derivata dello stress e non è indipendente dalla validazione.
+  // Manteniamo la sola contaminazione da pace loss UNRELIABLE.
+  if (paceLoss && paceLoss.pace_loss_status === "UNRELIABLE") {
+    contamination += 0.1;
   }
 
   return {
