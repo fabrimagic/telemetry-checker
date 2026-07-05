@@ -22,6 +22,8 @@ import {
   getIntervals,
   getPositions,
   getAllLaps,
+  getAllPitStops,
+  getAllStints,
   getSessionResult,
   getCarData,
   type Driver,
@@ -35,6 +37,7 @@ import {
   type SessionInfo,
   type CarData,
 } from "./openf1";
+import { computeUndercutLedger, type UndercutLedgerResult } from "./undercutLedger";
 import { estimateLapWork, estimateTotalWork, type LapWorkEstimate } from "./fuelEstimator";
 import {
   computeVirtualRaceEngineer,
@@ -84,6 +87,21 @@ export interface VreLoaderInput {
    * drivers to avoid a duplicate session-scoped fetch (reduces 429 risk).
    */
   precomputedAllLaps?: Lap[] | null;
+  /**
+   * Optional precomputed session-wide pit stops. Shared between head-to-head
+   * loaders so the /pit?session_key fetch happens once per session.
+   */
+  precomputedAllPits?: PitData[] | null;
+  /**
+   * Optional precomputed session-wide stints. Shared between head-to-head
+   * loaders so the /stints?session_key fetch happens once per session.
+   */
+  precomputedAllStints?: StintData[] | null;
+  /**
+   * Optional precomputed undercut ledger (session-scoped). When provided,
+   * the loader skips its own computation and reuses this value in the output.
+   */
+  precomputedUndercutLedger?: UndercutLedgerResult | null;
 }
 
 export interface VreLoaderOutput {
@@ -99,6 +117,8 @@ export interface VreLoaderOutput {
   intervals: IntervalData[];
   positions: PositionData[];
   cumDevResult: CumulativeDeviationResult | null;
+  /** Session-scoped: identical across drivers of the same session. */
+  undercutLedger: UndercutLedgerResult | null;
   error: string | null;
 }
 
@@ -117,6 +137,9 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     computeAlternative = false,
     precomputedCumDev,
     precomputedAllLaps,
+    precomputedAllPits,
+    precomputedAllStints,
+    precomputedUndercutLedger,
   } = input;
 
   const out: VreLoaderOutput = {
@@ -131,6 +154,7 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
     intervals: [],
     positions: [],
     cumDevResult: null,
+    undercutLedger: precomputedUndercutLedger ?? null,
     error: null,
   };
 
@@ -362,6 +386,29 @@ export async function loadVreForDriver(input: VreLoaderInput): Promise<VreLoader
         });
         out.kdmResult = kdm;
       } catch { /* optional */ }
+    }
+
+    // ── Undercut Ledger (session-scoped, fase 1) ──
+    // Reuse precomputed when provided (head-to-head shares across drivers);
+    // otherwise fetch session-wide pits+stints once and compute here.
+    if (!out.undercutLedger) {
+      try {
+        const [allPits, allStintsSess, sessionAllLaps] = await Promise.all([
+          precomputedAllPits ? Promise.resolve(precomputedAllPits) : getAllPitStops(sessionKey),
+          precomputedAllStints ? Promise.resolve(precomputedAllStints) : getAllStints(sessionKey),
+          sessionAllLapsCache ? Promise.resolve(sessionAllLapsCache) : getAllLaps(sessionKey),
+        ]);
+        if (allPits.length && sessionAllLaps.length) {
+          out.undercutLedger = computeUndercutLedger({
+            allSessionLaps: sessionAllLaps,
+            allPitStops: allPits,
+            allStints: allStintsSess,
+            raceControlMessages,
+            sessionWeather,
+            drivers: allDrivers,
+          });
+        }
+      } catch { /* optional — ledger is best-effort */ }
     }
 
     return out;
