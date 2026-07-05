@@ -87,6 +87,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const [weather, setWeather] = useState<WeatherData[]>([]);
   const [intervals, setIntervals] = useState<IntervalData[]>([]);
   const [allLaps, setAllLaps] = useState<Lap[]>([]);
+  const [raceControl, setRaceControl] = useState<RaceControlMessage[]>([]);
+  const [undercutLedger, setUndercutLedger] = useState<UndercutLedgerResult | null>(null);
   const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null);
 
   const isRace = sessionType === "Race" || sessionType === "Sprint";
@@ -159,6 +161,15 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             const laps = await getAllLaps(sessionKey);
             if (cancelled) return;
             setAllLaps(laps);
+          } catch { /* optional */ }
+
+          // Race control: opzionale — l'errore non deve far fallire il report.
+          // Se il fetch fallisce, il ledger non viene calcolato e la card semplicemente non compare.
+          let rc: RaceControlMessage[] = [];
+          try {
+            rc = await getRaceControl(sessionKey);
+            if (cancelled) return;
+            setRaceControl(rc);
           } catch { /* optional */ }
         }
       } catch (e: any) {
