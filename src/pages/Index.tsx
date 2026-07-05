@@ -82,8 +82,6 @@ import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel, type AnalysisMode } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard, LappedTrafficSection } from "@/components/f1/VirtualRaceEngineerCard";
-import { UndercutLedgerCard } from "@/components/f1/UndercutLedgerCard";
-import { computeUndercutLedger, type UndercutLedgerResult } from "@/lib/undercutLedger";
 import { VRESetupCard } from "@/components/f1/VRESetupCard";
 import type { ViewMode } from "@/components/f1/VREViewModes";
 import type { RiskMode } from "@/lib/riskAppetite";
@@ -131,7 +129,7 @@ export default function Index() {
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [sessionAllLaps, setSessionAllLaps] = useState<import("@/lib/openf1").Lap[]>([]);
   const [sessionResults, setSessionResults] = useState<SessionResult[]>([]);
-  const [undercutLedger, setUndercutLedger] = useState<UndercutLedgerResult | null>(null);
+  
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [vreError, setVreError] = useState<string | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
@@ -170,7 +168,6 @@ export default function Index() {
     setRaceControlMessages([]);
     setSessionAllLaps([]);
     setSessionResults([]);
-    setUndercutLedger(null);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
@@ -205,36 +202,7 @@ export default function Index() {
     }
   }, []);
 
-  // ── Undercut Ledger (session-scoped, fase 1) ──
-  // Fetched once per race/sprint session; independent from the VRE scoring.
-  useEffect(() => {
-    if (!sessionKey) return;
-    const isRaceOrSprintLocal = sessionType === "Race" || sessionType === "Sprint";
-    if (!isRaceOrSprintLocal) { setUndercutLedger(null); return; }
-    if (!allDrivers.length) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [allLaps, allPits, allStints] = await Promise.all([
-          sessionAllLaps.length ? Promise.resolve(sessionAllLaps) : getAllLaps(sessionKey),
-          getAllPitStops(sessionKey).catch(() => [] as PitData[]),
-          getAllStints(sessionKey).catch(() => [] as StintData[]),
-        ]);
-        if (cancelled) return;
-        if (!allLaps.length || !allPits.length) { setUndercutLedger(null); return; }
-        const ledger = computeUndercutLedger({
-          allSessionLaps: allLaps,
-          allPitStops: allPits,
-          allStints: allStints,
-          raceControlMessages,
-          sessionWeather,
-          drivers: allDrivers,
-        });
-        if (!cancelled) setUndercutLedger(ledger);
-      } catch { if (!cancelled) setUndercutLedger(null); }
-    })();
-    return () => { cancelled = true; };
-  }, [sessionKey, sessionType, allDrivers, raceControlMessages, sessionWeather, sessionAllLaps]);
+  // Undercut Ledger: calcolato all'interno di SessionReport (sede naturale come misura di sessione).
 
 
 
@@ -1131,13 +1099,10 @@ export default function Index() {
                 <LappedTrafficSection result={vreResult} />
               )}
 
-              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && undercutLedger && undercutLedger.aggregates.attempts_detected > 0 && (
-                <UndercutLedgerCard
-                  ledger={undercutLedger}
-                  drivers={allDrivers}
-                  focusDriverNumber={singleDriverState.driver.driver_number}
-                />
-              )}
+              {/* Undercut Ledger: spostato in SessionReport perché è una misura di sessione,
+                  identica per qualunque pilota analizzato; il report di sessione è la sua sede naturale.
+                  L'evidenziazione per pilota resta disponibile via focusDriverNumber nei contesti che la usano
+                  (es. Compare, dove il duello testa a testa la rende direttamente pertinente). */}
 
 
 
