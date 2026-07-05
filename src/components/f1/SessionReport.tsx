@@ -10,6 +10,7 @@ import {
   getDrivers,
   getIntervals,
   getAllLaps,
+  getRaceControl,
   type SessionResult,
   type StartingGridEntry,
   type PositionData,
@@ -19,9 +20,12 @@ import {
   type Driver,
   type IntervalData,
   type Lap,
+  type RaceControlMessage,
 } from "@/lib/openf1";
 import { Watermark } from "./Watermark";
 import { CumulativeDeviationCard } from "./CumulativeDeviationCard";
+import { UndercutLedgerCard } from "./UndercutLedgerCard";
+import { computeUndercutLedger, type UndercutLedgerResult } from "@/lib/undercutLedger";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
@@ -83,6 +87,8 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
   const [weather, setWeather] = useState<WeatherData[]>([]);
   const [intervals, setIntervals] = useState<IntervalData[]>([]);
   const [allLaps, setAllLaps] = useState<Lap[]>([]);
+  const [raceControl, setRaceControl] = useState<RaceControlMessage[]>([]);
+  const [undercutLedger, setUndercutLedger] = useState<UndercutLedgerResult | null>(null);
   const [visibleDrivers, setVisibleDrivers] = useState<Set<number> | null>(null);
 
   const isRace = sessionType === "Race" || sessionType === "Sprint";
@@ -156,6 +162,15 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
             if (cancelled) return;
             setAllLaps(laps);
           } catch { /* optional */ }
+
+          // Race control: opzionale — l'errore non deve far fallire il report.
+          // Se il fetch fallisce, il ledger non viene calcolato e la card semplicemente non compare.
+          let rc: RaceControlMessage[] = [];
+          try {
+            rc = await getRaceControl(sessionKey);
+            if (cancelled) return;
+            setRaceControl(rc);
+          } catch { /* optional */ }
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message);
@@ -211,6 +226,27 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     if (!weather.length) return null;
     return weather[weather.length - 1];
   }, [weather]);
+
+  // Undercut Ledger: misura di sessione, calcolata una sola volta dai dati già fetchati.
+  // Sede naturale nel report di sessione perché il risultato è identico per qualunque pilota;
+  // l'evidenziazione per pilota resta esposta via focusDriverNumber per i chiamanti che la usano.
+  useEffect(() => {
+    if (!isRace) { setUndercutLedger(null); return; }
+    if (!drivers.length || !allLaps.length || !pitStops.length) { setUndercutLedger(null); return; }
+    try {
+      const ledger = computeUndercutLedger({
+        allSessionLaps: allLaps,
+        allPitStops: pitStops,
+        allStints: stints,
+        raceControlMessages: raceControl,
+        sessionWeather: weather,
+        drivers,
+      });
+      setUndercutLedger(ledger);
+    } catch {
+      setUndercutLedger(null);
+    }
+  }, [isRace, drivers, allLaps, pitStops, stints, raceControl, weather]);
 
   const weatherTimeline = useMemo(() => {
     if (!weather.length || !allLaps.length) return [];
@@ -980,6 +1016,14 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                   ))}
                 </div>
               </div>
+            )}
+
+            {undercutLedger && (
+              <UndercutLedgerCard
+                ledger={undercutLedger}
+                drivers={drivers}
+                focusDriverNumber={null}
+              />
             )}
           </TabsContent>
         </Tabs>
