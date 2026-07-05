@@ -28,7 +28,8 @@ export type UndercutExclusionReason =
   | "WEATHER_NON_DRY"
   | "MISSING_DATE_START"
   | "RETIREMENT_IN_WINDOW"
-  | "ANOMALOUS_PIT_DURATION";
+  | "ANOMALOUS_PIT_DURATION"
+  | "EXTRA_PIT_IN_WINDOW";
 
 export interface UndercutCycle {
   attacker_driver_number: number;
