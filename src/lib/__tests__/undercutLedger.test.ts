@@ -245,10 +245,11 @@ describe("computeUndercutLedger", () => {
       totalLaps: 40,
       aPitDuration: 60, bPitDuration: 22,
     });
-    // Add filler pits far outside the window to build a stable median.
+    // Filler pits for driver 1 at late laps (beyond B's only pit at 31) so
+    // no unintended A/B undercut pair can form: pit_duration=22 fixes the median.
     const fillerPits: PitData[] = [];
     for (let i = 0; i < 5; i++) {
-      fillerPits.push({ ...mkPit(1 + (i % 2), 5 + i, 22) });
+      fillerPits.push(mkPit(1, 34 + i, 22));
     }
     const res = computeUndercutLedger({
       allSessionLaps: s.laps,
