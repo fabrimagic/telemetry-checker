@@ -307,6 +307,30 @@ describe("computeUndercutLedger", () => {
     expect(res.excluded[0].reason).toBe("RETIREMENT_IN_WINDOW");
   });
 
+  it("esclude per sosta aggiuntiva dell'attaccante nella finestra di misura", () => {
+    // A pitta a La=11 e di nuovo a lap 13 (per danno / sosta abortita).
+    // B pitta a Lb=13. Il ciclo va escluso con EXTRA_PIT_IN_WINDOW.
+    const s = buildUndercutScenario({
+      gapBefore: 2, La: 11, Lb: 13,
+      aPitLoss: 20, bPitLoss: 20, bPaceDropDuringOut: 0,
+      totalLaps: 20,
+    });
+    const extraAPit = mkPit(1, 13, 22);
+    const res = computeUndercutLedger({
+      allSessionLaps: s.laps,
+      allPitStops: [...s.pits, extraAPit],
+      allStints: s.stints,
+      raceControlMessages: NO_RC,
+      sessionWeather: NO_WEATHER,
+      drivers: drivers(),
+    });
+    expect(res.aggregates.valid_cycles).toBe(0);
+    const extra = res.excluded.find(
+      (e) => e.attacker_pit_lap === 11 && e.defender_pit_lap === 13,
+    );
+    expect(extra?.reason).toBe("EXTRA_PIT_IN_WINDOW");
+  });
+
   it("livelli di confidenza al variare dei cicli validi", () => {
     // Genera N cicli indipendenti a giri diversi con coppie diverse.
     // Semplifichiamo: componiamo il ledger con N tentativi validi usando
