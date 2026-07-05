@@ -251,6 +251,15 @@ export function computeUndercutLedger(input: UndercutLedgerInput): UndercutLedge
           continue;
         }
 
+        // 2b) extra pit stop in the measurement window contaminates the swing
+        const aExtra = aPits.some((p) => p !== aPit && p.lap_number >= La + 1 && p.lap_number <= Lb + 1);
+        const bExtra = bPits.some((p) => p !== bPit && p.lap_number >= La - 1 && p.lap_number <= Lb + 1);
+        if (aExtra || bExtra) {
+          pushExcluded("EXTRA_PIT_IN_WINDOW");
+          continue;
+        }
+
+
         // 3) track status non-GREEN in [La-1, Lb+1] for either driver
         const aTs = trackStatusByDriver.get(attackerDn)!;
         const bTs = trackStatusByDriver.get(defenderDn)!;
