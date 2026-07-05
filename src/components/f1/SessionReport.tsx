@@ -1017,6 +1017,14 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
                 </div>
               </div>
             )}
+
+            {undercutLedger && (
+              <UndercutLedgerCard
+                ledger={undercutLedger}
+                drivers={drivers}
+                focusDriverNumber={null}
+              />
+            )}
           </TabsContent>
         </Tabs>
       ) : (
