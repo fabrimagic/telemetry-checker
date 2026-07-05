@@ -14,6 +14,7 @@ import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
 import { CompareDriverContext } from "@/components/f1/compare/CompareDriverContext";
 import { LappedTrafficSection } from "@/components/f1/VirtualRaceEngineerCard";
+import { UndercutLedgerCard } from "@/components/f1/UndercutLedgerCard";
 import { DataIntegrityNotice } from "@/components/f1/DataIntegrityNotice";
 import { detectDataIntegrityIssues } from "@/lib/dataIntegrity";
 import { DriverMiniChartsGrid } from "@/components/f1/DriverMiniChartsGrid";
@@ -26,11 +27,12 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ToolbarSection } from "@/components/layout/ToolbarSection";
 import {
   getDrivers, getWeatherForSession, getRaceControl,
-  getAllLaps, getSessionResult,
+  getAllLaps, getAllPitStops, getAllStints, getSessionResult,
   type Driver, type WeatherData, type RaceControlMessage, type PositionData,
-  type SessionResult,
+  type SessionResult, type PitData, type StintData,
 } from "@/lib/openf1";
 import { loadVreForDriver, type VreLoaderOutput } from "@/lib/vreLoader";
+import { computeUndercutLedger, type UndercutLedgerResult } from "@/lib/undercutLedger";
 import { computeHeadToHead, type ComparisonResult } from "@/lib/headToHeadComparison";
 import { computeCumulativeDeviation, type CumulativeDeviationResult } from "@/lib/cumulativeDeviation";
 import { classifyLapsTrackStatus } from "@/lib/trackStatusClassification";
@@ -138,16 +140,36 @@ export default function Compare() {
       let sharedCumDev: CumulativeDeviationResult | null = null;
       let sharedSessionResults: SessionResult[] | null = null;
       let sharedAllLaps: Awaited<ReturnType<typeof getAllLaps>> | null = null;
+      let sharedAllPits: PitData[] | null = null;
+      let sharedAllStints: StintData[] | null = null;
+      let sharedLedger: UndercutLedgerResult | null = null;
       try {
-        const [sessionAllLaps, sessionResults] = await Promise.all([
+        const [sessionAllLaps, sessionResults, sessionAllPits, sessionAllStints] = await Promise.all([
           getAllLaps(sessionKey),
           getSessionResult(sessionKey),
+          getAllPitStops(sessionKey).catch(() => [] as PitData[]),
+          getAllStints(sessionKey).catch(() => [] as StintData[]),
         ]);
         if (sessionAllLaps.length) sharedAllLaps = sessionAllLaps;
         if (sessionAllLaps.length && sessionResults.length) {
           sharedCumDev = computeCumulativeDeviation(sessionKey, sessionAllLaps, sessionResults, allDrivers);
         }
         if (sessionResults.length) sharedSessionResults = sessionResults;
+        if (sessionAllPits.length) sharedAllPits = sessionAllPits;
+        if (sessionAllStints.length) sharedAllStints = sessionAllStints;
+        // Undercut Ledger: session-scoped, computed once and shared.
+        if (sharedAllLaps && sharedAllPits) {
+          try {
+            sharedLedger = computeUndercutLedger({
+              allSessionLaps: sharedAllLaps,
+              allPitStops: sharedAllPits,
+              allStints: sharedAllStints ?? [],
+              raceControlMessages,
+              sessionWeather,
+              drivers: allDrivers,
+            });
+          } catch { /* optional */ }
+        }
       } catch { /* optional — loaders will fall back to their own fetch */ }
 
       if (cancelled) return;
@@ -167,6 +189,9 @@ export default function Compare() {
             computeAlternative: true,
             precomputedCumDev: sharedCumDev,
             precomputedAllLaps: sharedAllLaps,
+            precomputedAllPits: sharedAllPits,
+            precomputedAllStints: sharedAllStints,
+            precomputedUndercutLedger: sharedLedger,
           }),
           loadVreForDriver({
             driverNumber: driverObjB.driver_number,
@@ -181,6 +206,9 @@ export default function Compare() {
             computeAlternative: true,
             precomputedCumDev: sharedCumDev,
             precomputedAllLaps: sharedAllLaps,
+            precomputedAllPits: sharedAllPits,
+            precomputedAllStints: sharedAllStints,
+            precomputedUndercutLedger: sharedLedger,
           }),
         ]);
         if (cancelled) return;
@@ -521,6 +549,12 @@ export default function Compare() {
                   </div>
                 );
               })()}
+              {(() => {
+                const ledger = dual.outA?.undercutLedger ?? dual.outB?.undercutLedger ?? null;
+                if (!ledger || ledger.aggregates.attempts_detected === 0) return null;
+                return <UndercutLedgerCard ledger={ledger} drivers={allDrivers} focusDriverNumber={null} />;
+              })()}
+              
               <CompareDriverContext
                 driverA={driverObjA}
                 driverB={driverObjB}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { CountdownBanner } from "@/components/f1/CountdownBanner";
 import { WeekendWeatherCard } from "@/components/f1/WeekendWeatherCard";
 import { NextCircuitCard } from "@/components/f1/NextCircuitCard";
@@ -62,6 +62,8 @@ import {
   getSessionsByMeetingKey,
   getSessionResult,
   getAllLaps,
+  getAllPitStops,
+  getAllStints,
   type Driver,
   type Lap,
   type CarData,
@@ -80,6 +82,8 @@ import { buildRaceDiary, type DiaryEvent } from "@/lib/raceDiary";
 import { RaceDiaryCard } from "@/components/f1/RaceDiaryCard";
 import { computeVirtualRaceEngineer, type VirtualRaceEngineerResult, type PracticeCompoundModel, type AnalysisMode } from "@/lib/virtualRaceEngineer";
 import { VirtualRaceEngineerCard, LappedTrafficSection } from "@/components/f1/VirtualRaceEngineerCard";
+import { UndercutLedgerCard } from "@/components/f1/UndercutLedgerCard";
+import { computeUndercutLedger, type UndercutLedgerResult } from "@/lib/undercutLedger";
 import { VRESetupCard } from "@/components/f1/VRESetupCard";
 import type { ViewMode } from "@/components/f1/VREViewModes";
 import type { RiskMode } from "@/lib/riskAppetite";
@@ -127,6 +131,7 @@ export default function Index() {
   const [raceControlMessages, setRaceControlMessages] = useState<RaceControlMessage[]>([]);
   const [sessionAllLaps, setSessionAllLaps] = useState<import("@/lib/openf1").Lap[]>([]);
   const [sessionResults, setSessionResults] = useState<SessionResult[]>([]);
+  const [undercutLedger, setUndercutLedger] = useState<UndercutLedgerResult | null>(null);
   const [vreResult, setVreResult] = useState<VirtualRaceEngineerResult | null>(null);
   const [vreError, setVreError] = useState<string | null>(null);
   const [cumDevResult, setCumDevResult] = useState<CumulativeDeviationResult | null>(null);
@@ -165,6 +170,7 @@ export default function Index() {
     setRaceControlMessages([]);
     setSessionAllLaps([]);
     setSessionResults([]);
+    setUndercutLedger(null);
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
@@ -198,6 +204,39 @@ export default function Index() {
       setLoadingDrivers(false);
     }
   }, []);
+
+  // ── Undercut Ledger (session-scoped, fase 1) ──
+  // Fetched once per race/sprint session; independent from the VRE scoring.
+  useEffect(() => {
+    if (!sessionKey) return;
+    const isRaceOrSprintLocal = sessionType === "Race" || sessionType === "Sprint";
+    if (!isRaceOrSprintLocal) { setUndercutLedger(null); return; }
+    if (!allDrivers.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [allLaps, allPits, allStints] = await Promise.all([
+          sessionAllLaps.length ? Promise.resolve(sessionAllLaps) : getAllLaps(sessionKey),
+          getAllPitStops(sessionKey).catch(() => [] as PitData[]),
+          getAllStints(sessionKey).catch(() => [] as StintData[]),
+        ]);
+        if (cancelled) return;
+        if (!allLaps.length || !allPits.length) { setUndercutLedger(null); return; }
+        const ledger = computeUndercutLedger({
+          allSessionLaps: allLaps,
+          allPitStops: allPits,
+          allStints: allStints,
+          raceControlMessages,
+          sessionWeather,
+          drivers: allDrivers,
+        });
+        if (!cancelled) setUndercutLedger(ledger);
+      } catch { if (!cancelled) setUndercutLedger(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [sessionKey, sessionType, allDrivers, raceControlMessages, sessionWeather, sessionAllLaps]);
+
+
 
   // Build diary when driver selection changes
   const [loadingDiary, setLoadingDiary] = useState(false);
@@ -1090,6 +1129,14 @@ export default function Index() {
 
               {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && vreResult && (
                 <LappedTrafficSection result={vreResult} />
+              )}
+
+              {selectedDriverNumbers.length === 1 && isRaceOrSprint && singleDriverState && !loadingDiary && undercutLedger && undercutLedger.aggregates.attempts_detected > 0 && (
+                <UndercutLedgerCard
+                  ledger={undercutLedger}
+                  drivers={allDrivers}
+                  focusDriverNumber={singleDriverState.driver.driver_number}
+                />
               )}
 
 
