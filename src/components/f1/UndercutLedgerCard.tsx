@@ -16,6 +16,7 @@ const EXCLUSION_LABEL: Record<UndercutExclusionReason, string> = {
   MISSING_DATE_START: "Timestamp mancanti",
   RETIREMENT_IN_WINDOW: "Ritiro nella finestra",
   ANOMALOUS_PIT_DURATION: "Sosta anomala",
+  EXTRA_PIT_IN_WINDOW: "Sosta aggiuntiva nella finestra di misura",
 };
 
 function acronym(dn: number, drivers: Driver[]): string {
