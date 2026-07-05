@@ -227,6 +227,27 @@ export function SessionReport({ sessionKey, sessionType }: Props) {
     return weather[weather.length - 1];
   }, [weather]);
 
+  // Undercut Ledger: misura di sessione, calcolata una sola volta dai dati già fetchati.
+  // Sede naturale nel report di sessione perché il risultato è identico per qualunque pilota;
+  // l'evidenziazione per pilota resta esposta via focusDriverNumber per i chiamanti che la usano.
+  useEffect(() => {
+    if (!isRace) { setUndercutLedger(null); return; }
+    if (!drivers.length || !allLaps.length || !pitStops.length) { setUndercutLedger(null); return; }
+    try {
+      const ledger = computeUndercutLedger({
+        allSessionLaps: allLaps,
+        allPitStops: pitStops,
+        allStints: stints,
+        raceControlMessages: raceControl,
+        sessionWeather: weather,
+        drivers,
+      });
+      setUndercutLedger(ledger);
+    } catch {
+      setUndercutLedger(null);
+    }
+  }, [isRace, drivers, allLaps, pitStops, stints, raceControl, weather]);
+
   const weatherTimeline = useMemo(() => {
     if (!weather.length || !allLaps.length) return [];
     // Build a sorted list of lap start times from all drivers
