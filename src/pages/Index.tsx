@@ -62,8 +62,6 @@ import {
   getSessionsByMeetingKey,
   getSessionResult,
   getAllLaps,
-  getAllPitStops,
-  getAllStints,
   type Driver,
   type Lap,
   type CarData,
