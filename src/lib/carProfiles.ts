@@ -1118,6 +1118,44 @@ export async function computeCarProfiles(
 
   profiles.sort((a, b) => a.team_name.localeCompare(b.team_name));
 
+  // Additive gap_ratio variant (only the four sectors_only-relevant dims).
+  let profilesGap: CarProfile[] | undefined;
+  if (wantGap) {
+    const rawTopG = new Map<string, number>();
+    const rawS1G = new Map<string, number>();
+    const rawS2G = new Map<string, number>();
+    const rawS3G = new Map<string, number>();
+    const teamsGap = new Set<string>([
+      ...accSumGap.top.keys(),
+      ...accSumGap.s1.keys(),
+      ...accSumGap.s2.keys(),
+      ...accSumGap.s3.keys(),
+    ]);
+    for (const t of teamsGap) {
+      const a = avg(t, accSumGap.top, accWGap.top);
+      if (Number.isFinite(a)) rawTopG.set(t, a);
+      const b = avg(t, accSumGap.s1, accWGap.s1);
+      if (Number.isFinite(b)) rawS1G.set(t, b);
+      const c = avg(t, accSumGap.s2, accWGap.s2);
+      if (Number.isFinite(c)) rawS2G.set(t, c);
+      const d = avg(t, accSumGap.s3, accWGap.s3);
+      if (Number.isFinite(d)) rawS3G.set(t, d);
+    }
+    const nTopG = normalizeHigherIsBetter(rawTopG, "gap_ratio");
+    const nS1G = normalizeHigherIsBetter(rawS1G, "gap_ratio");
+    const nS2G = normalizeHigherIsBetter(rawS2G, "gap_ratio");
+    const nS3G = normalizeHigherIsBetter(rawS3G, "gap_ratio");
+    profilesGap = profiles.map((p) => ({
+      ...p,
+      top_speed_index: nTopG.get(p.team_name) ?? 0,
+      sector_strength: {
+        s1: nS1G.get(p.team_name) ?? 0,
+        s2: nS2G.get(p.team_name) ?? 0,
+        s3: nS3G.get(p.team_name) ?? 0,
+      },
+    }));
+  }
+
   return {
     profiles,
     races_used: racesUsed,
@@ -1125,6 +1163,7 @@ export async function computeCarProfiles(
     races_diagnostics: diagnostics,
     races_considered: racesConsidered,
     total_past_races: totalPastRaces,
+    profiles_gap_ratio: profilesGap,
   };
 }
 
