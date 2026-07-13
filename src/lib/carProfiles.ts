@@ -226,6 +226,16 @@ export interface ComputeCarProfilesOptions {
    * call site.
    */
   normalizationMode?: NormalizationMode;
+  /**
+   * When true, computeCarProfiles produces an ADDITIONAL profile array
+   * computed with the alternative "gap_ratio" normalization, exposed on
+   * the result as `profiles_gap_ratio`. The primary `profiles` field is
+   * NOT affected: it still uses {@link normalizationMode} (default
+   * "min_max"). Motivation: the backtest can measure the gap_ratio
+   * candidate without paying a second full data-fetch pass. Cheap: only
+   * an in-memory second aggregation of the already-fetched laps.
+   */
+  emitGapRatioVariant?: boolean;
 }
 
 /**
