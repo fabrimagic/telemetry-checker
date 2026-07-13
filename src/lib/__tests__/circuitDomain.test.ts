@@ -137,19 +137,19 @@ describe("computeDomainReliability", () => {
     // profili di riferimento (nessun circuito 2026 mappato ha 0.99).
     const syntheticHi = {
       ...CIRCUIT_PROFILES["Gran Premio di Miami"],
-      top_speed: 0.99,
+      top_speed: 1.5,
     };
     const hi = computeDomainReliability(syntheticHi, refs);
     expect(hi.top_speed_out_of_range).toBeDefined();
-    expect(hi.top_speed_out_of_range!.target).toBe(0.99);
+    expect(hi.top_speed_out_of_range!.target).toBe(1.5);
     expect(hi.top_speed_out_of_range!.target).toBeGreaterThan(
       hi.top_speed_out_of_range!.max,
     );
 
-    // Target sintetico con top_speed=0.01: strettamente sotto il minimo.
+    // Target sintetico con top_speed=-0.5: strettamente sotto il minimo.
     const syntheticLo = {
       ...CIRCUIT_PROFILES["Gran Premio di Miami"],
-      top_speed: 0.01,
+      top_speed: -0.5,
     };
     const lo = computeDomainReliability(syntheticLo, refs);
     expect(lo.top_speed_out_of_range).toBeDefined();
