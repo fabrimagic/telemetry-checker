@@ -143,6 +143,23 @@ export function buildGpPreviewNarrative(
     }
   }
 
+  // ----- 1c. AVVISO "PESO TOP-SPEED FUORI RANGE" (informativo, additivo) -----
+  // Independent from status: fires whenever the target's top_speed weight
+  // is strictly outside the min/max of the already-run circuits. The
+  // production score does NOT include straight-line efficiency, so this
+  // dimension cannot be compensated by the sector-only ranking.
+  {
+    const tsr = dataContext?.domain?.top_speed_out_of_range;
+    if (tsr) {
+      const higher = tsr.target > tsr.max;
+      const direction = higher ? "maggiore" : "minore";
+      sentences.push(
+        `Attenzione: questo circuito dà alla velocità di punta un peso ${direction} di tutti i circuiti corsi finora quest'anno, e il modello di forza recente è stato validato solo su quei circuiti. La previsione va quindi letta con cautela aggiuntiva: l'efficienza in rettilineo non entra nel punteggio.`,
+      );
+    }
+  }
+
+
   // ----- Edge: nessun team -----
   if (prediction.ranked.length === 0) {
     sentences.push("Dati insufficienti per un'analisi dei team su questo circuito.");
