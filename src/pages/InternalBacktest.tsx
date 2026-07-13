@@ -194,10 +194,14 @@ export default function InternalBacktest() {
                     <th className="py-2 pr-3">ρ trap+sett</th>
                     <th className="py-2 pr-3">ρ solo-sett</th>
                     <th className="py-2 pr-3">ρ circ-spec</th>
+                    <th className="py-2 pr-3">ρ gap_ratio</th>
+                    <th className="py-2 pr-3">ρ sens. team</th>
                     <th className="py-2 pr-3">Top-3 mod</th>
                     <th className="py-2 pr-3">Top-3 t+s</th>
                     <th className="py-2 pr-3">Top-3 s</th>
                     <th className="py-2 pr-3">Top-3 c-s</th>
+                    <th className="py-2 pr-3">Top-3 gap</th>
+                    <th className="py-2 pr-3">Top-3 sens</th>
                     <th className="py-2 pr-3">n team</th>
                     <th className="py-2 pr-3">Stato</th>
                   </tr>
@@ -210,10 +214,14 @@ export default function InternalBacktest() {
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_circuit_specific)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors_gap)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_team_sensitivity)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_model)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_circuit_specific)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors_gap)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_team_sensitivity)}</td>
                       <td className="py-2 pr-3">{r.n_teams || "—"}</td>
                       <td className="py-2 pr-3 text-xs text-muted-foreground">
                         {r.skipped_reason ?? "validata"}
