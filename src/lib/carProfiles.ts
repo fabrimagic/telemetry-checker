@@ -494,6 +494,8 @@ export async function computeCarProfiles(
 ): Promise<ComputeCarProfilesResult> {
   const now = opts.now ?? new Date();
   const signal = opts.signal;
+  const normMode: NormalizationMode = opts.normalizationMode ?? "min_max";
+
 
   let sessions: SessionInfo[] = [];
   try {
