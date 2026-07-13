@@ -161,11 +161,19 @@ export default function InternalBacktest() {
                 label="Δ (sensibilità per team − produzione)"
                 value={fmt(result.aggregate.delta_team_sensitivity_vs_sectors)}
               />
-              <Stat
-                label="Top-3 candidata B (sensibilità per team)"
-                value={fmtPct(result.aggregate.top3_team_sensitivity_rate)}
-              />
-            </div>
+            <Stat
+              label="Top-3 candidata B (sensibilità per team)"
+              value={fmtPct(result.aggregate.top3_team_sensitivity_rate)}
+            />
+            <Stat
+              label="Gare con sensibilità attiva"
+              value={
+                result.aggregate.races_with_active_sensitivity != null
+                  ? `${result.aggregate.races_with_active_sensitivity}/${result.aggregate.races_validated}`
+                  : "—"
+              }
+            />
+          </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
               La baseline che rappresenta la <strong>produzione</strong> è{" "}
               <strong>solo-settori</strong> (promossa dall'Opzione 1). Con poche
@@ -196,6 +204,7 @@ export default function InternalBacktest() {
                     <th className="py-2 pr-3">ρ circ-spec</th>
                     <th className="py-2 pr-3">ρ gap_ratio</th>
                     <th className="py-2 pr-3">ρ sens. team</th>
+                    <th className="py-2 pr-3">sens. attiva</th>
                     <th className="py-2 pr-3">Top-3 mod</th>
                     <th className="py-2 pr-3">Top-3 t+s</th>
                     <th className="py-2 pr-3">Top-3 s</th>
@@ -216,6 +225,19 @@ export default function InternalBacktest() {
                       <td className="py-2 pr-3">{fmt(r.rho_circuit_specific)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors_gap)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_team_sensitivity)}</td>
+                      <td className="py-2 pr-3">
+                        {r.sensitivity_diagnostics ? (
+                          <span
+                            title={`Regressione attiva: ${r.sensitivity_diagnostics.regressed}\nCampione insufficiente: ${r.sensitivity_diagnostics.insufficient_sample}\nVarianza top_speed nulla: ${r.sensitivity_diagnostics.variance_zero}\nTotale team: ${r.sensitivity_diagnostics.total}`}
+                            className="cursor-help underline decoration-dotted"
+                          >
+                            {r.sensitivity_diagnostics.regressed}/
+                            {r.sensitivity_diagnostics.total}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_model)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors)}</td>

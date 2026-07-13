@@ -569,6 +569,191 @@ describe("runBacktest — candidate policies (gap_ratio + team sensitivity)", ()
       const beforeGp2 = ts < new Date("2026-03-14T13:00:00Z").getTime();
       const beforeGp3 = ts < new Date("2026-03-28T13:00:00Z").getTime();
       expect(beforeGp2 || beforeGp3).toBe(true);
-    }
+  }
+});
+
+describe("runBacktest — sensitivity diagnostics (additive)", () => {
+  // Build ten historical circuits with varying top_speed so that some
+  // teams have a real regression sample and others fall back.
+  const histCircuits: Record<string, CircuitProfile> = Object.fromEntries(
+    ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "Test GP"].map((n, i) => [
+      n,
+      { ...circuit(n), top_speed: 0.1 + i * 0.1 },
+    ]),
+  );
+
+  function profileWithHistory(
+    name: string,
+    entries: Array<{ gp: string; y: number }>,
+  ): CarProfile {
+    return {
+      team_name: name,
+      top_speed_index: 0.5,
+      sector_strength: { s1: 0.5, s2: 0.5, s3: 0.5 },
+      sample_races: entries.length,
+      effective_sample_races: entries.length,
+      sample_laps: 100,
+      confidence: "high",
+      race_history: entries.map((e) => ({
+        gpName: e.gp,
+        date_end: "2026-01-01T00:00:00Z",
+        weight: 1,
+        sectors_normalized: e.y,
+        top_speed_normalized: null,
+      })),
+    };
+  }
+
+  function mkMixedDeps(profiles: CarProfile[]) {
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+    ];
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+      mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
+    ];
+    const lapsBySession = new Map<number, Lap[]>([
+      [22, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+    ]);
+    const driversBySession = new Map<number, Driver[]>([
+      [22, [mkDriver(1, "Reg1"), mkDriver(2, "Reg2"), mkDriver(3, "Small")]],
+    ]);
+    return makeDeps({
+      races,
+      qualis,
+      lapsBySession,
+      driversBySession,
+      circuitProfiles: histCircuits,
+      computeImpl: async () => ({
+        profiles,
+        races_used: [],
+        aborted: false,
+        races_diagnostics: [],
+        races_considered: 1,
+        total_past_races: 1,
+      }),
+    });
+  }
+
+  it("counts regressed / insufficient_sample / variance_zero correctly (mixed)", async () => {
+    const fullHist = [
+      { gp: "C1", y: 0.1 },
+      { gp: "C2", y: 0.2 },
+      { gp: "C3", y: 0.3 },
+      { gp: "C4", y: 0.4 },
+      { gp: "C5", y: 0.5 },
+      { gp: "C6", y: 0.6 },
+    ];
+    const flatHist = [
+      { gp: "C1", y: 0.1 },
+      { gp: "C1", y: 0.2 },
+      { gp: "C1", y: 0.3 },
+      { gp: "C1", y: 0.4 },
+      { gp: "C1", y: 0.5 },
+      { gp: "C1", y: 0.6 },
+    ];
+    const shortHist = [
+      { gp: "C1", y: 0.1 },
+      { gp: "C2", y: 0.2 },
+    ];
+    const profiles = [
+      profileWithHistory("Reg1", fullHist),
+      profileWithHistory("Reg2", fullHist),
+      profileWithHistory("Flat", flatHist),
+      profileWithHistory("Small", shortHist),
+    ];
+    const deps = mkMixedDeps(profiles);
+    const out = await runBacktest({ deps });
+    const r = out.per_race[0];
+    expect(r.sensitivity_diagnostics).toBeDefined();
+    expect(r.sensitivity_diagnostics!.total).toBe(4);
+    expect(r.sensitivity_diagnostics!.regressed).toBe(2);
+    expect(r.sensitivity_diagnostics!.variance_zero).toBe(1);
+    expect(r.sensitivity_diagnostics!.insufficient_sample).toBe(1);
   });
+
+  it("skipped races have sensitivity_diagnostics undefined", async () => {
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+    ];
+    // No quali → skipped.
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+    ];
+    const deps = makeDeps({ races, qualis });
+    const out = await runBacktest({ deps });
+    expect(out.per_race[0].skipped_reason).toBe("no_quali_session");
+    expect(out.per_race[0].sensitivity_diagnostics).toBeUndefined();
+  });
+
+  it("races_with_active_sensitivity counts only races with ≥ 50% regressed", async () => {
+    const fullHist = [
+      { gp: "C1", y: 0.1 },
+      { gp: "C2", y: 0.2 },
+      { gp: "C3", y: 0.3 },
+      { gp: "C4", y: 0.4 },
+      { gp: "C5", y: 0.5 },
+      { gp: "C6", y: 0.6 },
+    ];
+    const shortHist = [{ gp: "C1", y: 0.1 }];
+    // Race A: 2/3 regressed (active). Race B: 1/3 regressed (inactive).
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+      mkSession(3, 31, "2026-03-29T13:00:00Z", "2026-03-29T15:00:00Z", "GP3"),
+    ];
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+      mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
+      mkSession(3, 32, "2026-03-28T13:00:00Z", "2026-03-28T14:00:00Z", "GP3", "Qualifying"),
+    ];
+    const lapsBySession = new Map<number, Lap[]>([
+      [22, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+      [32, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+    ]);
+    const driversBySession = new Map<number, Driver[]>([
+      [22, [mkDriver(1, "A"), mkDriver(2, "B"), mkDriver(3, "C")]],
+      [32, [mkDriver(1, "A"), mkDriver(2, "B"), mkDriver(3, "C")]],
+    ]);
+    let call = 0;
+    const deps = makeDeps({
+      races,
+      qualis,
+      lapsBySession,
+      driversBySession,
+      circuitProfiles: histCircuits,
+      computeImpl: async () => {
+        call++;
+        // First target race: 2 regressed, 1 short.
+        // Second target race: 1 regressed, 2 short.
+        const profs =
+          call === 1
+            ? [
+                profileWithHistory("A", fullHist),
+                profileWithHistory("B", fullHist),
+                profileWithHistory("C", shortHist),
+              ]
+            : [
+                profileWithHistory("A", fullHist),
+                profileWithHistory("B", shortHist),
+                profileWithHistory("C", shortHist),
+              ];
+        return {
+          profiles: profs,
+          races_used: [],
+          aborted: false,
+          races_diagnostics: [],
+          races_considered: 1,
+          total_past_races: 1,
+        };
+      },
+    });
+    const out = await runBacktest({ deps });
+    expect(out.aggregate.races_validated).toBe(2);
+    expect(out.aggregate.races_with_active_sensitivity).toBe(1);
+  });
+});
+
 });

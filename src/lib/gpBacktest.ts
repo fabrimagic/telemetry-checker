@@ -93,6 +93,20 @@ export interface BacktestPerRace {
    * fallbacks (see `teamSensitivity`) keep it from fabricating slopes.
    */
   rho_team_sensitivity: number | null;
+  /**
+   * Additive diagnostic (optional): breakdown of how the team-sensitivity
+   * candidate produced its score for each team in this race. Undefined when
+   * the race is skipped or when computeTeamSensitivity did not produce a
+   * ranking. `regressed` = teams whose predicted_score came from the actual
+   * weighted regression (fallback_reason === null). The two fallback counts
+   * disambiguate persistence fallbacks from real regressions in the UI.
+   */
+  sensitivity_diagnostics?: {
+    regressed: number;
+    insufficient_sample: number;
+    variance_zero: number;
+    total: number;
+  };
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
@@ -156,6 +170,13 @@ export interface BacktestAggregate {
   top3_circuit_specific_rate: number | null;
   top3_baseline_sectors_gap_rate: number | null;
   top3_team_sensitivity_rate: number | null;
+  /**
+   * Additive diagnostic (optional): number of validated races in which the
+   * team-sensitivity candidate ran the regression on at least half of the
+   * teams (i.e. was not mostly a persistence fallback). Lets the reader see
+   * on how many races the candidate actually expressed its model.
+   */
+  races_with_active_sensitivity?: number;
 }
 
 export interface BacktestResult {
@@ -492,6 +513,9 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     // ONLY races with date_end < now — the guarantee is inherited from the
     // `now` parameter passed to `compute` above (no fabrication).
     let teamSensitivityOrder: string[] = [];
+    let sensitivityDiagnostics:
+      | { regressed: number; insufficient_sample: number; variance_zero: number; total: number }
+      | undefined = undefined;
     try {
       const sensitivity = computeTeamSensitivity({
         profiles: profilesResult.profiles,
@@ -499,9 +523,27 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
         circuitProfiles,
       });
       teamSensitivityOrder = sensitivity.ranked;
+      if (sensitivity.ranked && sensitivity.ranked.length > 0) {
+        let regressed = 0;
+        let insuff = 0;
+        let varZero = 0;
+        for (const e of sensitivity.by_team) {
+          if (e.fallback_reason === null) regressed++;
+          else if (e.fallback_reason === "insufficient_sample") insuff++;
+          else if (e.fallback_reason === "top_speed_variance_near_zero") varZero++;
+        }
+        sensitivityDiagnostics = {
+          regressed,
+          insufficient_sample: insuff,
+          variance_zero: varZero,
+          total: sensitivity.by_team.length,
+        };
+      }
     } catch {
       teamSensitivityOrder = [];
+      sensitivityDiagnostics = undefined;
     }
+
 
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
@@ -565,6 +607,9 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       top3_baseline_sectors_gap,
       top3_team_sensitivity,
       n_teams,
+      ...(sensitivityDiagnostics
+        ? { sensitivity_diagnostics: sensitivityDiagnostics }
+        : {}),
     });
   }
   opts.onProgress?.(total, total);
@@ -634,6 +679,11 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       top3_circuit_specific_rate: rateOrNull(validated.map((r) => r.top3_circuit_specific)),
       top3_baseline_sectors_gap_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors_gap)),
       top3_team_sensitivity_rate: rateOrNull(validated.map((r) => r.top3_team_sensitivity)),
+      races_with_active_sensitivity: validated.reduce((acc, r) => {
+        const d = r.sensitivity_diagnostics;
+        if (!d || d.total === 0) return acc;
+        return d.regressed * 2 >= d.total ? acc + 1 : acc;
+      }, 0),
     },
     total_races: total,
     notes,
