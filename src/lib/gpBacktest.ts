@@ -79,6 +79,20 @@ export interface BacktestPerRace {
    * distinction is a candidate to enter the production score.
    */
   rho_circuit_specific: number | null;
+  /**
+   * CANDIDATE POLICY A (monitoring only): sectors_only persistence
+   * computed on profiles aggregated with the `gap_ratio` normalization
+   * (proportional gaps instead of min-max). Same formula as
+   * rho_baseline_sectors, only the upstream normalization changes.
+   */
+  rho_baseline_sectors_gap: number | null;
+  /**
+   * CANDIDATE POLICY B (monitoring only): per-team linear sensitivity
+   * model that regresses each team's per-race sectors-normalized score
+   * against `top_speed` of the corresponding circuit profile. Strict
+   * fallbacks (see `teamSensitivity`) keep it from fabricating slopes.
+   */
+  rho_team_sensitivity: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
@@ -86,6 +100,8 @@ export interface BacktestPerRace {
   top3_baseline_sectors: boolean | null;
   /** MONITORING ONLY (Role B): top-3 hit from the circuit-specific model. */
   top3_circuit_specific: boolean | null;
+  top3_baseline_sectors_gap: boolean | null;
+  top3_team_sensitivity: boolean | null;
   /** Intersection size between predicted set and quali set. */
   n_teams: number;
   /** Set when the race could not be validated. */
