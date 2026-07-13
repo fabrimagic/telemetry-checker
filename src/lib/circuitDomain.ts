@@ -50,6 +50,20 @@ export interface DomainReliability {
   gap_from_nearest?: number;
   /** Free-form reason for "unknown" (no warning shown). */
   reason?: "no_target_speed" | "no_reference_speeds";
+  /**
+   * INFORMATIVE-ONLY, additive: signals that the target circuit's
+   * `top_speed` weight (how much the layout rewards straight-line efficiency)
+   * lies strictly outside the min/max range of the already-run circuits.
+   * Independent from `status`, does NOT alter the score or the bands. When
+   * present, the narrative surfaces an extra cautionary sentence because the
+   * production score (sector-only persistence) never captures straight-line
+   * efficiency and cannot compensate for this out-of-range character.
+   */
+  top_speed_out_of_range?: {
+    target: number;
+    min: number;
+    max: number;
+  };
 }
 
 /**
