@@ -646,17 +646,42 @@ export async function computeCarProfiles(
   //   { ok: true, metrics }            → session aggregated successfully
   //   { ok: true, metrics: null }      → fetched but no usable data
   //   { ok: false }                    → fetch failed
+  const wantGap = opts.emitGapRatioVariant === true;
+
   async function fetchSession(
     sessionKey: number,
-  ): Promise<{ ok: true; metrics: RaceTeamMetrics | null } | { ok: false }> {
+  ): Promise<
+    | { ok: true; metrics: RaceTeamMetrics | null; metricsGap: RaceTeamMetrics | null }
+    | { ok: false }
+  > {
     try {
       const laps = await getAllLaps(sessionKey);
       const drivers = await getDrivers(sessionKey);
-      return { ok: true, metrics: aggregateRace(laps, drivers, normMode) };
+      return {
+        ok: true,
+        metrics: aggregateRace(laps, drivers, normMode),
+        metricsGap: wantGap ? aggregateRace(laps, drivers, "gap_ratio") : null,
+      };
     } catch {
       return { ok: false };
     }
   }
+
+  // Accumulators for the additive gap_ratio variant (only populated when
+  // wantGap === true). Only the four dimensions consumed by the sectors_only
+  // baseline are tracked here.
+  const accSumGap = {
+    top: new Map<string, number>(),
+    s1: new Map<string, number>(),
+    s2: new Map<string, number>(),
+    s3: new Map<string, number>(),
+  };
+  const accWGap = {
+    top: new Map<string, number>(),
+    s1: new Map<string, number>(),
+    s2: new Map<string, number>(),
+    s3: new Map<string, number>(),
+  };
 
   for (let i = 0; i < selected.length; i++) {
     if (signal?.aborted) {
