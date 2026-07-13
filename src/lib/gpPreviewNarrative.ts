@@ -419,12 +419,15 @@ export function strengthLabel(topPct: number): "rettilineo" | "curve" | "equilib
 }
 
 function positionPhrase(index: number, total: number): string {
+  // OPZIONE Z + sectors_only: il punteggio riflette la forza recente nei
+  // tempi di settore, NON un'affinità col circuito. Le frasi non menzionano
+  // circuito né tracciato: parlano esplicitamente di forza recente.
   if (total <= 1) return "è l'unico team analizzato in questa anteprima";
   const ratio = index / (total - 1);
-  if (index === 0) return "risulta tra i team più in linea con questo circuito";
-  if (ratio <= 0.34) return "si colloca tra i team più in linea con questo circuito";
-  if (ratio >= 0.67) return "si colloca tra i meno favoriti su questo tracciato";
-  return "si trova in una posizione intermedia della classifica di affinità";
+  if (index === 0) return "risulta tra i team più forti nei tempi di settore delle gare recenti";
+  if (ratio <= 0.34) return "risulta tra i team più forti nei tempi di settore delle gare recenti";
+  if (ratio >= 0.67) return "si colloca tra i team meno forti nei tempi di settore delle gare recenti";
+  return "si trova in una posizione intermedia della classifica di forza recente";
 }
 
 
