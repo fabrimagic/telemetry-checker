@@ -540,6 +540,22 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     const top3_baseline_sectors = topKHit(baselineOrderSectors, truthOrder, 3);
     const top3_circuit_specific =
       predOrderCircuit.length > 0 ? topKHit(predOrderCircuit, truthOrder, 3) : null;
+    const rho_baseline_sectors_gap =
+      baselineOrderSectorsGap.length > 0
+        ? spearman(baselineOrderSectorsGap, truthOrder)
+        : null;
+    const top3_baseline_sectors_gap =
+      baselineOrderSectorsGap.length > 0
+        ? topKHit(baselineOrderSectorsGap, truthOrder, 3)
+        : null;
+    const rho_team_sensitivity =
+      teamSensitivityOrder.length > 0
+        ? spearman(teamSensitivityOrder, truthOrder)
+        : null;
+    const top3_team_sensitivity =
+      teamSensitivityOrder.length > 0
+        ? topKHit(teamSensitivityOrder, truthOrder, 3)
+        : null;
     const n_teams = predOrder.filter((t) => truthOrder.includes(t)).length;
 
     per_race.push({
@@ -550,11 +566,15 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       rho_baseline_topsec,
       rho_baseline_sectors,
       rho_circuit_specific,
+      rho_baseline_sectors_gap,
+      rho_team_sensitivity,
       top3_model,
       top3_baseline: top3_baseline_sectors,
       top3_baseline_topsec,
       top3_baseline_sectors,
       top3_circuit_specific,
+      top3_baseline_sectors_gap,
+      top3_team_sensitivity,
       n_teams,
     });
   }
