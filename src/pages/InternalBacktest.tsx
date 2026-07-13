@@ -161,11 +161,19 @@ export default function InternalBacktest() {
                 label="Δ (sensibilità per team − produzione)"
                 value={fmt(result.aggregate.delta_team_sensitivity_vs_sectors)}
               />
-              <Stat
-                label="Top-3 candidata B (sensibilità per team)"
-                value={fmtPct(result.aggregate.top3_team_sensitivity_rate)}
-              />
-            </div>
+            <Stat
+              label="Top-3 candidata B (sensibilità per team)"
+              value={fmtPct(result.aggregate.top3_team_sensitivity_rate)}
+            />
+            <Stat
+              label="Gare con sensibilità attiva"
+              value={
+                result.aggregate.races_with_active_sensitivity != null
+                  ? `${result.aggregate.races_with_active_sensitivity}/${result.aggregate.races_validated}`
+                  : "—"
+              }
+            />
+          </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
               La baseline che rappresenta la <strong>produzione</strong> è{" "}
               <strong>solo-settori</strong> (promossa dall'Opzione 1). Con poche
