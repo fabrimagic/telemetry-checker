@@ -544,3 +544,60 @@ describe("Role A — corner-type spread threshold + chassis/engine disclosure", 
     expect(text).not.toMatch(/non permettono di distinguere/i);
   });
 });
+
+describe("positionPhrase — nessun riferimento al circuito/tracciato", () => {
+  it("per ogni pilota della lista, il testo per-team non contiene mai 'circuito' o 'tracciato' nella clausola di posizione", () => {
+    const c = circuit();
+    // 5 team con score decrescente per coprire index=0, fasce media, e coda.
+    const cars = [
+      car("A", 0.9, [0.9, 0.9, 0.9]),
+      car("B", 0.7, [0.7, 0.7, 0.7]),
+      car("C", 0.5, [0.5, 0.5, 0.5]),
+      car("D", 0.3, [0.3, 0.3, 0.3]),
+      car("E", 0.1, [0.1, 0.1, 0.1]),
+    ];
+    const pred = predictGpAffinity(c, cars);
+    const out = buildPerTeamExplanations(c, pred);
+    for (const e of out) {
+      // Estrai la prima frase (positionPhrase è la clausola iniziale).
+      const firstSentence = e.text.split(". ")[0];
+      expect(firstSentence).not.toMatch(/circuito|tracciato/i);
+    }
+  });
+
+  it("team unico ⇒ frase 'è l'unico team analizzato in questa anteprima'", () => {
+    const c = circuit();
+    const pred = predictGpAffinity(c, [car("Solo", 0.5, [0.5, 0.5, 0.5])]);
+    const out = buildPerTeamExplanations(c, pred);
+    expect(out[0].text).toMatch(/unico team analizzato/i);
+    expect(out[0].text.split(". ")[0]).not.toMatch(/circuito|tracciato/i);
+  });
+});
+
+describe("informative top_speed_out_of_range sentence", () => {
+  it("aggiunge la frase informativa quando top_speed_out_of_range è presente", () => {
+    const c = circuit();
+    const pred = predictGpAffinity(c, [car("A", 0.5, [0.5, 0.5, 0.5])]);
+    const lines = buildGpPreviewNarrative(c, pred, {
+      domain: {
+        status: "in_domain",
+        reference_speeds: [],
+        top_speed_out_of_range: { target: 0.95, min: 0.4, max: 0.8 },
+      },
+    });
+    const all = lines.join(" ");
+    expect(all).toMatch(/velocità di punta un peso maggiore/i);
+    expect(all).toMatch(/efficienza in rettilineo non entra nel punteggio/i);
+  });
+
+  it("non aggiunge la frase quando top_speed_out_of_range è assente", () => {
+    const c = circuit();
+    const pred = predictGpAffinity(c, [car("A", 0.5, [0.5, 0.5, 0.5])]);
+    const lines = buildGpPreviewNarrative(c, pred, {
+      domain: { status: "in_domain", reference_speeds: [] },
+    });
+    const all = lines.join(" ");
+    expect(all).not.toMatch(/velocità di punta un peso (maggiore|minore)/i);
+  });
+});
+
