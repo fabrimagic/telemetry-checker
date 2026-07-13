@@ -351,7 +351,11 @@ interface RaceTeamMetrics {
   lapsByTeam: Map<string, number>;
 }
 
-function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
+function aggregateRace(
+  laps: Lap[],
+  drivers: Driver[],
+  mode: NormalizationMode = "min_max",
+): RaceTeamMetrics | null {
   const teamByDriver = new Map<number, string>();
   for (const d of drivers) {
     if (d.team_name) teamByDriver.set(d.driver_number, d.team_name);
