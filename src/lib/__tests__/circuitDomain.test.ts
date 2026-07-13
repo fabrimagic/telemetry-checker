@@ -121,6 +121,8 @@ describe("computeDomainReliability", () => {
       makeSession(9, 3),
     ]);
     expect(d.reference_speeds).toHaveLength(2);
+  });
+
   it("(f) top_speed_out_of_range: attivo con target > max, assente con target dentro il range", () => {
     // Reference set: Miami/COTA/Monza/Spa → raccogliamo i loro top_speed reali.
     const refs = [151, 9, 39, 7].map((k) => makeSession(k));
