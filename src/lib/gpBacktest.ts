@@ -141,11 +141,21 @@ export interface BacktestAggregate {
    * a candidate for promotion into the production score.
    */
   delta_circuit_vs_sectors: number | null;
+  /** Candidate policy A — mean rho of sectors_only with gap_ratio normalization. */
+  rho_baseline_sectors_gap_mean: number | null;
+  /** Candidate policy B — mean rho of the team-sensitivity regression. */
+  rho_team_sensitivity_mean: number | null;
+  /** Delta: candidate A − production baseline (sectors_only, min-max). */
+  delta_sectors_gap_vs_sectors: number | null;
+  /** Delta: candidate B − production baseline (sectors_only, min-max). */
+  delta_team_sensitivity_vs_sectors: number | null;
   top3_model_rate: number | null;
   top3_baseline_rate: number | null;
   top3_baseline_topsec_rate: number | null;
   top3_baseline_sectors_rate: number | null;
   top3_circuit_specific_rate: number | null;
+  top3_baseline_sectors_gap_rate: number | null;
+  top3_team_sensitivity_rate: number | null;
 }
 
 export interface BacktestResult {
