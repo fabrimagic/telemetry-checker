@@ -160,7 +160,7 @@ describe("gpPrediction", () => {
       corner_data_coverage: 0.8,
       corner_source: "location_geometry",
     };
-    const out = predictGpAffinity(c, [slowSpecialist, fastSpecialist]);
+    const out = predictGpAffinity(c, [slowSpecialist, fastSpecialist], { useCircuitSpecificModel: true });
     expect(out.ranked[0].team_name).toBe("Slow");
     expect(out.ranked[0].corner_source).toBe("location_geometry");
     expect(out.ranked[0].corner_coverage).toBeCloseTo(0.8, 5);
