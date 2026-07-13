@@ -433,10 +433,10 @@ function aggregateRace(
   if (teamTop.size === 0 && teamS1.size === 0) return null;
 
   return {
-    topSpeed: normalizeHigherIsBetter(teamTop),
-    s1: normalizeLowerIsBetter(teamS1),
-    s2: normalizeLowerIsBetter(teamS2),
-    s3: normalizeLowerIsBetter(teamS3),
+    topSpeed: normalizeHigherIsBetter(teamTop, mode),
+    s1: normalizeLowerIsBetter(teamS1, mode),
+    s2: normalizeLowerIsBetter(teamS2, mode),
+    s3: normalizeLowerIsBetter(teamS3, mode),
     lapsByTeam: teamLaps,
   };
 }
