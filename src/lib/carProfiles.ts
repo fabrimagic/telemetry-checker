@@ -218,6 +218,14 @@ export interface ComputeCarProfilesOptions {
     qualiSession: SessionInfo,
     driverNumbers: number[],
   ) => Promise<SessionCornerAnalysis | null>;
+  /**
+   * Normalization mode used to convert per-race raw team metrics into
+   * comparable [0,1] scores. Defaults to "min_max" (current production
+   * behavior). "gap_ratio" is exposed only as an alternative candidate
+   * for backtest evaluation; setting it does NOT change any production
+   * call site.
+   */
+  normalizationMode?: NormalizationMode;
 }
 
 /**
