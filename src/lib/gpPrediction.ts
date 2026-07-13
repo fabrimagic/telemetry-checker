@@ -531,7 +531,11 @@ export function predictGpAffinity(
     };
   });
 
-  ranked.sort((a, b) => b.affinity_score - a.affinity_score);
+  // Deterministic tie-break on team name so this production ranking stays
+  // bit-for-bit identical to computeBaselineOrder in gpBacktest.ts.
+  ranked.sort(
+    (a, b) => b.affinity_score - a.affinity_score || a.team_name.localeCompare(b.team_name),
+  );
 
   // Global confidence: min between circuit and median car confidence, then
   // downgraded if overtaking_difficulty exceeds the documented threshold.
