@@ -116,7 +116,42 @@ export interface CarProfile {
    * Does NOT affect the gate or the affinity score.
    */
   corner_alignment_error?: number | null;
+  /**
+   * ADDITIVE, retrocompatible: per-team historical series of the
+   * per-race normalized sector score (mean of s1/s2/s3 after quali+race
+   * combination, in the range [0,1]) together with the GP name (resolved
+   * via {@link resolveCalendarGpName}) and the recency weight applied by
+   * this aggregation. Preserved so downstream consumers (e.g. the
+   * `teamSensitivity` diagnostic model) can run a regression against
+   * per-circuit features. Undefined only if the team contributed to no
+   * usable race.
+   */
+  race_history?: TeamRaceHistoryEntry[];
 }
+
+export interface TeamRaceHistoryEntry {
+  gpName: string;
+  date_end: string;
+  /** Recency weight assigned to this race by the aggregation. */
+  weight: number;
+  /** Mean of per-race normalized s1/s2/s3 for this team, [0,1]. */
+  sectors_normalized: number;
+  /** Per-race normalized top-speed index for this team, or null. */
+  top_speed_normalized: number | null;
+}
+
+/**
+ * Normalization mode used to convert per-race raw team metrics into a
+ * comparable [0,1] score:
+ *  - "min_max"   (DEFAULT, unchanged production behavior): best team maps
+ *    to 1, worst to 0. Amplifies small gaps.
+ *  - "gap_ratio" (CANDIDATE): the best team maps to 1 and everyone else
+ *    to a proportional ratio close to 1 that preserves the actual size
+ *    of the gap (sectors: t_best/t_team; top speed: v_team/v_best). Used
+ *    ONLY as an alternative candidate in the backtest — not wired into
+ *    production.
+ */
+export type NormalizationMode = "min_max" | "gap_ratio";
 
 /**
  * Minimum aggregated /location coverage for a team to be considered
