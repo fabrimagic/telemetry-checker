@@ -295,8 +295,12 @@ function p90(values: number[]): number {
   return quantile(s, 0.9);
 }
 
-/** Normalize so the maximum maps to 1 and minimum to 0. */
-function normalizeHigherIsBetter(map: Map<string, number>): Map<string, number> {
+/** Normalize so the maximum maps to 1 and minimum to 0 (min-max), or so
+ * that best maps to 1 and others map to v_team/v_best (gap-ratio). */
+function normalizeHigherIsBetter(
+  map: Map<string, number>,
+  mode: NormalizationMode = "min_max",
+): Map<string, number> {
   const vals = [...map.values()].filter((v) => Number.isFinite(v));
   if (vals.length === 0) return new Map();
   const min = Math.min(...vals);
@@ -304,13 +308,21 @@ function normalizeHigherIsBetter(map: Map<string, number>): Map<string, number> 
   const out = new Map<string, number>();
   for (const [k, v] of map.entries()) {
     if (!Number.isFinite(v)) continue;
-    out.set(k, max === min ? 1 : (v - min) / (max - min));
+    if (mode === "gap_ratio") {
+      // best value maps to 1; others to v/best. Preserves proportional gaps.
+      out.set(k, max > 0 ? v / max : 1);
+    } else {
+      out.set(k, max === min ? 1 : (v - min) / (max - min));
+    }
   }
   return out;
 }
 
-/** Lower is better → invert. */
-function normalizeLowerIsBetter(map: Map<string, number>): Map<string, number> {
+/** Lower is better → invert. Under gap_ratio: best/v (times close to 1). */
+function normalizeLowerIsBetter(
+  map: Map<string, number>,
+  mode: NormalizationMode = "min_max",
+): Map<string, number> {
   const vals = [...map.values()].filter((v) => Number.isFinite(v));
   if (vals.length === 0) return new Map();
   const min = Math.min(...vals);
@@ -318,7 +330,11 @@ function normalizeLowerIsBetter(map: Map<string, number>): Map<string, number> {
   const out = new Map<string, number>();
   for (const [k, v] of map.entries()) {
     if (!Number.isFinite(v)) continue;
-    out.set(k, max === min ? 1 : (max - v) / (max - min));
+    if (mode === "gap_ratio") {
+      out.set(k, v > 0 ? min / v : 1);
+    } else {
+      out.set(k, max === min ? 1 : (max - v) / (max - min));
+    }
   }
   return out;
 }
