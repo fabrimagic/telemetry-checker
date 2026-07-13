@@ -160,7 +160,7 @@ describe("gpPrediction", () => {
       corner_data_coverage: 0.8,
       corner_source: "location_geometry",
     };
-    const out = predictGpAffinity(c, [slowSpecialist, fastSpecialist]);
+    const out = predictGpAffinity(c, [slowSpecialist, fastSpecialist], { useCircuitSpecificModel: true });
     expect(out.ranked[0].team_name).toBe("Slow");
     expect(out.ranked[0].corner_source).toBe("location_geometry");
     expect(out.ranked[0].corner_coverage).toBeCloseTo(0.8, 5);
@@ -748,4 +748,39 @@ describe("computePersistenceScore — mode parameter (Opzione 1 validation)", ()
     );
   });
 });
+
+describe("uncertainty band — persistenza pura non usa la confidenza del circuito", () => {
+  it("in modalità persistenza (default) la banda non cambia al variare di circuit.confidence", () => {
+    const cars = [car("A", 0.5, [0.6, 0.6, 0.6], "medium")];
+    const cHigh = circuit({ confidence: "high" });
+    const cLow = circuit({ confidence: "low" });
+    const uHigh = predictGpAffinity(cHigh, cars).ranked[0].uncertainty;
+    const uLow = predictGpAffinity(cLow, cars).ranked[0].uncertainty;
+    expect(uHigh).toBeCloseTo(uLow, 10);
+  });
+
+  it("in modalità circuit-specific la banda dipende dalla confidenza del circuito", () => {
+    const cars = [car("A", 0.5, [0.6, 0.6, 0.6], "medium")];
+    const cHigh = circuit({ confidence: "high" });
+    const cLow = circuit({ confidence: "low" });
+    const uHigh = predictGpAffinity(cHigh, cars, { useCircuitSpecificModel: true }).ranked[0].uncertainty;
+    const uLow = predictGpAffinity(cLow, cars, { useCircuitSpecificModel: true }).ranked[0].uncertainty;
+    expect(uLow).toBeGreaterThan(uHigh);
+  });
+});
+
+describe("ranked sort — tie-break alfabetico su team_name", () => {
+  it("a parità di punteggio i team sono ordinati alfabeticamente per team_name", () => {
+    const c = circuit();
+    // Stessi sector_strength ⇒ stesso persistence score.
+    const cars = [
+      car("Charlie", 0.5, [0.5, 0.5, 0.5]),
+      car("Alpha", 0.5, [0.5, 0.5, 0.5]),
+      car("Bravo", 0.5, [0.5, 0.5, 0.5]),
+    ];
+    const out = predictGpAffinity(c, cars);
+    expect(out.ranked.map((r) => r.team_name)).toEqual(["Alpha", "Bravo", "Charlie"]);
+  });
+});
+
 

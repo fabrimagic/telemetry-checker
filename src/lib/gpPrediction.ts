@@ -477,7 +477,18 @@ export function predictGpAffinity(
 
     const carBand = teamBandFromSample(car.effective_sample_races);
     const circuitBand = CONFIDENCE_BAND[circuit.confidence];
-    const uncertainty = Math.sqrt(carBand * carBand + circuitBand * circuitBand);
+    // Uncertainty:
+    //  - useCircuitSpecific = true (dormant): the score depends on the
+    //    circuit profile, so its confidence contributes to the band; we
+    //    combine carBand and circuitBand in quadrature (independent errors).
+    //  - useCircuitSpecific = false (PRODUCTION, pure persistence): the
+    //    score does NOT use the circuit profile at all, therefore the
+    //    circuit-profile confidence must NOT inflate the band. Uncertainty
+    //    is the team half-band alone. This intentionally tightens bands
+    //    and can shrink equivalence groups.
+    const uncertainty = useCircuitSpecific
+      ? Math.sqrt(carBand * carBand + circuitBand * circuitBand)
+      : carBand;
 
     return {
       team_name: car.team_name,
@@ -520,7 +531,11 @@ export function predictGpAffinity(
     };
   });
 
-  ranked.sort((a, b) => b.affinity_score - a.affinity_score);
+  // Deterministic tie-break on team name so this production ranking stays
+  // bit-for-bit identical to computeBaselineOrder in gpBacktest.ts.
+  ranked.sort(
+    (a, b) => b.affinity_score - a.affinity_score || a.team_name.localeCompare(b.team_name),
+  );
 
   // Global confidence: min between circuit and median car confidence, then
   // downgraded if overtaking_difficulty exceeds the documented threshold.

@@ -50,6 +50,20 @@ export interface DomainReliability {
   gap_from_nearest?: number;
   /** Free-form reason for "unknown" (no warning shown). */
   reason?: "no_target_speed" | "no_reference_speeds";
+  /**
+   * INFORMATIVE-ONLY, additive: signals that the target circuit's
+   * `top_speed` weight (how much the layout rewards straight-line efficiency)
+   * lies strictly outside the min/max range of the already-run circuits.
+   * Independent from `status`, does NOT alter the score or the bands. When
+   * present, the narrative surfaces an extra cautionary sentence because the
+   * production score (sector-only persistence) never captures straight-line
+   * efficiency and cannot compensate for this out-of-range character.
+   */
+  top_speed_out_of_range?: {
+    target: number;
+    min: number;
+    max: number;
+  };
 }
 
 /**
@@ -94,6 +108,7 @@ export function computeDomainReliability(
   racesUsed: SessionInfo[] | null | undefined,
 ): DomainReliability {
   const referenceSpeeds: number[] = [];
+  const referenceTopSpeeds: number[] = [];
   const seenGp = new Set<string>();
   for (const s of racesUsed ?? []) {
     const gpName = resolveGpNameByCircuitKey(s.circuit_key);
@@ -103,6 +118,8 @@ export function computeDomainReliability(
     const profile = CIRCUIT_PROFILES[gpName];
     const v = profile?.quali_speed_kmh;
     if (typeof v === "number" && Number.isFinite(v)) referenceSpeeds.push(v);
+    const ts = profile?.top_speed;
+    if (typeof ts === "number" && Number.isFinite(ts)) referenceTopSpeeds.push(ts);
   }
 
   const targetSpeed = target?.quali_speed_kmh;
@@ -149,6 +166,24 @@ export function computeDomainReliability(
     status = "in_domain";
   }
 
+  // Additive top_speed-weight range check: purely informative, independent
+  // from `status`. Only applies when the target circuit exposes top_speed
+  // and at least one reference profile does too. Strict inequality: exactly
+  // at the boundary is still considered inside.
+  let topSpeedOutOfRange: DomainReliability["top_speed_out_of_range"];
+  const targetTop = target?.top_speed;
+  if (
+    typeof targetTop === "number" &&
+    Number.isFinite(targetTop) &&
+    referenceTopSpeeds.length > 0
+  ) {
+    const tsMin = Math.min(...referenceTopSpeeds);
+    const tsMax = Math.max(...referenceTopSpeeds);
+    if (targetTop > tsMax || targetTop < tsMin) {
+      topSpeedOutOfRange = { target: targetTop, min: tsMin, max: tsMax };
+    }
+  }
+
   return {
     status,
     target_speed: targetSpeed,
@@ -159,5 +194,6 @@ export function computeDomainReliability(
     min,
     max,
     gap_from_nearest: gap,
+    ...(topSpeedOutOfRange ? { top_speed_out_of_range: topSpeedOutOfRange } : {}),
   };
 }

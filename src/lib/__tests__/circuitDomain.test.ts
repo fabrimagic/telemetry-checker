@@ -122,4 +122,42 @@ describe("computeDomainReliability", () => {
     ]);
     expect(d.reference_speeds).toHaveLength(2);
   });
+
+  it("(f) top_speed_out_of_range: attivo con target > max, assente con target dentro il range", () => {
+    // Reference set: Miami/COTA/Monza/Spa → raccogliamo i loro top_speed reali.
+    const refs = [151, 9, 39, 7].map((k) => makeSession(k));
+    // Un target dei circuiti sopra è già dentro il range: usiamo Miami stessa.
+    const inside = computeDomainReliability(
+      CIRCUIT_PROFILES["Gran Premio di Miami"],
+      refs,
+    );
+    expect(inside.top_speed_out_of_range).toBeUndefined();
+
+    // Target sintetico con top_speed=0.99: strettamente sopra il massimo dei
+    // profili di riferimento (nessun circuito 2026 mappato ha 0.99).
+    const syntheticHi = {
+      ...CIRCUIT_PROFILES["Gran Premio di Miami"],
+      top_speed: 1.5,
+    };
+    const hi = computeDomainReliability(syntheticHi, refs);
+    expect(hi.top_speed_out_of_range).toBeDefined();
+    expect(hi.top_speed_out_of_range!.target).toBe(1.5);
+    expect(hi.top_speed_out_of_range!.target).toBeGreaterThan(
+      hi.top_speed_out_of_range!.max,
+    );
+
+    // Target sintetico con top_speed=-0.5: strettamente sotto il minimo.
+    const syntheticLo = {
+      ...CIRCUIT_PROFILES["Gran Premio di Miami"],
+      top_speed: -0.5,
+    };
+    const lo = computeDomainReliability(syntheticLo, refs);
+    expect(lo.top_speed_out_of_range).toBeDefined();
+    expect(lo.top_speed_out_of_range!.target).toBeLessThan(
+      lo.top_speed_out_of_range!.min,
+    );
+
+    // Additivo: non modifica lo status del check di velocità media.
+    expect(hi.status).toBe(inside.status);
+  });
 });
