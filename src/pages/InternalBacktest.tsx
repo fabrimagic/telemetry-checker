@@ -141,6 +141,30 @@ export default function InternalBacktest() {
                 value={fmt(result.aggregate.delta_circuit_vs_sectors)}
                 highlight
               />
+              <Stat
+                label="ρ candidata A: solo-settori con normalizzazione gap_ratio"
+                value={fmt(result.aggregate.rho_baseline_sectors_gap_mean)}
+              />
+              <Stat
+                label="Δ (gap_ratio − produzione)"
+                value={fmt(result.aggregate.delta_sectors_gap_vs_sectors)}
+              />
+              <Stat
+                label="Top-3 candidata A (gap_ratio)"
+                value={fmtPct(result.aggregate.top3_baseline_sectors_gap_rate)}
+              />
+              <Stat
+                label="ρ candidata B: sensibilità per team"
+                value={fmt(result.aggregate.rho_team_sensitivity_mean)}
+              />
+              <Stat
+                label="Δ (sensibilità per team − produzione)"
+                value={fmt(result.aggregate.delta_team_sensitivity_vs_sectors)}
+              />
+              <Stat
+                label="Top-3 candidata B (sensibilità per team)"
+                value={fmtPct(result.aggregate.top3_team_sensitivity_rate)}
+              />
             </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
               La baseline che rappresenta la <strong>produzione</strong> è{" "}
