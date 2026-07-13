@@ -185,6 +185,16 @@ export interface ComputeCarProfilesResult {
   races_considered: number;
   /** Total number of past 2026 races. */
   total_past_races: number;
+  /**
+   * Optional alternative profile array normalized with the "gap_ratio"
+   * mode. Populated only when {@link ComputeCarProfilesOptions.emitGapRatioVariant}
+   * is true. Contains only the two dimensions used by the sectors_only
+   * baseline (top_speed_index + sector_strength); the corner/coverage
+   * diagnostics are NOT re-computed here — they are shared with the
+   * primary `profiles`. Consumers that need corner diagnostics must
+   * use `profiles`.
+   */
+  profiles_gap_ratio?: CarProfile[];
 }
 
 function sessionDisplayName(s: SessionInfo): string {
