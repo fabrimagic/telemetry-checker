@@ -513,6 +513,9 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     // ONLY races with date_end < now — the guarantee is inherited from the
     // `now` parameter passed to `compute` above (no fabrication).
     let teamSensitivityOrder: string[] = [];
+    let sensitivityDiagnostics:
+      | { regressed: number; insufficient_sample: number; variance_zero: number; total: number }
+      | undefined = undefined;
     try {
       const sensitivity = computeTeamSensitivity({
         profiles: profilesResult.profiles,
@@ -520,9 +523,27 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
         circuitProfiles,
       });
       teamSensitivityOrder = sensitivity.ranked;
+      if (sensitivity.ranked && sensitivity.ranked.length > 0) {
+        let regressed = 0;
+        let insuff = 0;
+        let varZero = 0;
+        for (const e of sensitivity.by_team) {
+          if (e.fallback_reason === null) regressed++;
+          else if (e.fallback_reason === "insufficient_sample") insuff++;
+          else if (e.fallback_reason === "top_speed_variance_near_zero") varZero++;
+        }
+        sensitivityDiagnostics = {
+          regressed,
+          insufficient_sample: insuff,
+          variance_zero: varZero,
+          total: sensitivity.by_team.length,
+        };
+      }
     } catch {
       teamSensitivityOrder = [];
+      sensitivityDiagnostics = undefined;
     }
+
 
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
