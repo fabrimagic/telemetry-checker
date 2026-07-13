@@ -93,6 +93,20 @@ export interface BacktestPerRace {
    * fallbacks (see `teamSensitivity`) keep it from fabricating slopes.
    */
   rho_team_sensitivity: number | null;
+  /**
+   * Additive diagnostic (optional): breakdown of how the team-sensitivity
+   * candidate produced its score for each team in this race. Undefined when
+   * the race is skipped or when computeTeamSensitivity did not produce a
+   * ranking. `regressed` = teams whose predicted_score came from the actual
+   * weighted regression (fallback_reason === null). The two fallback counts
+   * disambiguate persistence fallbacks from real regressions in the UI.
+   */
+  sensitivity_diagnostics?: {
+    regressed: number;
+    insufficient_sample: number;
+    variance_zero: number;
+    total: number;
+  };
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
