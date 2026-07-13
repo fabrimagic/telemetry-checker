@@ -170,6 +170,13 @@ export interface BacktestAggregate {
   top3_circuit_specific_rate: number | null;
   top3_baseline_sectors_gap_rate: number | null;
   top3_team_sensitivity_rate: number | null;
+  /**
+   * Additive diagnostic (optional): number of validated races in which the
+   * team-sensitivity candidate ran the regression on at least half of the
+   * teams (i.e. was not mostly a persistence fallback). Lets the reader see
+   * on how many races the candidate actually expressed its model.
+   */
+  races_with_active_sensitivity?: number;
 }
 
 export interface BacktestResult {
