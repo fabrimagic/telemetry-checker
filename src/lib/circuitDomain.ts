@@ -108,6 +108,7 @@ export function computeDomainReliability(
   racesUsed: SessionInfo[] | null | undefined,
 ): DomainReliability {
   const referenceSpeeds: number[] = [];
+  const referenceTopSpeeds: number[] = [];
   const seenGp = new Set<string>();
   for (const s of racesUsed ?? []) {
     const gpName = resolveGpNameByCircuitKey(s.circuit_key);
@@ -117,6 +118,8 @@ export function computeDomainReliability(
     const profile = CIRCUIT_PROFILES[gpName];
     const v = profile?.quali_speed_kmh;
     if (typeof v === "number" && Number.isFinite(v)) referenceSpeeds.push(v);
+    const ts = profile?.top_speed;
+    if (typeof ts === "number" && Number.isFinite(ts)) referenceTopSpeeds.push(ts);
   }
 
   const targetSpeed = target?.quali_speed_kmh;
