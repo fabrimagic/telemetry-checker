@@ -698,9 +698,11 @@ export async function computeCarProfiles(
     // Fetch race session.
     const raceRes = await fetchSession(session.session_key);
     let raceMetrics: RaceTeamMetrics | null = null;
+    let raceMetricsGap: RaceTeamMetrics | null = null;
     let raceFetchFailed = false;
     if (raceRes.ok) {
       raceMetrics = raceRes.metrics;
+      raceMetricsGap = raceRes.metricsGap;
       raceAvailable = raceMetrics != null;
     } else {
       raceFetchFailed = true;
@@ -708,11 +710,13 @@ export async function computeCarProfiles(
 
     // Fetch matching Qualifying (same meeting_key), if any.
     let qualiMetrics: RaceTeamMetrics | null = null;
+    let qualiMetricsGap: RaceTeamMetrics | null = null;
     const qualiSession = qualiByMeeting.get(session.meeting_key);
     if (qualiSession) {
       const qRes = await fetchSession(qualiSession.session_key);
       if (qRes.ok) {
         qualiMetrics = qRes.metrics;
+        qualiMetricsGap = qRes.metricsGap;
         qualiAvailable = qualiMetrics != null;
       }
       // qRes fetch failure is silently absorbed: quali is a "bonus" source.
