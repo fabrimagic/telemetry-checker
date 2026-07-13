@@ -558,14 +558,13 @@ describe("runBacktest — candidate policies (gap_ratio + team sensitivity)", ()
     ]);
     const deps = makeDeps({ races, qualis, lapsBySession, driversBySession });
     await runBacktest({ deps });
-    // Two compute calls per target: default + gap_ratio candidate.
-    expect(deps.computeCarProfiles).toHaveBeenCalledTimes(4);
-    const calls = deps.computeCarProfiles.mock.calls as Array<[{ now: Date; normalizationMode?: string }]>;
-    // Any call marked normalizationMode:gap_ratio must have `now` strictly
-    // before the matching target's quali start (2 targets: GP2 and GP3).
-    const gapCalls = calls.filter((c) => c[0].normalizationMode === "gap_ratio");
-    expect(gapCalls).toHaveLength(2);
-    for (const c of gapCalls) {
+    // Single compute call per target (gap_ratio is emitted additively in
+    // the same call via emitGapRatioVariant). Every call MUST use `now`
+    // strictly before the target quali start.
+    expect(deps.computeCarProfiles).toHaveBeenCalledTimes(2);
+    const calls = deps.computeCarProfiles.mock.calls as Array<[{ now: Date; emitGapRatioVariant?: boolean }]>;
+    for (const c of calls) {
+      expect(c[0].emitGapRatioVariant).toBe(true);
       const ts = c[0].now.getTime();
       const beforeGp2 = ts < new Date("2026-03-14T13:00:00Z").getTime();
       const beforeGp3 = ts < new Date("2026-03-28T13:00:00Z").getTime();
