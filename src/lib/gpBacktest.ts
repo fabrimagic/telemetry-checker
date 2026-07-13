@@ -51,6 +51,7 @@ import {
 import { CIRCUIT_PROFILES as DEFAULT_CIRCUIT_PROFILES } from "./circuitProfiles";
 import type { CircuitProfile } from "./circuitProfiles";
 import { resolveCalendarGpName as defaultResolveCalendarGpName } from "./circuitGeometry";
+import { computeTeamSensitivity } from "./teamSensitivity";
 
 /** Safety margin (ms) subtracted from quali date_start to compute `now`. */
 export const DEFAULT_PRE_WEEKEND_MARGIN_MS = 60_000;
