@@ -204,6 +204,7 @@ export default function InternalBacktest() {
                     <th className="py-2 pr-3">ρ circ-spec</th>
                     <th className="py-2 pr-3">ρ gap_ratio</th>
                     <th className="py-2 pr-3">ρ sens. team</th>
+                    <th className="py-2 pr-3">sens. attiva</th>
                     <th className="py-2 pr-3">Top-3 mod</th>
                     <th className="py-2 pr-3">Top-3 t+s</th>
                     <th className="py-2 pr-3">Top-3 s</th>
