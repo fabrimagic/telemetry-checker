@@ -476,6 +476,44 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     const predOrderCircuit =
       predictionCircuit.ranked?.map((t) => t.team_name) ?? [];
 
+    // ----- CANDIDATE POLICY A: sectors_only baseline on gap_ratio profiles.
+    // A second compute with `normalizationMode: "gap_ratio"` respects the
+    // same look-ahead `now` guarantee (uses only races with date_end < now).
+    // Wrapped in try/catch: on failure this candidate is simply not scored
+    // for the race (per-race fields stay null).
+    let baselineOrderSectorsGap: string[] = [];
+    try {
+      const profilesGap = await compute({
+        now,
+        signal,
+        normalizationMode: "gap_ratio",
+      });
+      if (profilesGap.profiles && profilesGap.profiles.length > 0) {
+        baselineOrderSectorsGap = computeBaselineOrder(
+          profilesGap.profiles,
+          "sectors_only",
+        );
+      }
+    } catch {
+      baselineOrderSectorsGap = [];
+    }
+
+    // ----- CANDIDATE POLICY B: team-sensitivity regression over the same
+    // profiles (with race_history) that fed the production baseline. Uses
+    // ONLY races with date_end < now — the guarantee is inherited from the
+    // `now` parameter passed to `compute` above (no fabrication).
+    let teamSensitivityOrder: string[] = [];
+    try {
+      const sensitivity = computeTeamSensitivity({
+        profiles: profilesResult.profiles,
+        target: circuit,
+        circuitProfiles,
+      });
+      teamSensitivityOrder = sensitivity.ranked;
+    } catch {
+      teamSensitivityOrder = [];
+    }
+
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
     let qDrivers: Driver[] = [];
