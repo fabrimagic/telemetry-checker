@@ -709,6 +709,37 @@ export async function computeCarProfiles(
         lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
       }
 
+      // Per-team per-race history entry (additive, retrocompatible).
+      const historyGpName =
+        resolveCalendarGpName(
+          session.location,
+          session.country_name,
+          session.circuit_key,
+        ) ?? sessionDisplayName(session);
+      const historyDate = session.date_end ?? "";
+      for (const t of teamsInRace) {
+        const s1 = agg.s1.get(t);
+        const s2 = agg.s2.get(t);
+        const s3 = agg.s3.get(t);
+        const parts = [s1, s2, s3].filter(
+          (x): x is number => x != null && Number.isFinite(x),
+        );
+        if (parts.length === 0) continue;
+        const sectorsNorm = parts.reduce((a, b) => a + b, 0) / parts.length;
+        const topN = agg.topSpeed.get(t);
+        const arr = historyByTeam.get(t) ?? [];
+        arr.push({
+          gpName: historyGpName,
+          date_end: historyDate,
+          weight: w,
+          sectors_normalized: sectorsNorm,
+          top_speed_normalized:
+            topN != null && Number.isFinite(topN) ? topN : null,
+        });
+        historyByTeam.set(t, arr);
+      }
+
+
       // ----- Opzione A: stima per-tipo dai SETTORI STORICI -----
       // Use the sector_corner_map of THIS past circuit (origin) to attribute
       // the team's per-sector strength to corner types. Without an origin
