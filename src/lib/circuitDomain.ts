@@ -166,6 +166,24 @@ export function computeDomainReliability(
     status = "in_domain";
   }
 
+  // Additive top_speed-weight range check: purely informative, independent
+  // from `status`. Only applies when the target circuit exposes top_speed
+  // and at least one reference profile does too. Strict inequality: exactly
+  // at the boundary is still considered inside.
+  let topSpeedOutOfRange: DomainReliability["top_speed_out_of_range"];
+  const targetTop = target?.top_speed;
+  if (
+    typeof targetTop === "number" &&
+    Number.isFinite(targetTop) &&
+    referenceTopSpeeds.length > 0
+  ) {
+    const tsMin = Math.min(...referenceTopSpeeds);
+    const tsMax = Math.max(...referenceTopSpeeds);
+    if (targetTop > tsMax || targetTop < tsMin) {
+      topSpeedOutOfRange = { target: targetTop, min: tsMin, max: tsMax };
+    }
+  }
+
   return {
     status,
     target_speed: targetSpeed,
@@ -176,5 +194,6 @@ export function computeDomainReliability(
     min,
     max,
     gap_from_nearest: gap,
+    ...(topSpeedOutOfRange ? { top_speed_out_of_range: topSpeedOutOfRange } : {}),
   };
 }
