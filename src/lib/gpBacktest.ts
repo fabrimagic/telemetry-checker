@@ -606,6 +606,20 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     rhoCircuitSpecificMean != null && rhoBaseSectorsMean != null
       ? rhoCircuitSpecificMean - rhoBaseSectorsMean
       : null;
+  const rhoBaseSectorsGapMean = meanOrNull(
+    validated.map((r) => r.rho_baseline_sectors_gap).filter((x): x is number => x != null),
+  );
+  const rhoTeamSensitivityMean = meanOrNull(
+    validated.map((r) => r.rho_team_sensitivity).filter((x): x is number => x != null),
+  );
+  const deltaSectorsGapVsSectors =
+    rhoBaseSectorsGapMean != null && rhoBaseSectorsMean != null
+      ? rhoBaseSectorsGapMean - rhoBaseSectorsMean
+      : null;
+  const deltaTeamSensVsSectors =
+    rhoTeamSensitivityMean != null && rhoBaseSectorsMean != null
+      ? rhoTeamSensitivityMean - rhoBaseSectorsMean
+      : null;
 
   return {
     per_race,
@@ -620,11 +634,17 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       delta_mean: delta,
       delta_sectors_vs_topsec: deltaSectorsVsTopSec,
       delta_circuit_vs_sectors: deltaCircuitVsSectors,
+      rho_baseline_sectors_gap_mean: rhoBaseSectorsGapMean,
+      rho_team_sensitivity_mean: rhoTeamSensitivityMean,
+      delta_sectors_gap_vs_sectors: deltaSectorsGapVsSectors,
+      delta_team_sensitivity_vs_sectors: deltaTeamSensVsSectors,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
       top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
       top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_circuit_specific_rate: rateOrNull(validated.map((r) => r.top3_circuit_specific)),
+      top3_baseline_sectors_gap_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors_gap)),
+      top3_team_sensitivity_rate: rateOrNull(validated.map((r) => r.top3_team_sensitivity)),
     },
     total_races: total,
     notes,
