@@ -141,6 +141,30 @@ export default function InternalBacktest() {
                 value={fmt(result.aggregate.delta_circuit_vs_sectors)}
                 highlight
               />
+              <Stat
+                label="ρ candidata A: solo-settori con normalizzazione gap_ratio"
+                value={fmt(result.aggregate.rho_baseline_sectors_gap_mean)}
+              />
+              <Stat
+                label="Δ (gap_ratio − produzione)"
+                value={fmt(result.aggregate.delta_sectors_gap_vs_sectors)}
+              />
+              <Stat
+                label="Top-3 candidata A (gap_ratio)"
+                value={fmtPct(result.aggregate.top3_baseline_sectors_gap_rate)}
+              />
+              <Stat
+                label="ρ candidata B: sensibilità per team"
+                value={fmt(result.aggregate.rho_team_sensitivity_mean)}
+              />
+              <Stat
+                label="Δ (sensibilità per team − produzione)"
+                value={fmt(result.aggregate.delta_team_sensitivity_vs_sectors)}
+              />
+              <Stat
+                label="Top-3 candidata B (sensibilità per team)"
+                value={fmtPct(result.aggregate.top3_team_sensitivity_rate)}
+              />
             </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
               La baseline che rappresenta la <strong>produzione</strong> è{" "}
@@ -170,10 +194,14 @@ export default function InternalBacktest() {
                     <th className="py-2 pr-3">ρ trap+sett</th>
                     <th className="py-2 pr-3">ρ solo-sett</th>
                     <th className="py-2 pr-3">ρ circ-spec</th>
+                    <th className="py-2 pr-3">ρ gap_ratio</th>
+                    <th className="py-2 pr-3">ρ sens. team</th>
                     <th className="py-2 pr-3">Top-3 mod</th>
                     <th className="py-2 pr-3">Top-3 t+s</th>
                     <th className="py-2 pr-3">Top-3 s</th>
                     <th className="py-2 pr-3">Top-3 c-s</th>
+                    <th className="py-2 pr-3">Top-3 gap</th>
+                    <th className="py-2 pr-3">Top-3 sens</th>
                     <th className="py-2 pr-3">n team</th>
                     <th className="py-2 pr-3">Stato</th>
                   </tr>
@@ -186,10 +214,14 @@ export default function InternalBacktest() {
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_circuit_specific)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors_gap)}</td>
+                      <td className="py-2 pr-3">{fmt(r.rho_team_sensitivity)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_model)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_circuit_specific)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors_gap)}</td>
+                      <td className="py-2 pr-3">{fmtBool(r.top3_team_sensitivity)}</td>
                       <td className="py-2 pr-3">{r.n_teams || "—"}</td>
                       <td className="py-2 pr-3 text-xs text-muted-foreground">
                         {r.skipped_reason ?? "validata"}

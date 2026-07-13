@@ -116,7 +116,42 @@ export interface CarProfile {
    * Does NOT affect the gate or the affinity score.
    */
   corner_alignment_error?: number | null;
+  /**
+   * ADDITIVE, retrocompatible: per-team historical series of the
+   * per-race normalized sector score (mean of s1/s2/s3 after quali+race
+   * combination, in the range [0,1]) together with the GP name (resolved
+   * via {@link resolveCalendarGpName}) and the recency weight applied by
+   * this aggregation. Preserved so downstream consumers (e.g. the
+   * `teamSensitivity` diagnostic model) can run a regression against
+   * per-circuit features. Undefined only if the team contributed to no
+   * usable race.
+   */
+  race_history?: TeamRaceHistoryEntry[];
 }
+
+export interface TeamRaceHistoryEntry {
+  gpName: string;
+  date_end: string;
+  /** Recency weight assigned to this race by the aggregation. */
+  weight: number;
+  /** Mean of per-race normalized s1/s2/s3 for this team, [0,1]. */
+  sectors_normalized: number;
+  /** Per-race normalized top-speed index for this team, or null. */
+  top_speed_normalized: number | null;
+}
+
+/**
+ * Normalization mode used to convert per-race raw team metrics into a
+ * comparable [0,1] score:
+ *  - "min_max"   (DEFAULT, unchanged production behavior): best team maps
+ *    to 1, worst to 0. Amplifies small gaps.
+ *  - "gap_ratio" (CANDIDATE): the best team maps to 1 and everyone else
+ *    to a proportional ratio close to 1 that preserves the actual size
+ *    of the gap (sectors: t_best/t_team; top speed: v_team/v_best). Used
+ *    ONLY as an alternative candidate in the backtest — not wired into
+ *    production.
+ */
+export type NormalizationMode = "min_max" | "gap_ratio";
 
 /**
  * Minimum aggregated /location coverage for a team to be considered
@@ -150,6 +185,16 @@ export interface ComputeCarProfilesResult {
   races_considered: number;
   /** Total number of past 2026 races. */
   total_past_races: number;
+  /**
+   * Optional alternative profile array normalized with the "gap_ratio"
+   * mode. Populated only when {@link ComputeCarProfilesOptions.emitGapRatioVariant}
+   * is true. Contains only the two dimensions used by the sectors_only
+   * baseline (top_speed_index + sector_strength); the corner/coverage
+   * diagnostics are NOT re-computed here — they are shared with the
+   * primary `profiles`. Consumers that need corner diagnostics must
+   * use `profiles`.
+   */
+  profiles_gap_ratio?: CarProfile[];
 }
 
 function sessionDisplayName(s: SessionInfo): string {
@@ -183,6 +228,24 @@ export interface ComputeCarProfilesOptions {
     qualiSession: SessionInfo,
     driverNumbers: number[],
   ) => Promise<SessionCornerAnalysis | null>;
+  /**
+   * Normalization mode used to convert per-race raw team metrics into
+   * comparable [0,1] scores. Defaults to "min_max" (current production
+   * behavior). "gap_ratio" is exposed only as an alternative candidate
+   * for backtest evaluation; setting it does NOT change any production
+   * call site.
+   */
+  normalizationMode?: NormalizationMode;
+  /**
+   * When true, computeCarProfiles produces an ADDITIONAL profile array
+   * computed with the alternative "gap_ratio" normalization, exposed on
+   * the result as `profiles_gap_ratio`. The primary `profiles` field is
+   * NOT affected: it still uses {@link normalizationMode} (default
+   * "min_max"). Motivation: the backtest can measure the gap_ratio
+   * candidate without paying a second full data-fetch pass. Cheap: only
+   * an in-memory second aggregation of the already-fetched laps.
+   */
+  emitGapRatioVariant?: boolean;
 }
 
 /**
@@ -252,8 +315,12 @@ function p90(values: number[]): number {
   return quantile(s, 0.9);
 }
 
-/** Normalize so the maximum maps to 1 and minimum to 0. */
-function normalizeHigherIsBetter(map: Map<string, number>): Map<string, number> {
+/** Normalize so the maximum maps to 1 and minimum to 0 (min-max), or so
+ * that best maps to 1 and others map to v_team/v_best (gap-ratio). */
+function normalizeHigherIsBetter(
+  map: Map<string, number>,
+  mode: NormalizationMode = "min_max",
+): Map<string, number> {
   const vals = [...map.values()].filter((v) => Number.isFinite(v));
   if (vals.length === 0) return new Map();
   const min = Math.min(...vals);
@@ -261,13 +328,21 @@ function normalizeHigherIsBetter(map: Map<string, number>): Map<string, number> 
   const out = new Map<string, number>();
   for (const [k, v] of map.entries()) {
     if (!Number.isFinite(v)) continue;
-    out.set(k, max === min ? 1 : (v - min) / (max - min));
+    if (mode === "gap_ratio") {
+      // best value maps to 1; others to v/best. Preserves proportional gaps.
+      out.set(k, max > 0 ? v / max : 1);
+    } else {
+      out.set(k, max === min ? 1 : (v - min) / (max - min));
+    }
   }
   return out;
 }
 
-/** Lower is better → invert. */
-function normalizeLowerIsBetter(map: Map<string, number>): Map<string, number> {
+/** Lower is better → invert. Under gap_ratio: best/v (times close to 1). */
+function normalizeLowerIsBetter(
+  map: Map<string, number>,
+  mode: NormalizationMode = "min_max",
+): Map<string, number> {
   const vals = [...map.values()].filter((v) => Number.isFinite(v));
   if (vals.length === 0) return new Map();
   const min = Math.min(...vals);
@@ -275,7 +350,11 @@ function normalizeLowerIsBetter(map: Map<string, number>): Map<string, number> {
   const out = new Map<string, number>();
   for (const [k, v] of map.entries()) {
     if (!Number.isFinite(v)) continue;
-    out.set(k, max === min ? 1 : (max - v) / (max - min));
+    if (mode === "gap_ratio") {
+      out.set(k, v > 0 ? min / v : 1);
+    } else {
+      out.set(k, max === min ? 1 : (max - v) / (max - min));
+    }
   }
   return out;
 }
@@ -292,7 +371,11 @@ interface RaceTeamMetrics {
   lapsByTeam: Map<string, number>;
 }
 
-function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
+function aggregateRace(
+  laps: Lap[],
+  drivers: Driver[],
+  mode: NormalizationMode = "min_max",
+): RaceTeamMetrics | null {
   const teamByDriver = new Map<number, string>();
   for (const d of drivers) {
     if (d.team_name) teamByDriver.set(d.driver_number, d.team_name);
@@ -370,10 +453,10 @@ function aggregateRace(laps: Lap[], drivers: Driver[]): RaceTeamMetrics | null {
   if (teamTop.size === 0 && teamS1.size === 0) return null;
 
   return {
-    topSpeed: normalizeHigherIsBetter(teamTop),
-    s1: normalizeLowerIsBetter(teamS1),
-    s2: normalizeLowerIsBetter(teamS2),
-    s3: normalizeLowerIsBetter(teamS3),
+    topSpeed: normalizeHigherIsBetter(teamTop, mode),
+    s1: normalizeLowerIsBetter(teamS1, mode),
+    s2: normalizeLowerIsBetter(teamS2, mode),
+    s3: normalizeLowerIsBetter(teamS3, mode),
     lapsByTeam: teamLaps,
   };
 }
@@ -431,6 +514,8 @@ export async function computeCarProfiles(
 ): Promise<ComputeCarProfilesResult> {
   const now = opts.now ?? new Date();
   const signal = opts.signal;
+  const normMode: NormalizationMode = opts.normalizationMode ?? "min_max";
+
 
   let sessions: SessionInfo[] = [];
   try {
@@ -546,6 +631,9 @@ export async function computeCarProfiles(
   // For each team, collect the weights of the races it contributed to —
   // used to compute the Kish effective sample size.
   const weightsByTeam = new Map<string, number[]>();
+  // Additive: preserved per-team per-race history for downstream regression
+  // consumers (see `race_history` on CarProfile).
+  const historyByTeam = new Map<string, TeamRaceHistoryEntry[]>();
 
   const racesUsed: SessionInfo[] = [];
   const diagnostics: RaceDiagnostic[] = [];
@@ -558,17 +646,42 @@ export async function computeCarProfiles(
   //   { ok: true, metrics }            → session aggregated successfully
   //   { ok: true, metrics: null }      → fetched but no usable data
   //   { ok: false }                    → fetch failed
+  const wantGap = opts.emitGapRatioVariant === true;
+
   async function fetchSession(
     sessionKey: number,
-  ): Promise<{ ok: true; metrics: RaceTeamMetrics | null } | { ok: false }> {
+  ): Promise<
+    | { ok: true; metrics: RaceTeamMetrics | null; metricsGap: RaceTeamMetrics | null }
+    | { ok: false }
+  > {
     try {
       const laps = await getAllLaps(sessionKey);
       const drivers = await getDrivers(sessionKey);
-      return { ok: true, metrics: aggregateRace(laps, drivers) };
+      return {
+        ok: true,
+        metrics: aggregateRace(laps, drivers, normMode),
+        metricsGap: wantGap ? aggregateRace(laps, drivers, "gap_ratio") : null,
+      };
     } catch {
       return { ok: false };
     }
   }
+
+  // Accumulators for the additive gap_ratio variant (only populated when
+  // wantGap === true). Only the four dimensions consumed by the sectors_only
+  // baseline are tracked here.
+  const accSumGap = {
+    top: new Map<string, number>(),
+    s1: new Map<string, number>(),
+    s2: new Map<string, number>(),
+    s3: new Map<string, number>(),
+  };
+  const accWGap = {
+    top: new Map<string, number>(),
+    s1: new Map<string, number>(),
+    s2: new Map<string, number>(),
+    s3: new Map<string, number>(),
+  };
 
   for (let i = 0; i < selected.length; i++) {
     if (signal?.aborted) {
@@ -585,9 +698,11 @@ export async function computeCarProfiles(
     // Fetch race session.
     const raceRes = await fetchSession(session.session_key);
     let raceMetrics: RaceTeamMetrics | null = null;
+    let raceMetricsGap: RaceTeamMetrics | null = null;
     let raceFetchFailed = false;
     if (raceRes.ok) {
       raceMetrics = raceRes.metrics;
+      raceMetricsGap = raceRes.metricsGap;
       raceAvailable = raceMetrics != null;
     } else {
       raceFetchFailed = true;
@@ -595,11 +710,13 @@ export async function computeCarProfiles(
 
     // Fetch matching Qualifying (same meeting_key), if any.
     let qualiMetrics: RaceTeamMetrics | null = null;
+    let qualiMetricsGap: RaceTeamMetrics | null = null;
     const qualiSession = qualiByMeeting.get(session.meeting_key);
     if (qualiSession) {
       const qRes = await fetchSession(qualiSession.session_key);
       if (qRes.ok) {
         qualiMetrics = qRes.metrics;
+        qualiMetricsGap = qRes.metricsGap;
         qualiAvailable = qualiMetrics != null;
       }
       // qRes fetch failure is silently absorbed: quali is a "bonus" source.
@@ -625,6 +742,17 @@ export async function computeCarProfiles(
       add(agg.s2, accSum.s2, accW.s2);
       add(agg.s3, accSum.s3, accW.s3);
 
+      // Companion accumulation for the gap_ratio variant, when requested.
+      if (wantGap) {
+        const aggGap = combineSessions(qualiMetricsGap, raceMetricsGap);
+        if (aggGap) {
+          add(aggGap.topSpeed, accSumGap.top, accWGap.top);
+          add(aggGap.s1, accSumGap.s1, accWGap.s1);
+          add(aggGap.s2, accSumGap.s2, accWGap.s2);
+          add(aggGap.s3, accSumGap.s3, accWGap.s3);
+        }
+      }
+
       const teamsInRace = new Set<string>([
         ...agg.topSpeed.keys(),
         ...agg.s1.keys(),
@@ -640,6 +768,37 @@ export async function computeCarProfiles(
       for (const [t, n] of agg.lapsByTeam.entries()) {
         lapsByTeam.set(t, (lapsByTeam.get(t) ?? 0) + n);
       }
+
+      // Per-team per-race history entry (additive, retrocompatible).
+      const historyGpName =
+        resolveCalendarGpName(
+          session.location,
+          session.country_name,
+          session.circuit_key,
+        ) ?? sessionDisplayName(session);
+      const historyDate = session.date_end ?? "";
+      for (const t of teamsInRace) {
+        const s1 = agg.s1.get(t);
+        const s2 = agg.s2.get(t);
+        const s3 = agg.s3.get(t);
+        const parts = [s1, s2, s3].filter(
+          (x): x is number => x != null && Number.isFinite(x),
+        );
+        if (parts.length === 0) continue;
+        const sectorsNorm = parts.reduce((a, b) => a + b, 0) / parts.length;
+        const topN = agg.topSpeed.get(t);
+        const arr = historyByTeam.get(t) ?? [];
+        arr.push({
+          gpName: historyGpName,
+          date_end: historyDate,
+          weight: w,
+          sectors_normalized: sectorsNorm,
+          top_speed_normalized:
+            topN != null && Number.isFinite(topN) ? topN : null,
+        });
+        historyByTeam.set(t, arr);
+      }
+
 
       // ----- Opzione A: stima per-tipo dai SETTORI STORICI -----
       // Use the sector_corner_map of THIS past circuit (origin) to attribute
@@ -814,10 +973,10 @@ export async function computeCarProfiles(
   }
 
   // Final cross-field re-normalization to ensure index in [0,1] with max=1.
-  const normTop = normalizeHigherIsBetter(rawTop);
-  const normS1 = normalizeHigherIsBetter(rawS1);
-  const normS2 = normalizeHigherIsBetter(rawS2);
-  const normS3 = normalizeHigherIsBetter(rawS3);
+  const normTop = normalizeHigherIsBetter(rawTop, normMode);
+  const normS1 = normalizeHigherIsBetter(rawS1, normMode);
+  const normS2 = normalizeHigherIsBetter(rawS2, normMode);
+  const normS3 = normalizeHigherIsBetter(rawS3, normMode);
 
   // Sector-history per-type raw averages, then cross-team normalization
   // so the resulting index is in [0,1] with 1 = best in field (same
@@ -953,10 +1112,49 @@ export async function computeCarProfiles(
       corner_source: cornerSource,
       corner_coverage_status: coverageStatus,
       corner_alignment_error: cornerAlignmentError,
+      race_history: historyByTeam.get(team) ?? [],
     });
   }
 
   profiles.sort((a, b) => a.team_name.localeCompare(b.team_name));
+
+  // Additive gap_ratio variant (only the four sectors_only-relevant dims).
+  let profilesGap: CarProfile[] | undefined;
+  if (wantGap) {
+    const rawTopG = new Map<string, number>();
+    const rawS1G = new Map<string, number>();
+    const rawS2G = new Map<string, number>();
+    const rawS3G = new Map<string, number>();
+    const teamsGap = new Set<string>([
+      ...accSumGap.top.keys(),
+      ...accSumGap.s1.keys(),
+      ...accSumGap.s2.keys(),
+      ...accSumGap.s3.keys(),
+    ]);
+    for (const t of teamsGap) {
+      const a = avg(t, accSumGap.top, accWGap.top);
+      if (Number.isFinite(a)) rawTopG.set(t, a);
+      const b = avg(t, accSumGap.s1, accWGap.s1);
+      if (Number.isFinite(b)) rawS1G.set(t, b);
+      const c = avg(t, accSumGap.s2, accWGap.s2);
+      if (Number.isFinite(c)) rawS2G.set(t, c);
+      const d = avg(t, accSumGap.s3, accWGap.s3);
+      if (Number.isFinite(d)) rawS3G.set(t, d);
+    }
+    const nTopG = normalizeHigherIsBetter(rawTopG, "gap_ratio");
+    const nS1G = normalizeHigherIsBetter(rawS1G, "gap_ratio");
+    const nS2G = normalizeHigherIsBetter(rawS2G, "gap_ratio");
+    const nS3G = normalizeHigherIsBetter(rawS3G, "gap_ratio");
+    profilesGap = profiles.map((p) => ({
+      ...p,
+      top_speed_index: nTopG.get(p.team_name) ?? 0,
+      sector_strength: {
+        s1: nS1G.get(p.team_name) ?? 0,
+        s2: nS2G.get(p.team_name) ?? 0,
+        s3: nS3G.get(p.team_name) ?? 0,
+      },
+    }));
+  }
 
   return {
     profiles,
@@ -965,6 +1163,7 @@ export async function computeCarProfiles(
     races_diagnostics: diagnostics,
     races_considered: racesConsidered,
     total_past_races: totalPastRaces,
+    profiles_gap_ratio: profilesGap,
   };
 }
 

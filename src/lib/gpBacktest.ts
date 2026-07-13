@@ -51,6 +51,7 @@ import {
 import { CIRCUIT_PROFILES as DEFAULT_CIRCUIT_PROFILES } from "./circuitProfiles";
 import type { CircuitProfile } from "./circuitProfiles";
 import { resolveCalendarGpName as defaultResolveCalendarGpName } from "./circuitGeometry";
+import { computeTeamSensitivity } from "./teamSensitivity";
 
 /** Safety margin (ms) subtracted from quali date_start to compute `now`. */
 export const DEFAULT_PRE_WEEKEND_MARGIN_MS = 60_000;
@@ -78,6 +79,20 @@ export interface BacktestPerRace {
    * distinction is a candidate to enter the production score.
    */
   rho_circuit_specific: number | null;
+  /**
+   * CANDIDATE POLICY A (monitoring only): sectors_only persistence
+   * computed on profiles aggregated with the `gap_ratio` normalization
+   * (proportional gaps instead of min-max). Same formula as
+   * rho_baseline_sectors, only the upstream normalization changes.
+   */
+  rho_baseline_sectors_gap: number | null;
+  /**
+   * CANDIDATE POLICY B (monitoring only): per-team linear sensitivity
+   * model that regresses each team's per-race sectors-normalized score
+   * against `top_speed` of the corresponding circuit profile. Strict
+   * fallbacks (see `teamSensitivity`) keep it from fabricating slopes.
+   */
+  rho_team_sensitivity: number | null;
   /** true iff predicted #1 team is in the real qualifying top 3. */
   top3_model: boolean | null;
   top3_baseline: boolean | null;
@@ -85,6 +100,8 @@ export interface BacktestPerRace {
   top3_baseline_sectors: boolean | null;
   /** MONITORING ONLY (Role B): top-3 hit from the circuit-specific model. */
   top3_circuit_specific: boolean | null;
+  top3_baseline_sectors_gap: boolean | null;
+  top3_team_sensitivity: boolean | null;
   /** Intersection size between predicted set and quali set. */
   n_teams: number;
   /** Set when the race could not be validated. */
@@ -124,11 +141,21 @@ export interface BacktestAggregate {
    * a candidate for promotion into the production score.
    */
   delta_circuit_vs_sectors: number | null;
+  /** Candidate policy A — mean rho of sectors_only with gap_ratio normalization. */
+  rho_baseline_sectors_gap_mean: number | null;
+  /** Candidate policy B — mean rho of the team-sensitivity regression. */
+  rho_team_sensitivity_mean: number | null;
+  /** Delta: candidate A − production baseline (sectors_only, min-max). */
+  delta_sectors_gap_vs_sectors: number | null;
+  /** Delta: candidate B − production baseline (sectors_only, min-max). */
+  delta_team_sensitivity_vs_sectors: number | null;
   top3_model_rate: number | null;
   top3_baseline_rate: number | null;
   top3_baseline_topsec_rate: number | null;
   top3_baseline_sectors_rate: number | null;
   top3_circuit_specific_rate: number | null;
+  top3_baseline_sectors_gap_rate: number | null;
+  top3_team_sensitivity_rate: number | null;
 }
 
 export interface BacktestResult {
@@ -284,11 +311,15 @@ function skippedRace(
     rho_baseline_topsec: null,
     rho_baseline_sectors: null,
     rho_circuit_specific: null,
+    rho_baseline_sectors_gap: null,
+    rho_team_sensitivity: null,
     top3_model: null,
     top3_baseline: null,
     top3_baseline_topsec: null,
     top3_baseline_sectors: null,
     top3_circuit_specific: null,
+    top3_baseline_sectors_gap: null,
+    top3_team_sensitivity: null,
     n_teams,
     skipped_reason: reason,
   };
@@ -336,11 +367,17 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
         delta_mean: null,
         delta_sectors_vs_topsec: null,
         delta_circuit_vs_sectors: null,
+        rho_baseline_sectors_gap_mean: null,
+        rho_team_sensitivity_mean: null,
+        delta_sectors_gap_vs_sectors: null,
+        delta_team_sensitivity_vs_sectors: null,
         top3_model_rate: null,
         top3_baseline_rate: null,
         top3_baseline_topsec_rate: null,
         top3_baseline_sectors_rate: null,
         top3_circuit_specific_rate: null,
+        top3_baseline_sectors_gap_rate: null,
+        top3_team_sensitivity_rate: null,
       },
       total_races: 0,
       notes: ["Errore nel recupero del calendario"],
@@ -391,7 +428,7 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     // ----- prediction (uses ONLY data with date_end < now) -----
     let profilesResult: ComputeCarProfilesResult;
     try {
-      profilesResult = await compute({ now, signal });
+      profilesResult = await compute({ now, signal, emitGapRatioVariant: true });
     } catch {
       per_race.push(skippedRace(gpName, "insufficient_upstream_data"));
       continue;
@@ -439,6 +476,33 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     const predOrderCircuit =
       predictionCircuit.ranked?.map((t) => t.team_name) ?? [];
 
+    // ----- CANDIDATE POLICY A: sectors_only baseline on gap_ratio profiles.
+    // Read from the additive `profiles_gap_ratio` array populated by
+    // computeCarProfiles when `emitGapRatioVariant: true` is requested — no
+    // second data-fetch pass, and the same look-ahead `now` guarantee
+    // applies (the profiles are computed only from races with date_end < now).
+    let baselineOrderSectorsGap: string[] = [];
+    const profilesGap = profilesResult.profiles_gap_ratio;
+    if (profilesGap && profilesGap.length > 0) {
+      baselineOrderSectorsGap = computeBaselineOrder(profilesGap, "sectors_only");
+    }
+
+    // ----- CANDIDATE POLICY B: team-sensitivity regression over the same
+    // profiles (with race_history) that fed the production baseline. Uses
+    // ONLY races with date_end < now — the guarantee is inherited from the
+    // `now` parameter passed to `compute` above (no fabrication).
+    let teamSensitivityOrder: string[] = [];
+    try {
+      const sensitivity = computeTeamSensitivity({
+        profiles: profilesResult.profiles,
+        target: circuit,
+        circuitProfiles,
+      });
+      teamSensitivityOrder = sensitivity.ranked;
+    } catch {
+      teamSensitivityOrder = [];
+    }
+
     // ----- ground truth: real qualifying of N -----
     let qLaps: Lap[] = [];
     let qDrivers: Driver[] = [];
@@ -465,6 +529,22 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     const top3_baseline_sectors = topKHit(baselineOrderSectors, truthOrder, 3);
     const top3_circuit_specific =
       predOrderCircuit.length > 0 ? topKHit(predOrderCircuit, truthOrder, 3) : null;
+    const rho_baseline_sectors_gap =
+      baselineOrderSectorsGap.length > 0
+        ? spearman(baselineOrderSectorsGap, truthOrder)
+        : null;
+    const top3_baseline_sectors_gap =
+      baselineOrderSectorsGap.length > 0
+        ? topKHit(baselineOrderSectorsGap, truthOrder, 3)
+        : null;
+    const rho_team_sensitivity =
+      teamSensitivityOrder.length > 0
+        ? spearman(teamSensitivityOrder, truthOrder)
+        : null;
+    const top3_team_sensitivity =
+      teamSensitivityOrder.length > 0
+        ? topKHit(teamSensitivityOrder, truthOrder, 3)
+        : null;
     const n_teams = predOrder.filter((t) => truthOrder.includes(t)).length;
 
     per_race.push({
@@ -475,11 +555,15 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       rho_baseline_topsec,
       rho_baseline_sectors,
       rho_circuit_specific,
+      rho_baseline_sectors_gap,
+      rho_team_sensitivity,
       top3_model,
       top3_baseline: top3_baseline_sectors,
       top3_baseline_topsec,
       top3_baseline_sectors,
       top3_circuit_specific,
+      top3_baseline_sectors_gap,
+      top3_team_sensitivity,
       n_teams,
     });
   }
@@ -511,6 +595,20 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     rhoCircuitSpecificMean != null && rhoBaseSectorsMean != null
       ? rhoCircuitSpecificMean - rhoBaseSectorsMean
       : null;
+  const rhoBaseSectorsGapMean = meanOrNull(
+    validated.map((r) => r.rho_baseline_sectors_gap).filter((x): x is number => x != null),
+  );
+  const rhoTeamSensitivityMean = meanOrNull(
+    validated.map((r) => r.rho_team_sensitivity).filter((x): x is number => x != null),
+  );
+  const deltaSectorsGapVsSectors =
+    rhoBaseSectorsGapMean != null && rhoBaseSectorsMean != null
+      ? rhoBaseSectorsGapMean - rhoBaseSectorsMean
+      : null;
+  const deltaTeamSensVsSectors =
+    rhoTeamSensitivityMean != null && rhoBaseSectorsMean != null
+      ? rhoTeamSensitivityMean - rhoBaseSectorsMean
+      : null;
 
   return {
     per_race,
@@ -525,11 +623,17 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       delta_mean: delta,
       delta_sectors_vs_topsec: deltaSectorsVsTopSec,
       delta_circuit_vs_sectors: deltaCircuitVsSectors,
+      rho_baseline_sectors_gap_mean: rhoBaseSectorsGapMean,
+      rho_team_sensitivity_mean: rhoTeamSensitivityMean,
+      delta_sectors_gap_vs_sectors: deltaSectorsGapVsSectors,
+      delta_team_sensitivity_vs_sectors: deltaTeamSensVsSectors,
       top3_model_rate: rateOrNull(validated.map((r) => r.top3_model)),
       top3_baseline_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_baseline_topsec_rate: rateOrNull(validated.map((r) => r.top3_baseline_topsec)),
       top3_baseline_sectors_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors)),
       top3_circuit_specific_rate: rateOrNull(validated.map((r) => r.top3_circuit_specific)),
+      top3_baseline_sectors_gap_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors_gap)),
+      top3_team_sensitivity_rate: rateOrNull(validated.map((r) => r.top3_team_sensitivity)),
     },
     total_races: total,
     notes,

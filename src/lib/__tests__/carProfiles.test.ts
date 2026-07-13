@@ -781,3 +781,48 @@ describe("computeCarProfiles — sector_typed_history (Opzione A)", () => {
 
 
 
+
+describe("gap_ratio normalization", () => {
+  const NOW = new Date("2026-06-01T00:00:00Z");
+
+  it("with small gaps, scores stay close to 1 while min-max spreads them to 0..1", async () => {
+    // Two teams with tiny sector-time gap. min-max forces 0 vs 1;
+    // gap_ratio preserves the near-1 proportional relationship.
+    mockedSessions.mockResolvedValue([
+      { session_key: 1, session_type: "Race", session_name: "Race", meeting_key: 1, date_start: "2026-04-01T15:00:00Z", date_end: "2026-04-01T15:00:00Z" },
+    ]);
+    mockedDrivers.mockResolvedValue([
+      { driver_number: 1, broadcast_name: "D1", full_name: "d1", name_acronym: "D1", team_name: "A", team_colour: "fff", headshot_url: null, session_key: 0 },
+      { driver_number: 2, broadcast_name: "D2", full_name: "d2", name_acronym: "D2", team_name: "B", team_colour: "fff", headshot_url: null, session_key: 0 },
+    ]);
+    // Team A: s1 30.00, Team B: s1 30.30 → 1% gap.
+    mockedLaps.mockResolvedValue([
+      ...Array.from({ length: 10 }, (_, i) => ({
+        lap_number: i + 2, lap_duration: 90, duration_sector_1: 30.0,
+        duration_sector_2: 30, duration_sector_3: 30, st_speed: 300,
+        date_start: null, is_pit_out_lap: false, driver_number: 1, session_key: 0,
+        segments_sector_1: null, segments_sector_2: null, segments_sector_3: null,
+      })),
+      ...Array.from({ length: 10 }, (_, i) => ({
+        lap_number: i + 2, lap_duration: 90, duration_sector_1: 30.3,
+        duration_sector_2: 30, duration_sector_3: 30, st_speed: 300,
+        date_start: null, is_pit_out_lap: false, driver_number: 2, session_key: 0,
+        segments_sector_1: null, segments_sector_2: null, segments_sector_3: null,
+      })),
+    ]);
+
+    const mm = await computeCarProfiles({ now: NOW });
+    const gr = await computeCarProfiles({ now: NOW, normalizationMode: "gap_ratio" });
+    const mmA = mm.profiles.find((p) => p.team_name === "A")!;
+    const mmB = mm.profiles.find((p) => p.team_name === "B")!;
+    const grA = gr.profiles.find((p) => p.team_name === "A")!;
+    const grB = gr.profiles.find((p) => p.team_name === "B")!;
+    // min-max: A=1, B=0 on s1.
+    expect(mmA.sector_strength.s1).toBeCloseTo(1, 6);
+    expect(mmB.sector_strength.s1).toBeCloseTo(0, 6);
+    // gap_ratio: A=1, B ≈ 30/30.3 ≈ 0.990 — both close to 1, no spurious spread.
+    expect(grA.sector_strength.s1).toBeCloseTo(1, 6);
+    expect(grB.sector_strength.s1).toBeGreaterThan(0.98);
+    expect(grB.sector_strength.s1).toBeLessThan(1);
+  });
+});
