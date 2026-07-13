@@ -225,6 +225,19 @@ export default function InternalBacktest() {
                       <td className="py-2 pr-3">{fmt(r.rho_circuit_specific)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_baseline_sectors_gap)}</td>
                       <td className="py-2 pr-3">{fmt(r.rho_team_sensitivity)}</td>
+                      <td className="py-2 pr-3">
+                        {r.sensitivity_diagnostics ? (
+                          <span
+                            title={`Regressione attiva: ${r.sensitivity_diagnostics.regressed}\nCampione insufficiente: ${r.sensitivity_diagnostics.insufficient_sample}\nVarianza top_speed nulla: ${r.sensitivity_diagnostics.variance_zero}\nTotale team: ${r.sensitivity_diagnostics.total}`}
+                            className="cursor-help underline decoration-dotted"
+                          >
+                            {r.sensitivity_diagnostics.regressed}/
+                            {r.sensitivity_diagnostics.total}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_model)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_topsec)}</td>
                       <td className="py-2 pr-3">{fmtBool(r.top3_baseline_sectors)}</td>
