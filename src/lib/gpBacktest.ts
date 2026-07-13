@@ -428,7 +428,7 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
     // ----- prediction (uses ONLY data with date_end < now) -----
     let profilesResult: ComputeCarProfilesResult;
     try {
-      profilesResult = await compute({ now, signal });
+      profilesResult = await compute({ now, signal, emitGapRatioVariant: true });
     } catch {
       per_race.push(skippedRace(gpName, "insufficient_upstream_data"));
       continue;
