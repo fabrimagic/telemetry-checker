@@ -607,6 +607,9 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       top3_baseline_sectors_gap,
       top3_team_sensitivity,
       n_teams,
+      ...(sensitivityDiagnostics
+        ? { sensitivity_diagnostics: sensitivityDiagnostics }
+        : {}),
     });
   }
   opts.onProgress?.(total, total);
