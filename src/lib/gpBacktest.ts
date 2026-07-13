@@ -679,6 +679,11 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       top3_circuit_specific_rate: rateOrNull(validated.map((r) => r.top3_circuit_specific)),
       top3_baseline_sectors_gap_rate: rateOrNull(validated.map((r) => r.top3_baseline_sectors_gap)),
       top3_team_sensitivity_rate: rateOrNull(validated.map((r) => r.top3_team_sensitivity)),
+      races_with_active_sensitivity: validated.reduce((acc, r) => {
+        const d = r.sensitivity_diagnostics;
+        if (!d || d.total === 0) return acc;
+        return d.regressed * 2 >= d.total ? acc + 1 : acc;
+      }, 0),
     },
     total_races: total,
     notes,
