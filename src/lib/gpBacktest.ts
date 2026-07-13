@@ -477,25 +477,14 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       predictionCircuit.ranked?.map((t) => t.team_name) ?? [];
 
     // ----- CANDIDATE POLICY A: sectors_only baseline on gap_ratio profiles.
-    // A second compute with `normalizationMode: "gap_ratio"` respects the
-    // same look-ahead `now` guarantee (uses only races with date_end < now).
-    // Wrapped in try/catch: on failure this candidate is simply not scored
-    // for the race (per-race fields stay null).
+    // Read from the additive `profiles_gap_ratio` array populated by
+    // computeCarProfiles when `emitGapRatioVariant: true` is requested — no
+    // second data-fetch pass, and the same look-ahead `now` guarantee
+    // applies (the profiles are computed only from races with date_end < now).
     let baselineOrderSectorsGap: string[] = [];
-    try {
-      const profilesGap = await compute({
-        now,
-        signal,
-        normalizationMode: "gap_ratio",
-      });
-      if (profilesGap.profiles && profilesGap.profiles.length > 0) {
-        baselineOrderSectorsGap = computeBaselineOrder(
-          profilesGap.profiles,
-          "sectors_only",
-        );
-      }
-    } catch {
-      baselineOrderSectorsGap = [];
+    const profilesGap = profilesResult.profiles_gap_ratio;
+    if (profilesGap && profilesGap.length > 0) {
+      baselineOrderSectorsGap = computeBaselineOrder(profilesGap, "sectors_only");
     }
 
     // ----- CANDIDATE POLICY B: team-sensitivity regression over the same
