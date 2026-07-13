@@ -629,7 +629,7 @@ export async function computeCarProfiles(
     try {
       const laps = await getAllLaps(sessionKey);
       const drivers = await getDrivers(sessionKey);
-      return { ok: true, metrics: aggregateRace(laps, drivers) };
+      return { ok: true, metrics: aggregateRace(laps, drivers, normMode) };
     } catch {
       return { ok: false };
     }
