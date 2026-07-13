@@ -913,10 +913,10 @@ export async function computeCarProfiles(
   }
 
   // Final cross-field re-normalization to ensure index in [0,1] with max=1.
-  const normTop = normalizeHigherIsBetter(rawTop);
-  const normS1 = normalizeHigherIsBetter(rawS1);
-  const normS2 = normalizeHigherIsBetter(rawS2);
-  const normS3 = normalizeHigherIsBetter(rawS3);
+  const normTop = normalizeHigherIsBetter(rawTop, normMode);
+  const normS1 = normalizeHigherIsBetter(rawS1, normMode);
+  const normS2 = normalizeHigherIsBetter(rawS2, normMode);
+  const normS3 = normalizeHigherIsBetter(rawS3, normMode);
 
   // Sector-history per-type raw averages, then cross-team normalization
   // so the resulting index is in [0,1] with 1 = best in field (same
