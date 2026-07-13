@@ -611,6 +611,9 @@ export async function computeCarProfiles(
   // For each team, collect the weights of the races it contributed to —
   // used to compute the Kish effective sample size.
   const weightsByTeam = new Map<string, number[]>();
+  // Additive: preserved per-team per-race history for downstream regression
+  // consumers (see `race_history` on CarProfile).
+  const historyByTeam = new Map<string, TeamRaceHistoryEntry[]>();
 
   const racesUsed: SessionInfo[] = [];
   const diagnostics: RaceDiagnostic[] = [];
