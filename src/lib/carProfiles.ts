@@ -742,6 +742,17 @@ export async function computeCarProfiles(
       add(agg.s2, accSum.s2, accW.s2);
       add(agg.s3, accSum.s3, accW.s3);
 
+      // Companion accumulation for the gap_ratio variant, when requested.
+      if (wantGap) {
+        const aggGap = combineSessions(qualiMetricsGap, raceMetricsGap);
+        if (aggGap) {
+          add(aggGap.topSpeed, accSumGap.top, accWGap.top);
+          add(aggGap.s1, accSumGap.s1, accWGap.s1);
+          add(aggGap.s2, accSumGap.s2, accWGap.s2);
+          add(aggGap.s3, accSumGap.s3, accWGap.s3);
+        }
+      }
+
       const teamsInRace = new Set<string>([
         ...agg.topSpeed.keys(),
         ...agg.s1.keys(),
