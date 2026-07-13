@@ -508,3 +508,68 @@ describe("Role B — circuit-specific 4th-way monitoring", () => {
     );
   });
 });
+
+describe("runBacktest — candidate policies (gap_ratio + team sensitivity)", () => {
+  it("aggregate exposes rho and top-3 for both new policies, plus their deltas", async () => {
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+    ];
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+      mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
+    ];
+    const lapsBySession = new Map<number, Lap[]>([
+      [22, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+    ]);
+    const driversBySession = new Map<number, Driver[]>([
+      [22, [mkDriver(1, "Alpha"), mkDriver(2, "Bravo"), mkDriver(3, "Charlie")]],
+    ]);
+    const deps = makeDeps({ races, qualis, lapsBySession, driversBySession });
+    const out = await runBacktest({ deps });
+    expect(out.aggregate.rho_baseline_sectors_gap_mean).not.toBeUndefined();
+    expect(out.aggregate.rho_team_sensitivity_mean).not.toBeUndefined();
+    expect(out.aggregate.delta_sectors_gap_vs_sectors).not.toBeUndefined();
+    expect(out.aggregate.delta_team_sensitivity_vs_sectors).not.toBeUndefined();
+    expect(out.aggregate.top3_baseline_sectors_gap_rate).not.toBeUndefined();
+    expect(out.aggregate.top3_team_sensitivity_rate).not.toBeUndefined();
+    expect(out.per_race[0].rho_baseline_sectors_gap).not.toBeUndefined();
+    expect(out.per_race[0].rho_team_sensitivity).not.toBeUndefined();
+  });
+
+  it("gap_ratio compute call for each target respects the same `now` (no look-ahead)", async () => {
+    const races = [
+      mkSession(1, 11, "2026-03-01T13:00:00Z", "2026-03-01T15:00:00Z", "GP1"),
+      mkSession(2, 21, "2026-03-15T13:00:00Z", "2026-03-15T15:00:00Z", "GP2"),
+      mkSession(3, 31, "2026-03-29T13:00:00Z", "2026-03-29T15:00:00Z", "GP3"),
+    ];
+    const qualis = [
+      mkSession(1, 12, "2026-02-28T13:00:00Z", "2026-02-28T14:00:00Z", "GP1", "Qualifying"),
+      mkSession(2, 22, "2026-03-14T13:00:00Z", "2026-03-14T14:00:00Z", "GP2", "Qualifying"),
+      mkSession(3, 32, "2026-03-28T13:00:00Z", "2026-03-28T14:00:00Z", "GP3", "Qualifying"),
+    ];
+    const lapsBySession = new Map<number, Lap[]>([
+      [22, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+      [32, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]],
+    ]);
+    const driversBySession = new Map<number, Driver[]>([
+      [22, [mkDriver(1, "Alpha"), mkDriver(2, "Bravo"), mkDriver(3, "Charlie")]],
+      [32, [mkDriver(1, "Alpha"), mkDriver(2, "Bravo"), mkDriver(3, "Charlie")]],
+    ]);
+    const deps = makeDeps({ races, qualis, lapsBySession, driversBySession });
+    await runBacktest({ deps });
+    // Two compute calls per target: default + gap_ratio candidate.
+    expect(deps.computeCarProfiles).toHaveBeenCalledTimes(4);
+    const calls = deps.computeCarProfiles.mock.calls as Array<[{ now: Date; normalizationMode?: string }]>;
+    // Any call marked normalizationMode:gap_ratio must have `now` strictly
+    // before the matching target's quali start (2 targets: GP2 and GP3).
+    const gapCalls = calls.filter((c) => c[0].normalizationMode === "gap_ratio");
+    expect(gapCalls).toHaveLength(2);
+    for (const c of gapCalls) {
+      const ts = c[0].now.getTime();
+      const beforeGp2 = ts < new Date("2026-03-14T13:00:00Z").getTime();
+      const beforeGp3 = ts < new Date("2026-03-28T13:00:00Z").getTime();
+      expect(beforeGp2 || beforeGp3).toBe(true);
+    }
+  });
+});
