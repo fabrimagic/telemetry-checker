@@ -1052,6 +1052,7 @@ export async function computeCarProfiles(
       corner_source: cornerSource,
       corner_coverage_status: coverageStatus,
       corner_alignment_error: cornerAlignmentError,
+      race_history: historyByTeam.get(team) ?? [],
     });
   }
 
