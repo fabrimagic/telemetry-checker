@@ -173,12 +173,40 @@ export default function InternalBacktest() {
                   : "—"
               }
             />
+            {(() => {
+              const win = result.aggregate.recent_window_size ?? 0;
+              const suffix = win > 0 && win < 5 ? ` (n=${win})` : "";
+              return (
+                <>
+                  <Stat
+                    label={`ρ solo-settori (ultime 5, monitoring)${suffix}`}
+                    value={fmt(result.aggregate.rho_baseline_sectors_recent_mean)}
+                  />
+                  <Stat
+                    label={`ρ trap+settori (ultime 5, monitoring)${suffix}`}
+                    value={fmt(result.aggregate.rho_baseline_topsec_recent_mean)}
+                  />
+                  <Stat
+                    label={`Δ recente (solo-settori − trap+settori)${suffix}`}
+                    value={fmt(result.aggregate.delta_sectors_vs_topsec_recent)}
+                    highlight
+                  />
+                </>
+              );
+            })()}
           </div>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
               La baseline che rappresenta la <strong>produzione</strong> è{" "}
               <strong>solo-settori</strong> (promossa dall'Opzione 1). Con poche
               gare validate (N piccolo) questi numeri sono
-              <strong> indicativi</strong>, non conclusivi.
+              <strong> indicativi</strong>, non conclusivi. Le tre card{" "}
+              <em>ultime 5</em> sono una metrica di monitoraggio per verificare
+              se il vantaggio della baseline solo-settori, costruito sulle
+              prime gare della stagione, si sta invertendo nelle gare recenti
+              dove il dato speed-trap è più stabile; se <strong>Δ recente</strong>{" "}
+              resta negativo su più rerun consecutivi,{" "}
+              <strong>trap+settori</strong> diventa candidata alla promozione,
+              ma il punteggio di produzione resta <strong>solo-settori</strong>.
             </p>
             <p className="text-xs text-muted-foreground pt-2 border-t border-border">
               <strong>Ruolo B — monitoraggio per-tipo di curva.</strong> Il
