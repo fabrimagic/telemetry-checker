@@ -675,6 +675,31 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
       ? rhoTeamSensitivityMean - rhoBaseSectorsMean
       : null;
 
+  // Rolling-window diagnostic: last up-to-5 validated races (chronological
+  // order preserved by construction of `validated`). Null when < 3 races.
+  const recentWindow = validated.slice(-5);
+  const recentWindowSize = recentWindow.length;
+  const recentSignificant = recentWindowSize >= 3;
+  const rhoBaseSectorsRecentMean = recentSignificant
+    ? meanOrNull(
+        recentWindow
+          .map((r) => r.rho_baseline_sectors)
+          .filter((x): x is number => x != null),
+      )
+    : null;
+  const rhoBaseTopSecRecentMean = recentSignificant
+    ? meanOrNull(
+        recentWindow
+          .map((r) => r.rho_baseline_topsec)
+          .filter((x): x is number => x != null),
+      )
+    : null;
+  const deltaSectorsVsTopSecRecent =
+    rhoBaseSectorsRecentMean != null && rhoBaseTopSecRecentMean != null
+      ? rhoBaseSectorsRecentMean - rhoBaseTopSecRecentMean
+      : null;
+
+
   return {
     per_race,
     aggregate: {
