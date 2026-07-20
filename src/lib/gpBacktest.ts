@@ -729,6 +729,10 @@ export async function runBacktest(opts: BacktestOptions = {}): Promise<BacktestR
         if (!d || d.total === 0) return acc;
         return d.regressed * 2 >= d.total ? acc + 1 : acc;
       }, 0),
+      rho_baseline_sectors_recent_mean: rhoBaseSectorsRecentMean,
+      rho_baseline_topsec_recent_mean: rhoBaseTopSecRecentMean,
+      delta_sectors_vs_topsec_recent: deltaSectorsVsTopSecRecent,
+      recent_window_size: recentWindowSize,
     },
     total_races: total,
     notes,
