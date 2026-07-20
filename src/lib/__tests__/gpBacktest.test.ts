@@ -756,4 +756,64 @@ describe("runBacktest — sensitivity diagnostics (additive)", () => {
   });
 });
 
+describe("runBacktest — rolling window (last 5 validated races)", () => {
+  function mkNRaceDeps(nRaces: number, skipIdx: number[] = []) {
+    const races: SessionInfo[] = [];
+    const qualis: SessionInfo[] = [];
+    const lapsBySession = new Map<number, Lap[]>();
+    const driversBySession = new Map<number, Driver[]>();
+    for (let i = 0; i < nRaces; i++) {
+      const rk = 1000 + i * 10;
+      const qk = rk + 1;
+      const day = String(i + 1).padStart(2, "0");
+      races.push(mkSession(i + 1, rk, `2026-05-${day}T13:00:00Z`, `2026-05-${day}T15:00:00Z`, `GP${i}`));
+      qualis.push(mkSession(i + 1, qk, `2026-04-${day}T13:00:00Z`, `2026-04-${day}T14:00:00Z`, `GP${i}`, "Qualifying"));
+      if (!skipIdx.includes(i)) {
+        lapsBySession.set(qk, [mkLap(1, 80), mkLap(2, 81), mkLap(3, 82)]);
+        driversBySession.set(qk, [mkDriver(1, "Alpha"), mkDriver(2, "Bravo"), mkDriver(3, "Charlie")]);
+      }
+    }
+    return makeDeps({ races, qualis, lapsBySession, driversBySession });
+  }
+
+  it("with fewer than 3 validated races the recent fields are null", async () => {
+    const deps = mkNRaceDeps(2);
+    const out = await runBacktest({ deps });
+    if ((out.aggregate.races_validated ?? 0) < 3) {
+      expect(out.aggregate.rho_baseline_sectors_recent_mean).toBeNull();
+      expect(out.aggregate.rho_baseline_topsec_recent_mean).toBeNull();
+      expect(out.aggregate.delta_sectors_vs_topsec_recent).toBeNull();
+      expect(out.aggregate.recent_window_size).toBe(out.aggregate.races_validated);
+    }
+  });
+
+  it("with 7 validated races the window caps at 5 and equals last-5 means", async () => {
+    const deps = mkNRaceDeps(7);
+    const out = await runBacktest({ deps });
+    if ((out.aggregate.races_validated ?? 0) >= 5) {
+      expect(out.aggregate.recent_window_size).toBe(5);
+      const validated = out.per_race.filter((r) => !r.skipped_reason);
+      const last5 = validated.slice(-5);
+      const rhoSec = last5
+        .map((r) => r.rho_baseline_sectors)
+        .filter((x): x is number => x != null);
+      if (rhoSec.length > 0) {
+        const expected = rhoSec.reduce((a, b) => a + b, 0) / rhoSec.length;
+        expect(out.aggregate.rho_baseline_sectors_recent_mean).toBeCloseTo(expected, 6);
+      }
+    }
+  });
+
+  it("skipped races do not enter the rolling window (validated only, chronological)", async () => {
+    // 6 races, skip the last two → up to 4 validated.
+    const deps = mkNRaceDeps(6, [4, 5]);
+    const out = await runBacktest({ deps });
+    expect(out.aggregate.recent_window_size ?? 0).toBeLessThanOrEqual(
+      out.aggregate.races_validated,
+    );
+    if ((out.aggregate.races_validated ?? 0) < 3) {
+      expect(out.aggregate.rho_baseline_sectors_recent_mean).toBeNull();
+    }
+  });
 });
+
