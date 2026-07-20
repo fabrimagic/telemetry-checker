@@ -817,3 +817,4 @@ describe("runBacktest — rolling window (last 5 validated races)", () => {
   });
 });
 
+});
