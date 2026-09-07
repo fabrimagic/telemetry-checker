@@ -1240,10 +1240,14 @@ export function computeVirtualRaceEngineer(
   // The message is later surfaced via confidence_factors AND narrative_insights.
   let alternativesUnavailableReason: string | null = null;
   if (actualAdjustedTime == null || actualSimTime == null) {
-    if (!hasMinTwoCompounds(actualCompounds)) {
+    if (!hasMinOnePitStop(actualPitLaps)) {
       alternativesUnavailableReason =
-        "la strategia reale non soddisfa la regola dei due compound validi, quindi nessuna alternativa può essere simulata coerentemente.";
+        "la strategia reale non prevede alcuna sosta ai box, requisito minimo per una strategia di gara valida, quindi nessuna alternativa può essere simulata coerentemente.";
+    } else if (!hasMinTwoCompounds(actualCompounds)) {
+      alternativesUnavailableReason =
+        "la strategia reale non soddisfa la regola dei due compound validi (nessuna dichiarazione di gara bagnata da race control), quindi nessuna alternativa può essere simulata coerentemente.";
     } else {
+
       const missing = [...new Set(actualCompounds.filter(c => !compoundModels.has(c)))];
       if (missing.length > 0) {
         alternativesUnavailableReason =
