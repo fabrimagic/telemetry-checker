@@ -267,3 +267,50 @@ describe("isNeutralizationEnding — rientro VSC / ripresa gara", () => {
     expect(isNeutralizationEnding("VIRTUAL SAFETY CAR DEPLOYED", null)).toBe(false);
   });
 });
+
+describe("classifyLapsTrackStatus — chiusura VSC su 'VSC ENDING' / 'TRACK CLEAR'", () => {
+  const lap = (n: number, startSec: number, dur = 90): Lap => ({
+    lap_number: n,
+    date_start: new Date(Date.UTC(2026, 8, 6, 13, 0, startSec)).toISOString(),
+    lap_duration: dur,
+  } as Lap);
+
+  const msg = (sec: number, message: string, flag: string | null = null, scope: string | null = null) => ({
+    date: new Date(Date.UTC(2026, 8, 6, 13, 0, sec)).toISOString(),
+    category: "Other",
+    flag,
+    scope,
+    sector: null,
+    driver_number: null,
+    message,
+  } as RaceControlMessage);
+
+  it("i giri dopo 'VSC ENDING' tornano GREEN", () => {
+    const laps = [lap(1, 0), lap(2, 90), lap(3, 180), lap(4, 270)];
+    const status = classifyLapsTrackStatus(laps, [
+      msg(10, "VIRTUAL SAFETY CAR DEPLOYED"),
+      msg(100, "VSC ENDING"),
+    ]);
+    expect(status.get(1)).toBe("VSC");
+    expect(status.get(3)).toBeUndefined();
+    expect(status.get(4)).toBeUndefined();
+  });
+
+  it("'TRACK CLEAR' chiude la neutralizzazione", () => {
+    const laps = [lap(1, 0), lap(2, 90), lap(3, 180)];
+    const status = classifyLapsTrackStatus(laps, [
+      msg(10, "VIRTUAL SAFETY CAR DEPLOYED"),
+      msg(95, "TRACK CLEAR", "CLEAR", "Track"),
+    ]);
+    expect(status.get(3)).toBeUndefined();
+  });
+
+  it("un clear di settore NON chiude la VSC", () => {
+    const laps = [lap(1, 0), lap(2, 90), lap(3, 180)];
+    const status = classifyLapsTrackStatus(laps, [
+      msg(10, "VIRTUAL SAFETY CAR DEPLOYED"),
+      msg(95, "CLEAR IN TRACK SECTOR 4", "CLEAR", "Sector"),
+    ]);
+    expect(status.get(3)).toBe("VSC");
+  });
+});
