@@ -522,6 +522,13 @@ export default function Compare() {
                 subtitle="Timeline del gap giro dopo giro e contesto di gara dei due piloti."
               />
               <CompareTimeline comparison={comparison} driverA={driverObjA} driverB={driverObjB} />
+              <ComparePitGaps
+                comparison={comparison}
+                driverA={driverObjA}
+                driverB={driverObjB}
+                lapsA={dual.outA?.laps ?? []}
+                lapsB={dual.outB?.laps ?? []}
+              />
               {(() => {
                 const rA = dual.outA?.vreResult ?? null;
                 const rB = dual.outB?.vreResult ?? null;
