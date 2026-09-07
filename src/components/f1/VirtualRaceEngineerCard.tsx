@@ -1906,6 +1906,34 @@ export function VirtualRaceEngineerCard({ result, analysisMode = "RACE_ENGINEER"
           </VRESection>
         )}
 
+        {/* Empty state: the section stays visible and declares WHY it is empty. */}
+        {alternative_strategies.length === 0 && (
+          <VRESection
+            title="Strategie alternative"
+            icon={<Repeat className="h-3.5 w-3.5 text-muted-foreground" />}
+            defaultOpen={true}
+            badge={
+              <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border text-muted-foreground">
+                0 alternative
+              </Badge>
+            }
+          >
+            <div className="pl-1">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
+                {(() => {
+                  const reason = [...(narrative_insights ?? []), ...(confidence_factors ?? [])].find(
+                    (s) => typeof s === "string" && s.includes("Strategie alternative non calcolate"),
+                  );
+                  return reason
+                    ? reason.replace(/^⚠️\s*/, "")
+                    : "Nessuna strategia alternativa calcolabile con i dati disponibili per questa sessione: i modelli di degrado richiesti non sono affidabili o la strategia reale non è simulabile.";
+                })()}
+              </div>
+            </div>
+          </VRESection>
+        )}
+
+
         </>)}
 
         {laps && positions && allDrivers && driverAcronym && (
