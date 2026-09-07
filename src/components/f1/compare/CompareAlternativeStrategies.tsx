@@ -17,8 +17,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowRight, AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { ArrowRight, AlertTriangle, TrendingDown, TrendingUp, Minus, ShieldAlert, ShieldCheck, HelpCircle } from "lucide-react";
 import type { ComparisonResult, CounterfactualScenarioId } from "@/lib/headToHeadComparison";
+import { computeDuelCounterMoves } from "@/lib/duelCounterMove";
 import type { Driver } from "@/lib/openf1";
 import type { VirtualRaceEngineerResult } from "@/lib/virtualRaceEngineer";
 import { cn } from "@/lib/utils";
@@ -296,6 +297,13 @@ export function CompareAlternativeStrategies({ comparison, driverA, driverB }: P
 
   const activeScenario = cf?.scenarios[scenarioId] ?? null;
 
+  // Race-episode layer: undercut attempts by the driver behind and the
+  // counter-move (covering stop) available to the driver ahead.
+  const counterMoves = useMemo(
+    () => computeDuelCounterMoves(comparison, aAcr, bAcr),
+    [comparison, aAcr, bAcr],
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -416,6 +424,59 @@ export function CompareAlternativeStrategies({ comparison, driverA, driverB }: P
         {!cf && (
           <div className="text-xs text-muted-foreground italic">
             Verdetto controfattuale non disponibile: alternativa mancante per entrambi i piloti.
+          </div>
+        )}
+
+        {counterMoves && (
+          <div className="rounded-lg border border-border bg-muted/20 p-4">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-xs font-mono uppercase tracking-wider text-foreground">
+                Contromossa all'undercut
+              </span>
+              <Badge variant="secondary" className="text-[9px] font-mono uppercase">
+                episodi di gara
+              </Badge>
+              <Badge variant="outline" className="text-[9px] font-mono uppercase">
+                {counterMoves.covered_attacks} coperti · {counterMoves.unanswered_attacks} senza risposta
+              </Badge>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+              Tentativi di undercut del pilota che si trova dietro e sosta di copertura disponibile al pilota davanti.
+            </p>
+
+            <div className="space-y-2">
+              {counterMoves.episodes.map((e, i) => {
+                const Icon =
+                  e.status === "COVERED_IN_RACE" ? ShieldCheck
+                  : e.status === "COVER_SIMULATED" ? ShieldAlert
+                  : HelpCircle;
+                const tone =
+                  e.status === "COVERED_IN_RACE" ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-300"
+                  : e.status === "COVER_SIMULATED" ? "border-[hsl(var(--f1-red))]/40 bg-[hsl(var(--f1-red))]/5 text-[hsl(var(--f1-red))]"
+                  : "border-border bg-muted/30 text-muted-foreground";
+                return (
+                  <div key={i} className={cn("rounded border p-2.5 flex items-start gap-2", tone)}>
+                    <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-xs text-foreground leading-relaxed">{e.message}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-muted-foreground tabular-nums">
+                        <span>gap pre: {fmtSec(e.gap_before_seconds)}</span>
+                        <span>swing {e.attacker_acronym}: {fmtSec(e.attacker_swing_seconds)}</span>
+                        {e.counter_pit_lap != null && <span>copertura: L{e.counter_pit_lap}</span>}
+                        {e.counter_delta_seconds != null && <span>Δ copertura: {fmtSec(e.counter_delta_seconds)}</span>}
+                        {e.attacker_compound_after && <span>mescola: {e.attacker_compound_after}</span>}
+                      </div>
+                      {e.reason && <p className="text-[10px] italic text-muted-foreground">{e.reason}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-start gap-2 text-[10px] text-muted-foreground italic leading-relaxed mt-3">
+              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+              <span>{counterMoves.disclaimer}</span>
+            </div>
           </div>
         )}
       </CardContent>
