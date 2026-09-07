@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SessionPicker } from "@/components/f1/SessionPicker";
 import { CompareHeader } from "@/components/f1/compare/CompareHeader";
 import { CompareTimeline } from "@/components/f1/compare/CompareTimeline";
+import { ComparePitGaps } from "@/components/f1/compare/ComparePitGaps";
 import { CompareMetricsGrid } from "@/components/f1/compare/CompareMetricsGrid";
 import { CompareNarrative } from "@/components/f1/compare/CompareNarrative";
 import { CompareAlternativeStrategies } from "@/components/f1/compare/CompareAlternativeStrategies";
