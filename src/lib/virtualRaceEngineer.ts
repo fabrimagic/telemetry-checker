@@ -1405,7 +1405,7 @@ export function computeVirtualRaceEngineer(
   // overcut / N+1 branches from producing duplicate or non-monotonic pits when
   // actual pits are close together.
   const isValidPitSequence = (pits: number[]): boolean => {
-    if (pits.length === 0) return true;
+    if (pits.length === 0) return false;
     if (pits[0] < 3) return false;
     if (pits[pits.length - 1] > totalLaps - 3) return false;
     for (let i = 1; i < pits.length; i++) {
