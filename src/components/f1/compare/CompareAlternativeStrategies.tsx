@@ -109,6 +109,15 @@ function DriverPanel({ driver, real, alt }: DriverPanelProps) {
   const altCons = altRec?.cons ?? [];
   const altBreakdown = altRec?.breakdown ?? null;
 
+  // Reason surfaced by the engine when no alternative could be simulated
+  // (presentation-only: we read existing factors, never fabricate a cause).
+  const unavailableReason =
+    [...(alt?.narrative_insights ?? []), ...(alt?.confidence_factors ?? []),
+     ...(real.narrative_insights ?? []), ...(real.confidence_factors ?? [])]
+      .find((f) => /Strategie alternative non calcolate/i.test(f))
+      ?.replace(/^⚠️\s*/, "") ?? null;
+
+
   // Breakdown rows: only render fields with finite values
   const breakdownRows: { label: string; value: number | null }[] = altBreakdown
     ? [
