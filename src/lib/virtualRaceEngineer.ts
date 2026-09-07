@@ -1632,6 +1632,73 @@ export function computeVirtualRaceEngineer(
     }
   }
 
+  // ── 4a-extra3. POST_RACE only: pit inside a real neutralisation window ──
+  // Ex-post analysis knows exactly when SC/VSC occurred, so it can evaluate the
+  // single most valuable hindsight option: moving one of the real pit stops into
+  // the neutralisation window, where the pit loss is materially lower
+  // (NEUTRALIZATION_PIT_LOSS). In RACE_ENGINEER (ex-ante) this candidate is NOT
+  // generated, because it would require knowledge of a future event.
+  // Compounds and number of stops are unchanged — only the timing moves.
+  if (!isRaceEngineerMode && actualPitLaps.length > 0 && actualAdjustedTime != null) {
+    const baseTime = actualAdjustedTime;
+    // Contiguous SC/VSC/MIXED windows from the OBSERVED track status.
+    const neutralLaps = [...trackStatusMap.entries()]
+      .filter(([, st]) => st === "SC" || st === "VSC" || st === "MIXED")
+      .map(([lap]) => lap)
+      .sort((a, b) => a - b);
+    const windows: { start: number; end: number }[] = [];
+    for (const lap of neutralLaps) {
+      const last = windows[windows.length - 1];
+      if (last && lap === last.end + 1) last.end = lap;
+      else windows.push({ start: lap, end: lap });
+    }
+
+    let bestNeutral: { pits: number[]; time: number; movedFrom: number; movedTo: number; window: { start: number; end: number } } | null = null;
+    for (const w of windows) {
+      for (let pi = 0; pi < actualPitLaps.length; pi++) {
+        // Already pitted inside this window → no hindsight gain to evaluate.
+        if (actualPitLaps[pi] >= w.start && actualPitLaps[pi] <= w.end) continue;
+        for (let targetLap = w.start; targetLap <= w.end; targetLap++) {
+          const candidatePits = actualPitLaps.map((p, i) => (i === pi ? targetLap : p));
+          const sorted = [...candidatePits].sort((a, b) => a - b);
+          if (sorted.join(",") !== candidatePits.join(",")) continue; // keep stop order
+          if (!isValidPitSequence(candidatePits)) continue;
+          const t = simulateStrategyCost(candidatePits, actualCompounds);
+          if (t == null) continue;
+          if (!bestNeutral || t < bestNeutral.time) {
+            bestNeutral = { pits: candidatePits, time: t, movedFrom: actualPitLaps[pi], movedTo: targetLap, window: w };
+          }
+        }
+      }
+    }
+
+    if (bestNeutral) {
+      const st = trackStatusMap.get(bestNeutral.movedTo);
+      const label = st === "SC" ? "Safety Car" : st === "VSC" ? "VSC" : "neutralizzazione";
+      const windowDesc = bestNeutral.window.start === bestNeutral.window.end
+        ? `giro ${bestNeutral.window.start}`
+        : `giri ${bestNeutral.window.start}-${bestNeutral.window.end}`;
+      alternatives.push({
+        name: `Pit sotto ${label} (giro ${bestNeutral.movedTo})`,
+        description: `Sosta spostata dal giro ${bestNeutral.movedFrom} al giro ${bestNeutral.movedTo}, dentro la ${label} reale (${windowDesc}). Mescole e numero di soste invariati.`,
+        pit_laps: bestNeutral.pits,
+        compounds: actualCompounds,
+        estimated_delta_vs_actual: Math.round((baseTime - bestNeutral.time) * 10) / 10,
+        time_delta_vs_actual: -Math.round((baseTime - bestNeutral.time) * 10) / 10,
+        pros: [
+          `Pit loss ridotto durante ${label} (campo rallentato/compattato)`,
+          "Numero di soste e mescole identici alla strategia reale",
+        ],
+        cons: [
+          "Valutazione ex-post: richiede conoscenza del momento della neutralizzazione, non disponibile in tempo reale",
+          "Lunghezza degli stint alterata rispetto alla strategia reale",
+        ],
+      });
+    }
+  }
+
+
+
   // ── 4b. Traffic Release Predictor ──
   const allLapsMap = allLapsMapEarly;
 
