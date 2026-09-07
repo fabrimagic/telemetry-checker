@@ -6,6 +6,7 @@ import {
   isNeutralizationDeployment,
   isRedFlagDeployment,
   isPenaltyOrProcedureContext,
+  isNeutralizationEnding,
 } from "../trackStatusClassification";
 
 import type { RaceControlMessage, Lap } from "../openf1";
@@ -245,5 +246,24 @@ describe("CLEAR scope-aware — non chiude la SC su clear settoriali", () => {
     const laps = [lap(1, "2024-01-01T00:02:30Z")];
     const map = classifyLapsTrackStatus(laps, msgs);
     expect(map.get(1)).toBe("VSC");
+  });
+});
+
+describe("isNeutralizationEnding — rientro VSC / ripresa gara", () => {
+  it("riconosce 'VSC ENDING' e la bandiera verde", () => {
+    expect(isNeutralizationEnding("VIRTUAL SAFETY CAR ENDING", null)).toBe(true);
+    expect(isNeutralizationEnding("VSC ENDING", null)).toBe(true);
+    expect(isNeutralizationEnding("GREEN LIGHT - PIT EXIT OPEN", "GREEN")).toBe(true);
+    expect(isNeutralizationEnding("SAFETY CAR IN THIS LAP", null)).toBe(true);
+    expect(isNeutralizationEnding("TRACK CLEAR", "CLEAR", "Track")).toBe(true);
+  });
+
+  it("non considera fine neutralizzazione i clear di settore e le penalità", () => {
+    expect(isNeutralizationEnding("CLEAR IN TRACK SECTOR 4", "CLEAR", "Sector")).toBe(false);
+    expect(isNeutralizationEnding("VSC INFRINGEMENT - CAR 4 - PENALTY", null)).toBe(false);
+  });
+
+  it("non confonde il deployment con la fine", () => {
+    expect(isNeutralizationEnding("VIRTUAL SAFETY CAR DEPLOYED", null)).toBe(false);
   });
 });

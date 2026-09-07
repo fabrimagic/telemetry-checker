@@ -13,6 +13,7 @@ import {
   isSafetyCarDeployment,
   isVirtualSafetyCarDeployment,
   isPenaltyOrProcedureContext,
+  isNeutralizationEnding,
 } from "./trackStatusClassification";
 
 // ── Severity / Relevance / Confidence ────────────────────────
@@ -153,6 +154,7 @@ export function getOvertakeEvents(
 function classifyRaceControl(
   msg: string,
   flag: string | undefined,
+  scope?: string | null,
 ): { severity: SeverityLevel; relevance: StrategicRelevance; tags: ImpactTag[] } {
   const upper = (msg || "").toUpperCase();
   const upperFlag = (flag || "").toUpperCase();
@@ -161,6 +163,13 @@ function classifyRaceControl(
   // Safety Car / VSC / Red Flag → high severity, neutralization (real deployments only)
   if (isNeutralizationDeployment(upper, upperFlag)) {
     tags.push("neutralization", "safety");
+    return { severity: "HIGH", relevance: "HIGH", tags };
+  }
+
+  // End of neutralization (VSC ending / SC in this lap / green flag) — the
+  // restoration of normal racing is as strategically relevant as the start.
+  if (isNeutralizationEnding(upper, upperFlag, scope)) {
+    tags.push("neutralization");
     return { severity: "HIGH", relevance: "HIGH", tags };
   }
 
@@ -229,11 +238,13 @@ export function getRaceControlEvents(
       // Track-wide only for *real* deployments (SC/VSC/RED). Mentions in
       // penalty/procedure messages (e.g. "SAFETY CAR INFRINGEMENT") do not
       // make the message track-wide.
-      const isTrackWide = isNeutralizationDeployment(text, m.flag);
+      const isTrackWide =
+        isNeutralizationDeployment(text, m.flag) ||
+        isNeutralizationEnding(text, m.flag, m.scope);
       return mentionsDriver || isTrackWide;
     })
     .map((m) => {
-      const classification = classifyRaceControl(m.message, m.flag);
+      const classification = classifyRaceControl(m.message, m.flag, m.scope);
       // Track-wide events have lower confidence for driver-specific impact
       const mentionsDriver = messageMentionsDriver(m.message || "", driverNumber, driverAcronym);
 
@@ -245,6 +256,11 @@ export function getRaceControlEvents(
         details: {
           category: m.category,
           flag: m.flag,
+          neutralization_phase: isNeutralizationDeployment((m.message || "").toUpperCase(), m.flag)
+            ? "START"
+            : isNeutralizationEnding(m.message || "", m.flag, m.scope)
+              ? "END"
+              : null,
         },
         severity: classification.severity,
         strategic_relevance: classification.relevance,
