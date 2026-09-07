@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowUp, ArrowDown, Flag, Wrench, ShieldAlert, Activity } from "lucide-react";
+import { ArrowUp, ArrowDown, Flag, Wrench, ShieldAlert, Activity, FlagTriangleRight } from "lucide-react";
 import type { DiaryEvent, DiaryEventType } from "@/lib/raceDiary";
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
   includeBattles?: boolean;
 }
 
-type Kind = DiaryEventType | "NEUTRALIZATION";
+type Kind = DiaryEventType | "NEUTRALIZATION" | "NEUTRALIZATION_END";
 
 const KIND_CONFIG: Record<
   Kind,
@@ -44,6 +44,13 @@ const KIND_CONFIG: Record<
     bg: "bg-orange-500/20",
     ring: "ring-orange-500/50",
   },
+  NEUTRALIZATION_END: {
+    label: "Ripresa gara",
+    icon: FlagTriangleRight,
+    color: "text-green-400",
+    bg: "bg-green-500/20",
+    ring: "ring-green-500/50",
+  },
   PIT_STOP: {
     label: "Pit Stop",
     icon: Wrench,
@@ -63,6 +70,7 @@ const KIND_CONFIG: Record<
 function classifyKind(ev: DiaryEvent): Kind {
   if (ev.type === "RACE_CONTROL") {
     const tags = ev.impact_tags ?? [];
+    if (ev.details?.neutralization_phase === "END") return "NEUTRALIZATION_END";
     if (tags.includes("neutralization") || tags.includes("safety")) return "NEUTRALIZATION";
   }
   return ev.type;
