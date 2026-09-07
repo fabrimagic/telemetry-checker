@@ -1004,10 +1004,15 @@ export function computeVirtualRaceEngineer(
     interceptOverrideByStint?: (number | null)[],
     modelsOverride?: Map<string, { slope: number; intercept: number }>,
   ): number | null {
+    if (!hasMinOnePitStop(pitLapsArr)) {
+      console.warn("[VRE] returning null:", "simulateStrategyCost requires at least one pit stop");
+      return null;
+    }
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateStrategyCost requires at least two compounds");
       return null;
     }
+
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
 
     let totalCost = 0;
