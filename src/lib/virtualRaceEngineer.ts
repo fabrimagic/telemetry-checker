@@ -816,11 +816,37 @@ export function computeVirtualRaceEngineer(
 
 
 
-  // F1 regulation: at least 2 different compounds must be used during a dry race
+  // ── Wet race declaration from Race Control ──
+  // The two-compound rule is suspended by the FIA when wet tyres have been used
+  // during the race. We detect it ONLY from explicit Race Control wording (no
+  // inference from lap times) to stay anti-hallucination compliant.
+  const wetRaceDeclared: boolean = (() => {
+    for (const m of raceControl ?? []) {
+      const text = (m?.message ?? "").toUpperCase();
+      if (!text) continue;
+      if (/\bWET\s+RACE\b/.test(text)) return true;
+      if (/\bWET\s+(TYRE|TYRES|TIRE|TIRES)\b/.test(text)) return true;
+      if (/\bEXTREME\s+WET\b/.test(text)) return true;
+      if (/\bRACE\s+DECLARED\s+WET\b/.test(text)) return true;
+      if (/\bWET\s+(TRACK|CONDITIONS)\b/.test(text)) return true;
+    }
+    return false;
+  })();
+
+  // F1 regulation: a valid strategy must include at least one pit stop, and at
+  // least 2 different compounds must be used during a dry race. When Race
+  // Control declares wet conditions the compound rule is waived, but the pit
+  // stop requirement remains.
+  function hasMinOnePitStop(pitLapsArr: number[]): boolean {
+    return pitLapsArr.length >= 1;
+  }
+
   function hasMinTwoCompounds(compounds: string[]): boolean {
     const valid = compounds.filter(c => c && c !== "UNKNOWN");
+    if (wetRaceDeclared) return valid.length >= 1;
     return new Set(valid).size >= 2;
   }
+
 
   const scenarioDef = SCENARIO_DEFINITIONS[effectiveScenarioId];
   const scenarioMods = buildTimedScenarioModifiers(effectiveScenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
@@ -978,10 +1004,15 @@ export function computeVirtualRaceEngineer(
     interceptOverrideByStint?: (number | null)[],
     modelsOverride?: Map<string, { slope: number; intercept: number }>,
   ): number | null {
+    if (!hasMinOnePitStop(pitLapsArr)) {
+      console.warn("[VRE] returning null:", "simulateStrategyCost requires at least one pit stop");
+      return null;
+    }
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateStrategyCost requires at least two compounds");
       return null;
     }
+
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
 
     let totalCost = 0;
@@ -1073,10 +1104,15 @@ export function computeVirtualRaceEngineer(
     interceptOverrideByStint?: (number | null)[],
     modelsOverride?: Map<string, { slope: number; intercept: number }>,
   ): number | null {
+    if (!hasMinOnePitStop(pitLapsArr)) {
+      console.warn("[VRE] returning null:", "simulateTimeRaw requires at least one pit stop");
+      return null;
+    }
     if (!hasMinTwoCompounds(compoundsArr)) {
       console.warn("[VRE] returning null:", "simulateTimeRaw requires at least two compounds");
       return null;
     }
+
     const stintBounds = buildStintBounds(pitLapsArr, compoundsArr);
     let total = 0;
     const modelsMap: Map<string, { slope: number; intercept: number }> = modelsOverride ?? compoundModels;
@@ -1204,10 +1240,14 @@ export function computeVirtualRaceEngineer(
   // The message is later surfaced via confidence_factors AND narrative_insights.
   let alternativesUnavailableReason: string | null = null;
   if (actualAdjustedTime == null || actualSimTime == null) {
-    if (!hasMinTwoCompounds(actualCompounds)) {
+    if (!hasMinOnePitStop(actualPitLaps)) {
       alternativesUnavailableReason =
-        "la strategia reale non soddisfa la regola dei due compound validi, quindi nessuna alternativa può essere simulata coerentemente.";
+        "la strategia reale non prevede alcuna sosta ai box, requisito minimo per una strategia di gara valida, quindi nessuna alternativa può essere simulata coerentemente.";
+    } else if (!hasMinTwoCompounds(actualCompounds)) {
+      alternativesUnavailableReason =
+        "la strategia reale non soddisfa la regola dei due compound validi (nessuna dichiarazione di gara bagnata da race control), quindi nessuna alternativa può essere simulata coerentemente.";
     } else {
+
       const missing = [...new Set(actualCompounds.filter(c => !compoundModels.has(c)))];
       if (missing.length > 0) {
         alternativesUnavailableReason =
@@ -1369,7 +1409,7 @@ export function computeVirtualRaceEngineer(
   // overcut / N+1 branches from producing duplicate or non-monotonic pits when
   // actual pits are close together.
   const isValidPitSequence = (pits: number[]): boolean => {
-    if (pits.length === 0) return true;
+    if (pits.length === 0) return false;
     if (pits[0] < 3) return false;
     if (pits[pits.length - 1] > totalLaps - 3) return false;
     for (let i = 1; i < pits.length; i++) {
