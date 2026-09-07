@@ -816,11 +816,37 @@ export function computeVirtualRaceEngineer(
 
 
 
-  // F1 regulation: at least 2 different compounds must be used during a dry race
+  // ── Wet race declaration from Race Control ──
+  // The two-compound rule is suspended by the FIA when wet tyres have been used
+  // during the race. We detect it ONLY from explicit Race Control wording (no
+  // inference from lap times) to stay anti-hallucination compliant.
+  const wetRaceDeclared: boolean = (() => {
+    for (const m of raceControl ?? []) {
+      const text = (m?.message ?? "").toUpperCase();
+      if (!text) continue;
+      if (/\bWET\s+RACE\b/.test(text)) return true;
+      if (/\bWET\s+(TYRE|TYRES|TIRE|TIRES)\b/.test(text)) return true;
+      if (/\bEXTREME\s+WET\b/.test(text)) return true;
+      if (/\bRACE\s+DECLARED\s+WET\b/.test(text)) return true;
+      if (/\bWET\s+(TRACK|CONDITIONS)\b/.test(text)) return true;
+    }
+    return false;
+  })();
+
+  // F1 regulation: a valid strategy must include at least one pit stop, and at
+  // least 2 different compounds must be used during a dry race. When Race
+  // Control declares wet conditions the compound rule is waived, but the pit
+  // stop requirement remains.
+  function hasMinOnePitStop(pitLapsArr: number[]): boolean {
+    return pitLapsArr.length >= 1;
+  }
+
   function hasMinTwoCompounds(compounds: string[]): boolean {
     const valid = compounds.filter(c => c && c !== "UNKNOWN");
+    if (wetRaceDeclared) return valid.length >= 1;
     return new Set(valid).size >= 2;
   }
+
 
   const scenarioDef = SCENARIO_DEFINITIONS[effectiveScenarioId];
   const scenarioMods = buildTimedScenarioModifiers(effectiveScenarioId, scenarioActivationLap, totalLaps, scenarioDurationLaps);
