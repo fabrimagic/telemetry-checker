@@ -100,6 +100,41 @@ export function isNeutralizationDeployment(text: string, flag: string | undefine
   return false;
 }
 
+/**
+ * True for a real track-wide *end* of neutralization: the Race Control
+ * announcement that the SC / VSC period is over ("VSC ENDING",
+ * "SAFETY CAR IN THIS LAP", "TRACK CLEAR", "RESTART") or the green flag /
+ * track-wide CLEAR flag that restores normal racing.
+ * Penalty / procedure mentions and sector-only clears are excluded.
+ */
+export function isNeutralizationEnding(
+  text: string,
+  flag: string | undefined | null,
+  scope?: string | undefined | null,
+): boolean {
+  const upper = (text || "").toUpperCase();
+  const upperFlag = (flag || "").toUpperCase();
+  const upperScope = (scope || "").toUpperCase();
+  if (isPenaltyOrProcedureContext(upper)) return false;
+
+  if (upperFlag === "GREEN") return true;
+  // A bare CLEAR flag counts only when track-wide (sector clears do not).
+  if (upperFlag === "CLEAR" && upperScope !== "SECTOR" && upperScope !== "DRIVER") return true;
+
+  return (
+    /\bVSC\s+ENDING\b/.test(upper) ||
+    /\bVIRTUAL\s+SAFETY\s+CAR\s+ENDING\b/.test(upper) ||
+    /\bVIRTUAL\s+SAFETY\s+CAR\b[^A-Z0-9]*(?:\([^)]*\)\s*)?(?:HAS\s+BEEN\s+)?WITHDRAWN\b/.test(upper) ||
+    /\bVSC\b[^A-Z0-9]*(?:HAS\s+BEEN\s+)?WITHDRAWN\b/.test(upper) ||
+    /\bSAFETY\s+CAR\b[^A-Z0-9]*(?:\([^)]*\)\s*)?IN\s+THIS\s+LAP\b/.test(upper) ||
+    /\bSAFETY\s+CAR\b[^A-Z0-9]*(?:HAS\s+BEEN\s+)?WITHDRAWN\b/.test(upper) ||
+    /\bTRACK\s+CLEAR\b/.test(upper) ||
+    /\bGREEN\s+LIGHT\b/.test(upper) ||
+    /\bGREEN\s+FLAG\b/.test(upper) ||
+    /\bRESTART\b/.test(upper)
+  );
+}
+
 
 /**
  * Parse race_control messages into status intervals.
