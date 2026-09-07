@@ -166,6 +166,28 @@ export default function Index() {
     setRaceControlMessages([]);
     setSessionAllLaps([]);
     setSessionResults([]);
+    // Clear every per-session derived state: without this, the previously
+    // selected session's VRE result (and its alternative strategies) stays on
+    // screen and `vreArgsRef` keeps stale args, so a mode switch would recompute
+    // against the OLD session's data.
+    setStintsData([]);
+    setPitStopsData([]);
+    setOvertakesData([]);
+    setOvertakesReceivedData([]);
+    setDiaryIntervals([]);
+    setDiaryPositions([]);
+    setDiaryEvents([]);
+    setVreResult(null);
+    setVreError(null);
+    setCumDevResult(null);
+    vreArgsRef.current = null;
+    setVreRiskMode("BALANCED");
+    setVreScenario("REAL_CONTEXT");
+    setVreScenarioLap(null);
+    setVreScenarioDuration(null);
+    setVreAnalysisMode("RACE_ENGINEER");
+    setVreViewMode("ENGINEER");
+
     setLoadingDrivers(true);
     try {
       const d = await getDrivers(key);
