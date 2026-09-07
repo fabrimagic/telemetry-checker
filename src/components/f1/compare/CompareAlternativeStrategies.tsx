@@ -297,6 +297,13 @@ export function CompareAlternativeStrategies({ comparison, driverA, driverB }: P
 
   const activeScenario = cf?.scenarios[scenarioId] ?? null;
 
+  // Race-episode layer: undercut attempts by the driver behind and the
+  // counter-move (covering stop) available to the driver ahead.
+  const counterMoves = useMemo(
+    () => computeDuelCounterMoves(comparison, aAcr, bAcr),
+    [comparison, aAcr, bAcr],
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3">
