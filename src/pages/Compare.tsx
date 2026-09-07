@@ -616,7 +616,7 @@ export default function Compare() {
             {/* 5. Strategia alternativa (collassabile) */}
             <section className="space-y-4">
               <SectionHeader label="Strategia alternativa (ex-ante · balanced)" accent />
-              <Accordion type="single" collapsible defaultValue="" className="border border-[hsl(var(--f1-red))]/30 rounded-lg bg-card/40">
+              <Accordion type="single" collapsible defaultValue="alt" className="border border-[hsl(var(--f1-red))]/30 rounded-lg bg-card/40">
                 <AccordionItem value="alt" className="border-b-0">
                   <AccordionTrigger className="px-4 hover:no-underline">
                     <div className="text-left">
