@@ -176,15 +176,14 @@ function buildStatusIntervals(messages: RaceControlMessage[]): StatusInterval[] 
     const isClearFlagTrackWide =
       flag === "CLEAR" && scope !== "SECTOR" && scope !== "DRIVER";
 
+    // Shared end-of-neutralization recognition (VSC ENDING, TRACK CLEAR,
+    // SAFETY CAR IN THIS LAP, withdrawn, green flag/light, RESTART) so that
+    // the lap classification used by the Virtual Race Engineer and the race
+    // diary agree on when normal racing resumes.
     const isClearPhrase =
       flag === "GREEN" ||
       isClearFlagTrackWide ||
-      text.includes("GREEN LIGHT") ||
-      text.includes("TRACK CLEAR") ||
-      text.includes("VSC ENDING") ||
-      text.includes("VIRTUAL SAFETY CAR ENDING") ||
-      text.includes("SAFETY CAR IN THIS LAP") ||
-      text.includes("RESTART");
+      isNeutralizationEnding(text, flag, scope);
 
     // RED FLAG — deployment only (not penalty mentions like "RED FLAG INFRINGEMENT")
     if (isRedFlagDeployment(text, flag)) {
