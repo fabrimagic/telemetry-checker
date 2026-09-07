@@ -181,8 +181,12 @@ function DriverPanel({ driver, real, alt }: DriverPanelProps) {
         {!altRec ? (
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1.5">
             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>Dati insufficienti per calcolare un'alternativa attendibile.</span>
+            <span>
+              {unavailableReason ??
+                "Dati insufficienti per calcolare un'alternativa attendibile."}
+            </span>
           </div>
+
         ) : (
           <>
             <div className="space-y-1.5 mb-2">
