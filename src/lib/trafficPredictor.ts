@@ -749,27 +749,38 @@ export function predictTrafficForPitLaps(
     const currentPos = driverTimeline ? (getPositionAtLap(driverTimeline, pitLap) ?? 0) : 0;
 
     // ── Step 3: Build gap-to-leader snapshot for all drivers ──
-    // Use time projection: project each driver's gap at pit exit time
+    // Use time projection: project each driver's gap at pit exit time.
+    // Cars reported with a lap-down marker have NO seconds gap: they are
+    // collected separately and placed physically via on-track phase (Step 3b).
     const driverGapSnapshots: { driverNumber: number; gap: number; position: number }[] = [];
+    const lappedCandidates: { driverNumber: number; laps: Lap[] }[] = [];
     let driverGapToLeader: number | null = null;
-
-    const refTimeForQuery = pitExitTimeMs ?? (driverRefTime ?? Date.now());
+    let driverLapsDown: number | null = null;
 
     for (const [dn, timeline] of driverIndex) {
       const dnRefTime = getLapRefTime(timeline, pitLap);
       if (dnRefTime == null) continue;
 
-      const gap = getGapToLeader(timeline, dnRefTime);
-      if (gap == null) continue;
+      const entry = getGapToLeaderEntry(timeline, dnRefTime);
 
       if (dn === driverNumber) {
-        driverGapToLeader = gap;
+        driverGapToLeader = entry.seconds;
+        driverLapsDown = entry.laps_down;
+        continue;
+      }
+
+      if (entry.seconds == null) {
+        // Not on the same lap count as the leader (or no seconds reported):
+        // only usable as physical on-track traffic.
+        if (entry.laps_down != null && timeline.laps.length > 0) {
+          lappedCandidates.push({ driverNumber: dn, laps: timeline.laps });
+        }
         continue;
       }
 
       // Time projection: if we have pit exit time, project where this driver
       // will be at that moment by checking their pace trend
-      let projectedGap = gap;
+      let projectedGap = entry.seconds;
       if (pitExitTimeMs != null && dnRefTime != null) {
         // Approximate: the gap-to-leader changes slowly over a pit window
         // For nearby timestamps, the snapshot is a good approximation
@@ -787,6 +798,7 @@ export function predictTrafficForPitLaps(
 
     // Sort by gap ascending (leader first)
     driverGapSnapshots.sort((a, b) => a.gap - b.gap);
+
 
     // ── Step 4: Estimate rejoin gap ──
     const driverGapAfterPit = driverGapToLeader != null ? driverGapToLeader + pitLoss : null;
