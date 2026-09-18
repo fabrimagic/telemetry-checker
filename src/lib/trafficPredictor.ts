@@ -279,13 +279,6 @@ function getGapToLeaderEntry(
   };
 }
 
-/** Get gap-to-leader (seconds) for a driver near a reference time */
-function getGapToLeader(
-  timeline: DriverTimeline,
-  refTimeMs: number,
-): number | null {
-  return getGapToLeaderEntry(timeline, refTimeMs).seconds;
-}
 
 /* ── On-track phase (used to place lapped / lapping cars physically) ── */
 
