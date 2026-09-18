@@ -927,8 +927,9 @@ export function predictTrafficForPitLaps(
     const lossPerLap = computeTimeLossPerLap(trafficLevel, inCompressedTrain, overtakeDifficulty);
     const totalTrafficLoss = Math.round(trafficEst.laps * lossPerLap * 10) / 10;
 
-    // ── Step 11: Release quality ──
-    const release = evaluateReleaseQuality(gapAhead, gapBehind, pack);
+    // ── Step 11: Release quality (lapped cars included as on-track traffic) ──
+    const release = evaluateReleaseQuality(effGapAhead, effGapBehind, pack);
+
 
     // ── Step 12: Overtake difficulty ──
     const overtakeScore = computeOvertakeDifficultyScore(pack, overtakeDifficulty, warmupHandicap);
