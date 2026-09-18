@@ -1013,9 +1013,15 @@ export function predictTrafficForPitLaps(
       compound_delta_effect: Math.round(compoundDelta * 100) / 100,
       warmup_handicap_estimate: warmupHandicap,
       clear_air_advantage_estimate: clearAirAdv,
-      release_gap_ahead: gapAhead != null ? Math.round(gapAhead * 10) / 10 : null,
-      release_gap_behind: gapBehind != null ? Math.round(gapBehind * 10) / 10 : null,
+      release_gap_ahead: effGapAhead != null ? Math.round(effGapAhead * 10) / 10 : null,
+      release_gap_behind: effGapBehind != null ? Math.round(effGapBehind * 10) / 10 : null,
+      lapped_traffic_considered: lappedConsidered,
+      lapped_cars_in_window: lappedNearby.length,
+      nearest_lapped_gap_ahead: nearestLappedAhead != null ? Math.round(nearestLappedAhead * 10) / 10 : null,
+      nearest_lapped_gap_behind: nearestLappedBehind != null ? Math.round(nearestLappedBehind * 10) / 10 : null,
+      lapped_cars_nearby: lappedNearby.map(l => l.driverNumber),
       model_notes: notes.length > 0 ? notes : undefined,
+
     });
   }
 
