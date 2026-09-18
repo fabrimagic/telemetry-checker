@@ -64,7 +64,20 @@ export interface TrafficPrediction {
   /* ── Release gap shortcuts (mirrors gap_ahead/behind but with explicit naming) ── */
   release_gap_ahead?: number | null;
   release_gap_behind?: number | null;
+
+  /* ── Lapped / lapping traffic (cars not on the same lap count) ── */
+  /** True when on-track phases allowed lapped cars to be evaluated. */
+  lapped_traffic_considered?: boolean;
+  /** Lapped/lapping cars physically within the clean-air window at rejoin. */
+  lapped_cars_in_window?: number;
+  /** Nearest lapped/lapping car ahead on track at rejoin (seconds). */
+  nearest_lapped_gap_ahead?: number | null;
+  /** Nearest lapped/lapping car behind on track at rejoin (seconds). */
+  nearest_lapped_gap_behind?: number | null;
+  /** Driver numbers of the lapped/lapping cars counted in the window. */
+  lapped_cars_nearby?: number[];
 }
+
 
 /* ── Centralized Configuration ── */
 
