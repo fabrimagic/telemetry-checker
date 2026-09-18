@@ -833,6 +833,44 @@ export function predictTrafficForPitLaps(
       }
     }
 
+    // ── Step 5b: Lapped / lapping cars (different lap count) ──
+    // These cars are physically on track and cause real traffic at rejoin,
+    // but they have no seconds gap-to-leader. Their position relative to the
+    // analyzed driver is derived ONLY from observed lap timestamps; when the
+    // phase cannot be resolved the car is simply skipped (no invention).
+    const selfPhase = (driverTimeline && pitExitTimeMs != null)
+      ? getTrackPhaseAt(driverTimeline.laps, pitExitTimeMs)
+      : null;
+
+    const lappedNearby: { driverNumber: number; offset: number }[] = [];
+    let lappedConsidered = false;
+    if (selfPhase && pitExitTimeMs != null && lappedCandidates.length > 0) {
+      for (const cand of lappedCandidates) {
+        const offset = trackOffsetSeconds(
+          selfPhase,
+          getTrackPhaseAt(cand.laps, pitExitTimeMs),
+        );
+        if (offset == null) continue;
+        lappedConsidered = true;
+        if (Math.abs(offset) <= TRAFFIC_CONFIG.gap_thresholds.clean) {
+          lappedNearby.push({ driverNumber: cand.driverNumber, offset });
+        }
+      }
+    }
+
+    const lappedAhead = lappedNearby.filter(l => l.offset > 0).sort((a, b) => a.offset - b.offset);
+    const lappedBehind = lappedNearby.filter(l => l.offset <= 0).sort((a, b) => b.offset - a.offset);
+    const nearestLappedAhead = lappedAhead.length > 0 ? lappedAhead[0].offset : null;
+    const nearestLappedBehind = lappedBehind.length > 0 ? Math.abs(lappedBehind[0].offset) : null;
+
+    // Effective release gaps: the nearest car ON TRACK, regardless of lap count.
+    const effGapAhead = [gapAhead, nearestLappedAhead]
+      .filter((v): v is number => v != null)
+      .reduce<number | null>((min, v) => (min == null || v < min ? v : min), null);
+    const effGapBehind = [gapBehind, nearestLappedBehind]
+      .filter((v): v is number => v != null)
+      .reduce<number | null>((min, v) => (min == null || v < min ? v : min), null);
+
     // ── Step 6: Pack / cluster analysis ──
     let pack: PackAnalysis = {
       pack_size_ahead: 0, pack_size_behind: 0, pack_size_total: 0,
@@ -841,11 +879,24 @@ export function predictTrafficForPitLaps(
     };
 
     if (driverGapAfterPit != null && driverGapSnapshots.length > 0) {
-      pack = analyzePackStructure(driverGapAfterPit, driverGapSnapshots);
+      // Lapped cars enter the cluster analysis in the same local time-space:
+      // a car `offset` seconds ahead on track sits at (rejoinGap - offset).
+      const packInput = lappedNearby.length > 0
+        ? [
+            ...driverGapSnapshots,
+            ...lappedNearby.map(l => ({
+              driverNumber: l.driverNumber,
+              gap: driverGapAfterPit - l.offset,
+              position: 99,
+            })),
+          ].sort((a, b) => a.gap - b.gap)
+        : driverGapSnapshots;
+      pack = analyzePackStructure(driverGapAfterPit, packInput);
     }
 
-    // ── Step 7: Traffic classification ──
-    const trafficLevel = classifyTraffic(gapAhead, gapBehind);
+    // ── Step 7: Traffic classification (includes lapped cars on track) ──
+    const trafficLevel = classifyTraffic(effGapAhead, effGapBehind);
+
 
     // ── Step 8: Compound & warmup awareness ──
     const driverCompound = driverTimeline
