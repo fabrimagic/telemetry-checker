@@ -220,33 +220,117 @@ function getPositionAtLap(
   return closest?.position ?? null;
 }
 
-/** Parse gap value (handles string/number/null from OpenF1 API) */
+/**
+ * Parse a gap value in SECONDS (handles string/number/null from OpenF1).
+ *
+ * IMPORTANT: OpenF1 encodes lapped cars in `gap_to_leader` as textual
+ * lap-down markers ("+1 LAP", "2 LAPS", "1L"). Those are NOT seconds and must
+ * never be parsed numerically — doing so places a car one full lap down at
+ * "1 second" behind the leader and corrupts every rejoin/pack computation.
+ */
 function parseGap(gap: number | string | null): number | null {
   if (gap == null) return null;
   if (typeof gap === "number") return gap;
-  const parsed = parseFloat(String(gap).replace("+", ""));
+  const raw = String(gap).trim();
+  if (raw.length === 0) return null;
+  if (/LAP/i.test(raw)) return null;
+  if (/^[+-]?\d+\s*L$/i.test(raw)) return null;
+  const parsed = parseFloat(raw.replace("+", ""));
   return isNaN(parsed) ? null : parsed;
 }
 
-/** Get gap-to-leader for a driver near a reference time */
+/** Laps-down value encoded in a gap_to_leader marker, when present. */
+function parseLapsDown(gap: number | string | null): number | null {
+  if (gap == null || typeof gap === "number") return null;
+  const m = String(gap).trim().match(/^[+-]?(\d+)\s*(?:LAPS?|L)$/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+interface LeaderGapEntry {
+  seconds: number | null;
+  laps_down: number | null;
+}
+
+/** Gap-to-leader near a reference time, separating seconds from laps-down. */
+function getGapToLeaderEntry(
+  timeline: DriverTimeline,
+  refTimeMs: number,
+): LeaderGapEntry {
+  const closest = findClosestByTime(timeline.intervals, refTimeMs);
+  if (!closest) return { seconds: null, laps_down: null };
+  return {
+    seconds: parseGap(closest.gap_to_leader),
+    laps_down: parseLapsDown(closest.gap_to_leader),
+  };
+}
+
+/** Get gap-to-leader (seconds) for a driver near a reference time */
 function getGapToLeader(
   timeline: DriverTimeline,
   refTimeMs: number,
 ): number | null {
-  const closest = findClosestByTime(timeline.intervals, refTimeMs);
-  if (!closest) return null;
-  return parseGap(closest.gap_to_leader);
+  return getGapToLeaderEntry(timeline, refTimeMs).seconds;
 }
 
-/** Get interval (gap to car ahead) for a driver near a reference time */
-function getInterval(
-  timeline: DriverTimeline,
-  refTimeMs: number,
-): number | null {
-  const closest = findClosestByTime(timeline.intervals, refTimeMs);
-  if (!closest) return null;
-  return parseGap(closest.interval);
+/* ── On-track phase (used to place lapped / lapping cars physically) ── */
+
+interface TrackPhase {
+  /** Fraction of the current lap completed at the reference time (0–1). */
+  phase: number;
+  /** Duration of that lap in seconds (observed). */
+  lap_time_seconds: number;
 }
+
+/**
+ * Where a car physically is on the track lap at time `t`, derived ONLY from
+ * observed lap timestamps. Returns null when the reference time falls outside
+ * the known lap boundaries (no extrapolation, no invented values).
+ */
+function getTrackPhaseAt(laps: Lap[], t: number): TrackPhase | null {
+  const starts = laps
+    .filter(l => l.date_start)
+    .map(l => ({ t: Date.parse(l.date_start!), d: l.lap_duration }))
+    .filter(s => Number.isFinite(s.t))
+    .sort((a, b) => a.t - b.t);
+  if (starts.length === 0) return null;
+
+  let idx = -1;
+  for (let i = 0; i < starts.length; i++) {
+    if (starts[i].t <= t) idx = i;
+    else break;
+  }
+  if (idx < 0) return null;
+
+  const cur = starts[idx];
+  const next = starts[idx + 1];
+  const lapMs = next
+    ? next.t - cur.t
+    : (cur.d != null && cur.d > 0 ? cur.d * 1000 : NaN);
+  if (!Number.isFinite(lapMs) || lapMs <= 0) return null;
+
+  const elapsed = t - cur.t;
+  if (elapsed < 0 || elapsed > lapMs) return null;
+  return { phase: elapsed / lapMs, lap_time_seconds: lapMs / 1000 };
+}
+
+/**
+ * Signed on-track time offset (seconds) of `other` relative to `self`.
+ * Positive = other car is AHEAD on track, negative = behind.
+ * Uses the shortest way round the lap; null when phases are unavailable.
+ */
+function trackOffsetSeconds(
+  self: TrackPhase | null,
+  other: TrackPhase | null,
+): number | null {
+  if (!self || !other) return null;
+  let d = other.phase - self.phase;
+  while (d > 0.5) d -= 1;
+  while (d <= -0.5) d += 1;
+  return d * self.lap_time_seconds;
+}
+
 
 /* ── Pace Helpers ── */
 
