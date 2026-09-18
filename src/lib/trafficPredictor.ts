@@ -962,11 +962,19 @@ export function predictTrafficForPitLaps(
     if (!hasTimestamps) {
       notes.push("Time projection unavailable — using gap-offset fallback");
     }
+    if (lappedNearby.length > 0) {
+      notes.push(
+        `${lappedNearby.length} lapped car(s) physically within ${TRAFFIC_CONFIG.gap_thresholds.clean}s on track at rejoin`,
+      );
+    } else if (lappedCandidates.length > 0 && !lappedConsidered) {
+      notes.push("Lapped cars present but their on-track position is not resolvable from lap timestamps");
+    }
 
     // ── Release classification (simplified for strategy engine) ──
     const releaseClassification: ReleaseClassification =
-      pack.rejoin_is_in_pack || (gapAhead != null && gapAhead < 1.0) ? "PACK" :
-      gapAhead != null && gapAhead < 3.0 ? "TRAFFIC" : "CLEAN";
+      pack.rejoin_is_in_pack || (effGapAhead != null && effGapAhead < 1.0) ? "PACK" :
+      effGapAhead != null && effGapAhead < 3.0 ? "TRAFFIC" : "CLEAN";
+
 
     // Traffic persistence: refined estimate of laps stuck
     const trafficPersistenceLaps = trafficEst.laps;
