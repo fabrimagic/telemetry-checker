@@ -64,7 +64,20 @@ export interface TrafficPrediction {
   /* ── Release gap shortcuts (mirrors gap_ahead/behind but with explicit naming) ── */
   release_gap_ahead?: number | null;
   release_gap_behind?: number | null;
+
+  /* ── Lapped / lapping traffic (cars not on the same lap count) ── */
+  /** True when on-track phases allowed lapped cars to be evaluated. */
+  lapped_traffic_considered?: boolean;
+  /** Lapped/lapping cars physically within the clean-air window at rejoin. */
+  lapped_cars_in_window?: number;
+  /** Nearest lapped/lapping car ahead on track at rejoin (seconds). */
+  nearest_lapped_gap_ahead?: number | null;
+  /** Nearest lapped/lapping car behind on track at rejoin (seconds). */
+  nearest_lapped_gap_behind?: number | null;
+  /** Driver numbers of the lapped/lapping cars counted in the window. */
+  lapped_cars_nearby?: number[];
 }
+
 
 /* ── Centralized Configuration ── */
 
@@ -220,33 +233,110 @@ function getPositionAtLap(
   return closest?.position ?? null;
 }
 
-/** Parse gap value (handles string/number/null from OpenF1 API) */
+/**
+ * Parse a gap value in SECONDS (handles string/number/null from OpenF1).
+ *
+ * IMPORTANT: OpenF1 encodes lapped cars in `gap_to_leader` as textual
+ * lap-down markers ("+1 LAP", "2 LAPS", "1L"). Those are NOT seconds and must
+ * never be parsed numerically — doing so places a car one full lap down at
+ * "1 second" behind the leader and corrupts every rejoin/pack computation.
+ */
 function parseGap(gap: number | string | null): number | null {
   if (gap == null) return null;
   if (typeof gap === "number") return gap;
-  const parsed = parseFloat(String(gap).replace("+", ""));
+  const raw = String(gap).trim();
+  if (raw.length === 0) return null;
+  if (/LAP/i.test(raw)) return null;
+  if (/^[+-]?\d+\s*L$/i.test(raw)) return null;
+  const parsed = parseFloat(raw.replace("+", ""));
   return isNaN(parsed) ? null : parsed;
 }
 
-/** Get gap-to-leader for a driver near a reference time */
-function getGapToLeader(
-  timeline: DriverTimeline,
-  refTimeMs: number,
-): number | null {
-  const closest = findClosestByTime(timeline.intervals, refTimeMs);
-  if (!closest) return null;
-  return parseGap(closest.gap_to_leader);
+/** Laps-down value encoded in a gap_to_leader marker, when present. */
+function parseLapsDown(gap: number | string | null): number | null {
+  if (gap == null || typeof gap === "number") return null;
+  const m = String(gap).trim().match(/^[+-]?(\d+)\s*(?:LAPS?|L)$/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Get interval (gap to car ahead) for a driver near a reference time */
-function getInterval(
+interface LeaderGapEntry {
+  seconds: number | null;
+  laps_down: number | null;
+}
+
+/** Gap-to-leader near a reference time, separating seconds from laps-down. */
+function getGapToLeaderEntry(
   timeline: DriverTimeline,
   refTimeMs: number,
-): number | null {
+): LeaderGapEntry {
   const closest = findClosestByTime(timeline.intervals, refTimeMs);
-  if (!closest) return null;
-  return parseGap(closest.interval);
+  if (!closest) return { seconds: null, laps_down: null };
+  return {
+    seconds: parseGap(closest.gap_to_leader),
+    laps_down: parseLapsDown(closest.gap_to_leader),
+  };
 }
+
+
+/* ── On-track phase (used to place lapped / lapping cars physically) ── */
+
+interface TrackPhase {
+  /** Fraction of the current lap completed at the reference time (0–1). */
+  phase: number;
+  /** Duration of that lap in seconds (observed). */
+  lap_time_seconds: number;
+}
+
+/**
+ * Where a car physically is on the track lap at time `t`, derived ONLY from
+ * observed lap timestamps. Returns null when the reference time falls outside
+ * the known lap boundaries (no extrapolation, no invented values).
+ */
+function getTrackPhaseAt(laps: Lap[], t: number): TrackPhase | null {
+  const starts = laps
+    .filter(l => l.date_start)
+    .map(l => ({ t: Date.parse(l.date_start!), d: l.lap_duration }))
+    .filter(s => Number.isFinite(s.t))
+    .sort((a, b) => a.t - b.t);
+  if (starts.length === 0) return null;
+
+  let idx = -1;
+  for (let i = 0; i < starts.length; i++) {
+    if (starts[i].t <= t) idx = i;
+    else break;
+  }
+  if (idx < 0) return null;
+
+  const cur = starts[idx];
+  const next = starts[idx + 1];
+  const lapMs = next
+    ? next.t - cur.t
+    : (cur.d != null && cur.d > 0 ? cur.d * 1000 : NaN);
+  if (!Number.isFinite(lapMs) || lapMs <= 0) return null;
+
+  const elapsed = t - cur.t;
+  if (elapsed < 0 || elapsed > lapMs) return null;
+  return { phase: elapsed / lapMs, lap_time_seconds: lapMs / 1000 };
+}
+
+/**
+ * Signed on-track time offset (seconds) of `other` relative to `self`.
+ * Positive = other car is AHEAD on track, negative = behind.
+ * Uses the shortest way round the lap; null when phases are unavailable.
+ */
+function trackOffsetSeconds(
+  self: TrackPhase | null,
+  other: TrackPhase | null,
+): number | null {
+  if (!self || !other) return null;
+  let d = other.phase - self.phase;
+  while (d > 0.5) d -= 1;
+  while (d <= -0.5) d += 1;
+  return d * self.lap_time_seconds;
+}
+
 
 /* ── Pace Helpers ── */
 
@@ -652,27 +742,38 @@ export function predictTrafficForPitLaps(
     const currentPos = driverTimeline ? (getPositionAtLap(driverTimeline, pitLap) ?? 0) : 0;
 
     // ── Step 3: Build gap-to-leader snapshot for all drivers ──
-    // Use time projection: project each driver's gap at pit exit time
+    // Use time projection: project each driver's gap at pit exit time.
+    // Cars reported with a lap-down marker have NO seconds gap: they are
+    // collected separately and placed physically via on-track phase (Step 3b).
     const driverGapSnapshots: { driverNumber: number; gap: number; position: number }[] = [];
+    const lappedCandidates: { driverNumber: number; laps: Lap[] }[] = [];
     let driverGapToLeader: number | null = null;
-
-    const refTimeForQuery = pitExitTimeMs ?? (driverRefTime ?? Date.now());
+    let driverLapsDown: number | null = null;
 
     for (const [dn, timeline] of driverIndex) {
       const dnRefTime = getLapRefTime(timeline, pitLap);
       if (dnRefTime == null) continue;
 
-      const gap = getGapToLeader(timeline, dnRefTime);
-      if (gap == null) continue;
+      const entry = getGapToLeaderEntry(timeline, dnRefTime);
 
       if (dn === driverNumber) {
-        driverGapToLeader = gap;
+        driverGapToLeader = entry.seconds;
+        driverLapsDown = entry.laps_down;
+        continue;
+      }
+
+      if (entry.seconds == null) {
+        // Not on the same lap count as the leader (or no seconds reported):
+        // only usable as physical on-track traffic.
+        if (entry.laps_down != null && timeline.laps.length > 0) {
+          lappedCandidates.push({ driverNumber: dn, laps: timeline.laps });
+        }
         continue;
       }
 
       // Time projection: if we have pit exit time, project where this driver
       // will be at that moment by checking their pace trend
-      let projectedGap = gap;
+      let projectedGap = entry.seconds;
       if (pitExitTimeMs != null && dnRefTime != null) {
         // Approximate: the gap-to-leader changes slowly over a pit window
         // For nearby timestamps, the snapshot is a good approximation
@@ -690,6 +791,7 @@ export function predictTrafficForPitLaps(
 
     // Sort by gap ascending (leader first)
     driverGapSnapshots.sort((a, b) => a.gap - b.gap);
+
 
     // ── Step 4: Estimate rejoin gap ──
     const driverGapAfterPit = driverGapToLeader != null ? driverGapToLeader + pitLoss : null;
@@ -724,6 +826,44 @@ export function predictTrafficForPitLaps(
       }
     }
 
+    // ── Step 5b: Lapped / lapping cars (different lap count) ──
+    // These cars are physically on track and cause real traffic at rejoin,
+    // but they have no seconds gap-to-leader. Their position relative to the
+    // analyzed driver is derived ONLY from observed lap timestamps; when the
+    // phase cannot be resolved the car is simply skipped (no invention).
+    const selfPhase = (driverTimeline && pitExitTimeMs != null)
+      ? getTrackPhaseAt(driverTimeline.laps, pitExitTimeMs)
+      : null;
+
+    const lappedNearby: { driverNumber: number; offset: number }[] = [];
+    let lappedConsidered = false;
+    if (selfPhase && pitExitTimeMs != null && lappedCandidates.length > 0) {
+      for (const cand of lappedCandidates) {
+        const offset = trackOffsetSeconds(
+          selfPhase,
+          getTrackPhaseAt(cand.laps, pitExitTimeMs),
+        );
+        if (offset == null) continue;
+        lappedConsidered = true;
+        if (Math.abs(offset) <= TRAFFIC_CONFIG.gap_thresholds.clean) {
+          lappedNearby.push({ driverNumber: cand.driverNumber, offset });
+        }
+      }
+    }
+
+    const lappedAhead = lappedNearby.filter(l => l.offset > 0).sort((a, b) => a.offset - b.offset);
+    const lappedBehind = lappedNearby.filter(l => l.offset <= 0).sort((a, b) => b.offset - a.offset);
+    const nearestLappedAhead = lappedAhead.length > 0 ? lappedAhead[0].offset : null;
+    const nearestLappedBehind = lappedBehind.length > 0 ? Math.abs(lappedBehind[0].offset) : null;
+
+    // Effective release gaps: the nearest car ON TRACK, regardless of lap count.
+    const effGapAhead = [gapAhead, nearestLappedAhead]
+      .filter((v): v is number => v != null)
+      .reduce<number | null>((min, v) => (min == null || v < min ? v : min), null);
+    const effGapBehind = [gapBehind, nearestLappedBehind]
+      .filter((v): v is number => v != null)
+      .reduce<number | null>((min, v) => (min == null || v < min ? v : min), null);
+
     // ── Step 6: Pack / cluster analysis ──
     let pack: PackAnalysis = {
       pack_size_ahead: 0, pack_size_behind: 0, pack_size_total: 0,
@@ -732,11 +872,24 @@ export function predictTrafficForPitLaps(
     };
 
     if (driverGapAfterPit != null && driverGapSnapshots.length > 0) {
-      pack = analyzePackStructure(driverGapAfterPit, driverGapSnapshots);
+      // Lapped cars enter the cluster analysis in the same local time-space:
+      // a car `offset` seconds ahead on track sits at (rejoinGap - offset).
+      const packInput = lappedNearby.length > 0
+        ? [
+            ...driverGapSnapshots,
+            ...lappedNearby.map(l => ({
+              driverNumber: l.driverNumber,
+              gap: driverGapAfterPit - l.offset,
+              position: 99,
+            })),
+          ].sort((a, b) => a.gap - b.gap)
+        : driverGapSnapshots;
+      pack = analyzePackStructure(driverGapAfterPit, packInput);
     }
 
-    // ── Step 7: Traffic classification ──
-    const trafficLevel = classifyTraffic(gapAhead, gapBehind);
+    // ── Step 7: Traffic classification (includes lapped cars on track) ──
+    const trafficLevel = classifyTraffic(effGapAhead, effGapBehind);
+
 
     // ── Step 8: Compound & warmup awareness ──
     const driverCompound = driverTimeline
@@ -767,8 +920,9 @@ export function predictTrafficForPitLaps(
     const lossPerLap = computeTimeLossPerLap(trafficLevel, inCompressedTrain, overtakeDifficulty);
     const totalTrafficLoss = Math.round(trafficEst.laps * lossPerLap * 10) / 10;
 
-    // ── Step 11: Release quality ──
-    const release = evaluateReleaseQuality(gapAhead, gapBehind, pack);
+    // ── Step 11: Release quality (lapped cars included as on-track traffic) ──
+    const release = evaluateReleaseQuality(effGapAhead, effGapBehind, pack);
+
 
     // ── Step 12: Overtake difficulty ──
     const overtakeScore = computeOvertakeDifficultyScore(pack, overtakeDifficulty, warmupHandicap);
@@ -801,11 +955,19 @@ export function predictTrafficForPitLaps(
     if (!hasTimestamps) {
       notes.push("Time projection unavailable — using gap-offset fallback");
     }
+    if (lappedNearby.length > 0) {
+      notes.push(
+        `${lappedNearby.length} lapped car(s) physically within ${TRAFFIC_CONFIG.gap_thresholds.clean}s on track at rejoin`,
+      );
+    } else if (lappedCandidates.length > 0 && !lappedConsidered) {
+      notes.push("Lapped cars present but their on-track position is not resolvable from lap timestamps");
+    }
 
     // ── Release classification (simplified for strategy engine) ──
     const releaseClassification: ReleaseClassification =
-      pack.rejoin_is_in_pack || (gapAhead != null && gapAhead < 1.0) ? "PACK" :
-      gapAhead != null && gapAhead < 3.0 ? "TRAFFIC" : "CLEAN";
+      pack.rejoin_is_in_pack || (effGapAhead != null && effGapAhead < 1.0) ? "PACK" :
+      effGapAhead != null && effGapAhead < 3.0 ? "TRAFFIC" : "CLEAN";
+
 
     // Traffic persistence: refined estimate of laps stuck
     const trafficPersistenceLaps = trafficEst.laps;
@@ -844,9 +1006,15 @@ export function predictTrafficForPitLaps(
       compound_delta_effect: Math.round(compoundDelta * 100) / 100,
       warmup_handicap_estimate: warmupHandicap,
       clear_air_advantage_estimate: clearAirAdv,
-      release_gap_ahead: gapAhead != null ? Math.round(gapAhead * 10) / 10 : null,
-      release_gap_behind: gapBehind != null ? Math.round(gapBehind * 10) / 10 : null,
+      release_gap_ahead: effGapAhead != null ? Math.round(effGapAhead * 10) / 10 : null,
+      release_gap_behind: effGapBehind != null ? Math.round(effGapBehind * 10) / 10 : null,
+      lapped_traffic_considered: lappedConsidered,
+      lapped_cars_in_window: lappedNearby.length,
+      nearest_lapped_gap_ahead: nearestLappedAhead != null ? Math.round(nearestLappedAhead * 10) / 10 : null,
+      nearest_lapped_gap_behind: nearestLappedBehind != null ? Math.round(nearestLappedBehind * 10) / 10 : null,
+      lapped_cars_nearby: lappedNearby.map(l => l.driverNumber),
       model_notes: notes.length > 0 ? notes : undefined,
+
     });
   }
 
