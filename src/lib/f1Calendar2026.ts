@@ -116,9 +116,9 @@ export const F1_CALENDAR_2026: F1Session[] = [
   ...stdWeekend(14, "Gran Premio di Spagna", "2026-09-11", "2026-09-12", "2026-09-13",
     "11:30", "15:00", "10:30", "14:00", "13:00"),
 
-  // Round 15 — Azerbaijan (Baku) — 24-26 Sep (orari aggiornati: FP1/FP2 giovedì, gara sabato; UTC da ora locale Baku UTC+4)
+  // Round 15 — Azerbaijan (Baku) — 24-26 Sep (orari aggiornati: FP1/FP2 giovedì, gara sabato; UTC da ora di Roma UTC+2)
   ...stdWeekend(15, "Gran Premio dell'Azerbaijan", "2026-09-24", "2026-09-25", "2026-09-26",
-    "06:30", "10:00", "06:30", "10:00", "09:00"),
+    "08:30", "12:00", "08:30", "12:00", "11:00"),
 
   // Round 16 — Singapore — 9-11 Oct
   ...stdWeekend(16, "Gran Premio di Singapore", "2026-10-09", "2026-10-10", "2026-10-11",
